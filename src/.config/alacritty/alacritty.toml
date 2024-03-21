@@ -28,3 +28,7 @@ family = "GeistMono Nerd Font Mono"
 [window]
 #decorations = "none"
 dynamic_title = true
+dimensions = { columns = 100, lines = 50 }
+position =  { x = 4600, y = 1200 }
+
+

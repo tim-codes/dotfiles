@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+# Check if Alacritty is already running
+p_id=$(pgrep alacritty)
+
+if [ -n "$p_id" ]; then
+    # Alacritty is running
+    # Check if Alacritty is focused
+    window_id=$(wmctrl -l | grep "Alacritty" | cut -d ' ' -f 1)
+    window_state=$(xprop -id "$window_id" _NET_WM_STATE | grep -o '_NET_WM_STATE_[^,]*' | tail -n1)
+
+    if [[ $window_state == *"_NET_WM_STATE_FOCUSED"* ]]; then
+        # Alacritty is focused, minimize it
+	xdotool getactivewindow windowminimize
+    else
+        # Alacritty is not focused, focus it
+        wmctrl -i -a "$window_id"	
+    fi
+else
+    # Alacritty is not running, launch it with tmux
+    /home/tim/.cargo/bin/alacritty -e tmux new -As0
+fi
+
