@@ -1,6 +1,9 @@
 # set OpenAI API Key to opencommit config
+if test -f ~/keys/openai.key
+  set -x OPENAI_KEY $(cat ~/keys/openai.key)
+end
 if type -q opencommit
-  opencommit config set OCO_OPENAI_API_KEY=$(cat ~/keys/openai.key) 1&> /dev/null
+  opencommit config set OCO_OPENAI_API_KEY=$OPENAI_KEY 1&>/dev/null
 end
 
 # poetry completions
