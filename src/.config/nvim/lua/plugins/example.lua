@@ -121,6 +121,7 @@ return {
     opts = {
       ensure_installed = {
         "bash",
+        "help",
         "html",
         "javascript",
         "json",
@@ -187,6 +188,9 @@ return {
         "shellcheck",
         "shfmt",
         "flake8",
+        "eslint_d",
+        "json-lsp",
+        "typescript-language-server",
       },
     },
   },
