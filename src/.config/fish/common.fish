@@ -1,14 +1,14 @@
 # set OpenAI API Key to opencommit config
 if test -f ~/keys/openai.key
-  set -x OPENAI_KEY $(cat ~/keys/openai.key)
+    set -x OPENAI_KEY $(cat ~/keys/openai.key)
 end
 if type -q opencommit
-  opencommit config set OCO_OPENAI_API_KEY=$OPENAI_KEY 1&>/dev/null
+    opencommit config set OCO_OPENAI_API_KEY=$OPENAI_KEY 1&>/dev/null
 end
 
 # poetry completions
 if type -q poetry
-  poetry completions fish > ~/.config/fish/completions/peotry.fish
+    poetry completions fish >~/.config/fish/completions/peotry.fish
 end
 
 # Fish Theme
@@ -28,25 +28,27 @@ set -x PATH $PATH $HOME/.nix-profile/bin
 set -x PATH $PATH $HOME/.local/share/fnm
 
 function dot-stow
-  if not set -q $DOTFILES_ROOT
-    echo "\$DOTFILES_ROOT is not set"
-    exit 1
-  end
-  cd $DOTFILES_ROOT && stow --target $HOME src
+    if not set -q $DOTFILES_ROOT
+        echo "\$DOTFILES_ROOT is not set"
+        exit 1
+    end
+    cd $DOTFILES_ROOT && stow --target $HOME src
 end
 
 if type -q nvm
-  set -x NVM_DIR "$HOME/.nvm"
-  # nodejs configuration
-  set -x nvm_default_version 18
-  nvm use $nvm_default_version &> /dev/null # override as the var is not being ignored by nvm
+    set -x NVM_DIR "$HOME/.nvm"
+    # nodejs configuration
+    set -x nvm_default_version 18
+    nvm use $nvm_default_version &>/dev/null # override as the var is not being ignored by nvm
 end
 
 if type -q fnm
-  fnm install 18 &> /dev/null
-  fnm default 18
-  fnm env --use-on-cd | source
+    fnm install 18 &>/dev/null
+    fnm default 18
+    fnm env --use-on-cd | source
 end
+
+alias pnpm="corepack pnpm"
 
 alias t="tmux"
 alias rf="source ~/.config/fish/config.fish"
@@ -84,13 +86,13 @@ alias glo='gl --oneline'
 alias gls='gl --stat'
 alias glg='gl --graph --oneline'
 function glr
-  git log $argv origin/(git rev-parse --abbrev-ref HEAD)
+    git log $argv origin/(git rev-parse --abbrev-ref HEAD)
 end
 alias glrg='glr --graph --oneline'
 alias glrs='glr --stat'
 
 function gd
-  git diff --color $argv[1] | diff-so-fancy | bat
+    git diff --color $argv[1] | diff-so-fancy | bat
 end
 alias gds="git diff --staged --color | diff-so-fancy | bat"
 
@@ -119,24 +121,24 @@ alias godel='gpu --no-verify --delete origin'
 
 alias gch='git checkout'
 function gchh
-  set resetting (echo $argv | grep -E 'package.json|pnpm-lock.yaml')
-  if $resetting
-    echo "manifests changed, running install hook"
-    git checkout HEAD -- $argv
-  else
-    echo "manifests unchanged, skipping install hook"
-    git -c core.hooksPath=/dev/null checkout HEAD -- $argv
-  end
+    set resetting (echo $argv | grep -E 'package.json|pnpm-lock.yaml')
+    if $resetting
+        echo "manifests changed, running install hook"
+        git checkout HEAD -- $argv
+    else
+        echo "manifests unchanged, skipping install hook"
+        git -c core.hooksPath=/dev/null checkout HEAD -- $argv
+    end
 end
 alias gsw='git switch'
 alias gsw-='git switch -'
 function gswp
-  git pull origin $argv[1]:$argv[1]
-  # git switch $argv[1]
+    git pull origin $argv[1]:$argv[1]
+    # git switch $argv[1]
 end
 
 # git config
-git config --global core.editor "vim"
+git config --global core.editor vim
 git config --global push.autoSetupRemote true
 git config --global pull.rebase true
 git config --global user.name "Tim O'Connell"
@@ -157,23 +159,23 @@ alias byaml="bat -l yaml"
 alias bjson="bat -l json"
 
 function ip-local
-  ifconfig | grep 'broadcast' | awk '{print $2}'
+    ifconfig | grep broadcast | awk '{print $2}'
 end
 
 function ip-public
-  curl -s ipinfo.io | jq '.ip' -r
+    curl -s ipinfo.io | jq '.ip' -r
 end
 
 function ip-public-detailed
-  curl -s ipinfo.io | jq
+    curl -s ipinfo.io | jq
 end
 
 # Clear docker container logs <container>
 function docker-clear
-  echo "" > $(docker inspect --format='{{.LogPath}}' $1)
+    echo "" >$(docker inspect --format='{{.LogPath}}' $1)
 end
 
 # Remove all stopped containers
 function docker-prune-stopped
-  docker rm $(docker ps -a -q)
+    docker rm $(docker ps -a -q)
 end

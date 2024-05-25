@@ -18,6 +18,6 @@ if [ -n "$p_id" ]; then
     fi
 else
     # Alacritty is not running, launch it with tmux
-    /home/tim/.cargo/bin/alacritty -e tmux new -As0
+    /home/tim/.cargo/bin/alacritty -e tmux -u new -As0
 fi
 
