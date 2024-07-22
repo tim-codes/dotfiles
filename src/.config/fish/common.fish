@@ -19,20 +19,29 @@ source $HOME/.local/share/omf/pkg/omf/functions/omf.fish
 # Make the blue color for directories more readable
 set -x LSCOLORS Exfxcxdxbxegedabagacad
 
-set -x PATH $PATH $HOME/.cargo/bin
-set -x PATH $PATH /usr/local/go/bin
-set -x PATH $PATH $HOME/bin
-set -x PATH $PATH $HOME/bin/google-cloud-sdk/bin
-set -x PATH $PATH $HOME/.local/bin
-set -x PATH $PATH $HOME/.nix-profile/bin
-set -x PATH $PATH $HOME/.local/share/fnm
+# append to $PATH idempotently
+if not string match -q "*.cargo*" "$PATH"
+    set -x PATH $PATH $HOME/.cargo/bin
+    set -x PATH $PATH /usr/local/go/bin
+    set -x PATH $PATH $HOME/bin
+    set -x PATH $PATH $HOME/bin/google-cloud-sdk/bin
+    set -x PATH $PATH $HOME/.local/bin
+    set -x PATH $PATH $HOME/.nix-profile/bin
+    set -x PATH $PATH $HOME/.local/share/fnm
+    # set -x PATH $PATH /run/user/1000/fnm_multishells/*/bin/node
+end
 
-function dot-stow
-    if not set -q $DOTFILES_ROOT
+alias t="tmux"
+alias rf="source ~/.config/fish/config.fish"
+
+function restow
+    if test -z "$DOTFILES_ROOT"
         echo "\$DOTFILES_ROOT is not set"
-        exit 1
+        return
     end
     cd $DOTFILES_ROOT && stow --target $HOME src
+    cd -
+    rf
 end
 
 if type -q nvm
@@ -44,14 +53,12 @@ end
 
 if type -q fnm
     fnm install 18 &>/dev/null
-    fnm default 18
-    fnm env --use-on-cd | source
+    fnm install 20 &>/dev/null
+    fnm default 20
+    # fnm env --use-on-cd | source
 end
 
 alias pnpm="corepack pnpm"
-
-alias t="tmux"
-alias rf="source ~/.config/fish/config.fish"
 
 # use exa for dir commands
 alias ls="exa"
@@ -69,6 +76,7 @@ alias p="pnpm"
 alias gcp="gcloud"
 alias oc="opencommit"
 alias ocn="opencommit --no-verify"
+alias dt="devtunnel"
 
 # Git aliases
 alias g="git"

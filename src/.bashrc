@@ -2,6 +2,8 @@
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
 
+export DOTFILES_ROOT="/home/tim/dev/personal/dotfiles"
+
 . "$HOME/.cargo/env"
 . $HOME/.nix-profile/etc/profile.d/nix.sh
 
@@ -13,6 +15,7 @@ export PATH="$PATH:/usr/local/go/bin"
 export PATH="$PATH:/home/tim/.cargo/bin"
 export PATH="$PATH:/home/tim/.local/share/JetBrains/Toolbox/scripts"
 export PATH="$PATH:/home/tim/bin/google-cloud-sdk/bin"
+export PATH="$PATH:/run/user/1000/fnm_multishells/*/bin/node"
 
 # fnm
 export PATH="/home/tim/.local/share/fnm:$PATH"
