@@ -20,8 +20,8 @@ source $HOME/.local/share/omf/pkg/omf/functions/omf.fish
 set -x LSCOLORS Exfxcxdxbxegedabagacad
 
 # append to $PATH idempotently
-if not string match -q "*.cargo*" "$PATH"
-    set -x PATH $PATH $HOME/.cargo/bin
+if not string match -q "*/usr/local/go/bin*" "$PATH"
+    # set -x PATH $PATH $HOME/.cargo/bin # defined in conf.d/rustup.fish
     set -x PATH $PATH /usr/local/go/bin
     set -x PATH $PATH $HOME/bin
     set -x PATH $PATH $HOME/bin/google-cloud-sdk/bin
@@ -70,6 +70,7 @@ alias mp="mkdir -p"
 
 alias python="python3"
 alias py="python"
+alias pip="pip3"
 alias tf="terraform"
 alias pm="podman"
 alias p="pnpm"
