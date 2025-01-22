@@ -9,6 +9,10 @@ config.fish >
     common.fish
 ```
 
+## contributing
+
+* if new files are added to dotfiles/src, then run `restow` to update symlinks
+
 ## macbook setup
 
 1. setup 1password, install ssh agent

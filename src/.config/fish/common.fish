@@ -103,8 +103,7 @@ function restow
         echo "\$DOTFILES_ROOT is not set"
         return
     end
-    cd $DOTFILES_ROOT && stow --target $HOME src
-    cd -
+    cd $DOTFILES_ROOT && stow --target $HOME src && cd -
     rf
 end
 
