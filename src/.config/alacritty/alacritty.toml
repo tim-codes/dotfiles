@@ -1,0 +1,26 @@
+[terminal]
+# todo: how to make this platform-specific
+shell = "/opt/homebrew/bin/fish"
+
+[font]
+size = 13
+
+[font.bold]
+family = "GeistMono Nerd Font Mono"
+style = "Bold"
+
+[font.bold_italic]
+family = "GeistMono Nerd Font Mono"
+style = "Bold Italic"
+
+[font.italic]
+family = "GeistMono Nerd Font Mono"
+style = "Italic"
+
+[font.normal]
+family = "GeistMono Nerd Font Mono"
+
+[window]
+# decorations = "none"
+dynamic_title = true
+dimensions = { columns = 100, lines = 50 }

@@ -1,0 +1,69 @@
+#!/bin/zsh
+
+# Enable nullglob to allow patterns that match no files to expand to an empty list
+setopt nullglob
+
+# Directory containing the font zip files
+assets_dir="$DOTFILES_ROOT/assets/fonts"
+
+# Check if the assets directory exists
+if [[ ! -d "$assets_dir" ]]; then
+  echo "Error: Assets directory $assets_dir does not exist."
+  exit 1
+fi
+
+# Check if there are any .zip files in the assets directory
+if [[ -z $(ls "$assets_dir"/*.zip 2>/dev/null) ]]; then
+  echo "Error: No .zip files found in $assets_dir."
+  exit 1
+fi
+
+# Loop through each .zip file in the assets directory
+for zip_file in "$assets_dir"/*.zip; do
+  echo "Extracting $(basename "$zip_file")..."
+
+  # Create a temporary directory to extract the fonts
+  temp_dir=$(mktemp -d)
+
+  # Extract the zip file to the temporary directory
+  unzip -q "$zip_file" -d "$temp_dir"
+
+  # Check if the extraction was successful
+  if [[ $? -ne 0 ]]; then
+    echo "Error: Failed to extract $zip_file."
+    rm -rf "$temp_dir"
+    exit 1
+  fi
+
+  # Install the fonts to the macOS Fonts directory
+  fonts_dir="$HOME/Library/Fonts"
+  ttf_files=("$temp_dir"/*.ttf)
+  otf_files=("$temp_dir"/*.otf)
+
+  # Copy .ttf files if they do not already exist
+  for ttf_file in "${ttf_files[@]}"; do
+    dest_file="$fonts_dir/$(basename "$ttf_file")"
+    if [[ ! -e "$dest_file" ]]; then
+      cp "$ttf_file" "$fonts_dir"
+      echo "Installed $ttf_file to $fonts_dir"
+    else
+      # echo "$dest_file already exists, skipping."
+    fi
+  done
+
+  # Copy .otf files if they do not already exist
+  for otf_file in "${otf_files[@]}"; do
+    dest_file="$fonts_dir/$(basename "$otf_file")"
+    if [[ ! -e "$dest_file" ]]; then
+      cp "$otf_file" "$fonts_dir"
+      echo "Installed $otf_file to $fonts_dir"
+    else
+      # echo "$dest_file already exists, skipping."
+    fi
+  done
+
+  # Clean up the temporary directory
+  rm -rf "$temp_dir"
+done
+
+echo "All fonts installed successfully."
