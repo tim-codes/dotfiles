@@ -9,30 +9,31 @@ source $HOME/.config/local.sh
 brewDeps=(
   asciinema
   bat
+  bropages
   colordiff
   ctop
   diff-so-fancy
-  lsd
   fd
   fish
   fzf
   glances
   htop
   httpie
-  just
   jq
+  just
   k9s
   lazydocker
   lazygit
+  lsd
   ncdu
   neovim
   ripgrep
   sloth
   stow
   telnet
-  tofu
   tldr
   tmux
+  tofu
   tree
   webp
   websocat
@@ -77,4 +78,6 @@ EOF
 $DOTFILES_ROOT/scripts/install-fonts-mac
 
 # install alacritty terminal emulator
-$DOTFILES_ROOT/scripts/install-alacritty-mac
+if ! command -v alacritty &> /dev/null; then
+  $DOTFILES_ROOT/scripts/install-alacritty-mac
+fi

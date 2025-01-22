@@ -25,6 +25,10 @@ if [ ! -e "$local_root" ]; then
 
 export DOTFILES_ROOT="$dotfiles_root"
 export DOTFILES_PLATFORM="$platform"
+
+export GO_VERSION="1.23.2"
+export GO_ROOT="$HOME/sdk/go/go$GO_VERSION"
+export GO_PATH="$HOME/go/go$GO_VERSION"
 EOT
 fi
 

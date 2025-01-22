@@ -4,6 +4,7 @@ import = ["~/.config/alacritty/themes/catppuccin_mocha.toml"]
 [terminal]
 # todo: how to make this platform-specific
 shell = "/opt/homebrew/bin/fish"
+# shell = "/bin/zsh"
 
 [font]
 size = 13

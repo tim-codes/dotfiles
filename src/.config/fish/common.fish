@@ -1,8 +1,6 @@
 # ~~~ VARIABLES ~~~ #
 # ~~~~~~~~~~~~~~~~~ #
 
-set -x GOROOT "$HOME/sdk/go/go$GO_VERSION"
-set -x GOPATH "$HOME/go/go$GO_VERSION"
 set -x NVM_DIR "$HOME/.nvm"
 set -x PNPM_HOME "$HOME/Library/pnpm"
 set -x KUBE_CONFIG_PATH "$HOME/.kube/config"
@@ -41,21 +39,6 @@ end
 # ~~~~~~ PATH ~~~~~~ #
 # ~~~~~~~~~~~~~~~~~~ #
 
-#~~ PATH_BASE on mac looks like:
-# /System/Cryptexes/App/usr/bin
-# /Users/toe649/Library/Application
-# /bin
-# /opt/homebrew/bin
-# /sbin
-# /usr/bin
-# /usr/local/bin
-# /usr/local/laps
-# /usr/sbin
-# /var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin
-# /var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin
-# /var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin
-# Support/JetBrains/Toolbox/scripts
-
 #~~ capture original PATH
 if test -z "$PATH_BASE"
   set -x PATH_BASE $PATH
@@ -71,7 +54,21 @@ function add_to_path
 end
 
 #~~ reset PATH and rebuild it
-set -x PATH $PATH_BASE
+#  todo: fix this
+function read_path_config
+  set -l paths_to_add
+  for line in (cat $HOME/.path.config)
+    set line (string trim -- "$line")
+    if test -n "$line" -a (string match -q -v '^#' "$line")
+      set paths_to_add $paths_to_add $line
+    end
+  end
+  echo $paths_to_add
+end
+# set -x PATH $PATH_BASE
+# add_to_path $paths_to_add
+
+# todo: remove this
 add_to_path \
   "$HOME/.local/bin" \
   "$HOME/.nix-profile/bin" \
@@ -89,8 +86,9 @@ add_to_path \
   "$HOME/.config/yarn/global/node_modules/.bin"
 
 function print_path
-  echo $PATH | tr ' ' '\n' | sort
+  echo $PATH | tr ' ' '\n' | sort | bat --decorations=never
 end
+alias ppath="print_path"
 
 # ~~~~ ALIASES ~~~~ #
 # ~~~~~~~~~~~~~~~~~ #
@@ -103,7 +101,9 @@ function restow
         echo "\$DOTFILES_ROOT is not set"
         return
     end
-    cd $DOTFILES_ROOT && stow --target $HOME src && cd -
+    set _dir "$(pwd)"
+    cd $DOTFILES_ROOT && stow --target $HOME src
+    cd $_dir
     rf
 end
 
@@ -127,7 +127,9 @@ alias gcp="gcloud"
 alias oc="opencommit"
 alias ocn="opencommit --no-verify"
 alias dt="devtunnel"
-alias chat="chatgpt"
+function chat
+    chatgpt $argv | bat --decorations=never --language=markdown
+end
 
 # Git aliases
 alias g="git"
@@ -214,8 +216,9 @@ alias tfa="tf apply" # apply
 alias tfac="tfa -input=false plan.cache" # apply from file
 
 # bat aliases
-alias byaml="bat -l yaml"
-alias bjson="bat -l json"
+alias batyaml="bat -l yaml"
+alias batjson="bat -l json"
+alias batmd="bat -l markdown"
 
 function ip-local
     ifconfig | grep broadcast | awk '{print $2}'
