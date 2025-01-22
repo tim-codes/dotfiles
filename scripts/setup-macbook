@@ -1,0 +1,74 @@
+#!/bin/zsh
+set -o pipefail
+
+source $HOME/.config/local.sh
+
+# ~~~~ CONFIG ~~~~ #
+# ~~~~~~~~~~~~~~~~ #
+
+brewDeps=(
+  asciinema
+  bat
+  colordiff
+  ctop
+  diff-so-fancy
+  lsd
+  fd
+  fish
+  fzf
+  glances
+  htop
+  httpie
+  just
+  jq
+  k9s
+  lazydocker
+  lazygit
+  ncdu
+  neovim
+  ripgrep
+  sloth
+  stow
+  telnet
+  tofu
+  tldr
+  tmux
+  tree
+  webp
+  websocat
+  yq
+)
+
+# ~~~~ SETUP ~~~~ #
+# ~~~~~~~~~~~~~~~ #
+
+# create default zshrc file
+touch ~/.zshrc
+
+# install homebrew
+if ! command -v /opt/homebrew/bin/brew &> /dev/null; then
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    echo 'PATH="/opt/homebrew/bin:$PATH"' >> ~/.zshrc
+    source ~/.zshrc
+fi
+
+# homebrew dependencies
+brew update && brew upgrade
+brew install $brewDeps
+
+# setup .config sync with stow
+cd $DOTFILES_ROOT && stow --target $HOME src
+cd -
+# chsh -s $(which fish)
+
+cat <<EOF | fish
+
+# if ! type -q fisher
+  echo "Installing fisher"
+  curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source \
+    && fisher install jorgebucaran/fisher
+# end
+# update/install fisher_plugins from file
+fisher update
+
+EOF

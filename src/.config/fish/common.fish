@@ -1,35 +1,99 @@
-# set OpenAI API Key to opencommit config
+# ~~~ VARIABLES ~~~ #
+# ~~~~~~~~~~~~~~~~~ #
+
+set -x GOROOT "$HOME/sdk/go/go$GO_VERSION"
+set -x GOPATH "$HOME/go/go$GO_VERSION"
+set -x NVM_DIR "$HOME/.nvm"
+set -x PNPM_HOME "$HOME/Library/pnpm"
+set -x KUBE_CONFIG_PATH "$HOME/.kube/config"
+set -x GOOGLE_APPLICATION_CREDENTIALS "$HOME/.config/gcloud/application_default_credentials.json"
+# enable IAP ssh tunnel to use numpy on system to increase performance
+set -x CLOUDSDK_PYTHON_SITEPACKAGES 1
+# enable TTY for GPG signing prompt
+set -x GPG_TTY $(tty)
+
+# OpenAI key -> chatgpt-cli, opencommit
 if test -f ~/keys/openai.key
-    set -x OPENAI_KEY $(cat ~/keys/openai.key)
-end
-if type -q opencommit
+  set -x OPENAI_KEY $(cat ~/keys/openai.key)
+  set -x OPENAI_API_KEY $OPENAI_KEY
+  if type -q opencommit
     opencommit config set OCO_OPENAI_API_KEY=$OPENAI_KEY 1&>/dev/null
+  end
 end
 
 # poetry completions
 if type -q poetry
     poetry completions fish >~/.config/fish/completions/peotry.fish
 end
-
-# Fish Theme
-set fish_theme eden
-
-source $HOME/.local/share/omf/pkg/omf/functions/omf.fish
-
-# Make the blue color for directories more readable
-set -x LSCOLORS Exfxcxdxbxegedabagacad
-
-# append to $PATH idempotently
-if not string match -q "*/usr/local/go/bin*" "$PATH"
-    # set -x PATH $PATH $HOME/.cargo/bin # defined in conf.d/rustup.fish
-    set -x PATH $PATH /usr/local/go/bin
-    set -x PATH $PATH $HOME/bin
-    set -x PATH $PATH $HOME/bin/google-cloud-sdk/bin
-    set -x PATH $PATH $HOME/.local/bin
-    set -x PATH $PATH $HOME/.nix-profile/bin
-    set -x PATH $PATH $HOME/.local/share/fnm
-    # set -x PATH $PATH /run/user/1000/fnm_multishells/*/bin/node
+# nvm configuration
+if type -q nvm
+    set -x nvm_default_version 20
+    nvm use $nvm_default_version &>/dev/null # override as the var is not being ignored by nvm
 end
+# fnm configuration
+if type -q fnm
+    fnm install 18 &>/dev/null
+    fnm install 20 &>/dev/null
+    fnm default 20
+    # fnm env --use-on-cd | source
+end
+
+# ~~~~~~ PATH ~~~~~~ #
+# ~~~~~~~~~~~~~~~~~~ #
+
+#~~ PATH_BASE on mac looks like:
+# /System/Cryptexes/App/usr/bin
+# /Users/toe649/Library/Application
+# /bin
+# /opt/homebrew/bin
+# /sbin
+# /usr/bin
+# /usr/local/bin
+# /usr/local/laps
+# /usr/sbin
+# /var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin
+# /var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin
+# /var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin
+# Support/JetBrains/Toolbox/scripts
+
+#~~ capture original PATH
+if test -z "$PATH_BASE"
+  set -x PATH_BASE $PATH
+end
+
+#~~ append to $PATH idempotently...
+function add_to_path
+  for dir in $argv
+    if not contains -- "$dir" $PATH
+      set -x PATH $PATH "$dir"
+    end
+  end
+end
+
+#~~ reset PATH and rebuild it
+set -x PATH $PATH_BASE
+add_to_path \
+  "$HOME/.local/bin" \
+  "$HOME/.nix-profile/bin" \
+  "$HOME/.local/share/fnm" \
+  "$HOME/bin" \
+  "/opt/homebrew/bin" \
+  "/opt/homebrew/sbin" \
+  # todo: figure out whitespace handling
+  # "/Applications/Sublime Text.app/Contents/SharedSupport/bin" \
+  # "$HOME/Library/Application Support/Jetbrains/Toolbox/scripts" \
+  "$GOPATH/bin" \
+  "$GOROOT/bin" \
+  "$PNPM_HOME" \
+  "$HOME/.yarn/bin" \
+  "$HOME/.config/yarn/global/node_modules/.bin"
+
+function print_path
+  echo $PATH | tr ' ' '\n' | sort
+end
+
+# ~~~~ ALIASES ~~~~ #
+# ~~~~~~~~~~~~~~~~~ #
 
 alias t="tmux"
 alias rf="source ~/.config/fish/config.fish"
@@ -44,40 +108,26 @@ function restow
     rf
 end
 
-if type -q nvm
-    set -x NVM_DIR "$HOME/.nvm"
-    # nodejs configuration
-    set -x nvm_default_version 18
-    nvm use $nvm_default_version &>/dev/null # override as the var is not being ignored by nvm
-end
-
-if type -q fnm
-    fnm install 18 &>/dev/null
-    fnm install 20 &>/dev/null
-    fnm default 20
-    # fnm env --use-on-cd | source
-end
-
 alias pnpm="corepack pnpm"
 
-# use exa for dir commands
-alias ls="exa"
-alias ll="exa -l"
-alias la="exa -la"
+# use lsd for dir commands
+alias ls="lsd"
+alias ll="lsd -l"
+alias la="lsd -la"
 alias l="ll"
 
 alias mp="mkdir -p"
-
 alias python="python3"
 alias py="python"
 alias pip="pip3"
-alias tf="terraform"
+alias tf="tofu"
 alias pm="podman"
 alias p="pnpm"
 alias gcp="gcloud"
 alias oc="opencommit"
 alias ocn="opencommit --no-verify"
 alias dt="devtunnel"
+alias chat="chatgpt"
 
 # Git aliases
 alias g="git"
@@ -146,14 +196,14 @@ function gswp
     # git switch $argv[1]
 end
 
-# git config
-git config --global core.editor vim
-git config --global push.autoSetupRemote true
-git config --global pull.rebase true
-git config --global user.name "Tim O'Connell"
-git config --global user.email "tim@exxo.sh"
+# # git config
+# git config --global core.editor vim
+# git config --global push.autoSetupRemote true
+# git config --global pull.rebase true
+# git config --global user.name "Tim O'Connell"
+# git config --global user.email "tim@exxo.sh"
 
-# Terraform aliases
+# Tofu aliases
 alias tfi="tf init"
 alias tfpx="tf plan" # base plan
 alias tfp="tfpx -lock=false" # plan (no-lock)

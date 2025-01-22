@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Check if Alacritty is already running
 p_id=$(pgrep alacritty)

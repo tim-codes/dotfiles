@@ -1,0 +1,40 @@
+#!/bin/zsh
+
+# NOTE: this is sourced by bashrc so ensure it is compatible
+
+#~~ capture original PATH
+if [[ -z "$PATH_BASE" ]]; then
+  export PATH_BASE="$PATH"
+fi
+
+#~~ append to $PATH idempotently...
+function add_to_path {
+  for dir in "$@"; do
+    if [[ ":$PATH:" != *":$dir:"* ]]; then
+      export PATH="$PATH:$dir"
+    fi
+  done
+}
+
+# reset PATH and rebuild it
+export PATH="$PATH_BASE"
+add_to_path \
+  "$HOME/.local/bin" \
+  "$HOME/.nix-profile/bin" \
+  "$HOME/.local/share/fnm" \
+  "$HOME/bin" \
+  "/opt/homebrew/bin" \
+  "/opt/homebrew/sbin" \
+  "$GOPATH/bin" \
+  "$GOROOT/bin" \
+  "$PNPM_HOME" \
+  "$HOME/.yarn/bin" \
+  "$HOME/.config/yarn/global/node_modules/.bin"
+# todo: figure out whitespace handling
+# "/Applications/Sublime Text.app/Contents/SharedSupport/bin" \
+# "$HOME/Library/Application Support/Jetbrains/Toolbox/scripts" \
+
+
+function print_path {
+  echo "$PATH" | tr ':' '\n' | sort
+}

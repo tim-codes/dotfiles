@@ -1,0 +1,49 @@
+#!/bin/bash
+
+local_root="$HOME/.config/local.sh"
+local_fish="$HOME/.config/fish/local.fish"
+local_zsh="$HOME/.config/zsh/zsh_local"
+dotfiles_root="$HOME/dev/dotfiles"
+
+platform="linux"
+if [[ "$(uname)" == "Darwin" ]]; then
+  platform="mac"
+fi
+
+# create root config file (used by all shells)
+mkdir -p $HOME/.config
+if [ ! -e "$local_root" ]; then
+  touch "$local_root"
+  cat <<EOT > "$local_root"
+#!/bin/bash
+
+# Compatibility Notes:
+# * Both Bash and Fish can read environment variables exported in the format export VAR="value".
+# * Variable Names: Ensure variable names are valid in both shells (alphanumeric and underscores).
+# * Quotes: Use double quotes for strings to handle spaces and special characters.
+# * Arrays: Bash arrays are not directly compatible with Fish arrays. You need to handle them separately.
+
+export DOTFILES_ROOT="$dotfiles_root"
+export DOTFILES_PLATFORM="$platform"
+EOT
+fi
+
+# create local fish config
+if [ ! -e "$local_fish" ]; then
+  mkdir -p "$(dirname "$local_fish")"
+  touch "$local_fish"
+fi
+
+# create local zsh config
+if [ ! -e "$local_zsh" ]; then
+  mkdir -p "$(dirname "$local_zsh")"
+  touch "$local_zsh"
+  cat <<EOT > "$local_zsh"
+#!/bin/zsh
+EOT
+fi
+
+# platform-specific setup (generally just install deps)
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ $platform == "mac" ]; then zsh -i -c "$script_dir/setup-macbook"; fi
+if [ $platform == "linux" ]; then "$script_dir/setup-linux"; fi

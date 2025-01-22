@@ -1,0 +1,12 @@
+[user]
+    name = Tim O'Connell
+    email = tim@exxo.sh
+[alias]
+    undo = reset HEAD^
+    unstage = reset HEAD --
+[pull]
+    rebase = true
+[push]
+    autoSetupRemote = true
+[url "ssh://git@github.com/"]
+    insteadOf = https://github.com/
