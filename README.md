@@ -1,25 +1,20 @@
 # dotfiles
 
-set .config/local.fish
-```fish
-set -x DOTFILES_ROOT "$HOME/dev/personal/dotfiles"
-set -x DOTFILES_PLATFORM "linux"
-```
-
-setup symlinks:
-```fish
-cd $DOTFILES_ROOT && stow --target ~ src
-source ~/.config/fish/config.fish
-```
-
 source order: 
 
+```
 config.fish > 
   local.fish, 
   $platform.fish > 
     common.fish
-
+```
 
 ## macbook setup
 
-1. install stow
+1. setup 1password, install ssh agent
+2. clone dotfiles repo to ~/dev/dotfiles
+3. `~/dev/dotfiles/scripts/init`
+
+## references
+
+* https://switowski.com/blog/favorite-cli-tools

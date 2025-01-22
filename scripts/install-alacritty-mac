@@ -1,0 +1,45 @@
+#!/bin/zsh
+
+# GitHub API URL for the latest release of Alacritty
+api_url="https://api.github.com/repos/alacritty/alacritty/releases/latest"
+
+# Fetch the latest release information using curl and parse it with jq
+tmp_file="/tmp/release_info_tmp.json"
+curl -s $api_url > $tmp_file
+
+# Extract the tag name of the latest release
+latest_release=$(cat $tmp_file | jq -r '.tag_name')
+
+# Extract the download URL for the .dmg asset
+dmg_url=$(cat $tmp_file | jq -r '.assets[] | select(.name | endswith(".dmg")) | .browser_download_url')
+
+echo "latest_release: $latest_release"
+rm $tmp_file || true
+
+# Check if the latest release and dmg URL were retrieved successfully
+if [[ -z "$latest_release" || -z "$dmg_url" ]]; then
+  echo "Failed to retrieve the latest release or the .dmg URL of Alacritty."
+  exit 1
+fi
+
+echo "The latest release of Alacritty is: $latest_release"
+echo "Downloading Alacritty from: $dmg_url"
+
+# Download the .dmg file
+dmg_file="/tmp/Alacritty-$latest_release.dmg"
+curl -L -o "$dmg_file" "$dmg_url"
+
+# Mount the .dmg file
+echo "Mounting the .dmg file..."
+hdiutil attach "$dmg_file" -quiet
+mount_point=$(hdiutil info | grep "/Volumes/Alacritty" | awk '{print $1}')
+
+# Copy the application to the /Applications directory
+echo "Copying Alacritty to the /Applications directory..."
+cp -r "/Volumes/Alacritty/Alacritty.app" /Applications/
+
+# Unmount the .dmg file
+echo "Unmounting the .dmg file..."
+hdiutil detach "$mount_point" -quiet
+
+echo "Alacritty has been installed successfully."

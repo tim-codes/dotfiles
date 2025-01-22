@@ -38,3 +38,11 @@ add_to_path \
 function print_path {
   echo "$PATH" | tr ':' '\n' | sort
 }
+
+alias mp="mkdir -p"
+if command -v lsd >/dev/null 2>&1; then
+  alias ls="lsd"
+fi
+alias ll="ls -l"
+alias la="ls -la"
+alias l="ll"

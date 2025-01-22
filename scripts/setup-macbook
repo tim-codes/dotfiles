@@ -72,3 +72,6 @@ cat <<EOF | fish
 fisher update
 
 EOF
+
+# install alacritty terminal emulator
+$DOTFILES_ROOT/scripts/install-alacritty-mac

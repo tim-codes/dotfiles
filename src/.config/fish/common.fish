@@ -110,13 +110,14 @@ end
 
 alias pnpm="corepack pnpm"
 
-# use lsd for dir commands
-alias ls="lsd"
-alias ll="lsd -l"
-alias la="lsd -la"
+alias mp="mkdir -p"
+if type -q lsd
+  alias ls="lsd"
+end
+alias ll="ls -l"
+alias la="ls -la"
 alias l="ll"
 
-alias mp="mkdir -p"
 alias python="python3"
 alias py="python"
 alias pip="pip3"
