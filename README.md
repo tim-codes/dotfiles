@@ -22,3 +22,7 @@ config.fish >
 ## references
 
 * https://switowski.com/blog/favorite-cli-tools
+
+## notes
+
+* when running the scripts, it is most reliable to open zsh in native terminal (not alacritty or another emulator), then run eg `./dev/dotfiles/scripts/init`

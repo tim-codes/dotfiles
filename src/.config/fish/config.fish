@@ -5,6 +5,11 @@ if not test -e $local_root
 end
 source $local_root
 
+# load PATH injections
+if test -f $HOME/.cargo/env.fish
+  source $HOME/.cargo/env.fish
+end
+
 # load platform-specific fish config (inc. common config)
 set -x fish_conf "$HOME/.config/fish/config.fish"
 source $HOME/.config/fish/$DOTFILES_PLATFORM.fish

@@ -53,8 +53,31 @@ if ! command -v /opt/homebrew/bin/brew &> /dev/null; then
     source ~/.zshrc
 fi
 
+# Path to the timestamp file
+timestamp_file="/tmp/brew_update_timestamp"
+
+# Function to check if brew update is needed
+function should_update_brew {
+  if [[ -f "$timestamp_file" ]]; then
+    last_update=$(cat "$timestamp_file")
+    current_time=$(date +%s)
+    time_diff=$((current_time - last_update))
+    if [[ $time_diff -lt 300 ]]; then
+      echo "Brew update was run less than 5 minutes ago. Skipping update."
+      return 1
+    fi
+  fi
+  return 0
+}
+
+# Check if brew update is needed
+if should_update_brew; then
+  echo "Running brew update..."
+  brew update && brew upgrade
+  date +%s > "$timestamp_file"
+fi
+
 # homebrew dependencies
-brew update && brew upgrade
 brew install $brewDeps
 
 # setup .config sync with stow
@@ -73,6 +96,12 @@ cat <<EOF | fish
 fisher update
 
 EOF
+
+# install rust
+if ! command -v rustup &> /dev/null; then
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
+  source $HOME/.cargo/env
+fi
 
 # add fonts
 $DOTFILES_ROOT/scripts/install-fonts-mac
