@@ -9,11 +9,15 @@
     rebase = true
 [push]
     autoSetupRemote = true
-[url "ssh://git@github.com/"]
-    insteadOf = https://github.com/
-[url "ssh://git@gitlab.com/"]
-    insteadOf = https://gitlab.com/
 [commit]
     gpgsign = true
 [tag]
     gpgSign = true
+[url "ssh://git@github.com/"]
+    insteadOf = https://github.com/
+[url "ssh://git@gitlab.com/"]
+    insteadOf = https://gitlab.com/
+[includeIf "gitdir:~/dev/sky/"]
+    path = ~/dev/sky/.gitconfig
+[includeIf "gitdir:~/dev/cecg"]
+    path = ~/dev/cecg/.gitconfig
