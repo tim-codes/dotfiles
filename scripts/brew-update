@@ -1,0 +1,62 @@
+#!/bin/zsh
+
+brewDeps=(
+  asciinema
+  bat
+  colordiff
+  ctop
+  diff-so-fancy
+  fd
+  fish
+  fzf
+  glances
+  htop
+  httpie
+  jq
+  just
+  k9s
+  lazydocker
+  lazygit
+  lsd
+  ncdu
+  neovim
+  ripgrep
+  sloth
+  stow
+  telnet
+  tldr
+  tmux
+  tofu
+  tree
+  webp
+  websocat
+  wget
+  yq
+)
+
+# Path to the timestamp file
+timestamp_file="/tmp/brew_update_timestamp"
+
+# Function to check if brew update is needed
+function should_update_brew {
+  if [[ -f "$timestamp_file" ]]; then
+    last_update=$(cat "$timestamp_file")
+    current_time=$(date +%s)
+    time_diff=$((current_time - last_update))
+    if [[ $time_diff -lt 1200 ]]; then
+      echo "Brew update was run less than 5 minutes ago. Skipping update."
+      return 1
+    fi
+  fi
+  return 0
+}
+
+# Check if brew update is needed
+if should_update_brew; then
+  echo "Running brew update..."
+  brew update -q && brew upgrade
+  date +%s > "$timestamp_file"
+fi
+
+# homebrew dependencies
+brew install $brewDeps

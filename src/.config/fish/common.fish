@@ -83,10 +83,11 @@ add_to_path \
   "$GOROOT/bin" \
   "$PNPM_HOME" \
   "$HOME/.yarn/bin" \
-  "$HOME/.config/yarn/global/node_modules/.bin"
+  "$HOME/.config/yarn/global/node_modules/.bin" \
+  "/Applications/Alacritty.app/Contents/MacOS"
 
 function print_path
-  echo $PATH | tr ' ' '\n' | sort | bat --decorations=never
+  echo $PATH | tr ' ' '\n' | sort | bat
 end
 alias ppath="print_path"
 
@@ -128,7 +129,7 @@ alias oc="opencommit"
 alias ocn="opencommit --no-verify"
 alias dt="devtunnel"
 function chat
-    chatgpt $argv | bat --decorations=never --language=markdown
+    chatgpt $argv | bat --language=markdown
 end
 
 # Git aliases

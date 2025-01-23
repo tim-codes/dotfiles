@@ -3,43 +3,6 @@ set -o pipefail
 
 source $HOME/.config/local.sh
 
-# ~~~~ CONFIG ~~~~ #
-# ~~~~~~~~~~~~~~~~ #
-
-brewDeps=(
-  asciinema
-  bat
-  bropages
-  colordiff
-  ctop
-  diff-so-fancy
-  fd
-  fish
-  fzf
-  glances
-  htop
-  httpie
-  jq
-  just
-  k9s
-  lazydocker
-  lazygit
-  lsd
-  ncdu
-  neovim
-  ripgrep
-  sloth
-  stow
-  telnet
-  tldr
-  tmux
-  tofu
-  tree
-  webp
-  websocat
-  yq
-)
-
 # ~~~~ SETUP ~~~~ #
 # ~~~~~~~~~~~~~~~ #
 
@@ -53,32 +16,7 @@ if ! command -v /opt/homebrew/bin/brew &> /dev/null; then
     source ~/.zshrc
 fi
 
-# Path to the timestamp file
-timestamp_file="/tmp/brew_update_timestamp"
-
-# Function to check if brew update is needed
-function should_update_brew {
-  if [[ -f "$timestamp_file" ]]; then
-    last_update=$(cat "$timestamp_file")
-    current_time=$(date +%s)
-    time_diff=$((current_time - last_update))
-    if [[ $time_diff -lt 300 ]]; then
-      echo "Brew update was run less than 5 minutes ago. Skipping update."
-      return 1
-    fi
-  fi
-  return 0
-}
-
-# Check if brew update is needed
-if should_update_brew; then
-  echo "Running brew update..."
-  brew update && brew upgrade
-  date +%s > "$timestamp_file"
-fi
-
-# homebrew dependencies
-brew install $brewDeps
+$DOTFILES_ROOT/scripts/brew-update
 
 # setup .config sync with stow
 cd $DOTFILES_ROOT && stow --target $HOME src
@@ -102,6 +40,8 @@ if ! command -v rustup &> /dev/null; then
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
   source $HOME/.cargo/env
 fi
+
+$DOTFILES_ROOT/scripts/cargo-update
 
 # add fonts
 $DOTFILES_ROOT/scripts/install-fonts-mac

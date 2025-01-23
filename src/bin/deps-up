@@ -1,0 +1,4 @@
+#!/bin/zsh
+
+$DOTFILES_ROOT/scripts/brew-update
+$DOTFILES_ROOT/scripts/cargo-update
