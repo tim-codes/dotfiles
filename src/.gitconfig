@@ -1,6 +1,7 @@
 [user]
     name = Tim O'Connell
     email = tim@exxo.sh
+    signingkey = 1B72684199452707
 [alias]
     undo = reset HEAD^
     unstage = reset HEAD --
@@ -12,3 +13,7 @@
     insteadOf = https://github.com/
 [url "ssh://git@gitlab.com/"]
     insteadOf = https://gitlab.com/
+[commit]
+    gpgsign = true
+[tag]
+    gpgSign = true

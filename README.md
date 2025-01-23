@@ -18,6 +18,9 @@ config.fish >
 1. setup 1password, install ssh agent
 2. clone dotfiles repo to ~/dev/dotfiles
 3. `~/dev/dotfiles/scripts/init`
+4. `gpg --generate-full-key`, use defaults, name="Tim O'Connell", email=<github-email>, no passphrase
+(see: https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key)
+5. follow instructions to add gpg key to github & gitlab
 
 ## references
 
