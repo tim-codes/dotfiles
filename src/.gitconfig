@@ -1,7 +1,8 @@
 [user]
     name = Tim O'Connell
     email = tim@exxo.sh
-    signingkey = 1B72684199452707
+[include]
+    path = ~/.gpg.gitconfig
 [alias]
     undo = reset HEAD^
     unstage = reset HEAD --

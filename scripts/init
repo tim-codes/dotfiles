@@ -47,6 +47,9 @@ if [ ! -e "$local_zsh" ]; then
 EOT
 fi
 
+# create empty gitconfig file
+touch ~/.gpg.gitconfig
+
 # platform-specific setup (generally just install deps)
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ $platform == "mac" ]; then zsh -i -c "$script_dir/setup-macbook"; fi

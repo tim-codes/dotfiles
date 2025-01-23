@@ -3,11 +3,21 @@
 source order: 
 
 ```
-config.fish > 
-  local.fish, 
-  $platform.fish > 
-    common.fish
+config.fish >
+  local.sh, 
+  $platform.fish > common.fish,
+  local.fish
+
+.zshrc >
+  local.sh,
+  zsh_$platform > zsh_common,
+  zsh_local
 ```
+
+user should modify:
+* ~/.config/local.sh         # variables
+* ~/.config/fish/local.fish  # fish overrides
+* ~/.config/zsh/zsh_local    # zsh overrides
 
 ## contributing
 
@@ -15,13 +25,19 @@ config.fish >
 
 ## macbook setup
 
-1. setup 1password, install ssh agent
+1. setup 1password, install ssh agent, then see 1.(a)
 2. clone dotfiles repo to ~/dev/dotfiles
 3. `~/dev/dotfiles/scripts/init`
 4. `gpg --generate-full-key`, use defaults, name="Tim O'Connell", email=<github-email>, no passphrase
 (see: https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key)
 5. follow instructions to add gpg key to github & gitlab
-6. where there is multiple e.g. github ssh keys for the same domain, then download the public keys to `~/.ssh/`, and add entries for unique remote names to `~/.ssh/config`:
+6. set signingkey to `~/.gpg.gitconfig`:
+```.gpg.gitconfig
+[user]
+    signingkey = xxx
+```
+
+1. (a) where there is multiple e.g. github ssh keys for the same domain, then download the public keys to `~/.ssh/`, and add entries for unique remote names to `~/.ssh/config`:
 ```
 Host github.com
   hostname github.com
@@ -45,3 +61,4 @@ Host *
 ## notes
 
 * when running the scripts, it is most reliable to open zsh in native terminal (not alacritty or another emulator), then run eg `./dev/dotfiles/scripts/init`
+* storing GPG keys in 1password as a reference, but they are not integrated, the local GPG key is used for signing
