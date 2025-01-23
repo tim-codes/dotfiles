@@ -95,20 +95,19 @@ function read_path_config
   end
   echo $paths_to_add
 end
-# set -x PATH $PATH_BASE
+
+set -x PATH $PATH_BASE
 # add_to_path $paths_to_add
 
-# todo: remove this
+# todo: remove this (copy from .path.config)
 add_to_path \
+  "/usr/local/bin" \
   "$HOME/.local/bin" \
   "$HOME/.nix-profile/bin" \
   "$HOME/.local/share/fnm" \
   "$HOME/bin" \
   "/opt/homebrew/bin" \
   "/opt/homebrew/sbin" \
-  # todo: figure out whitespace handling
-  # "/Applications/Sublime Text.app/Contents/SharedSupport/bin" \
-  # "$HOME/Library/Application Support/Jetbrains/Toolbox/scripts" \
   "$GOPATH/bin" \
   "$GOROOT/bin" \
   "$PNPM_HOME" \
