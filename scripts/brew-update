@@ -21,6 +21,7 @@ brewDeps=(
   lsd
   ncdu
   neovim
+  pnpm
   ripgrep
   sloth
   stow
@@ -45,7 +46,7 @@ function should_update_brew {
     current_time=$(date +%s)
     time_diff=$((current_time - last_update))
     if [[ $time_diff -lt 1200 ]]; then
-      echo "Brew update was run less than 5 minutes ago. Skipping update."
+      echo "Brew update was run less than 20 minutes ago. Skipping update."
       return 1
     fi
   fi

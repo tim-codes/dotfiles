@@ -29,6 +29,9 @@ export DOTFILES_PLATFORM="$platform"
 export GO_VERSION="1.23.2"
 export GO_ROOT="$HOME/sdk/go/go$GO_VERSION"
 export GO_PATH="$HOME/go/go$GO_VERSION"
+
+export NODE_VERSION="20"
+export NVM_DIR="$HOME/.nvm"
 EOT
 fi
 

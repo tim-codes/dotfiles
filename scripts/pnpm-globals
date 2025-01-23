@@ -1,0 +1,7 @@
+#!/bin/zsh
+
+packages=(
+  ts-node@latest
+)
+
+pnpm i -g "${packages[@]}"

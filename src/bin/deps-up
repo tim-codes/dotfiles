@@ -2,3 +2,17 @@
 
 $DOTFILES_ROOT/scripts/brew-update
 $DOTFILES_ROOT/scripts/cargo-update
+
+fish -c "fisher update"
+
+# see: https://github.com/nvm-sh/nvm?tab=readme-ov-file#migrating-global-packages-while-installing
+# todo: why does this not get executed by .zshrc?
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+if command -v nvm >/dev/null; then
+  nvm install-latest-npm
+fi
+
+# install global pnpm packages
+if command -v pnpm >/dev/null; then
+  $DOTFILES_ROOT/scripts/pnpm-globals
+fi

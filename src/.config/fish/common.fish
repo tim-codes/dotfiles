@@ -1,7 +1,6 @@
 # ~~~ VARIABLES ~~~ #
 # ~~~~~~~~~~~~~~~~~ #
 
-set -x NVM_DIR "$HOME/.nvm"
 set -x PNPM_HOME "$HOME/Library/pnpm"
 set -x KUBE_CONFIG_PATH "$HOME/.kube/config"
 set -x GOOGLE_APPLICATION_CREDENTIALS "$HOME/.config/gcloud/application_default_credentials.json"
@@ -23,11 +22,6 @@ end
 if type -q poetry
     poetry completions fish >~/.config/fish/completions/peotry.fish
 end
-# nvm configuration
-if type -q nvm
-    set -x nvm_default_version 20
-    nvm use $nvm_default_version &>/dev/null # override as the var is not being ignored by nvm
-end
 # fnm configuration
 if type -q fnm
     fnm install 18 &>/dev/null
@@ -35,6 +29,42 @@ if type -q fnm
     fnm default 20
     # fnm env --use-on-cd | source
 end
+# nvm configuration
+if type -q nvm
+    # set -x nvm_default_version $NODE_VERSION
+    # nvm use $nvm_default_version &>/dev/null # override as the var is not being ignored by nvm
+    nvm alias default $NODE_VERSION &>/dev/null
+end
+# Calling nvm use automatically in a directory with a .nvmrc file
+# requires bass plugin
+if type -q bass
+  function nvm
+    bass source ~/.nvm/nvm.sh --no-use ';' nvm $argv
+  end
+  # ~/.config/fish/functions/nvm_find_nvmrc.fish
+  function nvm_find_nvmrc
+    bass source ~/.nvm/nvm.sh --no-use ';' nvm_find_nvmrc
+  end
+  # ~/.config/fish/functions/load_nvm.fish
+  function load_nvm --on-variable="PWD"
+    set -l default_node_version (nvm version default)
+    set -l node_version (nvm version)
+    set -l nvmrc_path (nvm_find_nvmrc)
+    if test -n "$nvmrc_path"
+      set -l nvmrc_node_version (nvm version (cat $nvmrc_path))
+      if test "$nvmrc_node_version" = "N/A"
+        nvm install (cat $nvmrc_path)
+      else if test "$nvmrc_node_version" != "$node_version"
+        nvm use $nvmrc_node_version
+      end
+    else if test "$node_version" != "$default_node_version"
+      # echo "Reverting to default Node version"
+      nvm use default &>/dev/null
+    end
+  end
+  load_nvm > /dev/stderr
+end
+
 
 # ~~~~~~ PATH ~~~~~~ #
 # ~~~~~~~~~~~~~~~~~~ #
@@ -128,6 +158,7 @@ alias gcp="gcloud"
 alias oc="opencommit"
 alias ocn="opencommit --no-verify"
 alias dt="devtunnel"
+alias chati="chatgpt --interactive"
 function chat
     chatgpt $argv | bat --language=markdown
 end
@@ -196,15 +227,9 @@ alias gsw='git switch'
 alias gsw-='git switch -'
 function gswp
     git pull origin $argv[1]:$argv[1]
+    # todo: why is this line disabled?
     # git switch $argv[1]
 end
-
-# # git config
-# git config --global core.editor vim
-# git config --global push.autoSetupRemote true
-# git config --global pull.rebase true
-# git config --global user.name "Tim O'Connell"
-# git config --global user.email "tim@exxo.sh"
 
 # Tofu aliases
 alias tfi="tf init"

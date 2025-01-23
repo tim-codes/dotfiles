@@ -60,5 +60,6 @@ Host *
 
 ## notes
 
-* when running the scripts, it is most reliable to open zsh in native terminal (not alacritty or another emulator), then run eg `./dev/dotfiles/scripts/init`
+* when running the init script, it is most reliable to open zsh in native terminal (not alacritty or another emulator), then run eg `./dev/dotfiles/scripts/init`
 * storing GPG keys in 1password as a reference, but they are not integrated, the local GPG key is used for signing
+* maybe this tool will help with the bash->fish PATH loading: https://github.com/edc/bass

@@ -35,6 +35,13 @@ function print_path {
 }
 alias ppath="print_path"
 
+#~~ add cargo bin dir to PATH
+# need to use this method for some reason, instead of declaring the bin dir in .path.config
+if [[ -f $HOME/.cargo/env ]]; then
+  source $HOME/.cargo/env
+fi
+
+#~~ misc aliases
 alias mp="mkdir -p"
 if command -v lsd >/dev/null 2>&1; then
   alias ls="lsd"
