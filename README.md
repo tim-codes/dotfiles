@@ -57,6 +57,8 @@ Host *
 ## references
 
 * https://switowski.com/blog/favorite-cli-tools
+* https://gist.github.com/edwhad/a25f728e6add3f6d1f7a483810e9d555
+* https://bmaingret.github.io/blog/2022-02-15-1Password-gpg-git-seamless-commits-signing
 
 ## notes
 
