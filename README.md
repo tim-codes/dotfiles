@@ -66,3 +66,4 @@ Host *
 * storing GPG keys in 1password as a reference, but they are not integrated, the local GPG key is used for signing
 * maybe this tool will help with the bash->fish PATH loading: https://github.com/edc/bass
 * todo: the fisher install step is not idempotent and is super flaky between different shells
+

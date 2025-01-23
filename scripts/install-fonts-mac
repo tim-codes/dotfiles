@@ -37,8 +37,22 @@ for zip_file in "$assets_dir"/*.zip; do
 
   # Install the fonts to the macOS Fonts directory
   fonts_dir="$HOME/Library/Fonts"
+  woff2_files=("$temp_dir"/*.woff2)
   ttf_files=("$temp_dir"/*.ttf)
   otf_files=("$temp_dir"/*.otf)
+
+  # Copy .woff2 files if they do not already exist
+  for woff2_file in "${woff2_files[@]}"; do
+    dest_file="$fonts_dir/$(basename "$woff2_file")"
+    if [[ ! -e "$dest_file" ]]; then
+      cp "$woff2_file" "$fonts_dir"
+      # Convert .woff2 to .ttf using sfntly
+#      sfntly "$woff2_file" "$dest_file"
+      echo "Installed $woff2_file to $fonts_dir"
+    else
+      # echo "$dest_file already exists, skipping."
+    fi
+  done
 
   # Copy .ttf files if they do not already exist
   for ttf_file in "${ttf_files[@]}"; do
