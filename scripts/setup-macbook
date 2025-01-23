@@ -38,7 +38,7 @@ fisher update
 
 # install powerline fonts
 # see: https://github.com/powerline/powerline
-if ls $HOME/Library/Fonts | grep -qi powerline
+if ! ls $HOME/Library/Fonts | grep -qi powerline
   git clone https://github.com/powerline/fonts.git powerline-fonts \
     && cd powerline-fonts \
     && ./install.sh \
@@ -51,7 +51,7 @@ EOF
 # install nvm
 if ! command -v nvm &> /dev/null; then
   PROFILE=/dev/null bash -c 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash'
-  # source $HOME/.nvm/nvm.sh
+  source $HOME/.nvm/nvm.sh
   nvm install $NODE_VERSION
   nvm use $NODE_VERSION
 fi

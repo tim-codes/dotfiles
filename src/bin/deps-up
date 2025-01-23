@@ -3,7 +3,8 @@
 $DOTFILES_ROOT/scripts/brew-update
 $DOTFILES_ROOT/scripts/cargo-update
 
-fish -c "fisher update"
+# todo: this is only working from native terminal, not emulator
+# fish -c "fisher update"
 
 # see: https://github.com/nvm-sh/nvm?tab=readme-ov-file#migrating-global-packages-while-installing
 # todo: why does this not get executed by .zshrc?

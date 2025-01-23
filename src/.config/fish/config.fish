@@ -20,10 +20,6 @@ source $HOME/.config/fish/$DOTFILES_PLATFORM.fish
 # Fish Theme
 set fish_theme eden
 
-if test -d $HOME/.local/share/omf
-  source $HOME/.local/share/omf/pkg/omf/functions/omf.fish
-end
-
 # Make the blue color for directories more readable
 set -x LSCOLORS Exfxcxdxbxegedabagacad
 

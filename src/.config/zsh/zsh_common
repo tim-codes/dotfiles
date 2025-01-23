@@ -27,8 +27,26 @@ while IFS= read -r line; do
 done < $HOME/.path.config
 
 #~~ reset PATH and rebuild it
-export PATH="$PATH_BASE"
-add_to_path "${paths_array[@]}"
+PATH="$PATH_BASE"
+# todo: variables dont get expanded when read from .path.config
+# add_to_path "${paths_array[@]}"
+paths_tmp=(
+  "/usr/local/bin"
+  "$HOME/.local/bin"
+  "$HOME/.nix-profile/bin"
+  "$HOME/.local/share/fnm"
+  "$HOME/bin"
+  "/opt/homebrew/bin"
+  "/opt/homebrew/sbin"
+  "$GOPATH/bin"
+  "$GOROOT/bin"
+  "$PNPM_HOME"
+  "$HOME/.yarn/bin"
+  "$HOME/.config/yarn/global/node_modules/.bin"
+  "/Applications/Alacritty.app/Contents/MacOS"
+)
+
+add_to_path "${paths_tmp[@]}"
 
 function print_path {
   echo "$PATH" | tr ':' '\n' | sort

@@ -6,6 +6,7 @@ brewDeps=(
   colordiff
   ctop
   diff-so-fancy
+  docker-compose
   fd
   fish
   fzf

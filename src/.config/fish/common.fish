@@ -1,7 +1,6 @@
 # ~~~ VARIABLES ~~~ #
 # ~~~~~~~~~~~~~~~~~ #
 
-set -x PNPM_HOME "$HOME/Library/pnpm"
 set -x KUBE_CONFIG_PATH "$HOME/.kube/config"
 set -x GOOGLE_APPLICATION_CREDENTIALS "$HOME/.config/gcloud/application_default_credentials.json"
 # enable IAP ssh tunnel to use numpy on system to increase performance
