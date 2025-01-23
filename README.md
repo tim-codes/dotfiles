@@ -36,7 +36,7 @@ Host skygit
 Host *
     IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
 ```
---> then use e.g. `git@skygit/<repo>.git` for the origin remote
+--> then use e.g. `gcl git@skygit:<workspace>/<repo>.git` for the origin remote
 
 ## references
 
