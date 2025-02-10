@@ -95,7 +95,8 @@ function read_path_config
   echo $paths_to_add
 end
 
-set -x PATH $PATH_BASE
+# note: forcing homebrew in front so we have homebrew bash in front of system bash
+set -x PATH "/opt/homebrew/bin" "/opt/homebrew/sbin" $PATH_BASE
 # add_to_path $paths_to_add
 
 # todo: remove this (copy from .path.config)
@@ -105,8 +106,6 @@ add_to_path \
   "$HOME/.nix-profile/bin" \
   "$HOME/.local/share/fnm" \
   "$HOME/bin" \
-  "/opt/homebrew/bin" \
-  "/opt/homebrew/sbin" \
   "$GOPATH/bin" \
   "$GOROOT/bin" \
   "$PNPM_HOME" \
@@ -146,6 +145,8 @@ alias ll="ls -l"
 alias la="ls -la"
 alias l="ll"
 
+alias j="just"
+alias k="kubectl"
 alias python="python3"
 alias py="python"
 alias pip="pip3"

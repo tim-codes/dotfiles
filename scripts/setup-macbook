@@ -71,3 +71,7 @@ $DOTFILES_ROOT/scripts/install-fonts-mac
 if ! command -v alacritty &> /dev/null; then
   $DOTFILES_ROOT/scripts/install-alacritty-mac
 fi
+
+# override system bash
+#rm /bin/bash
+#ln -s /opt/homebrew/bin/bash /bin/bash

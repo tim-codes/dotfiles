@@ -28,7 +28,7 @@ user should modify:
 1. setup 1password, install ssh agent, then see 1.(a)
 2. clone dotfiles repo to ~/dev/dotfiles
 3. `~/dev/dotfiles/scripts/init`
-4. `gpg --generate-full-key`, use defaults, name="Tim O'Connell", email=<github-email>, no passphrase
+4. `gpg --full-generate-key`, use defaults, name="Tim O'Connell", email=<github-email>, no passphrase
 (see: https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key)
 5. follow instructions to add gpg key to github & gitlab
 6. set signingkey to `~/.gpg.gitconfig`:
@@ -36,6 +36,12 @@ user should modify:
 [user]
     signingkey = xxx
 ```
+
+### manual installations:
+* 1Password
+* Arc Browser
+* SetApp
+* JetBrains Toolbox + VSCode
 
 1. (a) where there is multiple e.g. github ssh keys for the same domain, then download the public keys to `~/.ssh/`, and add entries for unique remote names to `~/.ssh/config`:
 ```

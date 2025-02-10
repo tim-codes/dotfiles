@@ -2,8 +2,10 @@
 
 brewDeps=(
   asciinema
+  bash
   bat
   colordiff
+  crane
   ctop
   diff-so-fancy
   docker-compose

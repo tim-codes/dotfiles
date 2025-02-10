@@ -26,9 +26,9 @@ if [ ! -e "$local_root" ]; then
 export DOTFILES_ROOT="$dotfiles_root"
 export DOTFILES_PLATFORM="$platform"
 
-export GO_VERSION="1.23.2"
-export GO_ROOT="$HOME/sdk/go/go$GO_VERSION"
-export GO_PATH="$HOME/go/go$GO_VERSION"
+export GO_VERSION="1.23.5"
+export GOROOT="$HOME/sdk/go$GO_VERSION"
+export GOPATH="$HOME/.go"
 
 export NODE_VERSION="20"
 export NVM_DIR="$HOME/.nvm"
@@ -51,8 +51,16 @@ if [ ! -e "$local_zsh" ]; then
 EOT
 fi
 
-# create empty gitconfig file
-touch ~/.gpg.gitconfig
+# create default gitconfig file
+if [ ! -e "$HOME/.gpg.gitconfig" ]; then
+  touch ~/.gpg.gitconfig
+  cat <<EOT > ~/.gpg.gitconfig
+[gpg]
+  program = /opt/homebrew/bin/gpg
+[user]
+  signingkey = todo
+EOT
+fi
 
 # platform-specific setup (generally just install deps)
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
