@@ -110,8 +110,7 @@ add_to_path \
   "$GOROOT/bin" \
   "$PNPM_HOME" \
   "$HOME/.yarn/bin" \
-  "$HOME/.config/yarn/global/node_modules/.bin" \
-  "/Applications/Alacritty.app/Contents/MacOS"
+  "$HOME/.config/yarn/global/node_modules/.bin"
 
 function print_path
   echo $PATH | tr ' ' '\n' | sort | bat

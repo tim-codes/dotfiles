@@ -2,6 +2,7 @@
 
 packages=(
   ts-node@latest
+  prettier@latest
 )
 
 pnpm i -g "${packages[@]}"

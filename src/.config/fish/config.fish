@@ -14,6 +14,9 @@ end
 set -x fish_conf "$HOME/.config/fish/config.fish"
 source $HOME/.config/fish/$DOTFILES_PLATFORM.fish
 
+# update completions
+source ~/.config/fish/completions.fish
+
 # ~~~ FISH SHELL ~~~ #
 # ~~~~~~~~~~~~~~~~~~ #
 
@@ -28,11 +31,17 @@ set -U fish_greeting ""
 
 # set shell title to pwd
 function fish_title
-    set -q argv[1]; or set argv fish
-    # Looks like ~/d/fish: git log
-    # or /e/apt: fish
-    echo (fish_prompt_pwd_dir_length=1 prompt_pwd): $argv;
+  set -q argv[1]; or set argv fish
+  # Looks like ~/d/fish: git log
+  # or /e/apt: fish
+  echo (fish_prompt_pwd_dir_length=1 prompt_pwd): $argv;
 end
+
+# configure the prompt
+# function fish_prompt
+#   # remove the hostname prefix
+#   set -l prompt_hostname ''
+# end
 
 # ~~~ LOCAL OVERRIDES ~~~ #
 # ~~~~~~~~~~~~~~~~~~~~~~~ #

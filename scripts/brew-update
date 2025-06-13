@@ -14,6 +14,8 @@ brewDeps=(
   fzf
   glances
   gpg
+  gradle
+  helm
   htop
   httpie
   jq
@@ -24,8 +26,10 @@ brewDeps=(
   lsd
   ncdu
   neovim
+  pmd
   pnpm
   ripgrep
+  shellcheck
   sloth
   stow
   telnet
