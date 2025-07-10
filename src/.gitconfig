@@ -11,14 +11,12 @@
 [push]
     autoSetupRemote = true
 [commit]
-    gpgsign = true
+    gpgsign = false
 [tag]
-    gpgSign = true
+    gpgSign = false
 [url "ssh://git@github.com/"]
     insteadOf = https://github.com/
 [url "ssh://git@gitlab.com/"]
     insteadOf = https://gitlab.com/
-[includeIf "gitdir:~/dev/sky/"]
-    path = ~/dev/sky/.gitconfig
 [includeIf "gitdir:~/dev/cecg"]
     path = ~/dev/cecg/.gitconfig
