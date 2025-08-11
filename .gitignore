@@ -4,3 +4,4 @@
 src/bin/*
 !src/bin/deps-up
 !src/bin/pop-term
+.claude

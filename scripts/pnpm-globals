@@ -3,6 +3,9 @@
 packages=(
   ts-node@latest
   prettier@latest
+  opencommit@latest
+  chatgpt-cli@latest
+  @anthropic-ai/claude-code@latest
 )
 
 pnpm i -g "${packages[@]}"

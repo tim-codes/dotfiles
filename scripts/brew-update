@@ -26,6 +26,7 @@ brewDeps=(
   lsd
   ncdu
   neovim
+  pipx
   pmd
   pnpm
   ripgrep

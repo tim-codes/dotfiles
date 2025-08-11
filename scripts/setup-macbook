@@ -1,5 +1,5 @@
 #!/bin/zsh
-set -o pipefail
+set -eu -opipefail
 
 source $HOME/.config/local.sh
 
@@ -47,6 +47,9 @@ if ! ls $HOME/Library/Fonts | grep -qi powerline
 end
 
 EOF
+
+# install poetry
+pipx install poetry && poetry ensurepath
 
 # install nvm
 if ! command -v nvm &> /dev/null; then

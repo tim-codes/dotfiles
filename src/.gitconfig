@@ -1,22 +1,32 @@
 [user]
-    name = Tim O'Connell
+    name = "Tim O'Connell"
     email = tim@exxo.sh
+
 [include]
     path = ~/.gpg.gitconfig
+
 [alias]
     undo = reset HEAD^
     unstage = reset HEAD --
+
 [pull]
     rebase = true
 [push]
     autoSetupRemote = true
+
+[gpg]
+    format = ssh
+[gpg "ssh"]
+  program = "/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
 [commit]
-    gpgsign = false
+    gpgsign = true
 [tag]
-    gpgSign = false
+    gpgSign = true
+
 [url "ssh://git@github.com/"]
     insteadOf = https://github.com/
 [url "ssh://git@gitlab.com/"]
     insteadOf = https://gitlab.com/
+
 [includeIf "gitdir:~/dev/cecg"]
     path = ~/dev/cecg/.gitconfig

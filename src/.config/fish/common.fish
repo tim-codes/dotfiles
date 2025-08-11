@@ -131,6 +131,16 @@ function restow
     set _dir "$(pwd)"
     cd $DOTFILES_ROOT && stow --target $HOME src
     cd $_dir
+    
+    # rebuild bat cache for theme updates
+    if command -q bat
+        if bat cache --build >/dev/null 2>&1
+            echo "Rebuilt bat cache successfully"
+        else
+            echo "Failed to rebuild bat cache"
+        end
+    end
+    
     rf
 end
 
@@ -152,6 +162,7 @@ alias pip="pip3"
 alias tf="tofu"
 alias pm="podman"
 alias p="pnpm"
+alias pu="pulumi"
 alias gcp="gcloud"
 alias oc="opencommit"
 alias ocn="opencommit --no-verify"
