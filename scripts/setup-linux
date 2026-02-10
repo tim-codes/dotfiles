@@ -1,2 +1,15 @@
 #!/bin/bash
-echo "todo"
+set -eu -o pipefail
+
+# Install base packages
+sudo apt-get update
+sudo apt-get install -y \
+  zsh stow git curl vim \
+  build-essential unzip \
+  lsd bat fd-find ripgrep \
+  tmux htop tree
+
+# Change default shell to zsh
+if [[ "$SHELL" != */zsh ]]; then
+  chsh -s $(which zsh)
+fi

@@ -53,10 +53,20 @@ fi
 
 # create default gitconfig file
 if [ ! -e "${HOME}/.gpg.gitconfig" ]; then
-  touch ~/.gpg.gitconfig
+  if [[ "$platform" == "mac" ]]; then
+    op_sign="/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
+  else
+    op_sign="/opt/1Password/op-ssh-sign"
+  fi
   cat <<EOT > ~/.gpg.gitconfig
 [gpg]
-  program = /opt/homebrew/bin/gpg
+  format = ssh
+[gpg "ssh"]
+  program = "$op_sign"
+[commit]
+  gpgsign = true
+[tag]
+  gpgSign = true
 [user]
   signingkey = todo
 EOT

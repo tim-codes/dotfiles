@@ -14,15 +14,6 @@
 [push]
     autoSetupRemote = true
 
-[gpg]
-    format = ssh
-[gpg "ssh"]
-  program = "/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
-[commit]
-    gpgsign = true
-[tag]
-    gpgSign = true
-
 [url "ssh://git@github.com/"]
     insteadOf = https://github.com/
 [url "ssh://git@gitlab.com/"]
