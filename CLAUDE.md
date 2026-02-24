@@ -59,5 +59,6 @@ The setup scripts automatically detect platform (`mac` or `linux`) and load appr
 
 - The init script should be run from native terminal (not alacritty) for best compatibility
 - Fisher plugin installation can be flaky between different shells
-- GPG keys are stored locally, not integrated with 1Password (stored there as reference only)
+- Git commit signing uses 1Password SSH agent (key labeled "Git" in 1Password, deployed to ~/.ssh/git-signing.pub)
+- The init script detects WSL and uses `op-ssh-sign-wsl.exe` for commit signing (vs native paths on mac/linux)
 - Homebrew updates are throttled to run at most once every 20 minutes via timestamp check
