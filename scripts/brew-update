@@ -1,7 +1,9 @@
 #!/bin/zsh
 
 brewDeps=(
+  "1password-cli"
   asciinema
+  awscli
   bash
   bat
   colordiff
@@ -11,7 +13,9 @@ brewDeps=(
   docker-compose
   fd
   fish
+  fish-lsp
   fzf
+  gh
   glances
   gpg
   gradle
@@ -25,6 +29,7 @@ brewDeps=(
   lazygit
   lsd
   ncdu
+  neofetch
   neovim
   pipx
   pmd
@@ -42,6 +47,7 @@ brewDeps=(
   websocat
   wget
   yq
+  zoxide
 )
 
 # Path to the timestamp file

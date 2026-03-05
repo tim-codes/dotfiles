@@ -8,65 +8,9 @@ set -x CLOUDSDK_PYTHON_SITEPACKAGES 1
 # enable TTY for GPG signing prompt
 set -x GPG_TTY $(tty)
 
-# OpenAI key -> chatgpt-cli, opencommit
-if test -f ~/keys/openai.key
-  set -x OPENAI_KEY $(cat ~/keys/openai.key)
-  set -x OPENAI_API_KEY $OPENAI_KEY
-  if type -q opencommit
-    opencommit config set OCO_OPENAI_API_KEY=$OPENAI_KEY 1&>/dev/null
-  end
-end
-
-# poetry completions
-if type -q poetry
-    poetry completions fish >~/.config/fish/completions/peotry.fish
-end
-# fnm configuration
-if type -q fnm
-    fnm install 18 &>/dev/null
-    fnm install 20 &>/dev/null
-    fnm default 20
-    # fnm env --use-on-cd | source
-end
-# nvm configuration
-if type -q nvm
-    # set -x nvm_default_version $NODE_VERSION
-    # nvm use $nvm_default_version &>/dev/null # override as the var is not being ignored by nvm
-    nvm alias default $NODE_VERSION &>/dev/null
-end
-# Calling nvm use automatically in a directory with a .nvmrc file
-# requires bass plugin
-if type -q bass
-  function nvm
-    bass source ~/.nvm/nvm.sh --no-use ';' nvm $argv
-  end
-  # ~/.config/fish/functions/nvm_find_nvmrc.fish
-  function nvm_find_nvmrc
-    bass source ~/.nvm/nvm.sh --no-use ';' nvm_find_nvmrc
-  end
-  # ~/.config/fish/functions/load_nvm.fish
-  function load_nvm --on-variable="PWD"
-    set -l default_node_version (nvm version default)
-    set -l node_version (nvm version)
-    set -l nvmrc_path (nvm_find_nvmrc)
-    if test -n "$nvmrc_path"
-      set -l nvmrc_node_version (nvm version (cat $nvmrc_path))
-      if test "$nvmrc_node_version" = "N/A"
-        nvm install (cat $nvmrc_path)
-      else if test "$nvmrc_node_version" != "$node_version"
-        nvm use $nvmrc_node_version
-      end
-    else if test "$node_version" != "$default_node_version"
-      # echo "Reverting to default Node version"
-      nvm use default &>/dev/null
-    end
-  end
-  load_nvm > /dev/stderr
-end
-
-
 # ~~~~~~ PATH ~~~~~~ #
 # ~~~~~~~~~~~~~~~~~~ #
+# PATH must be set before any `type -q` checks for homebrew-installed tools
 
 #~~ capture original PATH
 if test -z "$PATH_BASE"
@@ -117,6 +61,70 @@ function print_path
 end
 alias ppath="print_path"
 
+# ~~~ TOOL SETUP ~~~ #
+# ~~~~~~~~~~~~~~~~~~ #
+
+# OpenAI key -> chatgpt-cli, opencommit
+if test -f ~/keys/openai.key
+  set -x OPENAI_KEY $(cat ~/keys/openai.key)
+  set -x OPENAI_API_KEY $OPENAI_KEY
+  if type -q opencommit
+    opencommit config set OCO_OPENAI_API_KEY=$OPENAI_KEY 1&>/dev/null
+  end
+end
+
+# poetry completions
+if type -q poetry
+    poetry completions fish >~/.config/fish/completions/poetry.fish
+end
+# fnm configuration
+if type -q fnm
+    fnm install 18 &>/dev/null
+    fnm install 20 &>/dev/null
+    fnm default 20
+    # fnm env --use-on-cd | source
+end
+# nvm configuration
+if type -q nvm
+    # set -x nvm_default_version $NODE_VERSION
+    # nvm use $nvm_default_version &>/dev/null # override as the var is not being ignored by nvm
+    nvm alias default $NODE_VERSION &>/dev/null
+end
+# Calling nvm use automatically in a directory with a .nvmrc file
+# requires bass plugin
+if type -q bass
+  function nvm
+    bass source ~/.nvm/nvm.sh --no-use ';' nvm $argv
+  end
+  # ~/.config/fish/functions/nvm_find_nvmrc.fish
+  function nvm_find_nvmrc
+    bass source ~/.nvm/nvm.sh --no-use ';' nvm_find_nvmrc
+  end
+  # ~/.config/fish/functions/load_nvm.fish
+  function load_nvm --on-variable="PWD"
+    set -l default_node_version (nvm version default)
+    set -l node_version (nvm version)
+    set -l nvmrc_path (nvm_find_nvmrc)
+    if test -n "$nvmrc_path"
+      set -l nvmrc_node_version (nvm version (cat $nvmrc_path))
+      if test "$nvmrc_node_version" = "N/A"
+        nvm install (cat $nvmrc_path)
+      else if test "$nvmrc_node_version" != "$node_version"
+        nvm use $nvmrc_node_version
+      end
+    else if test "$node_version" != "$default_node_version"
+      # echo "Reverting to default Node version"
+      nvm use default &>/dev/null
+    end
+  end
+  load_nvm > /dev/stderr
+end
+
+# zoxide
+if type -q zoxide
+    zoxide init fish | source
+end
+
 # ~~~~ ALIASES ~~~~ #
 # ~~~~~~~~~~~~~~~~~ #
 
@@ -131,7 +139,7 @@ function restow
     set _dir "$(pwd)"
     cd $DOTFILES_ROOT && stow --target $HOME src
     cd $_dir
-    
+
     # rebuild bat cache for theme updates
     if command -q bat
         if bat cache --build >/dev/null 2>&1
@@ -140,7 +148,7 @@ function restow
             echo "Failed to rebuild bat cache"
         end
     end
-    
+
     rf
 end
 
@@ -164,6 +172,25 @@ alias pm="podman"
 alias p="pnpm"
 alias pu="pulumi"
 alias gcp="gcloud"
+alias aws-setup="aws configure sso"
+alias aws-login="aws sso login"
+alias aws-profile="aws --profile"
+
+function aws-use
+    if test -z "$argv[1]"
+        echo "Current: $AWS_PROFILE"
+        echo "Available profiles:"
+        grep '^\[profile' ~/.aws/config | sed 's/\[profile /  /g' | sed 's/\]//g'
+        return
+    end
+    set -gx AWS_PROFILE $argv[1]
+    echo "Switched to AWS profile: $AWS_PROFILE"
+end
+
+function aws-clear
+    set -e AWS_PROFILE
+    echo "Cleared AWS_PROFILE"
+end
 alias oc="opencommit"
 alias ocn="opencommit --no-verify"
 alias dt="devtunnel"
