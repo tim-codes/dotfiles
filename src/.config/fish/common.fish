@@ -1,16 +1,6 @@
-# ~~~ VARIABLES ~~~ #
-# ~~~~~~~~~~~~~~~~~ #
-
-set -x KUBE_CONFIG_PATH "$HOME/.kube/config"
-set -x GOOGLE_APPLICATION_CREDENTIALS "$HOME/.config/gcloud/application_default_credentials.json"
-# enable IAP ssh tunnel to use numpy on system to increase performance
-set -x CLOUDSDK_PYTHON_SITEPACKAGES 1
-# enable TTY for GPG signing prompt
-set -x GPG_TTY $(tty)
-
 # ~~~~~~ PATH ~~~~~~ #
 # ~~~~~~~~~~~~~~~~~~ #
-# PATH must be set before any `type -q` checks for homebrew-installed tools
+# PATH must be set first — everything below may need system binaries
 
 #~~ capture original PATH
 if test -z "$PATH_BASE"
@@ -26,29 +16,17 @@ function add_to_path
   end
 end
 
-#~~ reset PATH and rebuild it
-#  todo: fix this
-function read_path_config
-  set -l paths_to_add
-  for line in (cat $HOME/.path.config)
-    set line (string trim -- "$line")
-    if test -n "$line" -a (string match -q -v '^#' "$line")
-      set paths_to_add $paths_to_add $line
-    end
-  end
-  echo $paths_to_add
-end
-
 # note: forcing homebrew in front so we have homebrew bash in front of system bash
+# always include system paths to ensure basic commands (cat, curl, tty) are available
 set -x PATH "/opt/homebrew/bin" "/opt/homebrew/sbin" $PATH_BASE
-# add_to_path $paths_to_add
-
-# todo: remove this (copy from .path.config)
 add_to_path \
   "/usr/local/bin" \
+  "/usr/bin" \
+  "/bin" \
+  "/usr/sbin" \
+  "/sbin" \
   "$HOME/.local/bin" \
   "$HOME/.nix-profile/bin" \
-  "$HOME/.local/share/fnm" \
   "$HOME/bin" \
   "$GOPATH/bin" \
   "$GOROOT/bin" \
@@ -60,6 +38,16 @@ function print_path
   echo $PATH | tr ' ' '\n' | sort | bat
 end
 alias ppath="print_path"
+
+# ~~~ VARIABLES ~~~ #
+# ~~~~~~~~~~~~~~~~~ #
+
+set -x KUBE_CONFIG_PATH "$HOME/.kube/config"
+set -x GOOGLE_APPLICATION_CREDENTIALS "$HOME/.config/gcloud/application_default_credentials.json"
+# enable IAP ssh tunnel to use numpy on system to increase performance
+set -x CLOUDSDK_PYTHON_SITEPACKAGES 1
+# enable TTY for GPG signing prompt
+set -x GPG_TTY $(tty)
 
 # ~~~ TOOL SETUP ~~~ #
 # ~~~~~~~~~~~~~~~~~~ #
@@ -77,30 +65,19 @@ end
 if type -q poetry
     poetry completions fish >~/.config/fish/completions/poetry.fish
 end
-# fnm configuration
-if type -q fnm
-    fnm install 18 &>/dev/null
-    fnm install 20 &>/dev/null
-    fnm default 20
-    # fnm env --use-on-cd | source
-end
-# nvm configuration
-if type -q nvm
-    # set -x nvm_default_version $NODE_VERSION
-    # nvm use $nvm_default_version &>/dev/null # override as the var is not being ignored by nvm
-    nvm alias default $NODE_VERSION &>/dev/null
-end
-# Calling nvm use automatically in a directory with a .nvmrc file
-# requires bass plugin
-if type -q bass
+# node version manager (bash nvm via bass)
+if type -q bass; and test -s "$NVM_DIR/nvm.sh"
   function nvm
-    bass source ~/.nvm/nvm.sh --no-use ';' nvm $argv
+    bass source $NVM_DIR/nvm.sh --no-use ';' nvm $argv
   end
-  # ~/.config/fish/functions/nvm_find_nvmrc.fish
   function nvm_find_nvmrc
-    bass source ~/.nvm/nvm.sh --no-use ';' nvm_find_nvmrc
+    bass source $NVM_DIR/nvm.sh --no-use ';' nvm_find_nvmrc
   end
-  # ~/.config/fish/functions/load_nvm.fish
+
+  # set default version from $NODE_VERSION (defined in local.sh)
+  nvm alias default $NODE_VERSION &>/dev/null
+
+  # auto-switch node version on cd when .nvmrc exists
   function load_nvm --on-variable="PWD"
     set -l default_node_version (nvm version default)
     set -l node_version (nvm version)
@@ -113,11 +90,10 @@ if type -q bass
         nvm use $nvmrc_node_version
       end
     else if test "$node_version" != "$default_node_version"
-      # echo "Reverting to default Node version"
       nvm use default &>/dev/null
     end
   end
-  load_nvm > /dev/stderr
+  load_nvm >/dev/stderr
 end
 
 # zoxide
