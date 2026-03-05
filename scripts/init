@@ -30,7 +30,7 @@ export GO_VERSION="1.23.5"
 export GOROOT="${HOME}/sdk/go$GO_VERSION"
 export GOPATH="${HOME}/.go"
 
-export NODE_VERSION="20"
+export NODE_VERSION="lts/krypton"
 export NVM_DIR="${HOME}/.nvm"
 export PNPM_HOME="${HOME}/Library/pnpm"
 EOT
