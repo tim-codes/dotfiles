@@ -48,6 +48,9 @@ set -x GOOGLE_APPLICATION_CREDENTIALS "$HOME/.config/gcloud/application_default_
 set -x CLOUDSDK_PYTHON_SITEPACKAGES 1
 # enable TTY for GPG signing prompt
 set -x GPG_TTY $(tty)
+# for getting claude code to use LSP plugins properly
+# (https://github.com/anthropics/claude-code/issues/15148)
+set -gx ENABLE_LSP_TOOL 1
 
 # ~~~ TOOL SETUP ~~~ #
 # ~~~~~~~~~~~~~~~~~~ #

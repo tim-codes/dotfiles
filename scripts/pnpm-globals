@@ -8,6 +8,8 @@ packages=(
   @anthropic-ai/claude-code@latest
   @fission-ai/openspec@latest
   npm-check-updates@latest
+  typescript@latest
+  typescript-language-server@latest
 )
 
 pnpm i -g "${packages[@]}"

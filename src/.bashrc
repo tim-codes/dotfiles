@@ -23,6 +23,9 @@ export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/application_default_
 export CLOUDSDK_PYTHON_SITEPACKAGES=1
 # enable TTY for GPG signing prompt
 export GPG_TTY=$(tty)
+# for getting claude code to use LSP plugins properly
+# (https://github.com/anthropics/claude-code/issues/15148)
+export ENABLE_LSP_TOOL=1
 
 # OpenAI key -> chatgpt-cli, opencommit
 if [[ -f ~/keys/openai.key ]]; then

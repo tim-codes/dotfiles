@@ -31,3 +31,7 @@
 #   export OPENAI_KEY=$(cat ~/keys/openai.key)
 #   export OPENAI_API_KEY=$OPENAI_KEY
 # fi
+
+# for getting claude code to use LSP plugins properly
+# (https://github.com/anthropics/claude-code/issues/15148)
+export ENABLE_LSP_TOOL=1
