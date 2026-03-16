@@ -10,6 +10,7 @@ packages=(
   npm-check-updates@latest
   typescript@latest
   typescript-language-server@latest
+  @playwright/mcp@latest
 )
 
 pnpm i -g "${packages[@]}"

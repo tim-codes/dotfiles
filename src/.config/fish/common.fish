@@ -282,3 +282,45 @@ end
 function docker-prune-stopped
     docker rm $(docker ps -a -q)
 end
+
+# ~~~~ HELP TUI ~~~~ #
+# ~~~~~~~~~~~~~~~~~~ #
+
+# Parse custom functions/aliases from this file at load time
+set -g _help_entries
+set -l _common_file (status filename)
+set -l _prev_comment ""
+set -l _lines (cat $_common_file)
+for _line in $_lines
+    # Track comment lines (only single-line comments above functions)
+    if string match -rq '^\s*#\s+(?!~)(.+)' -- $_line
+        set _prev_comment (string match -rg '^\s*#\s+(.+)' -- $_line)
+    else
+        # One-liner alias: show expansion
+        if string match -rq '^\s*alias\s+' -- $_line
+            set -l _parts (string match -rg '^\s*alias\s+(\S+?)=[\"\'](.+?)[\"\']' -- $_line)
+            if test (count $_parts) -ge 2
+                set -a _help_entries (printf '%s\t%s' $_parts[1] "$_parts[2]")
+            end
+        # Multi-line function: show comment if present
+        else if string match -rq '^\s*function\s+' -- $_line
+            set -l _fname (string match -rg '^\s*function\s+(\S+)' -- $_line)
+            if test -n "$_fname"; and not contains $_fname help add_to_path print_path nvm nvm_find_nvmrc load_nvm fish_title
+                if test -n "$_prev_comment"
+                    set -a _help_entries (printf '%s\t%s' $_fname "$_prev_comment")
+                else
+                    set -a _help_entries "$_fname"
+                end
+            end
+        end
+        set _prev_comment ""
+    end
+end
+
+alias h="help"
+function help
+    set -l selected (printf '%s\n' $_help_entries | sort | column -t -s \t | fzf --prompt="Commands > " --height=100% --layout=reverse)
+    or return
+    set -l cmd (string match -rg '^(\S+)' -- $selected)
+    commandline -i $cmd
+end
