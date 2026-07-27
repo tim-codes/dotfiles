@@ -6,6 +6,7 @@ brewDeps=(
   awscli
   bash
   bat
+  btop
   colordiff
   crane
   ctop
@@ -28,6 +29,7 @@ brewDeps=(
   lazydocker
   lazygit
   lsd
+  mysql-client
   ncdu
   neofetch
   neovim

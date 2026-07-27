@@ -69,6 +69,7 @@ add_to_path \
     "$PNPM_HOME" \
     "$HOME/.yarn/bin" \
     "$HOME/.config/yarn/global/node_modules/.bin" \
+    "/opt/homebrew/opt/mysql-client/bin" \
     "/Applications/Alacritty.app/Contents/MacOS" \
     "/Applications/Sublime Text.app/Contents/SharedSupport/bin" \
     "$HOME/Library/Application Support/Jetbrains/Toolbox/scripts"

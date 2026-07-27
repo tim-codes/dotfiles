@@ -67,6 +67,13 @@ fi
 
 $DOTFILES_ROOT/scripts/cargo-update
 
+# install compiled crcmod for gsutil (avoids slow checksumming)
+# gcloud SDK uses its own python — install crcmod into that specific interpreter
+GCLOUD_PYTHON="$(gcloud info --format='value(basic.python_location)' 2>/dev/null)" || true
+if [[ -n "$GCLOUD_PYTHON" ]]; then
+  "$GCLOUD_PYTHON" -m pip install --no-cache-dir crcmod 2>/dev/null || true
+fi
+
 # add fonts
 $DOTFILES_ROOT/scripts/install-fonts-mac
 

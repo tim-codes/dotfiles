@@ -32,7 +32,8 @@ add_to_path \
   "$GOROOT/bin" \
   "$PNPM_HOME" \
   "$HOME/.yarn/bin" \
-  "$HOME/.config/yarn/global/node_modules/.bin"
+  "$HOME/.config/yarn/global/node_modules/.bin" \
+  "/opt/homebrew/opt/mysql-client/bin"
 
 function print_path
   echo $PATH | tr ' ' '\n' | sort | bat

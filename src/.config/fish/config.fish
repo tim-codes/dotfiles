@@ -26,6 +26,9 @@ set fish_theme eden
 # Make the blue color for directories more readable
 set -x LSCOLORS Exfxcxdxbxegedabagacad
 
+# Allow gcloud to use system-installed Python packages (grpcio for log tailing)
+set -x CLOUDSDK_PYTHON_SITEPACKAGES 1
+
 # delete fish greeting in new shell
 set -U fish_greeting ""
 
