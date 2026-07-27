@@ -25,25 +25,40 @@ user should modify:
 
 ## macbook setup
 
-1. setup 1password, install ssh agent, then see 1.(a)
-2. clone dotfiles repo to ~/dev/dotfiles
-3. `~/dev/dotfiles/scripts/init`
-4. `gpg --full-generate-key`, use defaults, name="Tim O'Connell", email=<github-email>, no passphrase
-(see: https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key)
-5. follow instructions to add gpg key to github & gitlab
-6. set signingkey to `~/.gpg.gitconfig`:
+### prerequisites (manual)
+
+1. install 1Password and sign in
+2. 1Password Settings → Developer:
+   * enable **Use the SSH Agent**
+   * enable **Integrate with 1Password CLI**
+   * enable **Generate SSH config file with bookmarked hosts**
+
+### bootstrap (one command)
+
+Run from the native macOS Terminal (not alacritty):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/tim-codes/dotfiles/main/scripts/bootstrap | zsh
+```
+
+This installs Xcode Command Line Tools, wires `~/.ssh/config` to the 1Password
+SSH agent, clones this repo to `~/dev/dotfiles` (SSH, with submodules), then
+runs `scripts/init`: local config files, homebrew + deps, stow symlinks, fish
+plugins, fonts, alacritty (cask), tmux plugins (tpm), nvm/node, rust, poetry.
+Safe to re-run at any point if a step fails.
+
+### post-bootstrap (manual)
+
+1. set the git signingkey in `~/.gpg.gitconfig` — commit signing uses the
+   1Password SSH key (see the "Git" item in 1Password):
 ```.gpg.gitconfig
 [user]
     signingkey = xxx
 ```
+2. where there are multiple ssh keys for the same domain, see (a) below
+3. remaining app installs: Arc Browser, SetApp, JetBrains Toolbox + VSCode
 
-### manual installations:
-* 1Password
-* Arc Browser
-* SetApp
-* JetBrains Toolbox + VSCode
-
-1. (a) where there is multiple e.g. github ssh keys for the same domain, then download the public keys to `~/.ssh/`, and add entries for unique remote names to `~/.ssh/config`:
+(a) where there is multiple e.g. github ssh keys for the same domain, then download the public keys to `~/.ssh/`, and add entries for unique remote names to `~/.ssh/config`:
 ```
 Host github.com
   hostname github.com

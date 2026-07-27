@@ -1,0 +1,75 @@
+#!/bin/zsh
+# Bootstrap a new macbook from scratch. Safe to re-run.
+#
+# Prereqs: 1Password installed + signed in, with (Settings -> Developer):
+#   - "Use the SSH Agent" enabled
+#   - "Integrate with 1Password CLI" enabled
+#   - "Generate SSH config file with bookmarked hosts" enabled (optional)
+#
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/tim-codes/dotfiles/main/scripts/bootstrap | zsh
+set -euo pipefail
+
+DOTFILES_REPO="git@github.com:tim-codes/dotfiles.git"
+DOTFILES_ROOT="$HOME/dev/dotfiles"
+OP_AGENT_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+OP_SSH_CONFIG="$HOME/.ssh/1Password/config"
+
+echo "==> [1/4] Xcode Command Line Tools"
+if ! xcode-select -p &>/dev/null; then
+  xcode-select --install || true
+  echo "    Waiting for Command Line Tools install to finish (complete the GUI dialog)..."
+  until xcode-select -p &>/dev/null; do
+    sleep 10
+  done
+fi
+echo "    OK: $(xcode-select -p)"
+
+echo "==> [2/4] SSH config for 1Password agent"
+mkdir -p "$HOME/.ssh"
+chmod 700 "$HOME/.ssh"
+touch "$HOME/.ssh/config"
+chmod 600 "$HOME/.ssh/config"
+
+if [[ -f "$OP_SSH_CONFIG" ]]; then
+  # 1Password generates this file when "Generate SSH config file" is enabled;
+  # the Include must come before any Host blocks to apply globally
+  if ! grep -qF "Include ~/.ssh/1Password/config" "$HOME/.ssh/config"; then
+    printf 'Include ~/.ssh/1Password/config\n\n%s' "$(cat "$HOME/.ssh/config")" > "$HOME/.ssh/config.tmp"
+    mv "$HOME/.ssh/config.tmp" "$HOME/.ssh/config"
+    echo "    Added Include for 1Password-generated ssh config"
+  fi
+elif ! grep -qF "$OP_AGENT_SOCK" "$HOME/.ssh/config"; then
+  cat <<EOT >> "$HOME/.ssh/config"
+
+Host *
+  IdentityAgent "$OP_AGENT_SOCK"
+EOT
+  echo "    Added IdentityAgent block for 1Password agent"
+fi
+
+if [[ ! -S "$OP_AGENT_SOCK" ]]; then
+  echo "    WARNING: 1Password SSH agent socket not found at:"
+  echo "      $OP_AGENT_SOCK"
+  echo "    Check 1Password Settings -> Developer -> 'Use the SSH Agent', then re-run."
+  exit 1
+fi
+
+# pre-seed github host key so the clone never prompts
+touch "$HOME/.ssh/known_hosts"
+if ! grep -q "^github.com" "$HOME/.ssh/known_hosts"; then
+  ssh-keyscan github.com >> "$HOME/.ssh/known_hosts" 2>/dev/null
+fi
+
+echo "==> [3/4] Clone dotfiles to $DOTFILES_ROOT"
+mkdir -p "$HOME/dev"
+if [[ -d "$DOTFILES_ROOT/.git" ]]; then
+  echo "    Repo already cloned; pulling latest main"
+  git -C "$DOTFILES_ROOT" pull --ff-only origin main
+  git -C "$DOTFILES_ROOT" submodule update --init --recursive
+else
+  git clone --recurse-submodules "$DOTFILES_REPO" "$DOTFILES_ROOT"
+fi
+
+echo "==> [4/4] Run dotfiles init"
+exec "$DOTFILES_ROOT/scripts/init"

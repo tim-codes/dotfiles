@@ -9,6 +9,7 @@ This is a personal dotfiles repository for macOS and Linux development environme
 ## Key Commands
 
 ### Initial Setup
+- `scripts/bootstrap` - Fresh-machine bootstrap (curl-able from main): Xcode CLT, 1Password SSH agent config, clone to ~/dev/dotfiles, then runs init
 - `~/dev/dotfiles/scripts/init` - Complete initial setup (creates configs, installs dependencies)
 - `~/dev/dotfiles/scripts/setup-macbook` - macOS-specific setup
 - `~/dev/dotfiles/scripts/setup-linux` - Linux-specific setup
