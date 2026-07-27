@@ -49,7 +49,7 @@ end
 EOF
 
 # install poetry
-pipx install poetry && poetry ensurepath
+pipx install poetry && pipx ensurepath
 
 # install nvm
 if ! command -v nvm &> /dev/null; then
@@ -78,8 +78,22 @@ fi
 $DOTFILES_ROOT/scripts/install-fonts-mac
 
 # install alacritty terminal emulator
+# built from source: the homebrew cask is deprecated (unnotarized, fails
+# Gatekeeper) and is disabled from 2026-09-01; a locally-built app bundle
+# carries no quarantine attribute so Gatekeeper never blocks it
 if [[ ! -d /Applications/Alacritty.app ]]; then
-  brew install --cask alacritty
+  alacritty_build_dir="$(mktemp -d)/alacritty"
+  git clone --depth 1 --branch v0.17.0 https://github.com/alacritty/alacritty.git "$alacritty_build_dir"
+  (
+    cd "$alacritty_build_dir"
+    source $HOME/.cargo/env
+    make app
+    cp -r target/release/osx/Alacritty.app /Applications/
+    ln -sf /Applications/Alacritty.app/Contents/MacOS/alacritty /opt/homebrew/bin/alacritty
+    tic -xe alacritty,alacritty-direct extra/alacritty.info
+    cp extra/completions/alacritty.fish /opt/homebrew/share/fish/vendor_completions.d/ 2>/dev/null || true
+  )
+  rm -rf "$(dirname "$alacritty_build_dir")"
 fi
 
 # install tmux plugin manager + plugins from .tmux.conf
