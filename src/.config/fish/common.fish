@@ -110,6 +110,7 @@ end
 
 alias t="tmux"
 alias rf="source ~/.config/fish/config.fish"
+alias cl="cd ~/Claude && claude"
 
 function restow
     if test -z "$DOTFILES_ROOT"
