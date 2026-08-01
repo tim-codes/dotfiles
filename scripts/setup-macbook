@@ -59,6 +59,12 @@ if ! command -v nvm &> /dev/null; then
   nvm use $NODE_VERSION
 fi
 
+# install claude code
+# native installer (not brew cask) so it self-updates; installs to ~/.local/bin
+if [[ ! -x $HOME/.local/bin/claude ]]; then
+  curl -fsSL https://claude.ai/install.sh | bash
+fi
+
 # install rust
 if ! command -v rustup &> /dev/null; then
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path

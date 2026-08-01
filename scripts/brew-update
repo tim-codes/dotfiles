@@ -7,7 +7,6 @@ brewDeps=(
   bash
   bat
   btop
-  claude-code
   colordiff
   crane
   ctop
