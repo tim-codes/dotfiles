@@ -87,15 +87,34 @@ $DOTFILES_ROOT/scripts/install-fonts-mac
 # built from source: the homebrew cask is deprecated (unnotarized, fails
 # Gatekeeper) and is disabled from 2026-09-01; a locally-built app bundle
 # carries no quarantine attribute so Gatekeeper never blocks it
-if [[ ! -d /Applications/Alacritty.app ]]; then
+ALACRITTY_VERSION="0.17.0"
+
+# Gate on the version AND the supporting pieces, not just the presence of the
+# app bundle. A Mac carrying the old cask build already has Alacritty.app, so a
+# `! -d` guard skips it forever — leaving no `alacritty` terminfo entry (which
+# ~/.tmux.conf's terminal-features line needs), no bin symlink and no
+# completions. Those live in the source tree, so recovering any of them means
+# re-cloning; the build is ~35s, so just redo the lot.
+alacritty_current=""
+if [[ -x /Applications/Alacritty.app/Contents/MacOS/alacritty ]]; then
+  alacritty_current="$(/Applications/Alacritty.app/Contents/MacOS/alacritty --version | awk '{print $2}')"
+fi
+if [[ "$alacritty_current" != "$ALACRITTY_VERSION" ]] \
+  || ! infocmp -1 alacritty >/dev/null 2>&1 \
+  || [[ ! -L /opt/homebrew/bin/alacritty ]]; then
   alacritty_build_dir="$(mktemp -d)/alacritty"
-  git clone --depth 1 --branch v0.17.0 https://github.com/alacritty/alacritty.git "$alacritty_build_dir"
+  git clone --depth 1 --branch "v$ALACRITTY_VERSION" https://github.com/alacritty/alacritty.git "$alacritty_build_dir"
   (
     cd "$alacritty_build_dir"
     source $HOME/.cargo/env
-    make app
+    make app   # needs scdoc for the man pages — it is in brewDeps
+    # Replace rather than `cp -r` over the top: copying into an existing
+    # bundle merges the two and can leave stale files from the old version.
+    rm -rf /Applications/Alacritty.app
     cp -r target/release/osx/Alacritty.app /Applications/
     ln -sf /Applications/Alacritty.app/Contents/MacOS/alacritty /opt/homebrew/bin/alacritty
+    # Unprivileged tic writes to ~/.terminfo, which ncurses reads — including
+    # over SSH, so remote sessions get a working TERM=alacritty too.
     tic -xe alacritty,alacritty-direct extra/alacritty.info
     cp extra/completions/alacritty.fish /opt/homebrew/share/fish/vendor_completions.d/ 2>/dev/null || true
   )

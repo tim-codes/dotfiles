@@ -65,9 +65,15 @@ if test -f ~/keys/openai.key
   end
 end
 
-# poetry completions
-if type -q poetry
-    poetry completions fish >~/.config/fish/completions/poetry.fish
+# poetry completions — generated once, not on every shell start.
+# `type -q poetry` only proves the pipx wrapper script exists; it does not run
+# it. When a brew python upgrade removes the interpreter the venv pinned, the
+# wrapper stays on PATH and every new shell printed its exec error before the
+# prompt. Fix the cause with `pipx reinstall-all`; this keeps a broken poetry
+# from leaking into shell startup, and drops poetry's ~300ms off every launch.
+if type -q poetry; and not test -s ~/.config/fish/completions/poetry.fish
+    poetry completions fish >~/.config/fish/completions/poetry.fish 2>/dev/null
+    or rm -f ~/.config/fish/completions/poetry.fish
 end
 # node version manager (bash nvm via bass)
 if type -q bass; and test -s "$NVM_DIR/nvm.sh"

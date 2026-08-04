@@ -37,6 +37,7 @@ brewDeps=(
   pmd
   pnpm
   ripgrep
+  scdoc
   shellcheck
   sloth
   stow
