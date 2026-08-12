@@ -4,4 +4,14 @@ cargoDeps=(
   bropages
 )
 
+# apps installed from git (not published to crates.io)
+cargoGitDeps=(
+  https://github.com/tim-codes/stray
+)
+
 cargo install $cargoDeps
+
+for repo in $cargoGitDeps; do
+  # use the git CLI so ssh auth (1Password agent) works for private/rewritten remotes
+  CARGO_NET_GIT_FETCH_WITH_CLI=true cargo install --git $repo
+done
