@@ -9,7 +9,10 @@ sudo apt-get install -y \
   lsd bat fd-find ripgrep \
   tmux htop tree
 
-# Change default shell to zsh
-if [[ "$SHELL" != */zsh ]]; then
+# Change default shell to zsh, unless the machine wants its native login
+# shell kept (e.g. ragnar: a zsh login shell breaks the Ubuntu desktop
+# session env — snap apps vanish from the menu; interactive use is fish
+# via alacritty/tmux regardless). Set DOTFILES_SKIP_CHSH=1 to opt out.
+if [[ "${DOTFILES_SKIP_CHSH:-}" != "1" && "$SHELL" != */zsh ]]; then
   chsh -s $(which zsh)
 fi
