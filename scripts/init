@@ -33,6 +33,8 @@ export GOPATH="${HOME}/.go"
 export NODE_VERSION="lts/krypton"
 export NVM_DIR="${HOME}/.nvm"
 export PNPM_HOME="${HOME}/Library/pnpm"
+
+export STRAY_ROOT="${HOME}/dev"
 EOT
 fi
 
