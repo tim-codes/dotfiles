@@ -1,5 +1,3 @@
-echo "sourcing .bashrc"
-
 # default bashrc for mac os
 # Synced with ~/.config/fish/*.fish configuration
 
@@ -105,6 +103,10 @@ case $- in
     *i*) ;;
       *) return;;
 esac
+
+# Interactive-only from here on. Any output above the guard corrupts
+# scp/sftp and pollutes captured ssh output, so the echo lives here.
+echo "sourcing .bashrc"
 
 # Set CLICOLOR if you want Ansi Colors in iTerm2
 export CLICOLOR=1
