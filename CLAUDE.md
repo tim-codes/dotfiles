@@ -39,15 +39,35 @@ This is a personal dotfiles repository for macOS and Linux development environme
 config.fish > local.sh, $platform.fish > common.fish, local.fish
 ```
 
-**Zsh:**
+**Zsh and bash** — both load one shared file, `~/.config/shell/common.sh`,
+which sources `local.sh` and builds PATH:
 ```
-.zshrc > local.sh, zsh_$platform > zsh_common, zsh_local
-``` s
+zsh:   .zshenv > common.sh > local.sh          (EVERY zsh, incl. non-interactive)
+       [login]       /etc/zprofile (path_helper) > .zprofile > common.sh again
+       [interactive] .zshrc  (nvm only)
+bash:  .bashrc > common.sh > local.sh, then interactive-only aliases/prompt
+```
+
+- **zsh is the login shell** on these machines (`scripts/setup-linux` runs
+  `chsh -s $(which zsh)`, macOS defaults to `/bin/zsh`) even though interactive
+  use is fish. ssh one-liners, cron, scripts and Claude Code all land in zsh,
+  and `.zshenv` is the only file they read — so nothing shared may live in
+  `.zshrc`.
+- zsh is deliberately **not** at parity with fish. It is the redundant fallback
+  for machines and contexts without fish, so it gets variables and PATH and
+  nothing else; aliases, prompt and completions stay in `.bashrc` and the fish
+  config.
+- `.zprofile` re-sources `common.sh` because macOS's `/etc/zprofile` runs
+  `path_helper`, which reorders PATH *and* adds the `/etc/paths.d` entries
+  after `.zshenv` has already run.
+- Earlier versions of this file described `zsh_$platform`/`zsh_common` files.
+  They never existed, and `local.sh` sourcing was commented out in both
+  `.zshenv` and `.zprofile` — zsh had no shared config at all.
 
 ### Key Configuration Files
-- `~/.config/local.sh` - Environment variables (shared between shells)
+- `~/.config/local.sh` - Environment variables (shared between all three shells)
+- `~/.config/shell/common.sh` - Shared bash+zsh config: variables + PATH
 - `~/.config/fish/local.fish` - Fish-specific overrides
-- `~/.config/zsh/zsh_local` - Zsh-specific overrides
 - `~/.gpg.gitconfig` - GPG signing configuration
 
 ### Stow Integration

@@ -1,37 +1,20 @@
-# echo "sourcing ~/.zshenv"
-
-# .zshenv - Loaded for ALL zsh shells (interactive and non-interactive)
-# This is the ONLY file sourced by non-interactive zsh shells
-# Critical for Claude Code, scripts, and other non-interactive contexts
-
-# Load shared configuration (variables like $GOROOT, $GOPATH, $PNPM_HOME)
-# if [[ -f "$HOME/.config/local.sh" ]]; then
-#   source "$HOME/.config/local.sh"
-# fi
-
-# Set PATH with all required directories
-# echo "GOROOT=${GOROOT}"
-# export GOROOT="/Users/tim/sdk/go/go1.25.3"
-# export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/.nix-profile/bin:$HOME/.local/share/fnm:$HOME/bin:$GOPATH/bin:$GOROOT/bin:$PNPM_HOME:$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:/Applications/Alacritty.app/Contents/MacOS:/Applications/Sublime Text.app/Contents/SharedSupport/bin:$HOME/Library/Application Support/Jetbrains/Toolbox/scripts"
-# export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin:$HOME/.nix-profile/bin:$HOME/bin:$GOPATH/bin:$GOROOT/bin:$PNPM_HOME"
+# .zshenv - loaded for ALL zsh shells, interactive or not, and the ONLY file a
+# non-interactive zsh reads.
 #
-# # Cargo/Rust
-# if [[ -f "$HOME/.cargo/env" ]]; then
-#   source "$HOME/.cargo/env"
-# fi
+# Load-bearing, because zsh is the LOGIN shell on these machines
+# (scripts/setup-linux chsh's to it, macOS defaults to /bin/zsh) while
+# interactive use goes through fish. So ssh one-liners, cron, scripts and
+# Claude Code all land here and nowhere else. The block below used to be
+# commented out, which left zsh — the redundant/fallback shell — as the only
+# one with no shared config at all.
 #
-# # Additional environment variables from fish common.fish
-# export KUBE_CONFIG_PATH="$HOME/.kube/config"
-# export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/application_default_credentials.json"
-# export CLOUDSDK_PYTHON_SITEPACKAGES=1
-# export GPG_TTY=$(tty)
+# The shared minimal set (variables + PATH) lives in one file sourced by both
+# bash and zsh so the two cannot drift apart again. Aliases, prompt and
+# completions are deliberately NOT included: zsh is the fallback for machines
+# and contexts without fish, not a second fish.
 #
-# # OpenAI key
-# if [[ -f ~/keys/openai.key ]]; then
-#   export OPENAI_KEY=$(cat ~/keys/openai.key)
-#   export OPENAI_API_KEY=$OPENAI_KEY
-# fi
+# Keep this file silent — output here corrupts scp/sftp and captured ssh output.
 
-# for getting claude code to use LSP plugins properly
-# (https://github.com/anthropics/claude-code/issues/15148)
-export ENABLE_LSP_TOOL=1
+if [ -f "$HOME/.config/shell/common.sh" ]; then
+    . "$HOME/.config/shell/common.sh"
+fi

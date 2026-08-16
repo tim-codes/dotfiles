@@ -3,78 +3,14 @@
 
 # ~/.bashrc: executed by bash(1) for non-login shells.
 
-# ~~~ LOAD LOCAL CONFIG FIRST ~~~ #
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-# Load local.sh BEFORE the interactive check so variables are available
-# even in non-interactive shells (needed for Claude Code, scripts, etc.)
-if [[ -f "$HOME/.config/local.sh" ]]; then
-    source "$HOME/.config/local.sh"
-fi
-
-
-# ~~~ VARIABLES (from common.fish) ~~~ #
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-
-export KUBE_CONFIG_PATH="$HOME/.kube/config"
-export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/application_default_credentials.json"
-# enable IAP ssh tunnel to use numpy on system to increase performance
-export CLOUDSDK_PYTHON_SITEPACKAGES=1
-# enable TTY for GPG signing prompt
-export GPG_TTY=$(tty)
-# for getting claude code to use LSP plugins properly
-# (https://github.com/anthropics/claude-code/issues/15148)
-export ENABLE_LSP_TOOL=1
-
-# OpenAI key -> chatgpt-cli, opencommit
-if [[ -f ~/keys/openai.key ]]; then
-    export OPENAI_KEY=$(cat ~/keys/openai.key)
-    export OPENAI_API_KEY=$OPENAI_KEY
-fi
-
-# ~~~ PATH (from common.fish and mac.fish) ~~~ #
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-# NOTE: PATH setup happens AFTER local.sh is loaded so we can use
-# $GOROOT, $GOPATH, $PNPM_HOME from local.sh
-
-# Capture original PATH
-if [[ -z "$PATH_BASE" ]]; then
-    export PATH_BASE="$PATH"
-fi
-
-# Helper function to add to PATH idempotently
-add_to_path() {
-    for dir in "$@"; do
-        if [[ ":$PATH:" != *":$dir:"* ]]; then
-            export PATH="$PATH:$dir"
-        fi
-    done
-}
-
-# Reset PATH and rebuild it
-# Note: forcing homebrew in front so we have homebrew bash in front of system bash
-export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH_BASE"
-
-# Add all paths from fish config
-# Now $GOROOT, $GOPATH, $PNPM_HOME are available from local.sh
-add_to_path \
-    "/usr/local/bin" \
-    "$HOME/.local/bin" \
-    "$HOME/.nix-profile/bin" \
-    "$HOME/.local/share/fnm" \
-    "$HOME/bin" \
-    "$GOPATH/bin" \
-    "$GOROOT/bin" \
-    "$PNPM_HOME" \
-    "$HOME/.yarn/bin" \
-    "$HOME/.config/yarn/global/node_modules/.bin" \
-    "/opt/homebrew/opt/mysql-client/bin" \
-    "/Applications/Alacritty.app/Contents/MacOS" \
-    "/Applications/Sublime Text.app/Contents/SharedSupport/bin" \
-    "$HOME/Library/Application Support/Jetbrains/Toolbox/scripts"
-
-# Cargo/Rust
-if [[ -f "$HOME/.cargo/env" ]]; then
-    source "$HOME/.cargo/env"
+# ~~~ SHARED CONFIG FIRST ~~~ #
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+# Variables and PATH live in one file shared with zsh (which sources it from
+# .zshenv), so the two non-fish shells cannot drift apart. It loads local.sh
+# itself, and runs BEFORE the interactive check below so the variables exist in
+# non-interactive shells too — Claude Code, scripts, ssh one-liners.
+if [[ -f "$HOME/.config/shell/common.sh" ]]; then
+    source "$HOME/.config/shell/common.sh"
 fi
 
 # nvm configuration
