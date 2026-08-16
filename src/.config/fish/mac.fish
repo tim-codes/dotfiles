@@ -24,3 +24,14 @@ alias claude-d-exxo='open -na "Claude" --args --user-data-dir="$HOME/Library/App
 set -x PATH $PATH "/Applications/Alacritty.app/Contents/MacOS"
 set -x PATH $PATH "/Applications/Sublime Text.app/Contents/SharedSupport/bin"
 set -x PATH $PATH "$HOME/Library/Application Support/Jetbrains/Toolbox/scripts"
+
+# OrbStack docker CLI (its installer only wires ~/.zprofile, see there)
+source ~/.orbstack/shell/init2.fish 2>/dev/null || :
+
+# Homelab integration functions (mbp-claude, ...) — that repo owns machines'
+# roles and inter-host wiring, this repo owns $HOME, so homelab keeps the
+# content and dotfiles owns the single line that loads it. See ADR-012 in
+# ~/dev/homelab/docs/adr/. Absent on machines with no homelab clone.
+for f in $HOME/dev/homelab/projects/*/files/fish/*.fish
+  test -f $f; and source $f
+end

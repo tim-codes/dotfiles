@@ -8,6 +8,13 @@ brewDeps=(
   bat
   btop
   colordiff
+  composer
+  # macOS ships no timeout(1)/nproc/shuf, so Linux-written scripts and agent
+  # tooling die with exit 127 rather than timing out. coreutils g-prefixes only
+  # the names that would collide (gls, gdate, ...) and links everything else
+  # under its normal name, so installing it is the whole fix. Deliberately no
+  # libexec/gnubin on PATH — that swaps ls/cp/date/sed shell-wide.
+  coreutils
   crane
   ctop
   diff-so-fancy
@@ -31,8 +38,14 @@ brewDeps=(
   lsd
   mysql-client
   ncdu
+  # speeds up gcloud's IAP TCP tunnels. gcloud has no bundled python here so it
+  # falls back to Homebrew's, where pip is blocked by PEP 668 — hence the formula
+  numpy
   fastfetch
   neovim
+  # pinned: h2gc-legacy requires 8.3. Must be linked AFTER composer, which pulls
+  # in the unversioned php formula as a dependency and auto-links it on top.
+  "php@8.3"
   pipx
   pmd
   pnpm
@@ -77,5 +90,40 @@ if should_update_brew; then
   date +%s > "$timestamp_file"
 fi
 
+# GUI apps and SDKs shipped as casks. Alacritty is deliberately absent — its
+# cask is deprecated/unnotarized, so setup-macbook builds it from source.
+# Format: "cask" or "cask:Bundle Name.app" when it installs an /Applications app.
+brewCasks=(
+  "firefox:Firefox.app"
+  "gcloud-cli"
+  "iterm2:iTerm.app"
+  "orbstack:OrbStack.app"
+)
+
 # homebrew dependencies
 brew install $brewDeps
+
+# composer pulls in the unversioned php formula and auto-links it, silently
+# overriding php@8.3 above. Relink so the pinned version wins.
+brew link "php@8.3" --force --overwrite
+
+# casks. An app installed by hand — dragged from a .dmg, or carried across by
+# Migration Assistant — is invisible to `brew list`, and `brew install --cask`
+# on top of one aborts with "It seems there is already an App at ...". That
+# would fail this script (and abort setup-macbook, which runs with `set -e`),
+# so probe the bundle and leave such an app alone. Adopting it replaces the
+# bundle and would discard a non-default install, so that stays manual:
+#   brew install --cask --force <cask>
+for entry in $brewCasks; do
+  cask="${entry%%:*}"
+  bundle="${entry#*:}"
+  [[ "$bundle" == "$entry" ]] && bundle=""
+
+  if brew list --cask "$cask" &>/dev/null; then
+    echo "$cask: already installed"
+  elif [[ -n "$bundle" && -d "/Applications/$bundle" ]]; then
+    echo "$cask: $bundle present but not homebrew-managed — leaving as is"
+  else
+    brew install --cask "$cask"
+  fi
+done
