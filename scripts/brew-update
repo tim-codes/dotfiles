@@ -51,6 +51,9 @@ brewDeps=(
   pmd
   pnpm
   pulumi
+  # redis-cli for inspecting the local secret cache (the cache itself runs as
+  # a container; this is the client, not a server we run)
+  redis
   # from pulumi's own tap — the fully-qualified name auto-taps on install
   "pulumi/tap/esc"
   ripgrep
