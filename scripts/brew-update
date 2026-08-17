@@ -43,12 +43,16 @@ brewDeps=(
   numpy
   fastfetch
   neovim
+  pandoc
   # pinned: h2gc-legacy requires 8.3. Must be linked AFTER composer, which pulls
   # in the unversioned php formula as a dependency and auto-links it on top.
   "php@8.3"
   pipx
   pmd
   pnpm
+  pulumi
+  # from pulumi's own tap — the fully-qualified name auto-taps on install
+  "pulumi/tap/esc"
   ripgrep
   scdoc
   shellcheck
@@ -60,9 +64,11 @@ brewDeps=(
   # is what this list silently installed for months while `tf` stayed broken
   opentofu
   tree
+  vercel
   webp
   websocat
   wget
+  wireguard-tools
   yq
   zoxide
 )
