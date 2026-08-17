@@ -355,23 +355,29 @@ end
 # back to where it started.
 # All arguments after the context dir pass straight through, so
 # `claude-exxo --model fable --effort medium -p ...` works as if calling claude
-# directly. On exit, claude-reset-defaults puts model/effortLevel back to the
-# repo baseline: a mid-session /model change lasts for that session only.
+# directly. Those flags are session-scoped and never touch settings.json; the
+# in-session `/model` and `/effort` DO write your default, which is a habit to
+# avoid rather than something to guard against — a rewrite shows up in
+# `git diff` on files/claude/settings.json and is reverted there.
+#
+# Starting in $HOME makes Claude ask to trust the ENTIRE home directory — a
+# huge scope granted in one keystroke — and starting in ANOTHER account's
+# context dir is a leftover from a previous session, not a place to work. Both
+# are redirected into this context's own dir: small, already Claude's own, and
+# a sane thing to trust. Any real working directory is left alone. The cd is
+# not undone afterwards: you asked for this context, so ending up in it is the
+# expected result.
 function __claude_ctx --description 'Run claude in a per-account config context'
     set -l dir $argv[1]
     set -e argv[1]
-    set -l rc 0
-    if test (path resolve .) = (path resolve $HOME)
-        pushd $dir
-        env CLAUDE_CONFIG_DIR=$dir claude $argv
-        set rc $status
-        popd
-    else
-        env CLAUDE_CONFIG_DIR=$dir claude $argv
-        set rc $status
+    set -l home (path resolve $HOME)
+    set -l here (path resolve .)
+    set -l target (path resolve $dir)
+    set -l ctx_dirs $home/.claude $home/.claude-personal $home/.claude-exxo
+    if test "$here" = "$home"; or contains -- "$here" $ctx_dirs
+        test "$here" = "$target"; or cd $target
     end
-    claude-reset-defaults $dir
-    return $rc
+    env CLAUDE_CONFIG_DIR=$dir claude $argv
 end
 
 function claude --wraps claude --description 'claude in the personal context'

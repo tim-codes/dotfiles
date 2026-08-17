@@ -16,22 +16,18 @@
 # where the unaliased command would otherwise slip through. Gated on the
 # context existing so machines without the per-account split are untouched.
 #
-# A function rather than an alias, because it also redirects a bare $HOME start
-# into the context dir — launching from $HOME makes Claude ask to trust the
-# whole home directory. The redirect runs in a subshell so the caller's $PWD is
-# unchanged. `command claude` is the PATH binary, so there is no recursion.
+# A function rather than an alias, because it also redirects the start
+# directory: launching from $HOME asks to trust the whole home directory, and
+# launching from another account's context dir is a leftover from a previous
+# session. Both land in this context's own dir instead. The cd is not undone —
+# you asked for this context. `command claude` is the PATH binary, no recursion.
 if [ -d "$HOME/.claude-personal" ]; then
     claude() {
-        local dir="$HOME/.claude-personal" rc
-        if [ "$PWD" = "$HOME" ]; then
-            ( cd "$dir" && CLAUDE_CONFIG_DIR="$dir" command claude "$@" ); rc=$?
-        else
-            CLAUDE_CONFIG_DIR="$dir" command claude "$@"; rc=$?
-        fi
-        # model/effortLevel back to the repo baseline; a /model change lasts
-        # for that session only. Arguments pass straight through, so
-        # `claude --model fable --effort medium` still works.
-        claude-reset-defaults "$dir"
-        return $rc
+        local dir="$HOME/.claude-personal"
+        case "$PWD" in
+            "$HOME"|"$HOME"/.claude|"$HOME"/.claude-personal|"$HOME"/.claude-exxo)
+                [ "$PWD" = "$dir" ] || cd "$dir" ;;
+        esac
+        CLAUDE_CONFIG_DIR="$dir" command claude "$@"
     }
 fi
