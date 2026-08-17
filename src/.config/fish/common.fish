@@ -348,10 +348,11 @@ end
 # Contexts are created by scripts/claude-contexts.
 #
 # Starting from $HOME makes Claude ask to trust the ENTIRE home directory — a
-# huge, mostly irrelevant trust scope granted in one keystroke. So a bare $HOME
-# start is redirected into the context dir itself: small, already Claude's own,
-# and a sane thing to trust. Every other directory is left alone — an explicit
-# `cd` into a project is the whole point. pushd/popd so the caller's shell comes
+# huge, mostly irrelevant trust scope granted in one keystroke — and starting
+# in a context dir treats config state as a workspace. Both are redirected into
+# ~/claude, the default working directory: small, purpose-made, and a sane
+# thing to trust. Any real working directory is left alone — an explicit `cd`
+# into a project is the whole point. pushd/popd so the caller's shell comes
 # back to where it started.
 # All arguments after the context dir pass straight through, so
 # `claude-exxo --model fable --effort medium -p ...` works as if calling claude
@@ -359,25 +360,26 @@ end
 # in-session `/model` and `/effort` DO write your default, which is a habit to
 # avoid rather than something to guard against — a rewrite shows up in
 # `git diff` on files/claude/settings.json and is reverted there.
-#
-# Starting in $HOME makes Claude ask to trust the ENTIRE home directory — a
-# huge scope granted in one keystroke — and starting in ANOTHER account's
-# context dir is a leftover from a previous session, not a place to work. Both
-# are redirected into this context's own dir: small, already Claude's own, and
-# a sane thing to trust. Any real working directory is left alone. The cd is
-# not undone afterwards: you asked for this context, so ending up in it is the
-# expected result.
 function __claude_ctx --description 'Run claude in a per-account config context'
-    set -l dir $argv[1]
+    set -l dir $argv[1] # context dir, or "" for the default ~/.claude
     set -e argv[1]
     set -l home (path resolve $HOME)
     set -l here (path resolve .)
-    set -l target (path resolve $dir)
-    set -l ctx_dirs $home/.claude $home/.claude-personal $home/.claude-exxo
+    set -l ctx_dirs $home/.claude-personal $home/.claude-exxo
+    set -l jumped 0
     if test "$here" = "$home"; or contains -- "$here" $ctx_dirs
-        test "$here" = "$target"; or cd $target
+        mkdir -p $home/claude
+        pushd $home/claude
+        set jumped 1
     end
-    env CLAUDE_CONFIG_DIR=$dir claude $argv
+    if test -n "$dir"
+        env CLAUDE_CONFIG_DIR=$dir claude $argv
+    else
+        env -u CLAUDE_CONFIG_DIR claude $argv
+    end
+    set -l st $status
+    test $jumped -eq 1; and popd
+    return $st
 end
 
 function claude --wraps claude --description 'claude in the personal context'
@@ -388,5 +390,11 @@ function claude-personal --wraps claude --description 'claude in the personal co
 end
 function claude-exxo --wraps claude --description 'claude in the exxo (work) context'
     __claude_ctx "$HOME/.claude-exxo" $argv
+end
+# Escape hatch past the wrong-account guard: the retired default context.
+# Using it RECREATES ~/.claude and ~/.claude.json from scratch (fresh
+# login/onboarding) — that is the one sanctioned way they come back.
+function claude-default --wraps claude --description 'claude in the retired default ~/.claude context (recreates it)'
+    __claude_ctx "" $argv
 end
 
