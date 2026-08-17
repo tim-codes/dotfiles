@@ -1,0 +1,98 @@
+#!/bin/bash
+# Distribute repo-managed Claude Code config into every per-account context
+# (~/.claude-personal, ~/.claude-exxo — created by scripts/claude-contexts).
+#
+# Replaces homelab's projects/macos-common/sync-claude-config.sh. Two changes
+# of substance beyond the move:
+#
+# 1. settings.json is COPIED, never symlinked. Symlinking made the live user
+#    settings file *be* the repo file, and Claude Code writes through it
+#    constantly — plugin toggles, dialog acks, key reordering — so the repo was
+#    perpetually dirty. Copying breaks that loop: the repo file is a one-way
+#    baseline, and drift is promoted deliberately (see `diff` below) instead of
+#    landing in git by accident.
+# 2. It targets the real contexts, never ~/.claude. The default context is
+#    retired; recreating it is how it would come back from the dead.
+#
+# Skills are still SYMLINKED — they are read-only reference material that
+# Claude never writes, so the churn problem does not apply and a symlink means
+# `git pull` is the whole update.
+#
+# Skills are collected from this repo AND from homelab, if that clone is
+# present: skill content describing lab infrastructure versions with the lab,
+# while $HOME stays this repo's to write. Same split as the fish functions in
+# mac.fish.
+#
+# Usage:
+#   claude-sync            apply settings + skills to every context
+#   claude-sync --diff     show what has drifted, change nothing
+#
+# Safe to re-run.
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SRC_SETTINGS="$REPO_DIR/files/claude/settings.json"
+SKILL_SOURCES=(
+    "$REPO_DIR/files/claude/skills"
+    "$HOME/dev/homelab/projects/macos-common/files/claude/skills"
+)
+CONTEXTS=("$HOME/.claude-personal" "$HOME/.claude-exxo")
+
+info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33mwarn:\033[0m %s\n' "$*"; }
+
+diff_only=0
+[ "${1:-}" = "--diff" ] && diff_only=1
+
+if [ "$diff_only" = 1 ]; then
+    for ctx in "${CONTEXTS[@]}"; do
+        [ -d "$ctx" ] || continue
+        info "${ctx/#$HOME/~} vs repo"
+        if diff -u "$SRC_SETTINGS" "$ctx/settings.json" 2>/dev/null; then
+            echo "  identical"
+        fi
+    done
+    exit 0
+fi
+
+for ctx in "${CONTEXTS[@]}"; do
+    if [ ! -d "$ctx" ]; then
+        warn "${ctx/#$HOME/~} does not exist — run scripts/claude-contexts first"
+        continue
+    fi
+    info "${ctx/#$HOME/~}"
+
+    # A symlink here is the old homelab arrangement; replace it with a real file.
+    if [ -L "$ctx/settings.json" ]; then
+        rm "$ctx/settings.json"
+        echo "  settings.json: removed legacy symlink into the homelab repo"
+    fi
+    if [ -f "$ctx/settings.json" ] && ! diff -q "$SRC_SETTINGS" "$ctx/settings.json" >/dev/null 2>&1; then
+        backup="$ctx/settings.json.bak-$(date +%Y%m%d-%H%M%S)"
+        cp "$ctx/settings.json" "$backup"
+        echo "  settings.json: differed — backed up to ${backup/#$HOME/~}"
+        echo "  (promote anything worth keeping into $SRC_SETTINGS, then re-run)"
+    fi
+    cp "$SRC_SETTINGS" "$ctx/settings.json"
+    echo "  settings.json: written from repo"
+
+    mkdir -p "$ctx/skills"
+    for src_dir in "${SKILL_SOURCES[@]}"; do
+        [ -d "$src_dir" ] || continue
+        for skill in "$src_dir"/*/; do
+            [ -d "$skill" ] || continue
+            skill="${skill%/}"
+            name="$(basename "$skill")"
+            dest="$ctx/skills/$name"
+            if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$skill" ]; then
+                echo "  skills/$name: already linked"
+                continue
+            fi
+            [ -e "$dest" ] && rm -rf "$dest"
+            ln -s "$skill" "$dest"
+            echo "  skills/$name: linked -> ${skill/#$HOME/~}"
+        done
+    done
+done
+
+info "Done"
