@@ -8,16 +8,23 @@ config.fish >
   $platform.fish > common.fish,
   local.fish
 
-.zshrc >
-  local.sh,
-  zsh_$platform > zsh_common,
-  zsh_local
+.zshenv >                               # EVERY zsh, incl. non-interactive
+  ~/.config/shell/common.sh > local.sh
+  [login]       .zprofile > common.sh again   # after /etc/zprofile path_helper
+  [interactive] .zshrc                        # nvm only
+
+.bashrc >
+  ~/.config/shell/common.sh > local.sh,
+  then interactive-only aliases/prompt
 ```
 
+zsh is the fallback for machines and contexts without fish, so it gets the
+minimal set — variables and PATH — not parity. It and bash read the same
+`common.sh`, so the two cannot drift apart.
+
 user should modify:
-* ~/.config/local.sh         # variables
+* ~/.config/local.sh         # variables (read by all three shells)
 * ~/.config/fish/local.fish  # fish overrides
-* ~/.config/zsh/zsh_local    # zsh overrides
 
 ## contributing
 

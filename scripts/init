@@ -2,7 +2,6 @@
 
 local_root="${HOME}/.config/local.sh"
 local_fish="${HOME}/.config/fish/local.fish"
-local_zsh="${HOME}/.config/zsh/zsh_local"
 dotfiles_root="${HOME}/dev/dotfiles"
 
 platform="linux"
@@ -42,15 +41,6 @@ fi
 if [ ! -e "$local_fish" ]; then
   mkdir -p "$(dirname "$local_fish")"
   touch "$local_fish"
-fi
-
-# create local zsh config
-if [ ! -e "$local_zsh" ]; then
-  mkdir -p "$(dirname "$local_zsh")"
-  touch "$local_zsh"
-  cat <<EOT > "$local_zsh"
-#!/bin/zsh
-EOT
 fi
 
 # create local alacritty config with this machine's fish path (the

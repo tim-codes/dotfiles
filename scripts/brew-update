@@ -1,7 +1,6 @@
 #!/bin/zsh
 
 brewDeps=(
-  "1password-cli"
   asciinema
   awscli
   bash
@@ -25,7 +24,8 @@ brewDeps=(
   fzf
   gh
   glances
-  gpg
+  # canonical name; "gpg" is an old alias for the same formula
+  gnupg
   gradle
   helm
   htop
@@ -52,12 +52,13 @@ brewDeps=(
   ripgrep
   scdoc
   shellcheck
-  sloth
   stow
   telnet
   tldr
   tmux
-  tofu
+  # NOT "tofu" — that name resolves to a cask for Tofu.app, an e-reader, which
+  # is what this list silently installed for months while `tf` stayed broken
+  opentofu
   tree
   webp
   websocat
@@ -94,6 +95,7 @@ fi
 # cask is deprecated/unnotarized, so setup-macbook builds it from source.
 # Format: "cask" or "cask:Bundle Name.app" when it installs an /Applications app.
 brewCasks=(
+  "1password-cli"
   "firefox:Firefox.app"
   "gcloud-cli"
   "iterm2:iTerm.app"
