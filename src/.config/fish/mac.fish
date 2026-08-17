@@ -27,6 +27,10 @@ alias where="type -a"
 # must inject via --env (LaunchServices does not inherit the shell env).
 alias claude-d-personal='open -na "Claude" --env CLAUDE_CONFIG_DIR="$HOME/.claude-personal" --args --user-data-dir="$HOME/Library/Application Support/Claude-Personal"'
 alias claude-d-exxo='open -na "Claude" --env CLAUDE_CONFIG_DIR="$HOME/.claude-exxo" --args --user-data-dir="$HOME/Library/Application Support/Claude-Exxo"'
+# Escape hatch: default desktop dir AND default ~/.claude context — using it
+# recreates both retired dirs from scratch. Session working dir is picked
+# in-app (open cannot set it); prefer ~/claude there.
+alias claude-d-default='open -na "Claude"'
 
 set -x PATH $PATH "/Applications/Alacritty.app/Contents/MacOS"
 set -x PATH $PATH "/Applications/Sublime Text.app/Contents/SharedSupport/bin"

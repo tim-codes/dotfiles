@@ -18,16 +18,29 @@
 #
 # A function rather than an alias, because it also redirects the start
 # directory: launching from $HOME asks to trust the whole home directory, and
-# launching from another account's context dir is a leftover from a previous
-# session. Both land in this context's own dir instead. The cd is not undone —
-# you asked for this context. `command claude` is the PATH binary, no recursion.
+# launching from a context dir treats config state as a workspace. Both run
+# from ~/claude, the default working directory, via a subshell so the caller's
+# shell stays where it was. `command claude` is the PATH binary, no recursion.
 if [ -d "$HOME/.claude-personal" ]; then
     claude() {
         local dir="$HOME/.claude-personal"
         case "$PWD" in
-            "$HOME"|"$HOME"/.claude|"$HOME"/.claude-personal|"$HOME"/.claude-exxo)
-                [ "$PWD" = "$dir" ] || cd "$dir" ;;
+            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo)
+                mkdir -p "$HOME/claude"
+                ( cd "$HOME/claude" && CLAUDE_CONFIG_DIR="$dir" command claude "$@" )
+                return ;;
         esac
         CLAUDE_CONFIG_DIR="$dir" command claude "$@"
+    }
+    # Escape hatch: the retired default ~/.claude context. Using it RECREATES
+    # ~/.claude and ~/.claude.json from scratch (fresh login/onboarding).
+    claude-default() {
+        case "$PWD" in
+            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo)
+                mkdir -p "$HOME/claude"
+                ( cd "$HOME/claude" && command env -u CLAUDE_CONFIG_DIR claude "$@" )
+                return ;;
+        esac
+        command env -u CLAUDE_CONFIG_DIR claude "$@"
     }
 fi
