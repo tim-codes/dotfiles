@@ -105,6 +105,7 @@ add_to_path \
     "$GOPATH/bin" \
     "$GOROOT/bin" \
     "$PNPM_HOME" \
+    "$PNPM_HOME/bin" \
     "$HOME/.orbstack/bin" \
     "$HOME/.yarn/bin" \
     "$HOME/.config/yarn/global/node_modules/.bin" \
