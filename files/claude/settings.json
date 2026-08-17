@@ -1,5 +1,5 @@
 {
-  "model": "fable",
+  "model": "sonnet",
   "hooks": {
     "Notification": [
       {
@@ -82,11 +82,11 @@
       }
     ]
   },
-  "effortLevel": "medium",
+  "effortLevel": "high",
   "skipWorkflowUsageWarning": true,
   "theme": "dark",
   "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": false,
+  "agentPushNotifEnabled": true,
   "enabledPlugins": {
     "vercel@claude-plugins-official": true
   }
