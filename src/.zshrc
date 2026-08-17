@@ -22,11 +22,16 @@
 # unchanged. `command claude` is the PATH binary, so there is no recursion.
 if [ -d "$HOME/.claude-personal" ]; then
     claude() {
-        local dir="$HOME/.claude-personal"
+        local dir="$HOME/.claude-personal" rc
         if [ "$PWD" = "$HOME" ]; then
-            ( cd "$dir" && CLAUDE_CONFIG_DIR="$dir" command claude "$@" )
+            ( cd "$dir" && CLAUDE_CONFIG_DIR="$dir" command claude "$@" ); rc=$?
         else
-            CLAUDE_CONFIG_DIR="$dir" command claude "$@"
+            CLAUDE_CONFIG_DIR="$dir" command claude "$@"; rc=$?
         fi
+        # model/effortLevel back to the repo baseline; a /model change lasts
+        # for that session only. Arguments pass straight through, so
+        # `claude --model fable --effort medium` still works.
+        claude-reset-defaults "$dir"
+        return $rc
     }
 fi

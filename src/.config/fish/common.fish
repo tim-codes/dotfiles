@@ -353,17 +353,25 @@ end
 # and a sane thing to trust. Every other directory is left alone — an explicit
 # `cd` into a project is the whole point. pushd/popd so the caller's shell comes
 # back to where it started.
+# All arguments after the context dir pass straight through, so
+# `claude-exxo --model fable --effort medium -p ...` works as if calling claude
+# directly. On exit, claude-reset-defaults puts model/effortLevel back to the
+# repo baseline: a mid-session /model change lasts for that session only.
 function __claude_ctx --description 'Run claude in a per-account config context'
     set -l dir $argv[1]
     set -e argv[1]
+    set -l rc 0
     if test (path resolve .) = (path resolve $HOME)
         pushd $dir
         env CLAUDE_CONFIG_DIR=$dir claude $argv
-        set -l rc $status
+        set rc $status
         popd
-        return $rc
+    else
+        env CLAUDE_CONFIG_DIR=$dir claude $argv
+        set rc $status
     end
-    env CLAUDE_CONFIG_DIR=$dir claude $argv
+    claude-reset-defaults $dir
+    return $rc
 end
 
 function claude --wraps claude --description 'claude in the personal context'
