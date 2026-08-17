@@ -62,6 +62,28 @@ add_to_path() {
     done
 }
 
+# Drop later repeats of an entry, keeping the first (which is the one that
+# wins lookups anyway). PATH is rebuilt from the live PATH — by .zprofile after
+# path_helper, and by tools that append their own entries — so repeats
+# accumulate without this. Read line-by-line rather than splitting on ":" in a
+# for loop: zsh does not word-split unquoted parameters the way bash does, and
+# several entries contain spaces.
+dedupe_path() {
+    _dp_new=""
+    while IFS= read -r _dp_dir; do
+        [ -n "$_dp_dir" ] || continue
+        case ":$_dp_new:" in
+            *":$_dp_dir:"*) continue ;;
+        esac
+        _dp_new="${_dp_new:+$_dp_new:}$_dp_dir"
+    done <<EOF
+$(printf '%s' "$PATH" | tr ':' '\n')
+EOF
+    PATH="$_dp_new"
+    export PATH
+    unset _dp_new _dp_dir
+}
+
 # homebrew forced in front so its bash/tools beat the system copies
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH_BASE"
 
@@ -74,6 +96,7 @@ add_to_path \
     "$GOPATH/bin" \
     "$GOROOT/bin" \
     "$PNPM_HOME" \
+    "$HOME/.orbstack/bin" \
     "$HOME/.yarn/bin" \
     "$HOME/.config/yarn/global/node_modules/.bin" \
     "/opt/homebrew/opt/mysql-client/bin" \
@@ -86,3 +109,7 @@ add_to_path \
 if [ -f "$HOME/.cargo/env" ]; then
     . "$HOME/.cargo/env"
 fi
+
+# Last, so it also catches whatever cargo's env (and anything sourced before
+# this file) appended.
+dedupe_path

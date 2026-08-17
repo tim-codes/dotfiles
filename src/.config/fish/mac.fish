@@ -1,7 +1,15 @@
 source ~/.config/fish/common.fish
 
-if test -d /opt/homebrew/Caskroom/google-cloud-sdk
-  source /opt/homebrew/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.fish.inc
+# gcloud: sets CLOUDSDK_ROOT_DIR and puts the SDK's own bin on PATH.
+# Anchored on brew's share/ symlink rather than the Caskroom: the cask was
+# renamed google-cloud-sdk -> gcloud-cli, and the old path silently stopped
+# matching, so this never loaded. share/ survives the rename, and checking both
+# prefixes covers Apple Silicon and Intel.
+for gcloud_sdk in /opt/homebrew/share/google-cloud-sdk /usr/local/share/google-cloud-sdk
+  if test -f $gcloud_sdk/path.fish.inc
+    source $gcloud_sdk/path.fish.inc
+    break
+  end
 end
 
 # AWS CLI completions
