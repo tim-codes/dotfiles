@@ -83,3 +83,4 @@ The setup scripts automatically detect platform (`mac` or `linux`) and load appr
 - Git commit signing uses 1Password SSH agent (key labeled "Git" in 1Password, deployed to ~/.ssh/git-signing.pub)
 - The init script detects WSL and uses `op-ssh-sign-wsl.exe` for commit signing (vs native paths on mac/linux)
 - Homebrew updates are throttled to run at most once every 20 minutes via timestamp check
+- Scroll direction: LinearMouse reverses mice (its "bypass other apps" toggle leaves Logi Options+-managed MX mice alone; macOS stays "natural" for the trackpad) — see docs/adr/2026-08-17-per-device-scroll-direction.md
