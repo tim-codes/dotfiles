@@ -21,7 +21,14 @@ end
 alias which="type -p"
 alias where="type -a"
 
-# Claude Code CLI per account (separate CLAUDE_CONFIG_DIR = separate login/session state)
+# Claude Code CLI per account (separate CLAUDE_CONFIG_DIR = separate login/session state).
+# Bare `claude` is pinned to the personal context so the default ~/.claude
+# context can't be used by accident (wrong-account guard). Safe despite the
+# name collision: `alias` defines a fish *function* claude, but `env` is an
+# external command whose exec does a plain PATH lookup, so the inner `claude`
+# resolves to ~/.local/bin/claude, never back into the function.
+# Contexts are created by scripts/claude-contexts.
+alias claude='env CLAUDE_CONFIG_DIR="$HOME/.claude-personal" claude'
 alias claude-personal='env CLAUDE_CONFIG_DIR="$HOME/.claude-personal" claude'
 alias claude-exxo='env CLAUDE_CONFIG_DIR="$HOME/.claude-exxo" claude'
 

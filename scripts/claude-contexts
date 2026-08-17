@@ -1,0 +1,74 @@
+#!/bin/bash
+# Create the per-account Claude Code CLI config contexts that the
+# claude/claude-personal/claude-exxo aliases in fish select via
+# CLAUDE_CONFIG_DIR:
+#
+#   ~/.claude-personal   personal account (also what bare `claude` now uses)
+#   ~/.claude-exxo       work (Exxo) account
+#
+# Idempotent: existing files/dirs are never overwritten. Each context is
+# seeded with a settings.json (copied — NOT symlinked — from ~/.claude if one
+# exists there; per-context settings are the point of the split). First run
+# of claude in a fresh context prompts /login for that account.
+#
+# --adopt-default: one-shot migration of the legacy default context into
+# ~/.claude-personal, for machines that used bare `claude` (= ~/.claude +
+# ~/.claude.json) before the split. Copies login/config state and the
+# per-account session data (transcripts, history, plugins) so --resume and
+# history carry over. Copy, not move: ~/.claude is left fully intact — a
+# session may be running out of it, and Claude Code regenerates runtime
+# state (daemon, caches, telemetry, shell-snapshots) per context anyway.
+set -euo pipefail
+
+adopt=0
+[ "${1:-}" = "--adopt-default" ] && adopt=1
+
+legacy="$HOME/.claude"
+
+for ctx in personal exxo; do
+    dir="$HOME/.claude-$ctx"
+    mkdir -p "$dir"
+
+    if [ ! -e "$dir/settings.json" ]; then
+        if [ -f "$legacy/settings.json" ]; then
+            # -L: dereference — ~/.claude/settings.json may be a symlink into
+            # the homelab repo; contexts get their own plain copy.
+            cp -L "$legacy/settings.json" "$dir/settings.json"
+            echo "$dir/settings.json: seeded from ~/.claude/settings.json"
+        else
+            printf '{}\n' > "$dir/settings.json"
+            echo "$dir/settings.json: created empty"
+        fi
+    else
+        echo "$dir/settings.json: exists, left alone"
+    fi
+done
+
+if [ "$adopt" = 1 ]; then
+    dest="$HOME/.claude-personal"
+
+    # Account/login + onboarding + per-project trust. Lives at ~/.claude.json
+    # for the default context, but inside the dir for CLAUDE_CONFIG_DIR ones.
+    if [ ! -e "$dest/.claude.json" ] && [ -f "$HOME/.claude.json" ]; then
+        cp -p "$HOME/.claude.json" "$dest/.claude.json"
+        echo "$dest/.claude.json: adopted from ~/.claude.json"
+    fi
+
+    # Per-account data worth carrying over. Deliberately NOT copied (machine/
+    # runtime state, regenerated per context): daemon*, telemetry, cache,
+    # shell-snapshots, session-env, chrome, downloads, jobs, backups,
+    # skills (fanned out by homelab's sync-claude-config.sh), *.json caches.
+    for item in history.jsonl projects file-history paste-cache plans tasks sessions todos plugins; do
+        src="$legacy/$item"
+        [ -e "$src" ] || continue
+        if [ -e "$dest/$item" ]; then
+            echo "$dest/$item: exists, left alone"
+            continue
+        fi
+        cp -Rp "$src" "$dest/$item"
+        echo "$dest/$item: adopted"
+    done
+fi
+
+echo "Done. Run homelab's projects/macos-common/sync-claude-config.sh (if the"
+echo "repo is present) to fan the lab skills into the new contexts."
