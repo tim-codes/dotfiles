@@ -48,6 +48,31 @@ end
 
 EOF
 
+# LinearMouse (installed by brew-update, config stowed from src/.config/linearmouse)
+# reverses scroll direction for mice while the trackpad stays "natural" — see
+# docs/adr/2026-08-17-per-device-scroll-direction.md
+# App-level settings (the General pane) live in UserDefaults, not
+# linearmouse.json, so stow can't carry them — codify them here instead.
+# Must run before the app's first launch so it starts with these values.
+# The bypass toggle is the behavior-critical one: it makes LinearMouse ignore
+# events synthesized by other apps, which is what stops it double-reversing
+# the MX mice that Logi Options+ manages.
+defaults write com.lujjjh.LinearMouse bypassEventsFromOtherApplications -bool true
+defaults write com.lujjjh.LinearMouse showInMenuBar -bool true
+# these two are JSON-encoded strings — the embedded quotes are required
+defaults write com.lujjjh.LinearMouse menuBarVisibilityMode -string '"always"'
+defaults write com.lujjjh.LinearMouse menuBarBatteryDisplayMode -string '"off"'
+defaults write com.lujjjh.LinearMouse showInDock -bool false
+defaults write com.lujjjh.LinearMouse betaChannelOn -bool true
+defaults write com.lujjjh.LinearMouse SUEnableAutomaticChecks -bool true
+defaults write com.lujjjh.LinearMouse SUAutomaticallyUpdate -bool true
+if ! osascript -e 'tell application "System Events" to get name of login items' 2>/dev/null | grep -q LinearMouse; then
+  osascript -e 'tell application "System Events" to make login item at end with properties {path:"/Applications/LinearMouse.app", hidden:true}'
+fi
+# first run on a fresh machine prompts for Accessibility permission — that
+# grant is TCC-protected and cannot be scripted without MDM; approve it once
+open -a LinearMouse
+
 # install poetry
 pipx install poetry && pipx ensurepath
 

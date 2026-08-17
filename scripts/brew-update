@@ -108,6 +108,10 @@ brewCasks=(
   "firefox:Firefox.app"
   "gcloud-cli"
   "iterm2:iTerm.app"
+  # reverses scroll direction for non-Logitech mice only (config in
+  # src/.config/linearmouse); Logi Options+ keeps owning the MX mice — see
+  # docs/adr/2026-08-17-per-device-scroll-direction.md
+  "linearmouse:LinearMouse.app"
   "orbstack:OrbStack.app"
 )
 
