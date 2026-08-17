@@ -21,9 +21,12 @@ end
 alias which="type -p"
 alias where="type -a"
 
-# Claude Desktop per account (separate Electron user-data dirs; default "Claude" dir retired)
-alias claude-d-personal='open -na "Claude" --args --user-data-dir="$HOME/Library/Application Support/Claude-Personal"'
-alias claude-d-exxo='open -na "Claude" --args --user-data-dir="$HOME/Library/Application Support/Claude-Exxo"'
+# Claude Desktop per account (separate Electron user-data dirs; default "Claude" dir retired).
+# --user-data-dir only isolates the DESKTOP app's state; Claude Code sessions
+# inside it resolve their own context from CLAUDE_CONFIG_DIR, which `open`
+# must inject via --env (LaunchServices does not inherit the shell env).
+alias claude-d-personal='open -na "Claude" --env CLAUDE_CONFIG_DIR="$HOME/.claude-personal" --args --user-data-dir="$HOME/Library/Application Support/Claude-Personal"'
+alias claude-d-exxo='open -na "Claude" --env CLAUDE_CONFIG_DIR="$HOME/.claude-exxo" --args --user-data-dir="$HOME/Library/Application Support/Claude-Exxo"'
 
 set -x PATH $PATH "/Applications/Alacritty.app/Contents/MacOS"
 set -x PATH $PATH "/Applications/Sublime Text.app/Contents/SharedSupport/bin"

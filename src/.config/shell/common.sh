@@ -65,23 +65,32 @@ add_to_path() {
 # Drop later repeats of an entry, keeping the first (which is the one that
 # wins lookups anyway). PATH is rebuilt from the live PATH — by .zprofile after
 # path_helper, and by tools that append their own entries — so repeats
-# accumulate without this. Read line-by-line rather than splitting on ":" in a
-# for loop: zsh does not word-split unquoted parameters the way bash does, and
-# several entries contain spaces.
+# accumulate without this.
+#
+# Uses only shell parameter expansion — no `tr`, no external command at all.
+# This runs from .zshenv, where PATH is whatever the parent handed us and may
+# not yet contain /usr/bin, so an external command can fail with "command not
+# found" printed to stderr — and output at that point corrupts scp and sftp.
+# Splitting with ${var%%:*} also sidesteps zsh not word-splitting unquoted
+# parameters the way bash does.
 dedupe_path() {
     _dp_new=""
-    while IFS= read -r _dp_dir; do
+    _dp_rest="$PATH"
+    while [ -n "$_dp_rest" ]; do
+        _dp_dir="${_dp_rest%%:*}"
+        case "$_dp_rest" in
+            *:*) _dp_rest="${_dp_rest#*:}" ;;
+            *)   _dp_rest="" ;;
+        esac
         [ -n "$_dp_dir" ] || continue
         case ":$_dp_new:" in
             *":$_dp_dir:"*) continue ;;
         esac
         _dp_new="${_dp_new:+$_dp_new:}$_dp_dir"
-    done <<EOF
-$(printf '%s' "$PATH" | tr ':' '\n')
-EOF
+    done
     PATH="$_dp_new"
     export PATH
-    unset _dp_new _dp_dir
+    unset _dp_new _dp_rest _dp_dir
 }
 
 # homebrew forced in front so its bash/tools beat the system copies
