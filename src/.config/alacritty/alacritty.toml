@@ -35,3 +35,25 @@ dimensions = { columns = 100, lines = 50 }
 key = "Return"
 mods = "Shift"
 chars = "\u001B\r"
+
+# macOS-style word-wise editing: send the readline/emacs escape sequences so
+# fish/zsh/bash treat Opt+arrows and Opt+delete as word motions.
+[[keyboard.bindings]]
+key = "Left"
+mods = "Alt"
+chars = "\u001Bb"
+
+[[keyboard.bindings]]
+key = "Right"
+mods = "Alt"
+chars = "\u001Bf"
+
+[[keyboard.bindings]]
+key = "Back"
+mods = "Alt"
+chars = "\u001B\u007F"
+
+[[keyboard.bindings]]
+key = "Delete"
+mods = "Alt"
+chars = "\u001Bd"
