@@ -15,6 +15,18 @@
 # rail, not fish parity — an interactive zsh (the fallback shell) is exactly
 # where the unaliased command would otherwise slip through. Gated on the
 # context existing so machines without the per-account split are untouched.
-# zsh does not re-expand an alias inside its own expansion, so the inner
-# claude is the PATH binary.
-[ -d "$HOME/.claude-personal" ] && alias claude='CLAUDE_CONFIG_DIR="$HOME/.claude-personal" claude'
+#
+# A function rather than an alias, because it also redirects a bare $HOME start
+# into the context dir — launching from $HOME makes Claude ask to trust the
+# whole home directory. The redirect runs in a subshell so the caller's $PWD is
+# unchanged. `command claude` is the PATH binary, so there is no recursion.
+if [ -d "$HOME/.claude-personal" ]; then
+    claude() {
+        local dir="$HOME/.claude-personal"
+        if [ "$PWD" = "$HOME" ]; then
+            ( cd "$dir" && CLAUDE_CONFIG_DIR="$dir" command claude "$@" )
+        else
+            CLAUDE_CONFIG_DIR="$dir" command claude "$@"
+        fi
+    }
+fi
