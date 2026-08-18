@@ -59,10 +59,16 @@ Account-specific keys (the exxo-skills marketplace, its plugin) live only in
    `shared_skills()` to make it cross-account.
 2. **Plugins** via marketplaces declared in the settings fragments: exxo
    enables `exxo-common@exxo-skills` (org skills: secret handling, CI runner
-   targeting). Until Exxo-Labs/skills#2 merges, the marketplace points at the
-   local checkout `~/dev/exxo/skills`; after that it should be the SSH remote
-   (`git@github.com:Exxo-Labs/skills.git` — background plugin refresh
-   disables git credential helpers, so HTTPS fails on private repos).
+   targeting). The marketplace source is the SSH remote
+   `git@github.com:Exxo-Labs/skills.git` — SSH, not HTTPS, because the
+   background plugin refresh disables git credential helpers and HTTPS fails
+   on private repos. Plugin installs are SNAPSHOTS pinned to a commit SHA,
+   not live reads: authoring in the skills repo reaches exxo only after the
+   change lands on main and `claude plugin update exxo-common@exxo-skills`
+   runs under the exxo CLAUDE_CONFIG_DIR (restart the session to apply).
+   Changing a marketplace's source in settings does not re-source an
+   already-registered context — that takes `plugin marketplace remove` +
+   `add`, then `plugin install`.
 
 The allow-list replaced an earlier exclusion list, which failed open: every
 new personal skill had to remember to opt itself out of the exxo context.
