@@ -73,9 +73,12 @@ session started from. Nothing here touches them.
 
 ## Deferred follow-ups
 
-- The plugin currently exposes `purge-esc-cache`;
-  [Exxo-Labs/skills#4](https://github.com/Exxo-Labs/skills/pull/4) renames it
-  `purge-secret-cache`. Re-check references after it merges.
+None currently.
+
+(Resolved 2026-08-18: [Exxo-Labs/skills#4](https://github.com/Exxo-Labs/skills/pull/4)
+merged — the plugin's `purge-esc-cache` is now `purge-secret-cache`, plugin
+updated to the post-merge snapshot and re-checked; nothing here referenced
+the old name.)
 
 (Resolved 2026-08-18: the `exxo-skills` marketplace was repointed from the
 local checkout to `git@github.com:Exxo-Labs/skills.git` after
