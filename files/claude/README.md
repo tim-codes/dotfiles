@@ -17,6 +17,20 @@ The split exists because the Exxo context must receive the Exxo skills
 marketplace/plugin while `~/.claude-personal` must never get it (homelab #76,
 Linear ENG-20).
 
+`CLAUDE.md` follows the same shape, one level simpler: `claude-sync`
+concatenates `CLAUDE.md.shared` with an optional `CLAUDE.md.<account>`
+fragment (plain text, not a jq merge) and copies the result into each
+context's `CLAUDE.md` — copied, not symlinked, for the same reason as
+settings.json: the file can be hand-edited in a context (or edited by a
+Claude session), and a symlink would let that edit land in the repo silently
+instead of surfacing as drift to promote deliberately. Unlike the settings
+fragments, the account fragment is optional — `CLAUDE.md.personal` and
+`CLAUDE.md.exxo` don't need to exist until an account actually needs
+instructions the other shouldn't get; `CLAUDE.md.shared` alone is a valid
+baseline. This closes a gap where both contexts had independently
+hand-duplicated copies of the same global instructions with no sync
+mechanism at all (found and fixed 2026-08-18).
+
 Skills follow the same split. `~/.claude-personal/skills` stays a
 whole-directory symlink to `files/claude/skills`. `~/.claude-exxo/skills` is
 a real directory of per-skill symlinks maintained by `claude-sync`, built

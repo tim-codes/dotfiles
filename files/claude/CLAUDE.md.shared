@@ -1,0 +1,21 @@
+# Global instructions
+
+## Environment/setup obstacles: surface, don't silently work around
+
+If a task hits an environment or tooling setup issue — a package-manager
+restriction (e.g. PEP 668's "externally managed environment" blocking
+`pip install`), a missing dependency, a blocked install, a permissions or
+config gap — don't route around it unprompted. Surface it to the user and
+let them resolve it first.
+
+Skip prompting only when resolving it is genuinely unnecessary for the task
+at hand (a different path already covers the need, so fixing the blocked one
+buys nothing) — but even then, still surface the issue for awareness rather
+than silently absorbing it.
+
+**Why:** a fixable local-environment quirk is not architectural evidence. Left
+unexamined, it can quietly bias a technical decision — e.g. ruling out an
+otherwise-reasonable approach because its dependency happened to be blocked
+by a solvable config issue, rather than because the approach itself was
+wrong. Surfacing it first keeps that reasoning honest, and gives the user the
+chance to fix the environment rather than have a decision made around it.

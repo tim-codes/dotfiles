@@ -1,6 +1,6 @@
 ---
 name: claude-workstation-setup
-description: Full disclosure of how Claude Code is set up on Tim's workstations — per-account contexts, shell wrappers, settings fragment merge, the two skill-delivery paths, and where approvals/memory live. Use when asked how the Claude setup/context segregation works, when changing any part of it (claude-sync, settings fragments, skills, plugins), or when a session behaves as if it's in the wrong account.
+description: Full disclosure of how Claude Code is set up on Tim's workstations — per-account contexts, shell wrappers, settings/CLAUDE.md fragment merge, the two skill-delivery paths, and where approvals/memory live. Use when asked how the Claude setup/context segregation works, when changing any part of it (claude-sync, settings/CLAUDE.md fragments, skills, plugins), or when a session behaves as if it's in the wrong account, or when adding/updating a global (cross-session) instruction.
 ---
 
 # How Claude Code is set up on these workstations
@@ -49,6 +49,36 @@ Consequence: never hand-edit `~/.claude-*/settings.json` for anything meant
 to last — it reverts on the next sync. Put it in the right fragment instead.
 Account-specific keys (the exxo-skills marketplace, its plugin) live only in
 `settings.exxo.json`; `~/.claude-personal` must never receive Exxo config.
+
+## Global instructions (CLAUDE.md): shared baseline + optional per-account fragment
+
+Same shape as settings, one level simpler. `claude-sync` concatenates
+`files/claude/CLAUDE.md.shared` with an optional `files/claude/CLAUDE.md.<account>`
+fragment (plain text append, not a jq merge — there's nothing to deep-merge)
+and copies the result to `<context>/CLAUDE.md`, copied not symlinked, same
+reasoning as settings.json (the file gets hand-edited in place sometimes,
+and a symlink would let that land in the repo silently instead of showing up
+as drift). Unlike settings, the account fragment is optional: most global
+instructions are expected to stay shared, so `CLAUDE.md.personal` /
+`CLAUDE.md.exxo` don't need to exist until one account actually needs
+something the other shouldn't get.
+
+**Procedure for adding or updating a global instruction:** never write
+directly to `~/.claude-personal/CLAUDE.md` or `~/.claude-exxo/CLAUDE.md` —
+that's exactly the hand-duplication that created the gap this section fixes
+(found 2026-08-18: both contexts had independently hand-copied CLAUDE.md
+content with no sync mechanism between them at all). Instead:
+1. Decide scope — applies to both accounts (the common case) → edit
+   `files/claude/CLAUDE.md.shared`; personal-only or exxo-only → edit (or
+   create) `files/claude/CLAUDE.md.personal` / `CLAUDE.md.exxo`.
+2. Run `scripts/claude-sync` (or `--diff` first to preview).
+3. If a context's `CLAUDE.md` had unmanaged edits, they're backed up to
+   `CLAUDE.md.bak-<ts>` before being overwritten — check that backup for
+   anything worth promoting into a fragment, same as settings.json drift.
+
+This is also the fix to reach for if an agent (or you) is asked to "record
+an instruction so it applies everywhere" — that request means "edit the
+repo fragment and sync," not "write the same text into each context file."
 
 ## Skills reach a context by exactly two paths
 
@@ -111,8 +141,9 @@ collision first.
   for `claude-exxo`; empty means the legacy default context (fine if
   launched deliberately via `claude-default` or an unpinned tool, wrong if
   an account wrapper was intended).
-- A settings change vanished → it was hand-written into a context file;
-  promote it into a fragment and re-run `claude-sync`.
+- A settings or CLAUDE.md change vanished → it was hand-written into a
+  context file; promote it into the matching fragment (`settings.<account>.json`
+  or `CLAUDE.md.shared`/`CLAUDE.md.<account>`) and re-run `claude-sync`.
 - Two skills with one name → check both delivery paths; fix by editing
   `shared_skills()` in `claude-sync` (repo skills are personal-only unless
   named there), not by hand-deleting links.
@@ -124,5 +155,7 @@ collision first.
   local_*.json`) — the desktop record wins on resume.
 
 History/references: dotfiles PR #17 (fragment split + exxo curation),
-homelab #76, Linear ENG-20. Deferred follow-ups tracked in
+homelab #76, Linear ENG-20; CLAUDE.md shared+fragment sync added 2026-08-18
+after two independently hand-duplicated copies were found with no sync
+mechanism between them. Deferred follow-ups tracked in
 `files/claude/README.md`.
