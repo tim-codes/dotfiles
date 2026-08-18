@@ -11,6 +11,8 @@ packages=(
   typescript@latest
   typescript-language-server@latest
   @playwright/mcp@latest
+  # markdown → OOXML conversion in the office-files skill (md2exxo-report.sh, via MD2EXXO_MARKDOWN_IT)
+  markdown-it@latest
 )
 
 pnpm i -g "${packages[@]}"
