@@ -89,7 +89,8 @@ incongruously next to existing installables, still install it if the task
 genuinely needs it — but don't leave it as undocumented host state. Persist
 the install into the dotfiles repo (or whichever repo governs that class of
 machine config, e.g. homelab for server-side installs) as idempotent config,
-and open a PR for it.
+and open a PR for it. See the `dotfiles-repo` skill for exactly where a
+given install gets persisted.
 
 **Why:** most one-off dependencies are cheap, reversible, and not worth a
 round-trip to ask about — this doesn't conflict with the "surface, don't
