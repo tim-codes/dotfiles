@@ -39,6 +39,15 @@
             "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Working # notchbar-agents-claude-hook"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'$HOME/dev/dotfiles/files/claude/hooks/guard-dotfiles-checkout.sh' # dotfiles-guard-primary-checkout"
+          }
+        ]
       }
     ],
     "SessionEnd": [
