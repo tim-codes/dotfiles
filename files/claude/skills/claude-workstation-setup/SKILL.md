@@ -19,12 +19,16 @@ repo — prefer reading those before modifying anything they govern.
 - `~/.claude-exxo` — work (Exxo) account. `claude-exxo` pins it; desktop
   alias `claude-d-exxo`.
 
-The legacy default `~/.claude` was retired 2026-08-17. If it ever reappears,
-something launched Claude without the env pin (the desktop aliases pass
-`--env CLAUDE_CONFIG_DIR=...` because LaunchServices does not inherit shell
-env) — find the env-less launcher and fix it; do not treat the stray dir as
-normal. `claude-default` / `claude-d-default` are the one sanctioned way to
-recreate it deliberately.
+The legacy default context (`~/.claude` plus the home-level `~/.claude.json`)
+is EXPECTED to exist alongside the dedicated ones — launchers that don't
+carry the env pin (Cowork-style sessions, tools shelling out to `claude`)
+legitimately use it. Note `.claude.json` never follows CLAUDE_CONFIG_DIR: a
+pinned run writes `<context>/.claude.json` and leaves the home-level file
+untouched. The dedicated contexts simply ignore the default one — its
+presence is not an error signal, and nothing here syncs into it.
+`claude-default` / `claude-d-default` are the wrappers for using it
+deliberately. (The desktop aliases pass `--env CLAUDE_CONFIG_DIR=...`
+because LaunchServices does not inherit shell env.)
 
 `~/claude` is a WORKSPACE, not config: wrappers auto-cd into it when
 launched from `~` or a context dir. Contexts are created by
@@ -57,6 +61,13 @@ Account-specific keys (the exxo-skills marketplace, its plugin) live only in
    `claude-workstation-setup`). Every other repo skill is personal-only by
    default and must be explicitly promoted — add its name to
    `shared_skills()` to make it cross-account.
+   Authoring asymmetry (verified against claude-sync): author new skills in
+   the personal context or the repo directly. A real directory created under
+   `~/.claude-exxo/skills/` works for sessions only until the next
+   claude-sync, which ADOPTS it into `files/claude/skills/` — safely in git,
+   but personal-only, so it vanishes from the exxo context until promoted
+   via `shared_skills()`. (A name the repo already has is warned about and
+   left in place.) Org content belongs in the Exxo-Labs/skills repo instead.
 2. **Plugins** via marketplaces declared in the settings fragments: exxo
    enables `exxo-common@exxo-skills` (org skills: secret handling, CI runner
    targeting). The marketplace source is the SSH remote
@@ -95,7 +106,11 @@ collision first.
 ## Quick diagnosis
 
 - Session sees Exxo skills in personal (or vice versa) → wrong
-  CLAUDE_CONFIG_DIR; check which wrapper launched it.
+  CLAUDE_CONFIG_DIR. Concrete check: `echo $CLAUDE_CONFIG_DIR` —
+  `/Users/tim/.claude-personal` for bare `claude`, `/Users/tim/.claude-exxo`
+  for `claude-exxo`; empty means the legacy default context (fine if
+  launched deliberately via `claude-default` or an unpinned tool, wrong if
+  an account wrapper was intended).
 - A settings change vanished → it was hand-written into a context file;
   promote it into a fragment and re-run `claude-sync`.
 - Two skills with one name → check both delivery paths; fix by editing
