@@ -73,13 +73,16 @@ session started from. Nothing here touches them.
 
 ## Deferred follow-ups
 
-- `settings.exxo.json` points the `exxo-skills` marketplace at the local
-  checkout `/Users/tim/dev/exxo/skills` so it works before
-  [Exxo-Labs/skills#2](https://github.com/Exxo-Labs/skills/pull/2) merges.
-  Once #2 is on `main`, repoint it at the git remote
-  `git@github.com:Exxo-Labs/skills.git` — SSH, not HTTPS, because Claude
-  Code's background plugin refresh disables git credential helpers and HTTPS
-  fails on private repos.
 - The plugin currently exposes `purge-esc-cache`;
   [Exxo-Labs/skills#4](https://github.com/Exxo-Labs/skills/pull/4) renames it
   `purge-secret-cache`. Re-check references after it merges.
+
+(Resolved 2026-08-18: the `exxo-skills` marketplace was repointed from the
+local checkout to `git@github.com:Exxo-Labs/skills.git` after
+[Exxo-Labs/skills#2](https://github.com/Exxo-Labs/skills/pull/2) merged —
+SSH, not HTTPS, because Claude Code's background plugin refresh disables git
+credential helpers and HTTPS fails on private repos. Changing a marketplace's
+source in `settings.exxo.json` is not enough for an already-registered
+context: `claude plugin marketplace remove exxo-skills` + `add <git-url>` +
+`claude plugin install exxo-common@exxo-skills` under the exxo
+CLAUDE_CONFIG_DIR re-registers it.)
