@@ -5,24 +5,44 @@
 # Replaces homelab's projects/macos-common/sync-claude-config.sh. Two changes
 # of substance beyond the move:
 #
-# 1. settings.json is COPIED, never symlinked. Symlinking made the live user
+# 1. settings.json is built by deep-merging files/claude/settings.shared.json
+#    with a per-account files/claude/settings.<account>.json fragment
+#    (jq -s '.[0] * .[1]', account fragment wins) and the result is COPIED
+#    into the context, never symlinked. Symlinking made the live user
 #    settings file *be* the repo file, and Claude Code writes through it
-#    constantly — plugin toggles, dialog acks, key reordering — so the repo was
-#    perpetually dirty. Copying breaks that loop: the repo file is a one-way
-#    baseline, and drift is promoted deliberately (see `diff` below) instead of
-#    landing in git by accident.
+#    constantly — plugin toggles, dialog acks, key reordering — so the repo
+#    was perpetually dirty. Copying breaks that loop: the repo files are a
+#    one-way baseline, and drift is promoted deliberately (see `diff` below)
+#    instead of landing in git by accident. The fragments exist because some
+#    settings — enabledPlugins, extraKnownMarketplaces — must differ per
+#    account (the exxo-skills marketplace and its plugin belong only in the
+#    exxo context; homelab issue #76, Linear ENG-20). The merge is what lets
+#    those account-specific keys layer on top of one shared baseline instead
+#    of forking the whole file.
 # 2. It targets the real contexts, never ~/.claude. The default context is
 #    retired; recreating it is how it would come back from the dead.
 #
-# Skills are SYMLINKED as a whole directory, so ~/.claude-*/skills IS
+# Skills default to a whole-directory symlink, so ~/.claude-*/skills IS
 # files/claude/skills in this repo: author a skill straight into the context
-# and it lands in git, exactly like editing ~/.config/fish/*. Both contexts
-# point at the one directory — a skill is a capability, not account state.
+# and it lands in git, exactly like editing ~/.config/fish/*. That's still
+# how the personal context works — a skill is a capability, not account
+# state, and personal has no reason to see anything less than the whole set.
+#
+# exxo is the exception: it enables the exxo-common plugin, which ships its
+# own run-with-secrets skill, and the repo also has a run-with-secrets skill
+# (homelab's op-shim/Ansible/zima/ragnar guidance). Verified empirically on
+# 2026-08-18: with the whole-dir symlink, BOTH copies loaded at once in the
+# exxo context, so an Exxo session could pick up homelab credential
+# guidance. exxo therefore gets a real skills directory curated with
+# per-skill symlinks, excluding whatever the plugin already covers, instead
+# of the whole-dir symlink. See excluded_skills() below for the exclusion
+# list itself.
 #
 # Skills from other repos (an org skills repo, a lab repo) are NOT fanned in
 # here: composition inside a folded directory would mean gitignored symlinks
 # in the middle of the tracked one. They belong in a plugin instead, enabled
-# per account via enabledPlugins.
+# per account via enabledPlugins — which is exactly how exxo-common's
+# run-with-secrets reaches the exxo context.
 #
 # Usage:
 #   claude-sync            apply settings + skills to every context
@@ -32,62 +52,112 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SRC_SETTINGS="$REPO_DIR/files/claude/settings.json"
+SRC_SETTINGS_SHARED="$REPO_DIR/files/claude/settings.shared.json"
 SRC_SKILLS="$REPO_DIR/files/claude/skills"
-CONTEXTS=("$HOME/.claude-personal" "$HOME/.claude-exxo")
+ACCOUNTS=("personal" "exxo")
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33mwarn:\033[0m %s\n' "$*"; }
+
+# Scratch file for the merged settings JSON, reused across contexts.
+MERGE_TMP="$(mktemp)"
+trap 'rm -f "$MERGE_TMP"' EXIT
+
+# Skills to leave out of a given account's context, because a plugin already
+# enabled there ships an equivalent (and better-scoped) copy. Keyed by
+# account so the rationale for each exclusion lives next to the account it
+# applies to.
+excluded_skills() {
+    case "$1" in
+        exxo)
+            # exxo-common:run-with-secrets is the Exxo-appropriate version;
+            # ours is the homelab copy (op-shim, Ansible, zima/ragnar
+            # credentials) and has no business loading in an Exxo session.
+            echo "run-with-secrets"
+            ;;
+        personal)
+            ;;
+    esac
+}
+
+# Human-readable reason shown next to an excluded skill's status line.
+exclusion_reason() {
+    case "$1:$2" in
+        exxo:run-with-secrets)
+            echo "exxo-common plugin provides the Exxo copy"
+            ;;
+        *)
+            echo "excluded for this account"
+            ;;
+    esac
+}
+
+is_excluded() {
+    local skill="$1" list="$2"
+    [ -n "$list" ] && printf '%s\n' "$list" | grep -qx "$skill"
+}
 
 diff_only=0
 [ "${1:-}" = "--diff" ] && diff_only=1
 
 if [ "$diff_only" = 1 ]; then
-    for ctx in "${CONTEXTS[@]}"; do
+    for account in "${ACCOUNTS[@]}"; do
+        ctx="$HOME/.claude-$account"
         [ -d "$ctx" ] || continue
-        info "${ctx/#$HOME/~} vs repo"
-        if diff -u "$SRC_SETTINGS" "$ctx/settings.json" 2>/dev/null; then
+        fragment="$REPO_DIR/files/claude/settings.$account.json"
+        if [ ! -f "$fragment" ]; then
+            warn "settings.$account.json missing — skipping ${ctx/#$HOME/~}"
+            continue
+        fi
+        info "${ctx/#$HOME/~} vs repo (settings.shared.json + settings.$account.json)"
+        jq -s '.[0] * .[1]' "$SRC_SETTINGS_SHARED" "$fragment" > "$MERGE_TMP"
+        if diff -u "$ctx/settings.json" "$MERGE_TMP" 2>/dev/null; then
             echo "  identical"
         fi
     done
     exit 0
 fi
 
-for ctx in "${CONTEXTS[@]}"; do
-    if [ ! -d "$ctx" ]; then
-        warn "${ctx/#$HOME/~} does not exist — run scripts/claude-contexts first"
-        continue
+# ---- settings: merge shared baseline + account fragment, write if changed ----
+sync_settings() {
+    local account="$1" ctx="$2"
+    local fragment="$REPO_DIR/files/claude/settings.$account.json"
+
+    if [ ! -f "$fragment" ]; then
+        warn "  settings.$account.json missing — skipping settings for this context"
+        return
     fi
-    info "${ctx/#$HOME/~}"
+    jq -s '.[0] * .[1]' "$SRC_SETTINGS_SHARED" "$fragment" > "$MERGE_TMP"
 
     # A symlink here is the old homelab arrangement; replace it with a real file.
     if [ -L "$ctx/settings.json" ]; then
         rm "$ctx/settings.json"
         echo "  settings.json: removed legacy symlink into the homelab repo"
     fi
-    if [ -f "$ctx/settings.json" ] && ! diff -q "$SRC_SETTINGS" "$ctx/settings.json" >/dev/null 2>&1; then
+    if [ -f "$ctx/settings.json" ] && ! diff -q "$MERGE_TMP" "$ctx/settings.json" >/dev/null 2>&1; then
         backup="$ctx/settings.json.bak-$(date +%Y%m%d-%H%M%S)"
         cp "$ctx/settings.json" "$backup"
         echo "  settings.json: differed — backed up to ${backup/#$HOME/~}"
-        echo "  (promote anything worth keeping into $SRC_SETTINGS, then re-run)"
+        echo "  (promote anything worth keeping into settings.shared.json / settings.$account.json, then re-run)"
     fi
-    cp "$SRC_SETTINGS" "$ctx/settings.json"
-    echo "  settings.json: written from repo"
+    cp "$MERGE_TMP" "$ctx/settings.json"
+    echo "  settings.json: written from settings.shared.json + settings.$account.json"
+}
 
-    # Whole-directory symlink, not per-skill: a skill authored straight into
-    # ~/.claude-*/skills/ then lands in the repo and shows up in `git diff`,
-    # the same way editing ~/.config/fish/* does. Per-skill links only gave
-    # that property to skills the repo already knew about; anything new was
-    # orphaned outside git where nothing would ever notice it.
+# ---- skills: whole-dir symlink for accounts with no exclusions ----
+sync_skills_wholedir() {
+    local ctx="$1"
+
     if [ -L "$ctx/skills" ]; then
         if [ "$(readlink "$ctx/skills")" = "$SRC_SKILLS" ]; then
             echo "  skills: already linked"
-            continue
+            return
         fi
         rm "$ctx/skills"
     elif [ -d "$ctx/skills" ]; then
-        # Real dir from the old per-skill scheme. Anything in it that is not a
+        # Real dir from an older scheme. Anything in it that is not a
         # symlink is unmanaged work — move it into the repo rather than delete.
+        local entry name
         for entry in "$ctx/skills"/*; do
             [ -e "$entry" ] || continue
             name="$(basename "$entry")"
@@ -102,11 +172,91 @@ for ctx in "${CONTEXTS[@]}"; do
         done
         rmdir "$ctx/skills" 2>/dev/null || {
             warn "${ctx/#$HOME/~}/skills not empty — left as is, resolve by hand"
-            continue
+            return
         }
     fi
     ln -s "$SRC_SKILLS" "$ctx/skills"
     echo "  skills: linked -> ${SRC_SKILLS/#$HOME/~}"
+}
+
+# ---- skills: curated real directory of per-skill symlinks, for accounts
+# with exclusions (see excluded_skills). Idempotent and self-healing: it
+# tears down the old whole-dir symlink if that's still what's there, prunes
+# any entry that's broken, excluded, or pointed somewhere other than the
+# matching repo skill, adopts unmanaged real subdirectories into the repo,
+# then (re)links everything that survives exclusion.
+sync_skills_curated() {
+    local account="$1" ctx="$2" exclusions="$3"
+    local dir="$ctx/skills"
+
+    if [ -L "$dir" ]; then
+        rm "$dir"
+        mkdir "$dir"
+        echo "  skills: replaced whole-dir symlink with a curated directory"
+    elif [ ! -d "$dir" ]; then
+        mkdir "$dir"
+    fi
+
+    local entry name target
+    for entry in "$dir"/*; do
+        # [ -e ] is false for a broken symlink, so also check [ -L ] — a
+        # broken link must still hit this loop body to get pruned below.
+        [ -e "$entry" ] || [ -L "$entry" ] || continue
+        name="$(basename "$entry")"
+        if [ -L "$entry" ]; then
+            target="$(readlink "$entry")"
+            if is_excluded "$name" "$exclusions" || [ ! -e "$entry" ] || [ "$target" != "$SRC_SKILLS/$name" ]; then
+                rm "$entry"
+            fi
+        elif [ -d "$entry" ]; then
+            # Real (non-symlink) subdirectory: unmanaged work, adopt it like
+            # the whole-dir migration path does.
+            if [ -e "$SRC_SKILLS/$name" ]; then
+                warn "$name exists in both repo and context — left at $entry"
+            else
+                mv "$entry" "$SRC_SKILLS/$name"
+                echo "  skills/$name: adopted into the repo (was unmanaged)"
+            fi
+        fi
+    done
+
+    local linked=0 skill_path skill
+    for skill_path in "$SRC_SKILLS"/*/; do
+        skill="$(basename "$skill_path")"
+        if is_excluded "$skill" "$exclusions"; then
+            echo "  skills/$skill: excluded ($(exclusion_reason "$account" "$skill"))"
+            continue
+        fi
+        if [ ! -e "$dir/$skill" ] && [ ! -L "$dir/$skill" ]; then
+            ln -s "$SRC_SKILLS/$skill" "$dir/$skill"
+        fi
+        linked=$((linked + 1))
+    done
+    echo "  skills: linked $linked skills"
+}
+
+sync_skills() {
+    local account="$1" ctx="$2"
+    local exclusions
+    exclusions="$(excluded_skills "$account")"
+
+    if [ -z "$exclusions" ]; then
+        sync_skills_wholedir "$ctx"
+    else
+        sync_skills_curated "$account" "$ctx" "$exclusions"
+    fi
+}
+
+for account in "${ACCOUNTS[@]}"; do
+    ctx="$HOME/.claude-$account"
+    if [ ! -d "$ctx" ]; then
+        warn "${ctx/#$HOME/~} does not exist — run scripts/claude-contexts first"
+        continue
+    fi
+    info "${ctx/#$HOME/~}"
+
+    sync_settings "$account" "$ctx"
+    sync_skills "$account" "$ctx"
 done
 
 info "Done"

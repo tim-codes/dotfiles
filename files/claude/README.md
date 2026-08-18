@@ -1,9 +1,32 @@
 # Claude Code config
 
-`settings.json` here is the baseline for every per-account context
-(`~/.claude-personal`, `~/.claude-exxo`). It is applied by `scripts/claude-sync`
-and **copied, not symlinked** — symlinking made the live user file *be* the repo
-file, and Claude Code writes to that file, so the repo was perpetually dirty.
+The baseline used to be a single `settings.json`. It's now split into
+fragments that `scripts/claude-sync` deep-merges with jq (`.[0] * .[1]`,
+account wins, nested objects merge key-wise) and writes to
+`~/.claude-<account>/settings.json` — still **copied, not symlinked**:
+symlinking made the live user file *be* the repo file, and Claude Code writes
+to that file, so the repo was perpetually dirty.
+
+- `settings.shared.json` — the baseline applied to every context.
+- `settings.personal.json` — the personal-context fragment, currently `{}`.
+- `settings.exxo.json` — Exxo-only: enables the `exxo-common@exxo-skills`
+  plugin and registers the `exxo-skills` marketplace under
+  `extraKnownMarketplaces`.
+
+The split exists because the Exxo context must receive the Exxo skills
+marketplace/plugin while `~/.claude-personal` must never get it (homelab #76,
+Linear ENG-20).
+
+Skills follow the same split. `~/.claude-personal/skills` stays a
+whole-directory symlink to `files/claude/skills`. `~/.claude-exxo/skills` is
+now a real directory of per-skill symlinks maintained by `claude-sync`, built
+from an exclusion list: `run-with-secrets` is excluded there because the
+`exxo-common` plugin ships its own `run-with-secrets` (`agent/run` +
+`agent.env`) and the repo's copy is the homelab one (op-shim, Ansible,
+zima/ragnar) — both were visible at once before the exclusion (verified
+2026-08-18), which risked an Exxo session following homelab credential
+guidance. In the Exxo context, the plugin's `exxo-common:run-with-secrets` is
+the only one.
 
 Contexts are created by `scripts/claude-contexts`; the `claude`,
 `claude-personal` and `claude-exxo` shell wrappers select them via
@@ -43,3 +66,16 @@ Permission approvals ("yes, don't ask again") are **per repository**, not
 per account: Claude Code writes them to `.claude/settings.local.json` at the
 git repository root. Outside a repository it writes them in the directory the
 session started from. Nothing here touches them.
+
+## Deferred follow-ups
+
+- `settings.exxo.json` points the `exxo-skills` marketplace at the local
+  checkout `/Users/tim/dev/exxo/skills` so it works before
+  [Exxo-Labs/skills#2](https://github.com/Exxo-Labs/skills/pull/2) merges.
+  Once #2 is on `main`, repoint it at the git remote
+  `git@github.com:Exxo-Labs/skills.git` — SSH, not HTTPS, because Claude
+  Code's background plugin refresh disables git credential helpers and HTTPS
+  fails on private repos.
+- The plugin currently exposes `purge-esc-cache`;
+  [Exxo-Labs/skills#4](https://github.com/Exxo-Labs/skills/pull/4) renames it
+  `purge-secret-cache`. Re-check references after it merges.
