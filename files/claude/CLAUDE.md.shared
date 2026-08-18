@@ -1,5 +1,31 @@
 # Global instructions
 
+## Use the repo's own command runner
+
+If a repo wraps its tooling in a task runner (`just`, `make`, a `scripts/`
+entry point), work through it rather than the underlying command — `just
+check`, not `pnpm turbo ...`. Check what recipes exist (`just --list`)
+before reaching for the raw tool.
+
+**Why:** the recipe is not a shortcut for the raw command — it carries what
+the raw command doesn't: the right working directory, a PATH shim,
+credential resolution, cache-aware orchestration. Bypassing it produces a
+run that looks equivalent and isn't, and the difference tends to surface as
+a confusing failure two steps later.
+
+## Target explicitly; don't rely on ambient state
+
+Where a tool offers a "select then act" workflow (`pulumi stack select`,
+`kubectl config use-context`, `gcloud config set project`), don't use it —
+pass the target on each invocation instead (`pulumi -C <dir> -s <stack>
+up`). Likewise prefer absolute paths and explicit target flags over
+whatever directory or context the shell was last left in.
+
+**Why:** a "select" mutates state the *next* command inherits — in this
+session, a parallel session, or the user's own shell tomorrow. An explicit
+target makes each invocation self-describing and stops it quietly acting on
+the wrong stack, host or directory.
+
 ## Environment/setup obstacles: surface, don't silently work around
 
 If a task hits an environment or tooling setup issue — a package-manager
@@ -19,6 +45,16 @@ otherwise-reasonable approach because its dependency happened to be blocked
 by a solvable config issue, rather than because the approach itself was
 wrong. Surfacing it first keeps that reasoning honest, and gives the user the
 chance to fix the environment rather than have a decision made around it.
+
+## A hung-looking command is often waiting on a human approval
+
+An apparently hung command may be blocked on an approval you can't see — a
+Touch ID prompt on the operator's Mac, a device-code sign-in, a GUI
+confirmation. Say so and wait rather than killing it, retrying it, or
+switching to a path that dodges the prompt. For the same reason, run a
+command that needs privilege escalation or interactive confirmation on its
+own, not buried in a compound command — the prompt has to be legible to the
+person answering it.
 
 ## Installing a missing dependency on the workstation: fine ad hoc, persist the rest
 
@@ -41,3 +77,42 @@ But an install big or unusual enough to change the workstation's shape (not
 just add a small tool to it) needs to survive a reinstall or a new machine —
 otherwise the workstation's real state silently diverges from what the repo
 says it is, and the next reproduction from source control is wrong.
+
+## Secrets are referenced, never written
+
+A secret never appears as a literal value — not in a config file
+"temporarily", not in a committed example or test fixture, not in a chat
+message. Put a reference in its place (a 1Password item, an `esc:`/`1p:`
+pointer, an env lookup) and resolve it at invocation time. Never ask the
+user to paste a secret into the conversation — find the item and reference
+it. Committed examples and fixtures get obviously-fake placeholders, never
+a real identifier (account UUID, item UUID, key material).
+
+The test: if this file were accidentally printed or committed, would it
+expose something real? If yes, it must be a reference.
+
+## Blanket-trusted files: the trust is in the file, not the entry
+
+Where one permission grant covers a whole file (e.g.
+`Bash(just --justfile=agent/Justfile:*)`), every entry in it runs without
+approval — including entries added after the grant. So anything added to
+such a file must be genuinely reusable, and read-only and
+non-secret-revealing **by construction** (no `--reveal`/`--show-secrets`,
+nothing that mutates resources). If unsure whether an entry is safe enough
+for blanket trust, don't add it — and never add one to dodge a permission
+prompt.
+
+When a recurring task needs a capability the deny rules block, don't ask
+for the deny to be lifted — add a narrowly-scoped recipe that fetches and
+consumes the secret in a single in-recipe pipeline (fixed secret, fixed
+consumer, nothing printed), so the session invokes it without ever seeing
+the value.
+
+## Don't code fast-moving tooling from memory
+
+For anything that plausibly moved since training — a framework's current
+major version, a provider SDK, a CLI's flags — read the docs that ship with
+the installed version (the docs under `node_modules/<pkg>/`, `--help`,
+`tldr <cmd>`) or the current official docs before writing code against it. Treat recall
+as a hypothesis to check, and when an answer came from research, say what
+it was checked against.

@@ -1,0 +1,38 @@
+# Personal-only instructions
+
+## Edit the source, not the deployed file
+
+Many live files on these machines are not their own source of truth:
+Stow symlinks into `~/dev/dotfiles/src`, the per-account
+`~/.claude-*/CLAUDE.md` and `settings.json` assembled by `claude-sync`,
+files rendered by a playbook. Edit the owning repo and re-run the mechanism
+(`restow`, `claude-sync`, the playbook) — never write to the deployed path:
+that edit is either silently overwritten on the next sync or diverges from
+the repo until a rebuild loses it.
+
+When dotfiles and homelab both configure the same machine, never write into
+the other repo's tree. The deciding question for anything new: would this
+belong on a work laptop that never joins the lab? Yes → dotfiles
+(user-level install and config). No → homelab (setup, integration,
+network).
+
+## Lab machines: codify state changes; probe read-only ad hoc
+
+On a machine whose configuration a repo owns (the homelab boxes), never
+change state with an ad-hoc command — put the change in that machine's
+project (a playbook, recipe, or committed script) and run it from there,
+writing the playbook first if none covers it. "I'll just `apt install` it
+this once" is exactly the drift the next rebuild silently loses. (Ad-hoc
+installs on the local workstation are the one carve-out — see the shared
+dependency rule above.)
+
+Reading needs no ceremony: ssh in and look around, check what's installed,
+`docker ps`, read logs. Only state changes must be codified.
+
+## Preserve a recovery path
+
+Before a change that could sever the access it's made over — network, SSH,
+firewall, auth, the shell config the session runs in — confirm an untouched
+second path exists, sequence the change so it's recoverable, and never
+"improve" the recovery path in the same pass. Say which path is the
+fallback before starting.
