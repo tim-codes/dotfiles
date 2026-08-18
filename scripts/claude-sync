@@ -22,6 +22,17 @@
 # 2. It targets the real contexts, never ~/.claude. The default context is
 #    retired; recreating it is how it would come back from the dead.
 #
+# CLAUDE.md follows the same shared+fragment shape as settings.json:
+# files/claude/CLAUDE.md.shared is the baseline, an optional per-account
+# files/claude/CLAUDE.md.<account> is appended after it (plain concatenation,
+# not a jq merge — it's markdown, not JSON), and the result is copied into
+# each context's CLAUDE.md, never symlinked, for the same reason as settings:
+# it can be hand-edited (or edited by a Claude session) in place, and a
+# symlink would make that edit land in the repo instead of surfacing as
+# drift to promote deliberately. Unlike settings.json, the account fragment
+# is optional — most instructions are expected to stay shared, so there's no
+# per-account file until one actually diverges.
+#
 # Skills default to a whole-directory symlink, so ~/.claude-*/skills IS
 # files/claude/skills in this repo: author a skill straight into the context
 # and it lands in git, exactly like editing ~/.config/fish/*. That's still
@@ -54,6 +65,7 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_SETTINGS_SHARED="$REPO_DIR/files/claude/settings.shared.json"
+SRC_CLAUDE_MD_SHARED="$REPO_DIR/files/claude/CLAUDE.md.shared"
 SRC_SKILLS="$REPO_DIR/files/claude/skills"
 ACCOUNTS=("personal" "exxo")
 
@@ -81,6 +93,22 @@ is_shared() {
     shared_skills | grep -qx "$1"
 }
 
+# Concatenate CLAUDE.md.shared with the optional CLAUDE.md.<account>
+# fragment into $1. The fragment is optional — absence just means this
+# account has no account-only instructions yet.
+build_claude_md() {
+    local account="$1" out="$2"
+    local fragment="$REPO_DIR/files/claude/CLAUDE.md.$account"
+
+    if [ -f "$fragment" ]; then
+        cat "$SRC_CLAUDE_MD_SHARED" > "$out"
+        printf '\n' >> "$out"
+        cat "$fragment" >> "$out"
+    else
+        cp "$SRC_CLAUDE_MD_SHARED" "$out"
+    fi
+}
+
 diff_only=0
 [ "${1:-}" = "--diff" ] && diff_only=1
 
@@ -96,6 +124,12 @@ if [ "$diff_only" = 1 ]; then
         info "${ctx/#$HOME/~} vs repo (settings.shared.json + settings.$account.json)"
         jq -s '.[0] * .[1]' "$SRC_SETTINGS_SHARED" "$fragment" > "$MERGE_TMP"
         if diff -u "$ctx/settings.json" "$MERGE_TMP" 2>/dev/null; then
+            echo "  identical"
+        fi
+
+        info "${ctx/#$HOME/~}/CLAUDE.md vs repo (CLAUDE.md.shared + CLAUDE.md.$account if present)"
+        build_claude_md "$account" "$MERGE_TMP"
+        if diff -u "$ctx/CLAUDE.md" "$MERGE_TMP" 2>/dev/null; then
             echo "  identical"
         fi
     done
@@ -126,6 +160,31 @@ sync_settings() {
     fi
     cp "$MERGE_TMP" "$ctx/settings.json"
     echo "  settings.json: written from settings.shared.json + settings.$account.json"
+}
+
+# ---- CLAUDE.md: shared baseline + optional account fragment, write if changed ----
+sync_claude_md() {
+    local account="$1" ctx="$2"
+    local fragment="$REPO_DIR/files/claude/CLAUDE.md.$account"
+
+    build_claude_md "$account" "$MERGE_TMP"
+
+    if [ -L "$ctx/CLAUDE.md" ]; then
+        rm "$ctx/CLAUDE.md"
+        echo "  CLAUDE.md: removed symlink"
+    fi
+    if [ -f "$ctx/CLAUDE.md" ] && ! diff -q "$MERGE_TMP" "$ctx/CLAUDE.md" >/dev/null 2>&1; then
+        backup="$ctx/CLAUDE.md.bak-$(date +%Y%m%d-%H%M%S)"
+        cp "$ctx/CLAUDE.md" "$backup"
+        echo "  CLAUDE.md: differed — backed up to ${backup/#$HOME/~}"
+        echo "  (promote anything worth keeping into CLAUDE.md.shared / CLAUDE.md.$account, then re-run)"
+    fi
+    cp "$MERGE_TMP" "$ctx/CLAUDE.md"
+    if [ -f "$fragment" ]; then
+        echo "  CLAUDE.md: written from CLAUDE.md.shared + CLAUDE.md.$account"
+    else
+        echo "  CLAUDE.md: written from CLAUDE.md.shared (no $account fragment)"
+    fi
 }
 
 # ---- skills: whole-dir symlink for accounts with no exclusions ----
@@ -241,6 +300,7 @@ for account in "${ACCOUNTS[@]}"; do
     info "${ctx/#$HOME/~}"
 
     sync_settings "$account" "$ctx"
+    sync_claude_md "$account" "$ctx"
     sync_skills "$account" "$ctx"
 done
 
