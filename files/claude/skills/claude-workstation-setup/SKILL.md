@@ -51,8 +51,12 @@ Account-specific keys (the exxo-skills marketplace, its plugin) live only in
 1. **Dotfiles skills** (`files/claude/skills/`, this skill included):
    personal gets a whole-directory symlink (`~/.claude-personal/skills` IS
    the repo dir — author a skill in place and it lands in git). exxo gets a
-   REAL directory of per-skill symlinks curated by claude-sync against a
-   per-account exclusion list.
+   REAL directory of per-skill symlinks curated by claude-sync against an
+   allow list: only repo skills named in `shared_skills()` in
+   `scripts/claude-sync` get linked in (currently just
+   `claude-workstation-setup`). Every other repo skill is personal-only by
+   default and must be explicitly promoted — add its name to
+   `shared_skills()` to make it cross-account.
 2. **Plugins** via marketplaces declared in the settings fragments: exxo
    enables `exxo-common@exxo-skills` (org skills: secret handling, CI runner
    targeting). Until Exxo-Labs/skills#2 merges, the marketplace points at the
@@ -60,14 +64,18 @@ Account-specific keys (the exxo-skills marketplace, its plugin) live only in
    (`git@github.com:Exxo-Labs/skills.git` — background plugin refresh
    disables git credential helpers, so HTTPS fails on private repos).
 
-The exclusion list exists because both paths can ship the same skill name:
-the repo's `run-with-secrets` is homelab guidance (op-shim, Ansible,
-zima/ragnar) and the exxo-common plugin ships an Exxo `run-with-secrets`
-(agent/run + agent.env). Verified 2026-08-18: without the exclusion BOTH
-loaded at once in the exxo context. So exxo's curated dir omits the repo
-copy, leaving only `exxo-common:run-with-secrets` there, while personal
-keeps the homelab one. When adding a skill to either delivery path, check
-the other path for a name collision first.
+The allow-list replaced an earlier exclusion list, which failed open: every
+new personal skill had to remember to opt itself out of the exxo context.
+The motivating case was `run-with-secrets`: the repo's copy is homelab
+guidance (op-shim, Ansible, zima/ragnar) and the exxo-common plugin ships its
+own Exxo `run-with-secrets` (agent/run + agent.env). Verified 2026-08-18:
+without an exclusion, BOTH loaded at once in the exxo context, which risked
+an Exxo session following homelab credential guidance. Under the allow-list,
+`run-with-secrets` is simply absent from `shared_skills()`, so exxo's
+curated dir never contains the repo copy — leaving only
+`exxo-common:run-with-secrets` there, while personal keeps the homelab one.
+When promoting a skill to cross-account, check the plugin side for a name
+collision first.
 
 ## What is deliberately NOT shared or synced
 
@@ -84,9 +92,9 @@ the other path for a name collision first.
   CLAUDE_CONFIG_DIR; check which wrapper launched it.
 - A settings change vanished → it was hand-written into a context file;
   promote it into a fragment and re-run `claude-sync`.
-- Two skills with one name → check both delivery paths; fix with the
-  exclusion list in `claude-sync` (`excluded_skills()`), not by hand-deleting
-  links.
+- Two skills with one name → check both delivery paths; fix by editing
+  `shared_skills()` in `claude-sync` (repo skills are personal-only unless
+  named there), not by hand-deleting links.
 - Moving an existing session to a new cwd takes three edits with the desktop
   app quit: move the transcript under the new cwd-slug in
   `<context>/projects/`, rewrite its embedded `"cwd":` fields, and update

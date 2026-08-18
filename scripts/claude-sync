@@ -28,15 +28,16 @@
 # how the personal context works — a skill is a capability, not account
 # state, and personal has no reason to see anything less than the whole set.
 #
-# exxo is the exception: it enables the exxo-common plugin, which ships its
-# own run-with-secrets skill, and the repo also has a run-with-secrets skill
-# (homelab's op-shim/Ansible/zima/ragnar guidance). Verified empirically on
-# 2026-08-18: with the whole-dir symlink, BOTH copies loaded at once in the
-# exxo context, so an Exxo session could pick up homelab credential
-# guidance. exxo therefore gets a real skills directory curated with
-# per-skill symlinks, excluding whatever the plugin already covers, instead
-# of the whole-dir symlink. See excluded_skills() below for the exclusion
-# list itself.
+# Every other context gets a real skills directory curated with per-skill
+# symlinks, and links ONLY the skills named in shared_skills() below — repo
+# skills are personal-only unless explicitly promoted to cross-account.
+# Allow-list, not deny-list, deliberately: a deny-list fails open, making
+# every new personal skill remember to opt out of the work context. That is
+# exactly how the run-with-secrets collision happened (verified 2026-08-18:
+# the repo's homelab run-with-secrets and the exxo-common plugin's Exxo
+# run-with-secrets BOTH loaded at once in the exxo context, so an Exxo
+# session could pick up homelab credential guidance). With the allow-list,
+# a new skill defaults to staying out of exxo.
 #
 # Skills from other repos (an org skills repo, a lab repo) are NOT fanned in
 # here: composition inside a folded directory would mean gitignored symlinks
@@ -63,38 +64,21 @@ warn() { printf '\033[1;33mwarn:\033[0m %s\n' "$*"; }
 MERGE_TMP="$(mktemp)"
 trap 'rm -f "$MERGE_TMP"' EXIT
 
-# Skills to leave out of a given account's context, because a plugin already
-# enabled there ships an equivalent (and better-scoped) copy. Keyed by
-# account so the rationale for each exclusion lives next to the account it
-# applies to.
-excluded_skills() {
-    case "$1" in
-        exxo)
-            # exxo-common:run-with-secrets is the Exxo-appropriate version;
-            # ours is the homelab copy (op-shim, Ansible, zima/ragnar
-            # credentials) and has no business loading in an Exxo session.
-            echo "run-with-secrets"
-            ;;
-        personal)
-            ;;
-    esac
+# The repo skills that are cross-account. Everything NOT named here is
+# personal-only: linked into ~/.claude-personal (which gets the whole
+# directory anyway) and left out of every curated context. Promote a skill
+# to cross-account by adding its name here — and check the plugin path for
+# a name collision first (the repo's run-with-secrets is the homelab copy;
+# the Exxo one reaches exxo as exxo-common:run-with-secrets via the plugin,
+# which is why it must never be in this list).
+shared_skills() {
+    cat <<'LIST'
+claude-workstation-setup
+LIST
 }
 
-# Human-readable reason shown next to an excluded skill's status line.
-exclusion_reason() {
-    case "$1:$2" in
-        exxo:run-with-secrets)
-            echo "exxo-common plugin provides the Exxo copy"
-            ;;
-        *)
-            echo "excluded for this account"
-            ;;
-    esac
-}
-
-is_excluded() {
-    local skill="$1" list="$2"
-    [ -n "$list" ] && printf '%s\n' "$list" | grep -qx "$skill"
+is_shared() {
+    shared_skills | grep -qx "$1"
 }
 
 diff_only=0
@@ -179,14 +163,14 @@ sync_skills_wholedir() {
     echo "  skills: linked -> ${SRC_SKILLS/#$HOME/~}"
 }
 
-# ---- skills: curated real directory of per-skill symlinks, for accounts
-# with exclusions (see excluded_skills). Idempotent and self-healing: it
-# tears down the old whole-dir symlink if that's still what's there, prunes
-# any entry that's broken, excluded, or pointed somewhere other than the
-# matching repo skill, adopts unmanaged real subdirectories into the repo,
-# then (re)links everything that survives exclusion.
+# ---- skills: curated real directory of per-skill symlinks, for every
+# account except personal. Links ONLY the shared_skills() allow-list.
+# Idempotent and self-healing: it tears down the old whole-dir symlink if
+# that's still what's there, prunes any entry that's broken, not shared, or
+# pointed somewhere other than the matching repo skill, adopts unmanaged
+# real subdirectories into the repo, then (re)links the shared set.
 sync_skills_curated() {
-    local account="$1" ctx="$2" exclusions="$3"
+    local account="$1" ctx="$2"
     local dir="$ctx/skills"
 
     if [ -L "$dir" ]; then
@@ -205,7 +189,7 @@ sync_skills_curated() {
         name="$(basename "$entry")"
         if [ -L "$entry" ]; then
             target="$(readlink "$entry")"
-            if is_excluded "$name" "$exclusions" || [ ! -e "$entry" ] || [ "$target" != "$SRC_SKILLS/$name" ]; then
+            if ! is_shared "$name" || [ ! -e "$entry" ] || [ "$target" != "$SRC_SKILLS/$name" ]; then
                 rm "$entry"
             fi
         elif [ -d "$entry" ]; then
@@ -220,30 +204,31 @@ sync_skills_curated() {
         fi
     done
 
-    local linked=0 skill_path skill
+    local linked=0 personal_only=0 skill_path skill
     for skill_path in "$SRC_SKILLS"/*/; do
         skill="$(basename "$skill_path")"
-        if is_excluded "$skill" "$exclusions"; then
-            echo "  skills/$skill: excluded ($(exclusion_reason "$account" "$skill"))"
+        if ! is_shared "$skill"; then
+            personal_only=$((personal_only + 1))
             continue
         fi
         if [ ! -e "$dir/$skill" ] && [ ! -L "$dir/$skill" ]; then
             ln -s "$SRC_SKILLS/$skill" "$dir/$skill"
         fi
+        echo "  skills/$skill: linked (shared)"
         linked=$((linked + 1))
     done
-    echo "  skills: linked $linked skills"
+    echo "  skills: $linked shared linked, $personal_only personal-only left out"
 }
 
 sync_skills() {
     local account="$1" ctx="$2"
-    local exclusions
-    exclusions="$(excluded_skills "$account")"
 
-    if [ -z "$exclusions" ]; then
+    # personal is the authoring context: whole-dir symlink, sees everything.
+    # Everyone else gets the curated shared_skills() subset.
+    if [ "$account" = "personal" ]; then
         sync_skills_wholedir "$ctx"
     else
-        sync_skills_curated "$account" "$ctx" "$exclusions"
+        sync_skills_curated "$account" "$ctx"
     fi
 }
 
