@@ -1,0 +1,77 @@
+# Exxo-only instructions
+
+## Exxo credentials go through `agent/run`
+
+Any command needing Exxo platform credentials — `gcloud` against platform
+projects, `pulumi`, `esc`, provider APIs — runs as `agent/run -- <command>`,
+never bare; never assume secrets are already in the shell. Use the
+`run-with-secrets` skill, and check the local cache first when making many
+calls in a row.
+
+`agent.env` + `agent/run` resolve from the operator's personal 1Password
+account and are for attended local work only: never wire them into anything
+unattended or deployed, and never treat them as a substitute for an app's
+own `.env` or service accounts — production credentials belong in the real
+secrets path (Secret Manager, Workload Identity Federation, Pulumi ESC).
+
+## The fast check is necessary, not sufficient
+
+`just check` (format + lint + typecheck) is the inner loop. Before pushing
+or calling a change complete, run the repo's comprehensive gate (`just ci`
+/ `just verify`) — it includes the production build, which is where
+SSR/prerender failures and build-time-only import errors surface; a green
+`just check` has missed them by definition.
+
+## Confirm material changes; proceed on trivial ones
+
+Check with the user before a material change, even when edits are being
+auto-accepted: a new pattern or architectural approach, work spanning
+multiple files or systems, a non-trivial refactor, or a solution that
+required researching documentation (say what you relied on). Proceed
+without asking for trivial fixes (lint, imports, typos), changes the user
+described explicitly, and work following a pattern already established in
+the repo.
+
+## British English
+
+Use British spellings in prose, identifiers and documentation — initialise,
+colour, optimise, organisation. Exception: match a third-party API's US
+spelling where a name must line up with an external signature (`color`
+props, upstream field names).
+
+## Query the live source, don't copy it in
+
+A fact with a live source is looked up on demand, not cached into a repo:
+another repo's stack outputs, project ids, resource names, environment
+values. Overviews and summaries are derived by scanning the underlying
+records, never hand-maintained beside them. Only a value with no live
+source at all (a billing account id, a checkout path) gets written down,
+and that is configuration, not a fact about infrastructure. A copied
+identifier is right on the day it's pasted and silently wrong afterwards.
+
+## Earn the abstraction
+
+Add a recipe, package, or directory level when the need has actually
+repeated, not in anticipation — a one-off command doesn't need a recipe,
+and files stay flat inside a package until growth genuinely justifies
+subdirectories.
+
+## Logging
+
+- Never leave a catch block empty; log at the level the consequence
+  warrants — `error` for lost data or broken functionality, `warn` for
+  degraded-but-working (fallback taken, audit write failed), `info` for
+  operational counts and progress.
+- Log unexpected failures only — not expected outcomes like bad credentials
+  or expired sessions. Noisy logs actively reduce signal.
+- Attach the exception and its context as structured fields, never
+  interpolated into the message string.
+- No bare `print`/`echo`/`dd()`/`console.*` as production logging — go
+  through the project's logger.
+
+## Prefer the platform's native mechanism for UI behaviour
+
+Reach for the CSS/HTML capability before writing JavaScript to reproduce
+it — `scroll-snap-type`, `position: sticky`, `overflow-anchor` rather than
+scroll handlers and offset maths. Use JS only where the native mechanism
+genuinely cannot express the behaviour.
