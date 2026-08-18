@@ -26,6 +26,27 @@ session, a parallel session, or the user's own shell tomorrow. An explicit
 target makes each invocation self-describing and stops it quietly acting on
 the wrong stack, host or directory.
 
+## Git workflow: branch, checkpoint as you go, merge only when directed
+
+Never commit directly to `main`/`master` unless explicitly directed to — do
+the work on a branch. Group commits into logical, reviewable chunks rather
+than one commit for everything, and push the branch with a draft PR at
+sensible checkpoints as work progresses, rather than waiting until
+everything is finished to make it visible.
+
+When explicitly directed to complete or ship the work, squash-merge the PR
+into main. Exception: a production-stage Exxo repo (a client product repo,
+an infra/deploy repo) always needs human review before merge — open the PR
+and stop there even if otherwise directed to complete the work, unless the
+operator explicitly overrides that requirement for this instance.
+
+**Why:** a draft PR at each checkpoint gives visibility into in-progress
+work without forcing a decision on it, and merging only on explicit
+direction keeps "merge" a deliberate act rather than a default outcome of
+finishing a task. Production Exxo repos carry real user/business risk, so
+the human review gate stays mandatory there regardless of how the change was
+authored.
+
 ## Environment/setup obstacles: surface, don't silently work around
 
 If a task hits an environment or tooling setup issue — a package-manager
