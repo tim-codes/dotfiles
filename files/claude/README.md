@@ -19,14 +19,18 @@ Linear ENG-20).
 
 Skills follow the same split. `~/.claude-personal/skills` stays a
 whole-directory symlink to `files/claude/skills`. `~/.claude-exxo/skills` is
-now a real directory of per-skill symlinks maintained by `claude-sync`, built
-from an exclusion list: `run-with-secrets` is excluded there because the
-`exxo-common` plugin ships its own `run-with-secrets` (`agent/run` +
-`agent.env`) and the repo's copy is the homelab one (op-shim, Ansible,
-zima/ragnar) — both were visible at once before the exclusion (verified
-2026-08-18), which risked an Exxo session following homelab credential
-guidance. In the Exxo context, the plugin's `exxo-common:run-with-secrets` is
-the only one.
+a real directory of per-skill symlinks maintained by `claude-sync`, built
+from an allow list: a `shared_skills()` list in `scripts/claude-sync` names
+the repo skills that are cross-account — currently just
+`claude-workstation-setup` — and only those are linked into exxo; every
+other repo skill is personal-only by default. The allow-list replaced an
+earlier exclusion list after `run-with-secrets` — homelab guidance (op-shim,
+Ansible, zima/ragnar) — turned up alongside the `exxo-common` plugin's own
+`run-with-secrets` (`agent/run` + `agent.env`) in the exxo context; both were
+visible at once (verified 2026-08-18), which risked an Exxo session following
+homelab credential guidance. In the Exxo context, the plugin's
+`exxo-common:run-with-secrets` is the only one. To make a repo skill
+cross-account, add its name to `shared_skills()`.
 
 Contexts are created by `scripts/claude-contexts`; the `claude`,
 `claude-personal` and `claude-exxo` shell wrappers select them via
