@@ -5,8 +5,8 @@
   "extraKnownMarketplaces": {
     "exxo-skills": {
       "source": {
-        "source": "directory",
-        "path": "/Users/tim/dev/exxo/skills"
+        "source": "git",
+        "url": "git@github.com:Exxo-Labs/skills.git"
       }
     }
   }
