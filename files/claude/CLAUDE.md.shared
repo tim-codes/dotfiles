@@ -40,12 +40,21 @@ an infra/deploy repo) always needs human review before merge — open the PR
 and stop there even if otherwise directed to complete the work, unless the
 operator explicitly overrides that requirement for this instance.
 
+An explicit direction to skip part of this flow — commit straight to main,
+merge without waiting, skip the draft stage — is scoped to the specific
+change it was given for, one-off. It does not carry forward to later
+changes in the same session or the same repo, even ones that look similar;
+default back to branch + draft PR + merge-on-direction for the next change
+and wait for a fresh direction if this one is meant to skip it too.
+
 **Why:** a draft PR at each checkpoint gives visibility into in-progress
 work without forcing a decision on it, and merging only on explicit
 direction keeps "merge" a deliberate act rather than a default outcome of
 finishing a task. Production Exxo repos carry real user/business risk, so
 the human review gate stays mandatory there regardless of how the change was
-authored.
+authored. Treating a one-off approval as standing permission is exactly the
+inference that erodes the "explicit" part — each skip has to be re-earned,
+not generalized from the last one.
 
 ## Environment/setup obstacles: surface, don't silently work around
 
