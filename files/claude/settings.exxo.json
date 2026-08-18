@@ -1,0 +1,13 @@
+{
+  "enabledPlugins": {
+    "exxo-common@exxo-skills": true
+  },
+  "extraKnownMarketplaces": {
+    "exxo-skills": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/tim/dev/exxo/skills"
+      }
+    }
+  }
+}
