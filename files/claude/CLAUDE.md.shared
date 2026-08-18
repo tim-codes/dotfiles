@@ -19,3 +19,25 @@ otherwise-reasonable approach because its dependency happened to be blocked
 by a solvable config issue, rather than because the approach itself was
 wrong. Surfacing it first keeps that reasoning honest, and gives the user the
 chance to fix the environment rather than have a decision made around it.
+
+## Installing a missing dependency on the workstation: fine ad hoc, persist the rest
+
+If a task needs a dependency that isn't installed on the local workstation
+yet — e.g. `brew install libreoffice` to check a document's formatting — go
+ahead and install it in the current session without stopping to ask, as long
+as it's small, low-risk, and doesn't conflict with what's already installed.
+
+If instead the dependency is particularly large, invasive, or sits
+incongruously next to existing installables, still install it if the task
+genuinely needs it — but don't leave it as undocumented host state. Persist
+the install into the dotfiles repo (or whichever repo governs that class of
+machine config, e.g. homelab for server-side installs) as idempotent config,
+and open a PR for it.
+
+**Why:** most one-off dependencies are cheap, reversible, and not worth a
+round-trip to ask about — this doesn't conflict with the "surface, don't
+silently work around" rule above, since nothing here is actually blocked.
+But an install big or unusual enough to change the workstation's shape (not
+just add a small tool to it) needs to survive a reinstall or a new machine —
+otherwise the workstation's real state silently diverges from what the repo
+says it is, and the next reproduction from source control is wrong.
