@@ -76,6 +76,25 @@ The repository uses GNU Stow to manage symlinks. All files in `src/` are symlink
 ### Platform Detection
 The setup scripts automatically detect platform (`mac` or `linux`) and load appropriate configurations. Platform-specific files are named with suffixes like `mac.fish` or `zsh_mac`.
 
+## Editing Workflow
+
+**Always use a git worktree for branch work in this repo — never switch
+branches in the primary `~/dev/dotfiles` checkout.** Stow symlinks the live
+config on this machine (`~/.zshrc`, `~/.config/fish/*`, the per-account
+`~/.claude-*/CLAUDE.md` and `settings.json` that `scripts/claude-sync`
+reads from here, etc.) straight into this checkout's `src/` — the symlink
+targets are files on disk at a fixed path, not a particular git ref. Check
+out a different branch in the primary checkout and every one of those live
+files changes content immediately, machine-wide, including mid-edit or
+half-finished branch state — until you check back out to `main`.
+
+To edit anything, `git worktree add ../dotfiles-<branch> <branch>` (or
+`-b <branch>` for a new one) and do the work there instead. The primary
+checkout stays parked on `main`, so the symlinks keep resolving to `main`'s
+content for the whole time a branch is being worked on, and the worktree
+branches, commits, pushes and gets removed (`git worktree remove`)
+independently of it.
+
 ## Important Notes
 
 - The init script should be run from native terminal (not alacritty) for best compatibility
