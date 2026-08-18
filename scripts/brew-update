@@ -50,6 +50,9 @@ brewDeps=(
   pipx
   pmd
   pnpm
+  # pdftoppm for rasterising PDF pages — Claude Code needs it to visually
+  # inspect PDFs (e.g. verifying generated Exxo report renders)
+  poppler
   pulumi
   # redis-cli for inspecting the local secret cache (the cache itself runs as
   # a container; this is the client, not a server we run)
