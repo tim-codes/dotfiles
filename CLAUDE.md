@@ -18,6 +18,7 @@ This is a personal dotfiles repository for macOS and Linux development environme
 - `~/dev/dotfiles/src/bin/deps-up` - Update all dependencies (brew, cargo, npm, pnpm)
 - `~/dev/dotfiles/scripts/brew-update` - Update Homebrew packages
 - `~/dev/dotfiles/scripts/cargo-update` - Update Rust packages
+- `~/dev/dotfiles/scripts/firefox-prefs` - Link codified Firefox prefs into each installation's active profile (only needed for a new profile/machine; the link means repo edits apply on Firefox restart)
 - `restow` - Update symlinks after adding new files to src/
 
 ### Development
@@ -29,7 +30,9 @@ This is a personal dotfiles repository for macOS and Linux development environme
 ### Directory Structure
 - `scripts/` - Setup and maintenance scripts
 - `src/` - Configuration files managed by Stow (symlinked to `~/.config/`)
-- `src/bin/` - Custom utility scripts
+- `src/bin/` - Custom utility scripts (gitignored by default — add a `!` negation in .gitignore per file)
+- `src/Library/LaunchAgents/` - launchd user agents; stows into the existing real `~/Library/LaunchAgents/`
+- `docs/adr/` - Architecture decision records
 - `assets/` - Fonts and other static resources
 
 ### Configuration Loading Order
@@ -103,3 +106,4 @@ independently of it.
 - The init script detects WSL and uses `op-ssh-sign-wsl.exe` for commit signing (vs native paths on mac/linux)
 - Homebrew updates are throttled to run at most once every 20 minutes via timestamp check
 - Scroll direction: LinearMouse reverses mice (its "bypass other apps" toggle leaves Logi Options+-managed MX mice alone; macOS stays "natural" for the trackpad) — see docs/adr/2026-08-17-per-device-scroll-direction.md
+- Firefox: prefs are codified in `src/.config/firefox/user.js` and symlinked into the profile — `about:config` edits reset on restart, change the repo file instead. A launchd watchdog (`src/bin/firefox-tab-watchdog`) flags runaway content processes; it ships in `warn` mode, flip `FF_WATCHDOG_MODE` to `enforce` in the plist to let it kill. See docs/adr/2026-08-22-firefox-resource-containment.md
