@@ -61,16 +61,8 @@ fresh and will happily run bare `op`, ansible from the repo root (no project
 each of which turns into a Touch ID / SSH-approval prompt storm on the
 operator's Mac (observed 2026-08-22).
 
-Any subagent brief that may run `ansible`, `ssh`, or `op` against the lab
-must therefore carry these four lines, near-verbatim:
-
-1. Run ansible from the relevant `projects/<host>/` directory or via `just`
-   recipes — never from the repo root (ControlPersist lives in each
-   project's `ansible.cfg`).
-2. Route `op` through the shim: `PATH=<repo>/tools/op-shim:$PATH op ...`
-   or a Just recipe — never bare `op` more than once.
-3. Batch raw ssh into ONE invocation per host, with `-o ControlMaster=auto
-   -o ControlPath=~/.ssh/cm-%r@%h -o ControlPersist=4h`.
-4. Never retry failing auth in a loop — one retry max, then report. (The
-   1Password agent offers many keys per attempt; unpinned hosts can hit
-   MaxAuthTries, and every attempt can prompt the operator.)
+Before launching any subagent that may run `ansible`, `ssh`, or `op`
+against the lab: read `delegation-brief.md` (next to this file) and include
+its block in the brief near-verbatim — it carries the project-dir ansible
+rule, the op-shim PATH, the batched/multiplexed ssh form, and the
+no-auth-retry-loop rule.
