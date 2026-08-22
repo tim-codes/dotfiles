@@ -45,7 +45,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'$HOME/dev/dotfiles/files/claude/hooks/guard-dotfiles-checkout.sh' # dotfiles-guard-primary-checkout"
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/guard-dotfiles-checkout.sh\" # dotfiles-guard-primary-checkout"
           }
         ]
       },
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'$HOME/dev/dotfiles/files/claude/hooks/preserve-worktree-transcripts.sh' # worktree-transcript-preserve"
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/preserve-worktree-transcripts.sh\" # worktree-transcript-preserve"
           }
         ]
       }
@@ -72,7 +72,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'$HOME/dev/dotfiles/files/claude/hooks/preserve-worktree-transcripts.sh' # worktree-transcript-preserve"
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/preserve-worktree-transcripts.sh\" # worktree-transcript-preserve"
           }
         ]
       }
