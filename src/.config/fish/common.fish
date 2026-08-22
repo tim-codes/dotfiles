@@ -3,8 +3,13 @@
 # PATH must be set first — everything below may need system binaries
 
 #~~ capture original PATH
+# Joined with ':' explicitly. $PATH is a fish list, and fish only colon-joins an
+# exported variable it recognises as a path variable — PATH_BASE ends in BASE,
+# so it would export space-separated. common.sh consumes this as a POSIX
+# colon-delimited string, and every zsh spawned from fish inherits it, so a
+# space-joined value leaves non-interactive zsh with no /usr/bin or /bin at all.
 if test -z "$PATH_BASE"
-  set -x PATH_BASE $PATH
+  set -x PATH_BASE (string join ':' $PATH)
 end
 
 #~~ append to $PATH idempotently...
@@ -18,7 +23,7 @@ end
 
 # note: forcing homebrew in front so we have homebrew bash in front of system bash
 # always include system paths to ensure basic commands (cat, curl, tty) are available
-set -x PATH "/opt/homebrew/bin" "/opt/homebrew/sbin" $PATH_BASE
+set -x PATH "/opt/homebrew/bin" "/opt/homebrew/sbin" (string split ':' $PATH_BASE)
 add_to_path \
   "/usr/local/bin" \
   "/usr/bin" \
