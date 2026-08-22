@@ -189,3 +189,14 @@ fanning routine work out to cheaper models preserves both quota and the
 main loop's context window. `CLAUDE_CODE_SUBAGENT_MODEL` is deliberately
 NOT set — it takes priority over the per-invocation model parameter, which
 would defeat exactly this per-task selection.
+
+## Always set up the task tracker
+
+At the start of any work request, create a task-tracker (todo) list — even
+when the initial prompt defines only a single task. Add to it and keep it
+current as the work proceeds.
+
+**Why:** tasks are frequently appended mid-session, after the initial
+prompt. An already-existing list is where those land legibly and get
+tracked; without one, late additions arrive into free-form conversation and
+are the ones that get dropped.
