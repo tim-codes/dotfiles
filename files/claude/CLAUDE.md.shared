@@ -164,3 +164,28 @@ them inspectable and resumable) and then removes the worktree properly.
 **Why:** transcripts of sessions launched inside a worktree live under the
 worktree's own cwd slug; removing the worktree orphans them from the resume
 picker and the periodic transcript cleanup then deletes them for good.
+
+## Orchestrator/subagent model policy
+
+Sessions run Fable at medium effort as the orchestrator — that's the pinned
+baseline (`model: fable`, `effortLevel: medium`), not something to restate
+per session. Keep the main loop for coordination, judgment, decisions, and
+final synthesis; delegate substantial self-contained work to subagents, and
+pick each agent's model judiciously to balance effectiveness against token
+cost:
+
+- `sonnet` — routine and mechanical work: broad searches and file sweeps,
+  well-specified implementation, boilerplate, mechanical migrations.
+- `opus` — genuinely hard subtasks: tricky debugging, design-sensitive
+  implementation, adversarial review/verification.
+- omit `model` (inherit Fable) only when the subtask needs frontier
+  judgment end-to-end.
+
+Don't spawn a subagent for a trivial lookup a couple of direct tool calls
+would answer.
+
+**Why:** the orchestrator's context and judgment are the scarce resource;
+fanning routine work out to cheaper models preserves both quota and the
+main loop's context window. `CLAUDE_CODE_SUBAGENT_MODEL` is deliberately
+NOT set — it takes priority over the per-invocation model parameter, which
+would defeat exactly this per-task selection.

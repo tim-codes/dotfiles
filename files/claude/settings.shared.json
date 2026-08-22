@@ -1,5 +1,5 @@
 {
-  "model": "sonnet",
+  "model": "fable",
   "hooks": {
     "Notification": [
       {
@@ -108,7 +108,7 @@
       }
     ]
   },
-  "effortLevel": "high",
+  "effortLevel": "medium",
   "tui": "fullscreen",
   "skipWorkflowUsageWarning": true,
   "theme": "auto",

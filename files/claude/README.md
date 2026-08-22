@@ -75,7 +75,7 @@ pickers are per user-data dir; resume across the two profiles via the CLI.
 
 ## Changing model / effort — use the flags, not the slash commands
 
-The baseline pins `model: sonnet` and `effortLevel: high`. Both are *defaults
+The baseline pins `model: fable` and `effortLevel: medium` — the orchestrator tier; subagents get cheaper models per the CLAUDE.md.shared orchestrator/subagent policy. Both are *defaults
 read at session start*, and there are two ways to change them for a session —
 only one of which leaves the file alone:
 
