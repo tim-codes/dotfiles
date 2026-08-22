@@ -13,6 +13,10 @@ packages=(
   @playwright/mcp@latest
   # markdown → OOXML conversion in the office-files skill (md2exxo-report.sh, via MD2EXXO_MARKDOWN_IT)
   markdown-it@latest
+  # Exxo agent credential tooling (agent-run / agent-tooling); private GH
+  # Packages registry — needs the read PAT in ~/.npmrc (1Password:
+  # "[EXXO] github npm read PAT" in Exxo Engineering)
+  @exxo-labs/agent-tooling@latest
 )
 
 pnpm i -g "${packages[@]}"
