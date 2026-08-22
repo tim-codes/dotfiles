@@ -48,6 +48,15 @@
             "command": "'$HOME/dev/dotfiles/files/claude/hooks/guard-dotfiles-checkout.sh' # dotfiles-guard-primary-checkout"
           }
         ]
+      },
+      {
+        "matcher": "ExitWorktree",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'$HOME/dev/dotfiles/files/claude/hooks/preserve-worktree-transcripts.sh' # worktree-transcript-preserve"
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -56,6 +65,14 @@
           {
             "type": "command",
             "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Ended # notchbar-agents-claude-hook"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'$HOME/dev/dotfiles/files/claude/hooks/preserve-worktree-transcripts.sh' # worktree-transcript-preserve"
           }
         ]
       }

@@ -108,6 +108,7 @@ trap 'rm -f "$MERGE_TMP"' EXIT
 shared_skills() {
     cat <<'LIST'
 claude-workstation-setup
+worktree-closedown
 dotfiles-repo
 LIST
 }

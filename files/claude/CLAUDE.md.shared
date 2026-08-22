@@ -152,3 +152,15 @@ the installed version (the docs under `node_modules/<pkg>/`, `--help`,
 `tldr <cmd>`) or the current official docs before writing code against it. Treat recall
 as a hypothesis to check, and when an answer came from research, say what
 it was checked against.
+
+## Worktree closedown: preserve transcripts first
+
+Never confirm Claude Code's built-in "clean up the worktree?" prompt, and
+never remove a git worktree that hosted Claude sessions without first
+relocating those sessions' transcripts — invoke the `worktree-closedown`
+skill, which merges them into the primary checkout's project slug (keeping
+them inspectable and resumable) and then removes the worktree properly.
+
+**Why:** transcripts of sessions launched inside a worktree live under the
+worktree's own cwd slug; removing the worktree orphans them from the resume
+picker and the periodic transcript cleanup then deletes them for good.
