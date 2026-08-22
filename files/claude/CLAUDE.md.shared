@@ -185,18 +185,30 @@ conflict resolution where each step depends on judging the previous one,
 and final synthesis. Independent delegable units launch as parallel
 subagents in one message, not sequentially.
 
-Model choice — sonnet is the default, not an option:
+Model choice — pick per task; when in doubt, prefer opus:
 
-- `sonnet` — the default for every delegated task: investigation, log
-  digging, searches, well-specified implementation, mechanical edits.
-- `opus` — only with a stated reason: tricky debugging, design-sensitive
-  implementation, adversarial review/verification.
+- `opus` — the default whenever the brief is complex or multi-step, the
+  edit is design-sensitive, the task is debugging or adversarial
+  review/verification, or precise instruction-following matters. It follows
+  detailed briefs more reliably (operator preference, 2026-08-22); no
+  stated reason needed.
+- `sonnet` — for simple, well-bounded tasks: a single-question search or
+  log dig, a mechanical edit with an unambiguous spec.
 - omit `model` (inherit Fable) — rare; only when the subtask needs frontier
   judgment end-to-end, and say why.
 
 On every launch, announce a numbered roster — **task** (agent type) —
 **model**, with a one-line brief per agent — so delegation and model
 choices stay visible and reviewable.
+
+Environment rules don't travel: skills and CLAUDE.md discipline loaded in
+the orchestrator do NOT reach a subagent's fresh context. If a delegated
+task touches an environment with prescribed invocation mechanics — secret
+caches, SSH multiplexing/config, command runners, PATH shims — the brief
+must restate those mechanics explicitly (e.g. the delegation clause in the
+`run-with-secrets` skill). A subagent left to improvise here doesn't just
+work worse, it leaks side effects onto the operator (auth prompt storms,
+uncached secret reads, unmultiplexed connections).
 
 Self-audit: on noticing more than ~5 tool calls have just run inline on
 work a subagent could have done, say so in the next message and delegate
@@ -205,9 +217,9 @@ embarrassment.
 
 **Why:** the orchestrator's context and judgment are the scarce resource,
 and under a busy main loop "good judgment" reliably drifts toward doing
-everything inline — mechanical triggers (call-count, output-size), an
-inverted default (sonnet unless a stated reason), and a self-audit clause
-are what convert the preference into behaviour. `CLAUDE_CODE_SUBAGENT_MODEL`
+everything inline — mechanical triggers (call-count, output-size), a
+per-task model default that leans opus for anything non-trivial, and a
+self-audit clause are what convert the preference into behaviour. `CLAUDE_CODE_SUBAGENT_MODEL`
 is deliberately NOT set — it takes priority over the per-invocation model
 parameter, which would defeat exactly this per-task selection.
 

@@ -52,3 +52,25 @@ never try to make its auth unattended.
 - Secrets live in the 1Password **HomeLab** vault; item UUIDs are documented
   in CLAUDE.md / project CLAUDE.md files.
 - Tradeoffs and design: `docs/adr/005-1password-secret-cache.md`.
+
+## Delegating: these rules do NOT travel to subagents on their own
+
+This skill loads only into the context that invoked it. A subagent starts
+fresh and will happily run bare `op`, ansible from the repo root (no project
+`ansible.cfg` → no ControlPersist multiplexing), or a raw-ssh retry loop —
+each of which turns into a Touch ID / SSH-approval prompt storm on the
+operator's Mac (observed 2026-08-22).
+
+Any subagent brief that may run `ansible`, `ssh`, or `op` against the lab
+must therefore carry these four lines, near-verbatim:
+
+1. Run ansible from the relevant `projects/<host>/` directory or via `just`
+   recipes — never from the repo root (ControlPersist lives in each
+   project's `ansible.cfg`).
+2. Route `op` through the shim: `PATH=<repo>/tools/op-shim:$PATH op ...`
+   or a Just recipe — never bare `op` more than once.
+3. Batch raw ssh into ONE invocation per host, with `-o ControlMaster=auto
+   -o ControlPath=~/.ssh/cm-%r@%h -o ControlPersist=4h`.
+4. Never retry failing auth in a loop — one retry max, then report. (The
+   1Password agent offers many keys per attempt; unpinned hosts can hit
+   MaxAuthTries, and every attempt can prompt the operator.)
