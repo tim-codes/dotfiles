@@ -22,6 +22,14 @@ inspectable and resumable, then removes the worktree.
 mid-session — EnterWorktree, `isolation: "worktree"` agents — already
 transcribe under the primary slug and need nothing from this skill.)
 
+A fail-open safety net also exists: the `preserve-worktree-transcripts.sh`
+hook (SessionEnd, plus PreToolUse on ExitWorktree — see
+settings.shared.json) copies a worktree-hosted session's transcripts to the
+primary slug automatically. Those raw copies still carry the worktree's cwd
+fields, so they're inspectable but not cleanly resumable — this skill's
+relocate-and-rewrite remains the proper closedown; the hook only makes
+forgetting it non-fatal.
+
 ## Procedure
 
 Definitions: `W` = absolute worktree path, `P` = absolute primary checkout
@@ -38,9 +46,12 @@ path (both from `git worktree list`), `CTX` = the session's config dir
 2. **Relocate each session into the primary slug.** Target dir is
    slug(`P`) (or slug of the matching subpath under `P`); `mkdir -p` it if
    new. For every entry in the source slug dir, move `<uuid>.jsonl` AND any
-   sidecar dir named `<uuid>/` into the target. A uuid collision in the
-   target should never happen (uuids are unique) — if one somehow does, stop
-   and surface it rather than overwrite.
+   sidecar dir named `<uuid>/` into the target, overwriting a same-uuid
+   entry already there: that's the raw safety copy made by the
+   `preserve-worktree-transcripts.sh` hook (SessionEnd / ExitWorktree,
+   see settings.shared.json), and the relocated, path-rewritten version
+   from this procedure supersedes it. Distinct sessions can't collide —
+   uuids are unique.
 
 3. **Rewrite embedded paths.** Each moved `.jsonl` records the worktree path
    in `"cwd"` fields (and possibly other path strings). Rewrite `W` → `P`
