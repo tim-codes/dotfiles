@@ -47,8 +47,31 @@ homelab credential guidance. In the Exxo context, the plugin's
 cross-account, add its name to `shared_skills()`.
 
 Contexts are created by `scripts/claude-contexts`; the `claude`,
-`claude-personal` and `claude-exxo` shell wrappers select them via
-`CLAUDE_CONFIG_DIR` (see `src/.config/fish/common.fish`, `src/.zshrc`).
+`claude-personal`, `claude-exxo` and `claude-exxo-personal` shell wrappers
+select them via `CLAUDE_CONFIG_DIR` (see `src/.config/fish/common.fish`,
+`src/.zshrc`).
+
+## The exxo-personal overlay context
+
+`~/.claude-exxo-personal` (wrapper `claude-exxo-personal`, desktop
+`claude-d-exxo-personal`) is the exxo context with only the login swapped to
+the personal subscription — for when exxo quota is maxed out. It works
+because auth is naturally the only per-dir state: credentials live in the
+keychain keyed by a hash of `CLAUDE_CONFIG_DIR`, and `.claude.json`
+(login/onboarding/per-project trust) is private to the dir. `claude-sync`
+builds its `settings.json`/`CLAUDE.md`/skills from the **exxo** fragments
+(the `CONTEXTS` mapping) and symlinks its durable state — `projects/`
+(transcripts + auto-memory), `history.jsonl`, `plugins/`, `file-history`,
+`plans`, `tasks`, `todos`, `paste-cache` — into `~/.claude-exxo`, so
+`claude-exxo-personal --resume` continues the very session that ran out of
+quota. First use needs a one-time `/login` with the personal account (and
+one-time per-repo trust prompts).
+
+Known limits: claude.ai-side features (MCP connectors, cloud sessions,
+artifacts, ultrareview billing) follow the logged-in account, not the config
+dir — Exxo-org-scoped connectors aren't reachable under the personal login,
+so connector-heavy sessions belong on real exxo quota. Desktop session
+pickers are per user-data dir; resume across the two profiles via the CLI.
 
 ## Changing model / effort — use the flags, not the slash commands
 

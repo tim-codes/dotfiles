@@ -18,6 +18,24 @@ repo — prefer reading those before modifying anything they govern.
   pins it; desktop alias `claude-d-personal`.
 - `~/.claude-exxo` — work (Exxo) account. `claude-exxo` pins it; desktop
   alias `claude-d-exxo`.
+- `~/.claude-exxo-personal` — OVERLAY, not a third account: the exxo context
+  with only the login swapped to the personal subscription, for when exxo
+  quota is maxed out. `claude-exxo-personal` pins it; desktop alias
+  `claude-d-exxo-personal`. claude-sync builds its settings/CLAUDE.md/skills
+  from the SAME exxo fragments (via its `CONTEXTS` name:fragment mapping) and
+  symlinks the durable state — `projects/` (transcripts + auto-memory),
+  `history.jsonl`, `plugins/`, `file-history`, `plans`, `tasks`, `todos`,
+  `paste-cache` — into `~/.claude-exxo`, so `claude-exxo-personal --resume`
+  continues the very session that hit the quota wall. Only auth is separate
+  (keychain credential keyed by a hash of CLAUDE_CONFIG_DIR, plus the
+  per-dir `.claude.json`); first use needs a one-time personal `/login` and
+  re-answers per-repo trust prompts. Caveats: claude.ai-side features
+  (MCP connectors, cloud sessions, artifacts, ultrareview billing) follow
+  the logged-in ACCOUNT, so Exxo-org connectors aren't reachable here —
+  connector-heavy sessions stay on real exxo quota; desktop session pickers
+  are per user-data dir, so resume across the two profiles via the CLI.
+  Never hand-create real files inside this context where a symlink belongs —
+  claude-sync warns and leaves them, orphaning that history from exxo.
 
 The legacy default context (`~/.claude` plus the home-level `~/.claude.json`)
 is EXPECTED to exist alongside the dedicated ones — launchers that don't
@@ -138,7 +156,8 @@ collision first.
 - Session sees Exxo skills in personal (or vice versa) → wrong
   CLAUDE_CONFIG_DIR. Concrete check: `echo $CLAUDE_CONFIG_DIR` —
   `/Users/tim/.claude-personal` for bare `claude`, `/Users/tim/.claude-exxo`
-  for `claude-exxo`; empty means the legacy default context (fine if
+  for `claude-exxo`, `/Users/tim/.claude-exxo-personal` for
+  `claude-exxo-personal`; empty means the legacy default context (fine if
   launched deliberately via `claude-default` or an unpinned tool, wrong if
   an account wrapper was intended).
 - A settings or CLAUDE.md change vanished → it was hand-written into a

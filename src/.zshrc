@@ -25,7 +25,7 @@ if [ -d "$HOME/.claude-personal" ]; then
     claude() {
         local dir="$HOME/.claude-personal"
         case "$PWD" in
-            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo)
+            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal)
                 mkdir -p "$HOME/claude"
                 ( cd "$HOME/claude" && CLAUDE_CONFIG_DIR="$dir" command claude "$@" )
                 return ;;
@@ -36,7 +36,7 @@ if [ -d "$HOME/.claude-personal" ]; then
     # ~/.claude and ~/.claude.json from scratch (fresh login/onboarding).
     claude-default() {
         case "$PWD" in
-            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo)
+            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal)
                 mkdir -p "$HOME/claude"
                 ( cd "$HOME/claude" && command env -u CLAUDE_CONFIG_DIR claude "$@" )
                 return ;;

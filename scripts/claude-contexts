@@ -3,8 +3,14 @@
 # claude/claude-personal/claude-exxo aliases in fish select via
 # CLAUDE_CONFIG_DIR:
 #
-#   ~/.claude-personal   personal account (also what bare `claude` now uses)
-#   ~/.claude-exxo       work (Exxo) account
+#   ~/.claude-personal       personal account (also what bare `claude` now uses)
+#   ~/.claude-exxo           work (Exxo) account
+#   ~/.claude-exxo-personal  exxo overlay on the personal subscription — the
+#                            exxo context with only the login swapped, for
+#                            when exxo quota is maxed out. This script just
+#                            creates the empty dir; scripts/claude-sync
+#                            builds its config from the exxo fragments and
+#                            symlinks its durable state into ~/.claude-exxo.
 #
 # Idempotent: existing files/dirs are never overwritten. Each context is
 # seeded with a settings.json (copied — NOT symlinked — from ~/.claude if one
@@ -25,7 +31,7 @@ adopt=0
 
 legacy="$HOME/.claude"
 
-for ctx in personal exxo; do
+for ctx in personal exxo exxo-personal; do
     dir="$HOME/.claude-$ctx"
     mkdir -p "$dir"
 

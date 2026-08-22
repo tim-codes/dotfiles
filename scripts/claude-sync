@@ -56,6 +56,17 @@
 # per account via enabledPlugins — which is exactly how exxo-common's
 # run-with-secrets reaches the exxo context.
 #
+# exxo-personal is an OVERLAY context, not a fourth account: ~/.claude-exxo
+# with the login swapped to the personal subscription, for when exxo quota is
+# maxed out. Auth is naturally per-context (credentials live in the keychain
+# keyed by a hash of CLAUDE_CONFIG_DIR, and .claude.json is private to the
+# dir), so a separate dir separates ONLY auth — everything durable is shared
+# back into ~/.claude-exxo by symlink (transcripts/auto-memory, prompt
+# history, plugin snapshots, plans/todos/tasks), which is what lets
+# `claude-exxo-personal --resume` continue the very session that ran out of
+# quota. Its settings/CLAUDE.md/skills are built from the SAME exxo fragments
+# via the CONTEXTS mapping below, so the two contexts cannot skew.
+#
 # Usage:
 #   claude-sync            apply settings + skills to every context
 #   claude-sync --diff     show what has drifted, change nothing
@@ -67,7 +78,18 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_SETTINGS_SHARED="$REPO_DIR/files/claude/settings.shared.json"
 SRC_CLAUDE_MD_SHARED="$REPO_DIR/files/claude/CLAUDE.md.shared"
 SRC_SKILLS="$REPO_DIR/files/claude/skills"
-ACCOUNTS=("personal" "exxo")
+
+# context name : fragment account. The fragment account picks which
+# settings.<account>.json / CLAUDE.md.<account> the context is built from —
+# exxo-personal deliberately reuses the exxo fragments (see header).
+CONTEXTS=("personal:personal" "exxo:exxo" "exxo-personal:exxo")
+
+# The durable state exxo-personal shares back into ~/.claude-exxo. Runtime
+# state (daemon, caches, session-env, shell-snapshots, sessions) and auth
+# (.claude.json, keychain) stay per-context — same split claude-contexts
+# --adopt-default draws.
+OVERLAY_DIRS=(projects plugins file-history plans tasks todos paste-cache)
+OVERLAY_FILES=(history.jsonl)
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33mwarn:\033[0m %s\n' "$*"; }
@@ -114,8 +136,10 @@ diff_only=0
 [ "${1:-}" = "--diff" ] && diff_only=1
 
 if [ "$diff_only" = 1 ]; then
-    for account in "${ACCOUNTS[@]}"; do
-        ctx="$HOME/.claude-$account"
+    for mapping in "${CONTEXTS[@]}"; do
+        name="${mapping%%:*}"
+        account="${mapping#*:}"
+        ctx="$HOME/.claude-$name"
         [ -d "$ctx" ] || continue
         fragment="$REPO_DIR/files/claude/settings.$account.json"
         if [ ! -f "$fragment" ]; then
@@ -281,19 +305,58 @@ sync_skills_curated() {
 }
 
 sync_skills() {
-    local account="$1" ctx="$2"
+    local name="$1" account="$2" ctx="$3"
 
     # personal is the authoring context: whole-dir symlink, sees everything.
     # Everyone else gets the curated shared_skills() subset.
-    if [ "$account" = "personal" ]; then
+    if [ "$name" = "personal" ]; then
         sync_skills_wholedir "$ctx"
     else
         sync_skills_curated "$account" "$ctx"
     fi
 }
 
-for account in "${ACCOUNTS[@]}"; do
-    ctx="$HOME/.claude-$account"
+# ---- overlay: symlink exxo-personal's durable state into ~/.claude-exxo ----
+# Idempotent and self-healing like the curated skills dir: correct links are
+# left alone, wrong-target links are repointed, and a REAL file/dir in the
+# way is never clobbered — that's unmanaged state to resolve by hand (it
+# would mean the context accumulated its own history that a blind relink
+# would orphan).
+sync_overlay() {
+    local ctx="$1" base="$2" entry src dst
+
+    for entry in "${OVERLAY_DIRS[@]}" "${OVERLAY_FILES[@]}"; do
+        src="$base/$entry"
+        dst="$ctx/$entry"
+
+        # Make sure the share target exists in the base context, so the link
+        # is never dangling (Claude Code should always land writes in exxo).
+        if [ ! -e "$src" ]; then
+            case " ${OVERLAY_DIRS[*]} " in
+                *" $entry "*) mkdir -p "$src" ;;
+                *) : > "$src" ;;
+            esac
+        fi
+
+        if [ -L "$dst" ]; then
+            if [ "$(readlink "$dst")" = "$src" ]; then
+                continue
+            fi
+            rm "$dst"
+        elif [ -e "$dst" ]; then
+            warn "  $entry: real (unshared) entry in ${ctx/#$HOME/~} — left alone, resolve by hand"
+            continue
+        fi
+        ln -s "$src" "$dst"
+        echo "  $entry: linked -> ${src/#$HOME/~}"
+    done
+    echo "  overlay: durable state shared with ${base/#$HOME/~}"
+}
+
+for mapping in "${CONTEXTS[@]}"; do
+    name="${mapping%%:*}"
+    account="${mapping#*:}"
+    ctx="$HOME/.claude-$name"
     if [ ! -d "$ctx" ]; then
         warn "${ctx/#$HOME/~} does not exist — run scripts/claude-contexts first"
         continue
@@ -302,7 +365,10 @@ for account in "${ACCOUNTS[@]}"; do
 
     sync_settings "$account" "$ctx"
     sync_claude_md "$account" "$ctx"
-    sync_skills "$account" "$ctx"
+    sync_skills "$name" "$account" "$ctx"
+    if [ "$name" = "exxo-personal" ]; then
+        sync_overlay "$ctx" "$HOME/.claude-exxo"
+    fi
 done
 
 info "Done"

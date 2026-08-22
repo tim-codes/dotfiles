@@ -365,7 +365,7 @@ function __claude_ctx --description 'Run claude in a per-account config context'
     set -e argv[1]
     set -l home (path resolve $HOME)
     set -l here (path resolve .)
-    set -l ctx_dirs $home/.claude-personal $home/.claude-exxo
+    set -l ctx_dirs $home/.claude-personal $home/.claude-exxo $home/.claude-exxo-personal
     set -l jumped 0
     if test "$here" = "$home"; or contains -- "$here" $ctx_dirs
         mkdir -p $home/claude
@@ -390,6 +390,16 @@ function claude-personal --wraps claude --description 'claude in the personal co
 end
 function claude-exxo --wraps claude --description 'claude in the exxo (work) context'
     __claude_ctx "$HOME/.claude-exxo" $argv
+end
+# The exxo overlay on the personal subscription: same exxo config/history/
+# skills (claude-sync builds it from the exxo fragments and symlinks the
+# durable state into ~/.claude-exxo), only the login differs. For when exxo
+# quota is maxed — `claude-exxo-personal --resume` continues the very session
+# that ran out. Caveat: claude.ai-side features (connectors, cloud sessions,
+# artifacts, ultrareview billing) follow the logged-in account, not the
+# config dir.
+function claude-exxo-personal --wraps claude --description 'claude in the exxo context on the personal subscription'
+    __claude_ctx "$HOME/.claude-exxo-personal" $argv
 end
 # Escape hatch past the wrong-account guard: the retired default context.
 # Using it RECREATES ~/.claude and ~/.claude.json from scratch (fresh

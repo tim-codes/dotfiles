@@ -27,6 +27,11 @@ alias where="type -a"
 # must inject via --env (LaunchServices does not inherit the shell env).
 alias claude-d-personal='open -na "Claude" --env CLAUDE_CONFIG_DIR="$HOME/.claude-personal" --args --user-data-dir="$HOME/Library/Application Support/Claude-Personal"'
 alias claude-d-exxo='open -na "Claude" --env CLAUDE_CONFIG_DIR="$HOME/.claude-exxo" --args --user-data-dir="$HOME/Library/Application Support/Claude-Exxo"'
+# The exxo overlay on the personal subscription (see claude-exxo-personal in
+# common.fish). Own desktop user-data dir, so the in-app session picker won't
+# show exxo-desktop sessions — resume across the two profiles via the CLI,
+# which reads the shared projects/ dir.
+alias claude-d-exxo-personal='open -na "Claude" --env CLAUDE_CONFIG_DIR="$HOME/.claude-exxo-personal" --args --user-data-dir="$HOME/Library/Application Support/Claude-ExxoPersonal"'
 # Escape hatch: default desktop dir AND default ~/.claude context — using it
 # recreates both retired dirs from scratch. Session working dir is picked
 # in-app (open cannot set it); prefer ~/claude there.
