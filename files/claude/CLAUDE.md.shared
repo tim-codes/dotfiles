@@ -169,26 +169,47 @@ picker and the periodic transcript cleanup then deletes them for good.
 
 Sessions run Fable at medium effort as the orchestrator — that's the pinned
 baseline (`model: fable`, `effortLevel: medium`), not something to restate
-per session. Keep the main loop for coordination, judgment, decisions, and
-final synthesis; delegate substantial self-contained work to subagents, and
-pick each agent's model judiciously to balance effectiveness against token
-cost:
+per session. Delegate by default; inline is the exception. Before running
+any multi-step task inline, apply two tests:
 
-- `sonnet` — routine and mechanical work: broad searches and file sweeps,
-  well-specified implementation, boilerplate, mechanical migrations.
-- `opus` — genuinely hard subtasks: tricky debugging, design-sensitive
+- **Fan-out test**: will this take more than ~3 tool calls with no decision
+  needed between them? Then it's a delegable unit — send it to a subagent.
+- **Scrollback test**: will the raw outputs (CI/build logs, search sweeps,
+  file dumps, API listings) be larger than the conclusion needed from them?
+  Then the orchestrator must never see them — delegate, and receive only
+  the conclusion. Log forensics, "why did CI fail", "which PRs merged
+  what", and doc/config sweeps are always this shape.
+
+Keep inline only: single-fact lookups (1–3 calls), decisions, approvals,
+conflict resolution where each step depends on judging the previous one,
+and final synthesis. Independent delegable units launch as parallel
+subagents in one message, not sequentially.
+
+Model choice — sonnet is the default, not an option:
+
+- `sonnet` — the default for every delegated task: investigation, log
+  digging, searches, well-specified implementation, mechanical edits.
+- `opus` — only with a stated reason: tricky debugging, design-sensitive
   implementation, adversarial review/verification.
-- omit `model` (inherit Fable) only when the subtask needs frontier
-  judgment end-to-end.
+- omit `model` (inherit Fable) — rare; only when the subtask needs frontier
+  judgment end-to-end, and say why.
 
-Don't spawn a subagent for a trivial lookup a couple of direct tool calls
-would answer.
+On every launch, announce a numbered roster — **task** (agent type) —
+**model**, with a one-line brief per agent — so delegation and model
+choices stay visible and reviewable.
 
-**Why:** the orchestrator's context and judgment are the scarce resource;
-fanning routine work out to cheaper models preserves both quota and the
-main loop's context window. `CLAUDE_CODE_SUBAGENT_MODEL` is deliberately
-NOT set — it takes priority over the per-invocation model parameter, which
-would defeat exactly this per-task selection.
+Self-audit: on noticing more than ~5 tool calls have just run inline on
+work a subagent could have done, say so in the next message and delegate
+the remainder — the correction is part of the expected behaviour, not an
+embarrassment.
+
+**Why:** the orchestrator's context and judgment are the scarce resource,
+and under a busy main loop "good judgment" reliably drifts toward doing
+everything inline — mechanical triggers (call-count, output-size), an
+inverted default (sonnet unless a stated reason), and a self-audit clause
+are what convert the preference into behaviour. `CLAUDE_CODE_SUBAGENT_MODEL`
+is deliberately NOT set — it takes priority over the per-invocation model
+parameter, which would defeat exactly this per-task selection.
 
 ## Always set up the task tracker
 
@@ -196,10 +217,17 @@ At the start of any work request, create a task-tracker (todo) list — even
 when the initial prompt defines only a single task. Add to it and keep it
 current as the work proceeds.
 
+If the harness build exposes no todo tool, state that explicitly in the
+first reply and keep the tracker as a visible checklist maintained in
+responses (or a scratchpad file) instead — never silently skip tracking.
+
 **Why:** tasks are frequently appended mid-session, after the initial
 prompt. An already-existing list is where those land legibly and get
 tracked; without one, late additions arrive into free-form conversation and
-are the ones that get dropped.
+are the ones that get dropped. The fallback clause exists because at least
+one harness build ships without a todo tool — an instruction that dies
+silently on such a build is a dead hook, and dead hooks get discovered
+weeks later (cf. the $HOME-quoting hook fix, #39).
 
 ## Git remotes: always SSH, never HTTPS
 
