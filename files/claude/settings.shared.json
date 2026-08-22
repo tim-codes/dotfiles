@@ -92,10 +92,12 @@
     ]
   },
   "effortLevel": "high",
+  "tui": "fullscreen",
   "skipWorkflowUsageWarning": true,
-  "theme": "dark",
+  "theme": "auto",
+  "remoteControlAtStartup": false,
   "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true,
+  "agentPushNotifEnabled": false,
   "enabledPlugins": {
     "vercel@claude-plugins-official": true
   }

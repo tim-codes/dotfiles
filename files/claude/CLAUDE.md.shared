@@ -1,5 +1,10 @@
 # Global instructions
 
+## Use the GitHub CLI for GitHub resources
+
+Always use the `gh` CLI for accessing GitHub resources instead of direct
+fetch; prompt the user if you encounter an auth issue.
+
 ## Use the repo's own command runner
 
 If a repo wraps its tooling in a task runner (`just`, `make`, a `scripts/`
