@@ -185,15 +185,12 @@ conflict resolution where each step depends on judging the previous one,
 and final synthesis. Independent delegable units launch as parallel
 subagents in one message, not sequentially.
 
-Model choice — pick per task; when in doubt, prefer opus:
+Model choice — the orchestrator's call, per task; neither tier needs a
+stated reason:
 
-- `opus` — the default whenever the brief is complex or multi-step, the
-  edit is design-sensitive, the task is debugging or adversarial
-  review/verification, or precise instruction-following matters. It follows
-  detailed briefs more reliably (operator preference, 2026-08-22); no
-  stated reason needed.
-- `sonnet` — for simple, well-bounded tasks: a single-question search or
-  log dig, a mechanical edit with an unambiguous spec.
+- `sonnet` and `opus` are both ordinary choices. Match the model to the
+  task: how complex or multi-step the brief is, how design-sensitive the
+  edit, how much precise instruction-following matters.
 - omit `model` (inherit Fable) — rare; only when the subtask needs frontier
   judgment end-to-end, and say why.
 
@@ -217,9 +214,9 @@ embarrassment.
 
 **Why:** the orchestrator's context and judgment are the scarce resource,
 and under a busy main loop "good judgment" reliably drifts toward doing
-everything inline — mechanical triggers (call-count, output-size), a
-per-task model default that leans opus for anything non-trivial, and a
-self-audit clause are what convert the preference into behaviour. `CLAUDE_CODE_SUBAGENT_MODEL`
+everything inline — mechanical triggers (call-count, output-size), free
+per-task model choice, and a self-audit clause are what convert the
+preference into behaviour. `CLAUDE_CODE_SUBAGENT_MODEL`
 is deliberately NOT set — it takes priority over the per-invocation model
 parameter, which would defeat exactly this per-task selection.
 
