@@ -200,3 +200,16 @@ current as the work proceeds.
 prompt. An already-existing list is where those land legibly and get
 tracked; without one, late additions arrive into free-form conversation and
 are the ones that get dropped.
+
+## Git remotes: always SSH, never HTTPS
+
+Hard rule: every git remote is SSH (`git@<host>:...`), on every forge —
+clones, `remote add`, `remote set-url`, generated config. Treat an HTTPS
+git remote encountered anywhere as a defect to fix (repoint it), not a
+variant to tolerate.
+
+**Why:** unattended git operations (background plugin refresh, future
+repo-populate tooling) run with credential helpers disabled, where HTTPS
+fails on private repos while SSH keys keep working — and one uniform
+scheme keeps remote identity checks trivial. This generalises the
+exxo-skills marketplace precedent to all git access.
