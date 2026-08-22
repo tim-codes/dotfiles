@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.tim.firefox-tab-watchdog</string>
+
+  <!-- Run through a login shell so $HOME expands: launchd does no variable
+       substitution in ProgramArguments, and hardcoding /Users/tim would not
+       survive a bootstrap onto a machine with a different username. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>exec "$HOME/bin/firefox-tab-watchdog"</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- Start in warn mode. Flip to "enforce" once the log shows it is
+         flagging the right processes and nothing else. -->
+    <key>FF_WATCHDOG_MODE</key>
+    <string>warn</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/firefox-tab-watchdog.out</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/firefox-tab-watchdog.err</string>
+</dict>
+</plist>

@@ -1,0 +1,41 @@
+#!/bin/zsh
+# Link the codified Firefox prefs (src/.config/firefox/user.js) into the
+# profile each Firefox installation actually uses.
+#
+# Profile resolution is via the [InstallXXXX] sections of profiles.ini, NOT the
+# `Default=1` flag on a [ProfileN] section. Those disagree on this machine: the
+# Profile flag points at an old `default` profile while release Firefox honours
+# its Install entry. The Install sections are what Firefox reads.
+#
+# Idempotent: safe to re-run. Refuses to clobber a real (non-symlink) user.js.
+
+set -eu -o pipefail
+
+src="$HOME/.config/firefox/user.js"
+ffdir="$HOME/Library/Application Support/Firefox"
+ini="$ffdir/profiles.ini"
+
+[[ -f $src ]] || { print -u2 "no $src — run 'stow --target ~ src' first"; exit 1 }
+[[ -f $ini ]] || { print -u2 "no $ini — is Firefox installed?"; exit 1 }
+
+# Every profile named as the default of an installation (release, dev edition…).
+profiles=("${(@f)$(awk -F= '
+  /^\[Install/      { in_install = 1; next }
+  /^\[/             { in_install = 0 }
+  in_install && $1 == "Default" { print $2 }
+' "$ini")}")
+
+(( ${#profiles} )) || { print -u2 "no [Install*] sections in profiles.ini"; exit 1 }
+
+for rel in $profiles; do
+  [[ -n $rel ]] || continue
+  dest="$ffdir/$rel/user.js"
+  if [[ -e $dest && ! -L $dest ]]; then
+    print -u2 "skip: $rel/user.js exists and is not a symlink — move it aside first"
+    continue
+  fi
+  ln -sfn "$src" "$dest"
+  print "linked: $rel/user.js"
+done
+
+print "\nRestart Firefox for the prefs to apply."

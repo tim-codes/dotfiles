@@ -4,5 +4,6 @@
 src/bin/*
 !src/bin/deps-up
 !src/bin/pop-term
+!src/bin/firefox-tab-watchdog
 .claude
 src/.config/alacritty/local.toml

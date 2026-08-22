@@ -1,0 +1,136 @@
+#!/bin/zsh
+# firefox-tab-watchdog — watch Firefox content processes and act on runaways.
+#
+# Why this exists outside the browser: Firefox has no per-tab CPU limit, and
+# no WebExtension API reports per-process CPU, so nothing *inside* the browser
+# can see or stop a page whose JS has pinned a core. Real process accounting
+# is only available from out here.
+#
+# CPU is measured as the delta of consumed CPU time between two samples, not
+# the `ps %cpu` column — that column is a lifetime average, so a tab that
+# spiked an hour ago keeps reading hot forever and would trip this constantly.
+#
+# Modes (FF_WATCHDOG_MODE):
+#   warn     log + notify only. The default: run here first, let the log build
+#            a picture of which sites actually run away.
+#   enforce  additionally SIGKILL the offender. Firefox replaces the tab with
+#            a restorable "tab crashed" page, so this loses no browsing state.
+#
+# Caveat, deliberately not papered over: Firefox's extension process is a
+# content process whose argv is identical to a web tab's (`-isForBrowser tab`)
+# — there is no flag that distinguishes it. It is reliably the *first* tab
+# child spawned, so the lowest child id is excluded as a heuristic. If that
+# ever mis-fires, extensions reload on their own; add the pid to
+# FF_WATCHDOG_EXCLUDE_PIDS to pin it out.
+
+set -u
+
+# Pin PATH and use zsh's own datetime module rather than /bin/date. launchd
+# hands a job a minimal environment, and separately this machine can inherit a
+# space-mangled PATH_BASE from fish (fish list-joins any exported variable not
+# recognised as a path variable, and PATH_BASE ends in BASE) which leaves a
+# non-interactive zsh with no /bin at all. Depending on neither keeps this
+# working in both cases.
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+zmodload zsh/datetime
+
+INTERVAL=${FF_WATCHDOG_INTERVAL:-30}            # seconds between samples
+THRESHOLD=${FF_WATCHDOG_THRESHOLD:-50}          # % of ONE core
+STRIKES_WARN=${FF_WATCHDOG_STRIKES_WARN:-4}     # 4 x 30s = 2 min
+STRIKES_KILL=${FF_WATCHDOG_STRIKES_KILL:-10}    # 10 x 30s = 5 min
+MODE=${FF_WATCHDOG_MODE:-warn}
+LOG=${FF_WATCHDOG_LOG:-$HOME/Library/Logs/firefox-tab-watchdog.log}
+EXCLUDE_PIDS=${FF_WATCHDOG_EXCLUDE_PIDS:-}
+
+mkdir -p "${LOG:h}"
+
+log() { print -r -- "$(strftime '%Y-%m-%dT%H:%M:%S%z' $EPOCHSECONDS) $*" >> "$LOG" }
+
+notify() {
+  osascript -e "display notification \"$1\" with title \"Firefox watchdog\"" \
+    >/dev/null 2>&1 || true
+}
+
+# Emit: pid cputime_seconds rss_kb childID — one line per content tab process.
+sample() {
+  # plugin-container passes no -childID flag; the child id and the process
+  # type are the last two positional args ("... <machname> <childID> <type>").
+  ps -Ao pid=,time=,rss=,args= | awk '
+    /plugin-container/ && $NF == "tab" {
+      cid = $(NF - 1)
+      if (cid !~ /^[0-9]+$/) cid = "?"
+      n = split($2, t, ":")
+      if (n == 3) secs = t[1] * 3600 + t[2] * 60 + t[3]
+      else        secs = t[1] * 60 + t[2]
+      print $1, secs, $3, cid
+    }'
+}
+
+typeset -A prev_cpu strikes notified
+typeset -F prev_epoch=0
+
+log "started mode=$MODE threshold=${THRESHOLD}% interval=${INTERVAL}s warn=${STRIKES_WARN} kill=${STRIKES_KILL}"
+
+while true; do
+  typeset -A cur_cpu cur_rss cur_cid
+  cur_cpu=(); cur_rss=(); cur_cid=()
+  typeset -F now_epoch=$EPOCHSECONDS
+  ext_pid=""; lowest_cid=999999
+
+  while read -r pid secs rss cid; do
+    cur_cpu[$pid]=$secs; cur_rss[$pid]=$rss; cur_cid[$pid]=$cid
+    if [[ $cid != "?" ]] && (( cid < lowest_cid )); then
+      lowest_cid=$cid; ext_pid=$pid
+    fi
+  done < <(sample)
+
+  typeset -F elapsed=$(( now_epoch - prev_epoch ))
+
+  if (( prev_epoch > 0 && elapsed > 0 )); then
+    for pid in ${(k)cur_cpu}; do
+      [[ $pid == $ext_pid ]] && continue
+      [[ " $EXCLUDE_PIDS " == *" $pid "* ]] && continue
+      [[ -z ${prev_cpu[$pid]:-} ]] && continue
+
+      typeset -F pct=$(( (cur_cpu[$pid] - prev_cpu[$pid]) / elapsed * 100 ))
+      (( pct < 0 )) && continue
+
+      if (( pct >= THRESHOLD )); then
+        strikes[$pid]=$(( ${strikes[$pid]:-0} + 1 ))
+        typeset -i n=${strikes[$pid]}
+        typeset -i mb=$(( cur_rss[$pid] / 1024 ))
+        typeset -i secs=$(( n * INTERVAL ))
+        typeset held
+        if (( secs < 60 )); then held="${secs}s"; else held="$(( secs / 60 ))min"; fi
+
+        if (( n >= STRIKES_KILL )); then
+          if [[ $MODE == enforce ]]; then
+            kill -9 "$pid" 2>/dev/null \
+              && log "KILL  pid=$pid childID=${cur_cid[$pid]} cpu=${pct%.*}% rss=${mb}MB sustained=${held}"
+            notify "Killed runaway tab (pid $pid, ${pct%.*}% CPU)"
+          else
+            log "WOULD-KILL pid=$pid childID=${cur_cid[$pid]} cpu=${pct%.*}% rss=${mb}MB sustained=${held} (mode=warn)"
+          fi
+          unset "strikes[$pid]" "notified[$pid]"
+        elif (( n >= STRIKES_WARN )) && [[ -z ${notified[$pid]:-} ]]; then
+          notified[$pid]=1
+          log "WARN  pid=$pid childID=${cur_cid[$pid]} cpu=${pct%.*}% rss=${mb}MB sustained=${held}"
+          notify "Tab pid $pid at ${pct%.*}% CPU for ${held} — open about:processes to identify it"
+        fi
+      else
+        unset "strikes[$pid]" "notified[$pid]"
+      fi
+    done
+  fi
+
+  # Drop bookkeeping for processes that have gone away.
+  for pid in ${(k)prev_cpu}; do
+    [[ -z ${cur_cpu[$pid]:-} ]] && unset "prev_cpu[$pid]" "strikes[$pid]" "notified[$pid]"
+  done
+
+  prev_cpu=()
+  for pid in ${(k)cur_cpu}; do prev_cpu[$pid]=${cur_cpu[$pid]}; done
+  prev_epoch=$now_epoch
+
+  sleep "$INTERVAL"
+done
