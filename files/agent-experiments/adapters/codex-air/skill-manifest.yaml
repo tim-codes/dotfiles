@@ -1,0 +1,33 @@
+version: 1
+adapter: codex-air
+mappings:
+  run-with-secrets:
+    codex_compatibility: compatible-skill-md
+    source: /Users/tim/dev/exxo/skills/common/skills/run-with-secrets/SKILL.md
+    experiment_delivery: reference-only
+    reason: Staging names the supported instruction source but does not install or copy it.
+  agent-tooling:
+    codex_compatibility: executable-reference
+    source: /Users/tim/dev/exxo/agent-tooling/README.md
+    experiment_delivery: reference-only
+    reason: Executable ownership remains with the npm package and stable command names.
+  h2gc-repo-skills:
+    codex_compatibility: compatible-skill-md-directories
+    source: /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/skills
+    experiment_delivery: reference-only
+    reason: The pinned downstream skill path remains the only project delivery path.
+  homelab-run-with-secrets:
+    codex_compatibility: not-selected
+    source: /Users/tim/dev/dotfiles/files/claude/skills/run-with-secrets/SKILL.md
+    experiment_delivery: excluded
+    reason: It collides with the approved Exxo capability.
+  mantine:
+    codex_compatibility: unproven-private-or-plugin-delivery
+    source: /Users/tim/dev/dotfiles/files/claude/vendor/mantine.lock.json
+    experiment_delivery: reference-only
+    reason: Do not copy private or plugin skills before a supported delivery path is proven.
+  credential-mcp:
+    codex_compatibility: credential-safe-delivery-unproven
+    source: intentionally-not-inspected
+    experiment_delivery: excluded
+    reason: Credential-bearing MCP configuration and values never enter the experiment.

@@ -1,0 +1,32 @@
+# Experimental Exxo agent context
+
+This is a staged, additive context packet for the `{{PROFILE_ID}}` profile.
+It is not installed configuration and grants no authority to broaden access.
+
+## Sources
+
+- Portable policy: `{{POLICY_SOURCE}}`
+- Selected profile: `{{PROFILE_SOURCE}}`
+- Capability catalogue: `{{CAPABILITIES_SOURCE}}`
+- Adapter manifest: `{{ADAPTER_SOURCE}}`
+
+## Portable policy
+
+{{POLICY_BODY}}
+
+## Selected capabilities
+
+{{CAPABILITY_LINES}}
+
+## Downstream routing
+
+{{DOWNSTREAM_LINES}}
+
+## Boundaries
+
+- Read the downstream project's existing `AGENTS.md` before planning work.
+- Existing downstream instructions override this packet where they are more specific.
+- Never read or render `agent.env`, resolved credentials, MCP values, authentication state, histories, plugins, or provider permission configuration.
+- `agent/run -- <command>` is the boundary for manual platform operations; it is not authority to reveal secrets or replace the application's environment flow.
+- Do not change live agent configuration or the downstream checkout from this read-only pilot.
+- Excluded capabilities: {{EXCLUSION_LINES}}
