@@ -1,0 +1,17 @@
+{
+  "//": "Written by scripts/vendor-mantine. Do not hand-edit; re-run the script.",
+  "upstream": {
+    "repo": "mantinedev/skills",
+    "ref": "master",
+    "commit": "222191c6b15d1ae2c02051a285f47230777be513"
+  },
+  "skills": [
+    "mantine-combobox",
+    "mantine-custom-components",
+    "mantine-form"
+  ],
+  "llms_index": {
+    "url": "https://mantine.dev/llms.txt",
+    "bytes": 43113
+  }
+}

@@ -1,0 +1,140 @@
+#!/bin/bash
+# Re-vendor Mantine's LLM materials into files/claude/skills/.
+#
+# Mantine is the standard UI framework for every Exxo frontend and for
+# personal projects, so its agent-facing materials need to be present in the
+# personal Claude context without reaching into a private Exxo repo for them.
+# Upstream publishes three things (https://mantine.dev/guides/llms/):
+#
+#   1. @mantine/mcp-server — the primary lookup path, and the one that is
+#      never stale. Registered for every context by scripts/claude-sync via
+#      files/claude/mcp.shared.json, not by this script.
+#   2. github.com/mantinedev/skills — three agent skills (form, combobox,
+#      custom-components). Vendored here, byte-for-byte.
+#   3. llms.txt / llms-full.txt. Only the compact llms.txt INDEX is vendored,
+#      into the mantine-docs skill's references/. llms-full.txt is ~1.8MB and
+#      is rewritten every Mantine release; carrying it would put a megabyte of
+#      churn in git to duplicate what the MCP server already answers.
+#
+# Vendored copies are kept byte-identical to upstream on purpose — no local
+# edits, no provenance headers spliced in. That is what makes `git diff` after
+# a refresh show exactly what Mantine changed and nothing else. Provenance
+# lives beside them in files/claude/vendor/mantine.lock.json instead; our own
+# framing lives in the mantine-docs skill, which is ours and not vendored.
+#
+# The same upstream is vendored independently into Exxo-Labs/skills for the
+# work context. Both pull from mantinedev/skills rather than from each other,
+# so the two copies cannot chain-drift: they are either at the same upstream
+# commit or visibly not.
+#
+# Usage:
+#   scripts/vendor-mantine            vendor the upstream default branch head
+#   scripts/vendor-mantine <ref>      vendor a specific branch, tag or SHA
+#   scripts/vendor-mantine --check    report whether the pin is behind upstream
+#
+# Needs `gh` (authenticated) and `jq`.
+set -euo pipefail
+
+UPSTREAM_REPO="mantinedev/skills"
+LLMS_INDEX_URL="https://mantine.dev/llms.txt"
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SKILLS_DIR="$REPO_DIR/files/claude/skills"
+LOCK="$REPO_DIR/files/claude/vendor/mantine.lock.json"
+DOCS_SKILL="$SKILLS_DIR/mantine-docs"
+
+info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33mwarn:\033[0m %s\n' "$*"; }
+die()  { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+
+command -v gh >/dev/null || die "gh is not installed"
+command -v jq >/dev/null || die "jq is not installed"
+
+default_branch() {
+    gh api "repos/$UPSTREAM_REPO" --jq '.default_branch'
+}
+
+# ---- --check: is the pinned commit behind upstream? -----------------------
+if [ "${1:-}" = "--check" ]; then
+    [ -f "$LOCK" ] || die "no lockfile at ${LOCK/#$REPO_DIR\//} — run scripts/vendor-mantine first"
+    pinned="$(jq -r '.commit' "$LOCK")"
+    branch="$(default_branch)"
+    head="$(gh api "repos/$UPSTREAM_REPO/commits/$branch" --jq '.sha')"
+    if [ "$pinned" = "$head" ]; then
+        info "mantine skills are current ($UPSTREAM_REPO@${pinned:0:8})"
+    else
+        warn "mantine skills are behind: pinned ${pinned:0:8}, $branch is ${head:0:8}"
+        warn "refresh with: scripts/vendor-mantine"
+        gh api "repos/$UPSTREAM_REPO/compare/$pinned...$head" \
+            --jq '.commits[] | "    \(.sha[0:8]) \(.commit.message | split("\n")[0])"' 2>/dev/null | head -10 || true
+    fi
+    exit 0
+fi
+
+REF="${1:-$(default_branch)}"
+
+# ---- resolve the ref to an immutable commit ------------------------------
+COMMIT="$(gh api "repos/$UPSTREAM_REPO/commits/$REF" --jq '.sha')"
+[ -n "$COMMIT" ] || die "could not resolve $UPSTREAM_REPO@$REF"
+info "vendoring $UPSTREAM_REPO@${COMMIT:0:8} (from $REF)"
+
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+
+gh api "repos/$UPSTREAM_REPO/tarball/$COMMIT" > "$WORK/src.tar.gz"
+mkdir -p "$WORK/src"
+tar -xzf "$WORK/src.tar.gz" -C "$WORK/src" --strip-components=1
+
+[ -d "$WORK/src/skills" ] || die "upstream layout changed: no skills/ directory at $COMMIT"
+
+# ---- replace each vendored skill wholesale -------------------------------
+# rm -rf then copy, rather than rsync-style update: a file deleted upstream
+# has to disappear here too, or the skill keeps serving guidance Mantine
+# withdrew.
+vendored=()
+for path in "$WORK/src/skills"/*/; do
+    name="$(basename "$path")"
+    case "$name" in
+        mantine-*) ;;
+        *) warn "skipping unexpected upstream skill '$name' (not mantine-*)"; continue ;;
+    esac
+    rm -rf "${SKILLS_DIR:?}/$name"
+    cp -R "$path" "$SKILLS_DIR/$name"
+    vendored+=("$name")
+    echo "  skills/$name: vendored"
+done
+[ ${#vendored[@]} -gt 0 ] || die "upstream had no mantine-* skills at $COMMIT"
+
+# ---- the llms.txt index ---------------------------------------------------
+# Not on GitHub, so this is the one direct fetch. A failure here is not fatal:
+# the skills above are the substance, and the index is a convenience that the
+# MCP server also covers.
+mkdir -p "$DOCS_SKILL/references"
+if curl -fsSL --max-time 30 "$LLMS_INDEX_URL" -o "$WORK/llms.txt"; then
+    mv "$WORK/llms.txt" "$DOCS_SKILL/references/llms.txt"
+    echo "  mantine-docs/references/llms.txt: fetched from $LLMS_INDEX_URL"
+    index_bytes="$(wc -c < "$DOCS_SKILL/references/llms.txt" | tr -d ' ')"
+else
+    warn "could not fetch $LLMS_INDEX_URL — kept the existing index"
+    index_bytes="$(wc -c < "$DOCS_SKILL/references/llms.txt" 2>/dev/null | tr -d ' ' || echo 0)"
+fi
+
+# ---- provenance -----------------------------------------------------------
+# No fetched-at timestamp: it would make every refresh a diff even when
+# nothing upstream moved. The commit IS the version.
+jq -n \
+    --arg repo "$UPSTREAM_REPO" \
+    --arg ref "$REF" \
+    --arg commit "$COMMIT" \
+    --arg index_url "$LLMS_INDEX_URL" \
+    --arg index_bytes "$index_bytes" \
+    --argjson skills "$(printf '%s\n' "${vendored[@]}" | jq -R . | jq -s .)" \
+    '{
+        "//": "Written by scripts/vendor-mantine. Do not hand-edit; re-run the script.",
+        upstream: { repo: $repo, ref: $ref, commit: $commit },
+        skills: $skills,
+        llms_index: { url: $index_url, bytes: ($index_bytes | tonumber) }
+    }' > "$LOCK"
+echo "  vendor/mantine.lock.json: pinned to ${COMMIT:0:8}"
+
+info "Done — review with: git -C \"$REPO_DIR\" diff"
