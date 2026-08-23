@@ -1,6 +1,7 @@
 {
   "enabledPlugins": {
-    "exxo-common@exxo-skills": true
+    "exxo-common@exxo-skills": true,
+    "exxo-mantine@exxo-skills": true
   },
   "extraKnownMarketplaces": {
     "exxo-skills": {
