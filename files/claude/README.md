@@ -31,13 +31,42 @@ baseline. This closes a gap where both contexts had independently
 hand-duplicated copies of the same global instructions with no sync
 mechanism at all (found and fixed 2026-08-18).
 
+MCP servers are the same shared+fragment family, but they are the one piece of
+repo-managed config that is not a `settings.json` key at all: Claude Code keeps
+user-scope servers in `<context>/.claude.json`, alongside login state and
+per-project trust. So `mcp.shared.json` — plus an optional `mcp.<account>.json`,
+same precedence as the settings fragments, account wins per server name — is
+**merged** into that file's `.mcpServers` rather than copied over it. Managed
+names win, hand-added servers are left untouched, and nothing else in
+`.claude.json` is disturbed. That is what makes a server like `mantine` present
+in every context by construction instead of by remembering to run `claude mcp
+add` three times, which is exactly how the gap that motivated this arose:
+`~/.claude-exxo-personal` had no MCP servers at all while `~/.claude-exxo`
+carried four (added 2026-08-23).
+
+Four properties of the merge, all deliberate:
+
+- Credential-bearing servers stay **out** of the repo. Secrets are referenced,
+  never written, and a JSON fragment has nowhere to reference a 1Password item
+  from — so a token-bearing server (`notion`, `Sanity`) is added by hand with
+  `claude mcp add -s user` and merely preserved by the merge, never codified.
+- Both `--diff` and the apply path print server **names only, never values**.
+  Both land in terminals and transcripts, and the live file holds real tokens.
+- The write is skipped when it would be a no-op, refuses to run if the file's
+  checksum moved between read and write, and swaps atomically in-directory. Any
+  live session rewrites `.claude.json` continuously, and clobbering a token it
+  has just persisted is recoverable from nowhere.
+- Removal is not a merge operation. Dropping a server from the fragment stops
+  managing it; it does not delete it from a context. Retire one with
+  `claude mcp remove -s user <name>` under that `CLAUDE_CONFIG_DIR`.
+
 Skills follow the same split. `~/.claude-personal/skills` stays a
 whole-directory symlink to `files/claude/skills`. `~/.claude-exxo/skills` is
 a real directory of per-skill symlinks maintained by `claude-sync`, built
 from an allow list: a `shared_skills()` list in `scripts/claude-sync` names
-the repo skills that are cross-account — currently just
-`claude-workstation-setup` — and only those are linked into exxo; every
-other repo skill is personal-only by default. The allow-list replaced an
+the repo skills that are cross-account — currently `claude-workstation-setup`,
+`worktree-closedown` and `dotfiles-repo` — and only those are linked into exxo;
+every other repo skill is personal-only by default. The allow-list replaced an
 earlier exclusion list after `run-with-secrets` — homelab guidance (op-shim,
 Ansible, zima/ragnar) — turned up alongside the `exxo-common` plugin's own
 `run-with-secrets` (`agent/run` + `agent.env`) in the exxo context; both were
@@ -50,6 +79,40 @@ Contexts are created by `scripts/claude-contexts`; the `claude`,
 `claude-personal`, `claude-exxo` and `claude-exxo-personal` shell wrappers
 select them via `CLAUDE_CONFIG_DIR` (see `src/.config/fish/common.fish`,
 `src/.zshrc`).
+
+## Vendored upstream skills: Mantine
+
+Mantine is the standard UI framework for Exxo frontends and for personal
+projects, and it moves fast enough that answering from memory is simply wrong.
+Upstream publishes three agent-facing things
+([mantine.dev/guides/llms](https://mantine.dev/guides/llms/)): an MCP server, a
+skills repo, and `llms.txt`/`llms-full.txt`. The server is registered for every
+context through `mcp.shared.json` above. `scripts/vendor-mantine` handles the
+other two — it vendors `mantinedev/skills` (public, pinned by commit in
+`vendor/mantine.lock.json`) into
+`skills/mantine-{form,combobox,custom-components}`, and fetches the compact
+`llms.txt` index into `skills/mantine-docs/references/`. `--check` reports
+whether the pin is behind upstream and lists what has landed since.
+`llms-full.txt` (~1.8MB, rewritten every release) is deliberately not vendored:
+it would put a megabyte of churn in git to duplicate what the MCP server
+already answers on demand.
+
+The vendored directories are kept **byte-identical** to upstream — no local
+edits, no provenance headers spliced in. That is the whole point: `git diff`
+after a refresh shows exactly what Mantine changed and nothing else. Provenance
+lives beside them in the lockfile, and our own framing lives in
+`skills/mantine-docs/SKILL.md`, which is ours and not vendored — it routes
+between the three lookup paths and says which to reach for first.
+
+The `mantine-*` skills are deliberately **not** in `shared_skills()`, so they
+stay personal-only. The exxo context receives the same upstream by the plugin
+path instead, as `exxo-mantine@exxo-skills` from `Exxo-Labs/skills`. That is
+the `run-with-secrets` rule again — one capability, one delivery path per
+context, never two at once — but the stronger reason here is that the personal
+context must never depend on a private Exxo repo, so it vendors from
+`mantinedev/skills` directly. Both repos pull from upstream and never from each
+other, so the two copies cannot chain-drift: they are either at the same
+upstream commit or visibly not.
 
 ## The exxo-personal overlay context
 
@@ -110,7 +173,21 @@ session started from. Nothing here touches them.
 
 ## Deferred follow-ups
 
-None currently.
+- `~/.claude-exxo-personal` still has no MCP servers of its own beyond what
+  `claude-sync` manages. `~/.claude-exxo` carries four hand-added ones —
+  `Sanity`, `notion`, `playwright`, `workos` — and `~/.claude-personal` three of
+  them (no `workos`). They hold live credentials, so they cannot be codified
+  into `mcp.shared.json`; re-adding them by hand with `claude mcp add -s user`
+  under `CLAUDE_CONFIG_DIR=~/.claude-exxo-personal` is outstanding
+  (noted 2026-08-23).
+- The `notion` and `Sanity` entries hold plaintext bearer tokens in each
+  context's `.claude.json` (`env.NOTION_TOKEN` and an `Authorization` header
+  respectively). Nothing here can fix that — a user-scope MCP server has no
+  reference-at-invocation form, which is precisely why those two are hand-added
+  rather than codified, and the file never enters a repo. But it is host state
+  outside this repo's reach and a standing exposure worth recording rather than
+  rediscovering: anything that can read `$HOME` can read the tokens, and
+  rotation is the only mitigation available (noted 2026-08-23).
 
 (Resolved 2026-08-18: [Exxo-Labs/skills#4](https://github.com/Exxo-Labs/skills/pull/4)
 merged — the plugin's `purge-esc-cache` is now `purge-secret-cache`, plugin

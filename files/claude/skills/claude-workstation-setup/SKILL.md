@@ -1,6 +1,6 @@
 ---
 name: claude-workstation-setup
-description: Full disclosure of how Claude Code is set up on Tim's workstations — per-account contexts, shell wrappers, settings/CLAUDE.md fragment merge, the two skill-delivery paths, and where approvals/memory live. Use when asked how the Claude setup/context segregation works, when changing any part of it (claude-sync, settings/CLAUDE.md fragments, skills, plugins), or when a session behaves as if it's in the wrong account, or when adding/updating a global (cross-session) instruction.
+description: Full disclosure of how Claude Code is set up on Tim's workstations — per-account contexts, shell wrappers, settings/CLAUDE.md fragment merge, repo-managed MCP servers, the two skill-delivery paths (including vendored upstream skills), and where approvals/memory live. Use when asked how the Claude setup/context segregation works, when changing any part of it (claude-sync, settings/CLAUDE.md/MCP fragments, skills, plugins), or when a session behaves as if it's in the wrong account, or when adding/updating a global (cross-session) instruction.
 ---
 
 # How Claude Code is set up on these workstations
@@ -98,6 +98,41 @@ This is also the fix to reach for if an agent (or you) is asked to "record
 an instruction so it applies everywhere" — that request means "edit the
 repo fragment and sync," not "write the same text into each context file."
 
+## MCP servers: merged into .claude.json, not copied
+
+The third managed artefact, and the one that is not a `settings.json` key.
+Claude Code keeps user-scope MCP servers in `<context>/.claude.json`, alongside
+login state and per-project trust, so claude-sync MERGES
+`files/claude/mcp.shared.json` (plus an optional `mcp.<account>.json`, same
+account-wins precedence as the settings fragments) into that file's
+`.mcpServers` rather than copying over it. Managed names win, hand-added
+servers are preserved, and nothing else in `.claude.json` is disturbed. The
+write is skipped when it would be a no-op, refuses to run if the file moved
+between read and write, and swaps atomically in-directory — any live session
+rewrites `.claude.json` continuously, and clobbering a token it has just
+persisted is recoverable from nowhere.
+
+Servers carrying a credential stay out of the repo: a JSON fragment has nowhere
+to reference a 1Password item from, so a token-bearing server is added by hand
+with `claude mcp add -s user` and merely preserved by the merge, never
+codified. For the same reason both `claude-sync --diff` and the apply path
+print server NAMES and never values — both land in terminals and transcripts
+while the live file holds real tokens. Don't route around that by dumping
+`.claude.json` to inspect a server.
+
+**Procedure, same shape as settings and CLAUDE.md:** never hand-add a
+credential-free server with `claude mcp add` and consider it done — it lands in
+one context and the other two silently never get it. Put it in
+`files/claude/mcp.shared.json` (or `mcp.<account>.json` when it genuinely
+belongs to one account) and run `claude-sync`. Removal is deliberately NOT a
+merge operation: deleting a server from the fragment only stops managing it, it
+does not remove it from any context — retire one with `claude mcp remove -s
+user <name>` under that CLAUDE_CONFIG_DIR.
+
+The gap this closed (added 2026-08-23): every context had been populated by
+hand, three times over, and `~/.claude-exxo-personal` was missed entirely — it
+carried no MCP servers at all while `~/.claude-exxo` had four.
+
 ## Skills reach a context by exactly two paths
 
 1. **Dotfiles skills** (`files/claude/skills/`, this skill included):
@@ -105,9 +140,9 @@ repo fragment and sync," not "write the same text into each context file."
    the repo dir — author a skill in place and it lands in git). exxo gets a
    REAL directory of per-skill symlinks curated by claude-sync against an
    allow list: only repo skills named in `shared_skills()` in
-   `scripts/claude-sync` get linked in (currently just
-   `claude-workstation-setup`). Every other repo skill is personal-only by
-   default and must be explicitly promoted — add its name to
+   `scripts/claude-sync` get linked in (currently `claude-workstation-setup`,
+   `worktree-closedown`, `dotfiles-repo`). Every other repo skill is
+   personal-only by default and must be explicitly promoted — add its name to
    `shared_skills()` to make it cross-account.
    Authoring asymmetry (verified against claude-sync): author new skills in
    the personal context or the repo directly. A real directory created under
@@ -142,6 +177,27 @@ curated dir never contains the repo copy — leaving only
 When promoting a skill to cross-account, check the plugin side for a name
 collision first.
 
+A repo skill on path 1 can itself be a byte-for-byte VENDORED copy of a public
+upstream. `files/claude/skills/mantine-{form,combobox,custom-components}` are
+`mantinedev/skills`, refreshed by `scripts/vendor-mantine` and pinned by commit
+in `files/claude/vendor/mantine.lock.json` (`--check` reports whether the pin is
+behind). Byte-identical is the point — no local edits, no spliced-in provenance
+headers — so `git diff` after a refresh shows what Mantine changed and nothing
+else; provenance lives in the lockfile and our own framing in the hand-written
+`mantine-docs` skill beside them, which also routes between the three Mantine
+lookup paths (MCP server, these skills, the `llms.txt` index). Never edit a
+vendored directory: the next refresh destroys the edit and hides upstream's.
+
+This adds no third delivery path, but it does mean one upstream can reach the
+two contexts by DIFFERENT paths. The `mantine-*` skills are absent from
+`shared_skills()`, so exxo receives the same content on path 2 instead, as the
+`exxo-mantine@exxo-skills` plugin. That is the `run-with-secrets` rule
+generalised — one capability, one delivery path per context, never two at once
+— with a second reason on top: the personal context must never depend on a
+private Exxo repo, so it vendors from upstream directly. Both repos pull from
+`mantinedev/skills` and never from each other, so the copies cannot
+chain-drift.
+
 ## What is deliberately NOT shared or synced
 
 - **Permission approvals** — per repository, in `.claude/settings.local.json`
@@ -149,7 +205,10 @@ collision first.
 - **Auto-memory** — per context, under `<context>/projects/<cwd-slug>/memory/`.
   Kept segregated on purpose (work/personal leakage); durable architecture
   facts belong here in this skill instead.
-- **Login state** (`.claude.json`), sessions, history — per context.
+- **Login state** (`.claude.json`), sessions, history — per context. The one
+  exception is that file's `.mcpServers` key, which claude-sync merges into
+  (above); every other key in `.claude.json` is left exactly as Claude Code
+  wrote it.
 
 ## Quick diagnosis
 
@@ -163,6 +222,14 @@ collision first.
 - A settings or CLAUDE.md change vanished → it was hand-written into a
   context file; promote it into the matching fragment (`settings.<account>.json`
   or `CLAUDE.md.shared`/`CLAUDE.md.<account>`) and re-run `claude-sync`.
+- An MCP server is missing in one context but present in another → check
+  whether it's managed. Credential-free servers belong in
+  `files/claude/mcp.shared.json` and reach every context on the next
+  `claude-sync`; token-bearing ones (`notion`, `Sanity`) are hand-added per
+  context by design and simply haven't been added there yet — `claude mcp add
+  -s user` under that CLAUDE_CONFIG_DIR. `claude-sync --diff` lists the managed
+  names per context, and the unmanaged ones it is leaving alone, without
+  printing any values.
 - Two skills with one name → check both delivery paths; fix by editing
   `shared_skills()` in `claude-sync` (repo skills are personal-only unless
   named there), not by hand-deleting links.
@@ -176,5 +243,6 @@ collision first.
 History/references: dotfiles PR #17 (fragment split + exxo curation),
 homelab #76, Linear ENG-20; CLAUDE.md shared+fragment sync added 2026-08-18
 after two independently hand-duplicated copies were found with no sync
-mechanism between them. Deferred follow-ups tracked in
+mechanism between them; repo-managed MCP servers and the vendored Mantine
+materials added 2026-08-23. Deferred follow-ups tracked in
 `files/claude/README.md`.
