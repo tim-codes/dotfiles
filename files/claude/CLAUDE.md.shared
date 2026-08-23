@@ -61,6 +61,48 @@ authored. Treating a one-off approval as standing permission is exactly the
 inference that erodes the "explicit" part — each skip has to be re-earned,
 not generalized from the last one.
 
+## Commit often, push in batches
+
+Commit **frequently** — every logically complete step, not just at the end
+of a task. Cheap, local, and the thing that makes a bad turn recoverable.
+
+Do **not** push on every commit. Pushing is what wakes CI: each push burns
+runner minutes and, on a busy branch, queues builds that are obsolete
+before they finish. Batch the commits and push at intervals instead:
+
+- at a checkpoint that is actually worth someone seeing (the draft PR
+  above — first push, then meaningfully advanced states),
+- when finishing or **pausing** a workstream — handing back to the
+  operator, switching to a different task or repo, ending a session, or
+  going idle waiting on an answer; unpushed work must never be the thing
+  left on a machine when attention moves elsewhere,
+- when someone else needs the branch (review, a colleague pulling it, a
+  cloud/remote session picking it up),
+- before anything that could lose the working tree — a rebase, a worktree
+  removal, a risky command.
+
+Roughly: many commits, few pushes, and never a long stretch of committed
+work that exists only locally.
+
+Push immediately, batching aside, when the push *is* the point: the
+operator asked for it, CI's verdict on this exact commit is what the next
+step depends on, or a fix is being shipped to unblock someone.
+
+If a repo's CI is expensive and the branch is going to churn, prefer
+`git push` once at the end of a work block over `--force-with-lease` cycles
+mid-block; if a batch is already pushed and the next commits are
+work-in-progress, `[skip ci]` in the commit subject (where the repo's CI
+honours it) is better than not pushing at all.
+
+**Why:** commit frequency and push frequency are separate decisions that
+get conflated into one habit. Commits are local, free and protective —
+there is no reason to be sparing. Pushes are shared, trigger runners, and
+carry real cost at both ends: wasted CI capacity and reviewers pulled at
+half-finished states. Tying the push cadence to *checkpoints and pauses*
+rather than to commits keeps the safety property that matters (nothing
+important lives only on one disk) without paying for a pipeline run per
+commit.
+
 ## Environment/setup obstacles: surface, don't silently work around
 
 If a task hits an environment or tooling setup issue — a package-manager

@@ -33,6 +33,28 @@
 # is optional — most instructions are expected to stay shared, so there's no
 # per-account file until one actually diverges.
 #
+# MCP servers are the one piece of repo-managed config that does NOT live in
+# settings.json: Claude Code keeps user-scope servers in <context>/.claude.json,
+# alongside login state and per-project trust. So files/claude/mcp.shared.json
+# (plus an optional per-account mcp.<account>.json) is MERGED into that file's
+# .mcpServers rather than copied over it — managed entries win by name,
+# hand-added ones are left untouched, and nothing else in .claude.json is
+# disturbed. That is what makes a server like mantine present in every context
+# by construction instead of by remembering to run `claude mcp add` three times.
+#
+# Two deliberate constraints on the fragment:
+#   * Servers carrying a credential stay OUT of it. Secrets are referenced,
+#     never written, and there is nowhere in a JSON fragment to reference one
+#     from — so a token-bearing server is added by hand with `claude mcp add`
+#     and simply preserved by the merge, never codified.
+#   * Removal is not a merge operation. Dropping a server from the fragment
+#     stops managing it; it does not delete it from a context. Retire one with
+#     `claude mcp remove -s user <name>` under that CLAUDE_CONFIG_DIR.
+#
+# The merge is skipped when it would be a no-op, and refuses to write if the
+# file moved underneath it — .claude.json is rewritten constantly by any live
+# session, and clobbering a token someone just added would be unrecoverable.
+#
 # Skills default to a whole-directory symlink, so ~/.claude-*/skills IS
 # files/claude/skills in this repo: author a skill straight into the context
 # and it lands in git, exactly like editing ~/.config/fish/*. That's still
@@ -68,7 +90,8 @@
 # via the CONTEXTS mapping below, so the two contexts cannot skew.
 #
 # Usage:
-#   claude-sync            apply settings + skills to every context
+#   claude-sync            apply settings + CLAUDE.md + MCP servers + skills
+#                          to every context
 #   claude-sync --diff     show what has drifted, change nothing
 #
 # Safe to re-run.
@@ -78,6 +101,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_SETTINGS_SHARED="$REPO_DIR/files/claude/settings.shared.json"
 SRC_CLAUDE_MD_SHARED="$REPO_DIR/files/claude/CLAUDE.md.shared"
 SRC_SKILLS="$REPO_DIR/files/claude/skills"
+SRC_MCP_SHARED="$REPO_DIR/files/claude/mcp.shared.json"
 
 # context name : fragment account. The fragment account picks which
 # settings.<account>.json / CLAUDE.md.<account> the context is built from —
@@ -96,7 +120,11 @@ warn() { printf '\033[1;33mwarn:\033[0m %s\n' "$*"; }
 
 # Scratch file for the merged settings JSON, reused across contexts.
 MERGE_TMP="$(mktemp)"
-trap 'rm -f "$MERGE_TMP"' EXIT
+# Separate scratch for the MCP merge: the managed fragment, the value that
+# would be written, and (in --diff) the live side being compared against.
+MCP_TMP="$(mktemp)"
+MCP_OUT="$(mktemp)"
+trap 'rm -f "$MERGE_TMP" "$MCP_TMP" "$MCP_OUT"' EXIT
 
 # The repo skills that are cross-account. Everything NOT named here is
 # personal-only: linked into ~/.claude-personal (which gets the whole
@@ -133,6 +161,43 @@ build_claude_md() {
     fi
 }
 
+# Collapse mcp.shared.json with the optional mcp.<account>.json into a single
+# {mcpServers: {...}} document at $1. Account fragment wins per server name,
+# same precedence as the settings merge.
+build_mcp() {
+    local account="$1" out="$2"
+    local fragment="$REPO_DIR/files/claude/mcp.$account.json"
+
+    if [ -f "$fragment" ]; then
+        jq -s '{mcpServers: ((.[0].mcpServers // {}) + (.[1].mcpServers // {}))}' \
+            "$SRC_MCP_SHARED" "$fragment" > "$out"
+    else
+        jq '{mcpServers: (.mcpServers // {})}' "$SRC_MCP_SHARED" > "$out"
+    fi
+}
+
+# Report, without printing a single value, how a context's live mcpServers
+# compares to the managed set. Values are withheld on purpose: hand-added
+# servers hold bearer tokens, and --diff output lands in terminals and
+# transcripts.
+mcp_status_lines() {
+    local live="$1"
+    [ -f "$live" ] || live=/dev/null
+    jq -rn --slurpfile m "$MCP_TMP" --slurpfile d "$live" '
+        (($d[0] // {}) | if type == "object" then . else {} end) as $doc
+        | ($m[0].mcpServers // {}) as $managed
+        | ($doc.mcpServers // {}) as $live
+        | [ $managed | to_entries[]
+            | if   ($live[.key] // null) == null then "  \(.key): missing (would be added)"
+              elif  $live[.key] != .value       then "  \(.key): differs (would be reset)"
+              else                                   "  \(.key): current" end ]
+          + [ "  unmanaged, left alone: "
+              + ((($live | keys) - ($managed | keys)) | join(", ")
+                 | if . == "" then "(none)" else . end) ]
+        | .[]
+    ' 2>/dev/null || echo "  (unreadable .claude.json — skipped)"
+}
+
 diff_only=0
 [ "${1:-}" = "--diff" ] && diff_only=1
 
@@ -157,6 +222,12 @@ if [ "$diff_only" = 1 ]; then
         build_claude_md "$account" "$MERGE_TMP"
         if diff -u "$ctx/CLAUDE.md" "$MERGE_TMP" 2>/dev/null; then
             echo "  identical"
+        fi
+
+        if [ -f "$SRC_MCP_SHARED" ]; then
+            info "${ctx/#$HOME/~}/.claude.json mcpServers vs repo (mcp.shared.json + mcp.$account.json if present)"
+            build_mcp "$account" "$MCP_TMP"
+            mcp_status_lines "$ctx/.claude.json"
         fi
     done
     exit 0
@@ -211,6 +282,67 @@ sync_claude_md() {
     else
         echo "  CLAUDE.md: written from CLAUDE.md.shared (no $account fragment)"
     fi
+}
+
+# ---- MCP servers: merge the managed set into <context>/.claude.json ----
+# Merge, not copy: .claude.json is Claude Code's own file (login, trust,
+# per-project state) and holds hand-added servers with live credentials. Only
+# .mcpServers is touched, managed names win, everything else is preserved.
+sync_mcp_servers() {
+    local account="$1" ctx="$2"
+    local live="$ctx/.claude.json"
+
+    if [ ! -f "$SRC_MCP_SHARED" ]; then
+        warn "  mcp.shared.json missing — skipping MCP servers for this context"
+        return
+    fi
+    build_mcp "$account" "$MCP_TMP"
+
+    # A context that has never been launched has no .claude.json yet. Seeding
+    # a bare object is enough — Claude Code fills in the rest on first run.
+    if [ ! -f "$live" ]; then
+        echo '{}' > "$live"
+        chmod 600 "$live"
+        echo "  .claude.json: seeded (context has never been launched)"
+    fi
+
+    # Checksum taken BEFORE the read, re-checked before the swap: a running
+    # session rewrites this file continuously, and overwriting a token it just
+    # persisted is not recoverable from anywhere.
+    local sum_before
+    sum_before="$(cksum < "$live")"
+
+    if ! jq --slurpfile m "$MCP_TMP" \
+        '.mcpServers = ((.mcpServers // {}) + ($m[0].mcpServers // {}))' \
+        "$live" > "$MCP_OUT" 2>/dev/null; then
+        warn "  .claude.json is not readable as JSON — MCP servers left alone"
+        return
+    fi
+
+    # Compare only .mcpServers: jq reformats the whole document, so a
+    # whole-file diff would report a change on every run and make the
+    # clobber window permanent instead of rare.
+    if [ "$(jq -cS '.mcpServers // {}' "$live")" = "$(jq -cS '.mcpServers // {}' "$MCP_OUT")" ]; then
+        echo "  .claude.json: mcpServers already current ($(jq -r '.mcpServers | length' "$MCP_TMP") managed)"
+        return
+    fi
+
+    if [ "$(cksum < "$live")" != "$sum_before" ]; then
+        warn "  .claude.json changed while syncing (a Claude session is likely running)"
+        warn "  — not written, nothing lost; re-run claude-sync"
+        return
+    fi
+
+    mcp_status_lines "$live"
+
+    # Swap in the same directory so the replace is atomic for any reader, and
+    # seed the temp from the live file first so it inherits its mode rather
+    # than mktemp's.
+    local swap="$ctx/.claude.json.claude-sync-$$"
+    cp "$live" "$swap"
+    cat "$MCP_OUT" > "$swap"
+    mv "$swap" "$live"
+    echo "  .claude.json: mcpServers merged from mcp.shared.json + mcp.$account.json (if present)"
 }
 
 # ---- skills: whole-dir symlink for accounts with no exclusions ----
@@ -366,6 +498,7 @@ for mapping in "${CONTEXTS[@]}"; do
 
     sync_settings "$account" "$ctx"
     sync_claude_md "$account" "$ctx"
+    sync_mcp_servers "$account" "$ctx"
     sync_skills "$name" "$account" "$ctx"
     if [ "$name" = "exxo-personal" ]; then
         sync_overlay "$ctx" "$HOME/.claude-exxo"
