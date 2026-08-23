@@ -57,7 +57,11 @@ default_branch() {
 # ---- --check: is the pinned commit behind upstream? -----------------------
 if [ "${1:-}" = "--check" ]; then
     [ -f "$LOCK" ] || die "no lockfile at ${LOCK/#$REPO_DIR\//} — run scripts/vendor-mantine first"
-    pinned="$(jq -r '.commit' "$LOCK")"
+    # .upstream.commit, not .commit — the lockfile nests it. Reading the wrong
+    # path yielded a null that sailed through into the compare URL and came
+    # back as a bare 404, so guard the value rather than trusting the read.
+    pinned="$(jq -r '.upstream.commit // empty' "$LOCK")"
+    [ -n "$pinned" ] || die "lockfile has no .upstream.commit — re-run scripts/vendor-mantine to rewrite it"
     branch="$(default_branch)"
     head="$(gh api "repos/$UPSTREAM_REPO/commits/$branch" --jq '.sha')"
     if [ "$pinned" = "$head" ]; then
