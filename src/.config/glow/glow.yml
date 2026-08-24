@@ -13,8 +13,10 @@ style: "auto"
 # measure for prose. Wider than this and long paragraphs get hard to track;
 # `md` overrides it for table-heavy documents, which need the real width.
 width: 100
-# no built-in TUI pager — `md` pipes through bat instead, so the pager is
-# consistent with everything else here
+# don't page by default. glow emits no colour once stdout is a pipe (and has no
+# force-colour env), so it can never feed an external pager — `md` passes -p to
+# turn glow's own pager on for the one case that needs it: output too long for
+# the screen.
 pager: false
 # TUI-mode only
 mouse: false
