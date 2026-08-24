@@ -14,6 +14,18 @@
 [push]
     autoSetupRemote = true
 
+[submodule]
+    # Carry submodule working trees along with switch/checkout/pull, so a
+    # branch switch between branches pinning different submodule SHAs stops
+    # leaving stale checkouts behind (the .claude/vendor/skills "modified"
+    # drift).
+    recurse = true
+
+[core]
+    # Global hooks (src/.config/git/hooks). NOTE: a global core.hooksPath
+    # HIDES each repo's own .git/hooks — the hooks here chain to it.
+    hooksPath = ~/.config/git/hooks
+
 [url "ssh://git@github.com/"]
     insteadOf = https://github.com/
 [url "ssh://git@gitlab.com/"]
