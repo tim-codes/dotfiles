@@ -274,6 +274,61 @@ alias batyaml="bat -l yaml"
 alias batjson="bat -l json"
 alias batmd="bat -l markdown"
 
+# Render a markdown file (or stdin) for reading in the terminal.
+#
+# Two renderers, because neither wins on everything: glow styles prose well but
+# pads every table column to the same width, which turns a wide glossary into
+# whitespace; mdcat sizes table columns to their content. So: tables -> mdcat
+# at the full terminal width, everything else -> glow at the prose measure from
+# ~/.config/glow/glow.yml (capped by the terminal). Output goes through bat as
+# a pager -- --style=plain passes glow's/mdcat's ANSI straight through instead
+# of re-highlighting it, and gives less-style scroll and search.
+#
+#   md FILE...      render files
+#   cmd | md        render stdin
+#   md -g FILE      force glow      md -m FILE   force mdcat
+#   md -w 90 FILE   fixed width
+function md -d "Pretty-print markdown (glow for prose, mdcat for tables) via bat"
+    argparse g/glow m/mdcat w/width= -- $argv
+    or return
+
+    set -l files $argv
+    set -l stdin_tmp
+    if test (count $files) -eq 0
+        set stdin_tmp (mktemp -t md.XXXXXX)
+        cat > $stdin_tmp
+        set files $stdin_tmp
+    end
+
+    set -l cols (tput cols 2>/dev/null; or echo 100)
+
+    # a table row is the only markdown construct that needs the full width
+    set -l use_mdcat 0
+    if set -q _flag_mdcat
+        set use_mdcat 1
+    else if not set -q _flag_glow
+        and command -q mdcat
+        and grep -qE '^ *\|.*\|' $files 2>/dev/null
+        set use_mdcat 1
+    end
+
+    begin
+        if test $use_mdcat -eq 1
+            mdcat --columns (test -n "$_flag_width"; and echo $_flag_width; or echo $cols) $files
+        else
+            # GLOW_WIDTH wins over the config file; glow ignores --config, so
+            # the cap lives here rather than in glow.yml
+            set -l w $_flag_width
+            if test -z "$w"
+                set w (math "min($cols, 100)")
+            end
+            glow -w $w $files
+        end
+    end | bat --style=plain --paging=auto
+
+    test -n "$stdin_tmp"; and rm -f $stdin_tmp
+end
+
 function ip-local
     ifconfig | grep broadcast | awk '{print $2}'
 end

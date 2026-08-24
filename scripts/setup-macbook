@@ -48,6 +48,16 @@ end
 
 EOF
 
+# glow reads its config from ~/Library/Preferences on macOS, not XDG, and its
+# --config flag / GLOW_CONFIG are ignored in 3.0.0 — so point the Preferences
+# path at the stowed copy rather than keeping a second file in sync.
+glow_pref_dir="$HOME/Library/Preferences/glow"
+mkdir -p "$glow_pref_dir"
+if [[ ! -L "$glow_pref_dir/glow.yml" ]]; then
+  rm -f "$glow_pref_dir/glow.yml"
+  ln -sf "$HOME/.config/glow/glow.yml" "$glow_pref_dir/glow.yml"
+fi
+
 # LinearMouse (installed by brew-update, config stowed from src/.config/linearmouse)
 # reverses scroll direction for mice while the trackpad stays "natural" — see
 # docs/adr/2026-08-17-per-device-scroll-direction.md

@@ -24,6 +24,9 @@ brewDeps=(
   fzf
   gh
   glances
+  # markdown rendering in the terminal: glow for prose, mdcat for table-heavy
+  # docs (see the `md` fish function in src/.config/fish/common.fish)
+  glow
   # canonical name; "gpg" is an old alias for the same formula
   gnupg
   gradle
@@ -36,6 +39,7 @@ brewDeps=(
   lazydocker
   lazygit
   lsd
+  mdcat
   mysql-client
   ncdu
   # speeds up gcloud's IAP TCP tunnels. gcloud has no bundled python here so it

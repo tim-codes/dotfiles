@@ -1,0 +1,12 @@
+# mdcat — markdown renderer for table-heavy documents. It sizes table columns
+# to their content instead of padding every column to the same width the way
+# glow does, so glossaries and reference tables stay readable.
+#
+# `md` passes --columns explicitly (the terminal width); this file is what a
+# bare `mdcat` call gets.
+
+[defaults]
+columns = 120
+
+[theme]
+base = "auto"

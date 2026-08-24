@@ -16,3 +16,25 @@ sudo apt-get install -y \
 if [[ "${DOTFILES_SKIP_CHSH:-}" != "1" && "$SHELL" != */zsh ]]; then
   chsh -s $(which zsh)
 fi
+
+# Markdown renderers used by the `md` shell function (glow for prose, mdcat for
+# table-heavy docs). Neither is reliably in the Ubuntu archive across the
+# releases these machines run, so each gets a fallback rather than being added
+# to the apt list above (a missing name there fails the whole install):
+#   - glow ships from Charm's own apt repo
+#   - mdcat is in newer archives only; cargo builds it everywhere else
+if ! command -v glow &> /dev/null; then
+  sudo mkdir -p /etc/apt/keyrings
+  curl -fsSL https://repo.charm.sh/apt/gpg.key \
+    | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
+  echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" \
+    | sudo tee /etc/apt/sources.list.d/charm.list > /dev/null
+  sudo apt-get update
+  sudo apt-get install -y glow
+fi
+
+if ! command -v mdcat &> /dev/null; then
+  sudo apt-get install -y mdcat \
+    || cargo install mdcat \
+    || echo "mdcat not installed (no archive package, no cargo) — skipping"
+fi

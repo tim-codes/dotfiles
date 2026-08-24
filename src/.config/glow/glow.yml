@@ -1,0 +1,21 @@
+# glow — markdown renderer for prose-shaped documents.
+#
+# Canonical location for this file is XDG (~/.config/glow/glow.yml) on Linux;
+# on macOS glow only reads ~/Library/Preferences/glow/glow.yml, which
+# scripts/setup-macbook symlinks here. glow 3.0.0 ignores --config/GLOW_CONFIG
+# (the flag parses but the file is never read), so the symlink is the only way
+# to keep one copy. Per-invocation overrides go through GLOW_WIDTH/GLOW_STYLE,
+# which *are* honoured — that is how the `md` function sizes output to the
+# terminal.
+
+# follow the terminal's light/dark background
+style: "auto"
+# measure for prose. Wider than this and long paragraphs get hard to track;
+# `md` overrides it for table-heavy documents, which need the real width.
+width: 100
+# no built-in TUI pager — `md` pipes through bat instead, so the pager is
+# consistent with everything else here
+pager: false
+# TUI-mode only
+mouse: false
+all: false

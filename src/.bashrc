@@ -86,6 +86,19 @@ alias gch='git checkout'
 alias gsw='git switch'
 alias gb='git branch'
 
+# Markdown rendering — the fallback twin of the `md` fish function (see
+# src/.config/fish/common.fish for why two renderers: glow pads table columns,
+# mdcat sizes them to content). Bash keeps the simple form, no flag parsing.
+md() {
+    local cols
+    cols=$(tput cols 2>/dev/null || echo 100)
+    if command -v mdcat > /dev/null && grep -qE '^ *\|.*\|' "$@" 2> /dev/null; then
+        mdcat --columns "$cols" "$@"
+    else
+        GLOW_WIDTH=$((cols < 100 ? cols : 100)) glow "$@"
+    fi | bat --style=plain --paging=auto
+}
+
 # ~~~ BASH COMPLETION ~~~ #
 # ~~~~~~~~~~~~~~~~~~~~~~~ #
 
