@@ -20,6 +20,16 @@
     undo = reset HEAD^
     unstage = reset HEAD --
 
+[submodule]
+    ; Carry submodule working trees along on switch/checkout/pull, so a repo
+    ; pinning a different submodule SHA per branch never shows phantom
+    ; "modified" drift after a branch switch.
+    recurse = true
+[core]
+    ; Global hooks (post-checkout drift warning). NOTE: a global hooksPath
+    ; hides per-repo .git/hooks — our hooks chain to them, see the scripts.
+    hooksPath = ~/.config/git/hooks
+
 [pull]
     rebase = true
 [push]
