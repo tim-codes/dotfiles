@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Warn when a branch checkout leaves submodule working trees out of sync.
+#
+# Setting core.hooksPath globally HIDES every repo's own .git/hooks (git looks
+# in exactly one hooks directory, not both), so this hook chains: it does its
+# own check, then execs the repo-local hook if there is an executable one.
+# Repos that set core.hooksPath themselves (husky and friends) never reach
+# here at all — their own value wins over the global one.
+#
+# Warns only, never fixes and never blocks: always exits 0. With
+# submodule.recurse enabled the drift cannot happen, so this stays dormant and
+# is only a safety net for machines/accounts where that config hasn't landed.
+#
+# Silence ladder, cheapest check first — stay quiet when:
+#   1. this is a file checkout, not a branch switch;
+#   2. the repo has no .gitmodules;
+#   3. submodule.recurse is effectively true (git config resolves
+#      local-over-global for us) — the drift is auto-handled;
+#   4. we are inside a Claude Code session ($CLAUDECODE) AND this repo's
+#      .claude/settings.json wires a SessionStart skills-check hook, which
+#      surfaces the same staleness itself — both conditions, not either;
+#   5. finally, the expensive `git submodule status` scan reports no drift.
+
+set -u
+
+prev_head=${1:-}
+new_head=${2:-}
+branch_checkout=${3:-0}
+
+chain() {
+    local repo_hook="${GIT_DIR:-$(git rev-parse --git-dir 2>/dev/null)}/hooks/post-checkout"
+    if [ -x "$repo_hook" ]; then
+        exec "$repo_hook" "$prev_head" "$new_head" "$branch_checkout"
+    fi
+    exit 0
+}
+
+# File checkouts (`git checkout -- path`) can't move submodule pointers.
+[ "$branch_checkout" = "1" ] || chain
+
+# Fast bail-out for the overwhelming majority of repos: no submodules at all.
+toplevel=$(git rev-parse --show-toplevel 2>/dev/null) || chain
+[ -f "$toplevel/.gitmodules" ] || chain
+
+# submodule.recurse already carries the working trees along — nothing to warn about.
+[ "$(git config --get submodule.recurse)" = "true" ] && chain
+
+# Inside a Claude Code session, a repo whose SessionStart hook runs a
+# skills-check already reports staleness — don't say it twice.
+if [ -n "${CLAUDECODE:-}" ] && [ -f "$toplevel/.claude/settings.json" ]; then
+    if grep -q 'SessionStart' "$toplevel/.claude/settings.json" &&
+        grep -q 'skills-check' "$toplevel/.claude/settings.json"; then
+        chain
+    fi
+fi
+
+# `git submodule status` prefixes out-of-sync entries with `-` (not initialised)
+# or `+` (checked out at a different SHA than the superproject records).
+drifted=$(git submodule status 2>/dev/null | awk '/^[+-]/ { print $2 }')
+
+if [ -n "$drifted" ]; then
+    printf '⚠ submodule checkout is out of sync after this branch switch:\n' >&2
+    printf '    %s\n' $drifted >&2
+    printf '  fix: git submodule update --init --recursive\n' >&2
+    printf '  or enable it permanently: git config --global submodule.recurse true\n' >&2
+fi
+
+chain
