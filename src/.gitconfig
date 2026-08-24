@@ -1,9 +1,20 @@
 [user]
     name = "Tim O'Connell"
     email = tim@exxo.sh
+    ; The "Git" SSH key held in 1Password — used for both auth (1P SSH agent)
+    ; and commit/tag signing (op-ssh-sign below). No GPG anywhere.
+    signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMw7ZezK984Ovyr3ri/E5GdMaaBGGE5i9UkIuPQx1sG5
 
-[include]
-    path = ~/.gpg.gitconfig
+[gpg]
+    format = ssh
+[gpg "ssh"]
+    program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
+    ; Lets `git log --show-signature` verify our own signatures locally.
+    allowedSignersFile = ~/.config/git/allowed_signers
+[commit]
+    gpgsign = true
+[tag]
+    gpgsign = true
 
 [alias]
     undo = reset HEAD^
@@ -18,6 +29,3 @@
     insteadOf = https://github.com/
 [url "ssh://git@gitlab.com/"]
     insteadOf = https://gitlab.com/
-
-[includeIf "gitdir:~/dev/cecg"]
-    path = ~/dev/cecg/.gitconfig
