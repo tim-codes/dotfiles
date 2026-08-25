@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "dotfiles",
+  "description": "Plugins managed in the dotfiles repo, served from the local checkout",
+  "owner": {
+    "name": "Tim O'Connell"
+  },
+  "plugins": [
+    {
+      "name": "shell-lsp",
+      "description": "LSP servers for languages the official marketplace lacks: bash (bash-language-server) and fish (fish-lsp)",
+      "source": "./shell-lsp"
+    }
+  ]
+}

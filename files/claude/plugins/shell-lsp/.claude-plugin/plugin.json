@@ -1,0 +1,5 @@
+{
+  "name": "shell-lsp",
+  "description": "Bash and fish language servers for Claude Code code intelligence. Binaries come from the dotfiles manifests: bash-language-server (scripts/pnpm-globals), fish-lsp (brewDeps in scripts/brew-update).",
+  "version": "0.1.0"
+}

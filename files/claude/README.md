@@ -17,6 +17,32 @@ The split exists because the Exxo context must receive the Exxo skills
 marketplace/plugin while `~/.claude-personal` must never get it (homelab #76,
 Linear ENG-20).
 
+## Language servers (LSP)
+
+Claude Code gets code intelligence (diagnostics after every edit, go-to-def,
+find-references) from LSP servers, delivered exclusively via plugins — there
+is no user-level `lsp.json`. `settings.shared.json` enables the official
+plugins for TypeScript, Go, Rust and Python
+(`*-lsp@claude-plugins-official`), so every context gets them. The server
+binaries are the user's responsibility and are persisted in the usual
+manifests: `typescript-language-server`, `bash-language-server`, `pyright`
+in `scripts/pnpm-globals`; `gopls`, `fish-lsp` in `scripts/brew-update`;
+`rust-analyzer` as a rustup component in `scripts/setup-macbook`.
+
+Bash and fish have no official plugin, so the `shell-lsp` plugin under
+`plugins/` covers them, served by the `dotfiles` marketplace registered in
+`settings.shared.json` as a local-directory source pointing at
+`files/claude/plugins/` in this checkout (main-parked, so content is stable —
+same reasoning as the Stow symlinks). Plugin installs are SNAPSHOTS copied
+into each context's plugin cache, not live references: after editing
+`plugins/shell-lsp/`, run `claude plugin update shell-lsp@dotfiles` under
+each context's `CLAUDE_CONFIG_DIR` to re-snapshot.
+
+If two enabled plugins declare an LSP server for the same file extension,
+the first registered wins and the rest silently never start (a warning shows
+in `/plugin`) — which is why the Exxo rollout recommends the same official
+plugins rather than shipping a duplicate `exxo-lsp` plugin.
+
 `CLAUDE.md` follows the same shape, one level simpler: `claude-sync`
 concatenates `CLAUDE.md.shared` with an optional `CLAUDE.md.<account>`
 fragment (plain text, not a jq merge) and copies the result into each
