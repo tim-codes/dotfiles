@@ -29,6 +29,9 @@ brewDeps=(
   glow
   # canonical name; "gpg" is an old alias for the same formula
   gnupg
+  # Go language server — completes the TS/Go/Rust LSP trio (typescript-language-server
+  # lives in pnpm-globals, rust-analyzer is a rustup component in setup-macbook)
+  gopls
   gradle
   helm
   htop
