@@ -116,6 +116,19 @@
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": false,
   "enabledPlugins": {
-    "vercel@claude-plugins-official": true
+    "vercel@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "gopls-lsp@claude-plugins-official": true,
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true,
+    "shell-lsp@dotfiles": true
+  },
+  "extraKnownMarketplaces": {
+    "dotfiles": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/tim/dev/dotfiles/files/claude/plugins"
+      }
+    }
   }
 }
