@@ -115,6 +115,10 @@ fi
 # Format: "cask" or "cask:Bundle Name.app" when it installs an /Applications app.
 brewCasks=(
   "1password-cli"
+  # display connection management for the shared Dell U4025QW — drops the
+  # phantom TB display when the monitor switches to the other machine; see
+  # homelab docs/workstation/desk-topology.md (connection mgmt is a Pro feature)
+  "betterdisplay:BetterDisplay.app"
   "firefox:Firefox.app"
   "gcloud-cli"
   "iterm2:iTerm.app"
