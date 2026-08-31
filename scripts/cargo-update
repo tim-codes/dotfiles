@@ -2,6 +2,9 @@
 
 cargoDeps=(
   bropages
+  # alacritty theme switcher TUI; macOS-only in practice - on Linux it would
+  # rewrite the stow-managed ~/.config/alacritty/alacritty.toml directly
+  althemer
 )
 
 # apps installed from git (not published to crates.io)
