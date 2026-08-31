@@ -1,5 +1,6 @@
 {
   "themes_dir": "~/.config/alacritty/themes",
+  "alacritty_config": "~/.config/alacritty/theme.toml",
   "show_preview": true,
   "quit_on_select": true,
   "picker_reversed": false,

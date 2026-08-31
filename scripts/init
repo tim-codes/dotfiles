@@ -55,20 +55,17 @@ shell = "$(command -v fish)"
 EOT
 fi
 
-# seed the theme indirection file althemer owns (mac only - althemer hardcodes
-# the alacritty config path to dirs::config_dir()/alacritty/alacritty.toml,
-# which is Application Support on mac; alacritty.toml imports this file and
-# ignores it while missing). althemer rewrites it on every theme switch, so it
-# stays machine-local rather than in git.
-if [[ "$platform" == "mac" ]]; then
-  althemer_config="${HOME}/Library/Application Support/alacritty/alacritty.toml"
-  if [ ! -e "$althemer_config" ]; then
-    mkdir -p "$(dirname "$althemer_config")"
-    cat <<EOT > "$althemer_config"
+# seed the active-theme indirection file (imported by alacritty.toml, ignored
+# while missing). althemer (our fork, pointed here via alacritty_config in its
+# config.json) rewrites it on every theme switch, so it stays machine-local
+# rather than in git.
+theme_toml="${HOME}/.config/alacritty/theme.toml"
+if [ ! -e "$theme_toml" ]; then
+  mkdir -p "$(dirname "$theme_toml")"
+  cat <<EOT > "$theme_toml"
 [general]
 import = ["${HOME}/.config/alacritty/themes/catppuccin_mocha.toml"]
 EOT
-  fi
 fi
 
 # create default gitconfig file
