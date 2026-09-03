@@ -4,7 +4,7 @@
 # file, so no machine-specific values may live here):
 # - theme.toml is the active-theme indirection, owned and rewritten by althemer
 #   (pointed at it via alacritty_config in althemer's config.json); seeded to
-#   catppuccin_mocha
+#   material_prism
 # - local.toml carries per-machine settings (the fish path differs per
 #   platform)
 import = [

@@ -7,11 +7,11 @@ cargoDeps=(
 # apps installed from git (not published to crates.io)
 cargoGitDeps=(
   https://github.com/tim-codes/stray
-  # alacritty theme switcher TUI - our fork adds a configurable alacritty
-  # config path (needed so it rewrites the theme.toml indirection, not the
-  # stow-managed alacritty.toml); switch back to crates.io `althemer` once
-  # https://github.com/xdagiz/althemer/pull/1 is merged and released
-  https://github.com/tim-codes/althemer
+  # alacritty theme switcher TUI - upstream main carries our configurable
+  # alacritty-config-path fix (xdagiz/althemer#1, merged 2026-09-02; needed so
+  # it rewrites the theme.toml indirection, not the stow-managed
+  # alacritty.toml); move to crates.io `althemer` once a release > 0.3.0 ships
+  https://github.com/xdagiz/althemer
 )
 
 cargo install $cargoDeps

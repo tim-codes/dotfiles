@@ -64,7 +64,7 @@ if [ ! -e "$theme_toml" ]; then
   mkdir -p "$(dirname "$theme_toml")"
   cat <<EOT > "$theme_toml"
 [general]
-import = ["${HOME}/.config/alacritty/themes/catppuccin_mocha.toml"]
+import = ["${HOME}/.config/alacritty/themes/material_prism.toml"]
 EOT
 fi
 
