@@ -55,8 +55,17 @@ shell = "$(command -v fish)"
 EOT
 fi
 
+# althemer resolves its own config.json via dirs::config_dir(), which on mac
+# is Application Support rather than the stowed ~/.config/althemer - symlink it
+# so the stowed config is what actually gets read
+if [[ "$platform" == "mac" ]]; then
+  mkdir -p "${HOME}/Library/Application Support/althemer"
+  ln -sf "${HOME}/.config/althemer/config.json" \
+    "${HOME}/Library/Application Support/althemer/config.json"
+fi
+
 # seed the active-theme indirection file (imported by alacritty.toml, ignored
-# while missing). althemer (our fork, pointed here via alacritty_config in its
+# while missing). althemer (pointed here via alacritty_config in its
 # config.json) rewrites it on every theme switch, so it stays machine-local
 # rather than in git.
 theme_toml="${HOME}/.config/alacritty/theme.toml"
