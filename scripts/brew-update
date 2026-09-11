@@ -29,6 +29,9 @@ brewDeps=(
   glow
   # canonical name; "gpg" is an old alias for the same formula
   gnupg
+  # Go language server — completes the TS/Go/Rust LSP trio (typescript-language-server
+  # lives in pnpm-globals, rust-analyzer is a rustup component in setup-macbook)
+  gopls
   gradle
   helm
   htop
@@ -57,7 +60,9 @@ brewDeps=(
   # pdftoppm for rasterising PDF pages — Claude Code needs it to visually
   # inspect PDFs (e.g. verifying generated Exxo report renders)
   poppler
-  pulumi
+  # from pulumi's own tap (its homebrew/core formula conflicts with the tap one
+  # and brew refuses to upgrade across taps)
+  "pulumi/tap/pulumi"
   # redis-cli for inspecting the local secret cache (the cache itself runs as
   # a container; this is the client, not a server we run)
   redis

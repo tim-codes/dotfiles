@@ -10,6 +10,11 @@ packages=(
   npm-check-updates@latest
   typescript@latest
   typescript-language-server@latest
+  # language servers for Claude Code code intelligence (LSP plugins declare
+  # them; binaries must be on PATH) — pairs with gopls (brew), rust-analyzer
+  # (rustup), fish-lsp (brew)
+  bash-language-server@latest
+  pyright@latest
   @playwright/mcp@latest
   # markdown → OOXML conversion in the office-files skill (md2exxo-report.sh, via MD2EXXO_MARKDOWN_IT)
   markdown-it@latest

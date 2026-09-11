@@ -1,0 +1,17 @@
+{
+  "bash": {
+    "command": "bash-language-server",
+    "args": ["start"],
+    "extensionToLanguage": {
+      ".sh": "shellscript",
+      ".bash": "shellscript"
+    }
+  },
+  "fish": {
+    "command": "fish-lsp",
+    "args": ["start"],
+    "extensionToLanguage": {
+      ".fish": "fish"
+    }
+  }
+}

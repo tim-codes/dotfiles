@@ -7,3 +7,4 @@ src/bin/*
 !src/bin/firefox-tab-watchdog
 .claude
 src/.config/alacritty/local.toml
+src/.config/alacritty/theme.toml

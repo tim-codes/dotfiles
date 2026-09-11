@@ -36,6 +36,7 @@ add_to_path \
   "$GOPATH/bin" \
   "$GOROOT/bin" \
   "$PNPM_HOME" \
+  "$PNPM_HOME/bin" \
   "$HOME/.yarn/bin" \
   "$HOME/.config/yarn/global/node_modules/.bin" \
   "/opt/homebrew/opt/mysql-client/bin"
@@ -194,10 +195,12 @@ end
 # Git aliases
 alias g="git"
 alias gs='git status -sb'
+alias gfs='gf && gs'
 alias gcl='git clone'
 alias gf='git fetch'
 alias gm='git merge'
 alias gp='git pull'
+alias gwl='git worktree list'
 
 alias ga='git add'
 alias gap='ga --patch'
