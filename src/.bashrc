@@ -87,16 +87,32 @@ alias gsw='git switch'
 alias gb='git branch'
 
 # Markdown rendering — the fallback twin of the `md` fish function (see
-# src/.config/fish/common.fish for why two renderers: glow pads table columns,
-# mdcat sizes them to content). Bash keeps the simple form, no flag parsing.
+# src/.config/fish/common.fish for the full reasoning: glow pads table columns
+# while mdcat sizes them to content, and neither renderer emits colour into a
+# pipe — so mdcat gets --ansi to feed less, and glow renders straight to the
+# terminal with its own pager when the output overflows the screen). Bash keeps
+# the simple form, no flag parsing.
 md() {
-    local cols
-    cols=$(tput cols 2>/dev/null || echo 100)
+    local cols rows
+    cols=$(tput cols 2> /dev/null || echo 100)
+    rows=$(tput lines 2> /dev/null || echo 40)
+
     if command -v mdcat > /dev/null && grep -qE '^ *\|.*\|' "$@" 2> /dev/null; then
-        mdcat --columns "$cols" "$@"
+        if [ -t 1 ]; then
+            mdcat --ansi --columns "$cols" "$@" < /dev/null | less -R -F -X
+        else
+            mdcat --columns "$cols" "$@" < /dev/null
+        fi
     else
-        GLOW_WIDTH=$((cols < 100 ? cols : 100)) glow "$@"
-    fi | bat --style=plain --paging=auto
+        local w=$((cols < 100 ? cols : 100))
+        if [ ! -t 1 ]; then
+            glow -w "$w" "$@" < /dev/null
+        elif [ "$(glow -w "$w" "$@" < /dev/null | wc -l)" -gt "$rows" ]; then
+            glow -p -w "$w" "$@"
+        else
+            glow -w "$w" "$@" < /dev/null
+        fi
+    fi
 }
 
 # ~~~ BASH COMPLETION ~~~ #
