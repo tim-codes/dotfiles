@@ -43,8 +43,29 @@ projects/ragnar-v3/client-config.sh
 
 scp projects/ragnar-v3/scripts/sort-completed-downloads.sh ragnar:/tmp/
 ssh ragnar "bash /tmp/sort-completed-downloads.sh --dry-run"   # review first
-ssh ragnar "bash /tmp/sort-completed-downloads.sh"             # then execute
+ssh ragnar "bash /tmp/sort-completed-downloads.sh --detach"    # then execute
 ```
+
+**Always pass `--detach` for a real run.** It forks the work into a session-
+independent process on ragnar and returns immediately, printing a pid and a
+log path. Without it the copy is a child of the ssh session, so anything that
+takes the caller's terminal away - an agent's background task being reaped,
+a dropped link, Ctrl-C - kills it partway through a file. Follow it with:
+
+```bash
+ssh ragnar "tail -f /tmp/sort-completed-downloads.<stamp>.<pid>.log"
+```
+
+`--detach` also runs from a timestamped private copy of the script, so the
+"never re-scp mid-run" hazard below no longer applies to a detached run.
+
+If a run *is* interrupted, audit before resuming rather than assuming: moves
+are `rsync --remove-source-files`, so an interrupted file leaves a short
+destination that the script will refuse to overwrite on the next pass (it
+logs a conflict and keeps the source). Compare sizes for every planned move -
+src gone = done; src and dest both present with equal size = fine; unequal =
+partial, delete the destination before resuming. Re-running the same
+`--apply-plan` is otherwise safe and picks up where it left off.
 
 If scp fails with "Received message too long", a shell startup file on ragnar
 is printing on non-interactive sessions again. Fix it at the source; as a
