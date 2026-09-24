@@ -66,9 +66,8 @@ mkdir -p "$HOME/dev"
 if [[ -d "$DOTFILES_ROOT/.git" ]]; then
   echo "    Repo already cloned; pulling latest main"
   git -C "$DOTFILES_ROOT" pull --ff-only origin main
-  git -C "$DOTFILES_ROOT" submodule update --init --recursive
 else
-  git clone --recurse-submodules "$DOTFILES_REPO" "$DOTFILES_ROOT"
+  git clone "$DOTFILES_REPO" "$DOTFILES_ROOT"
 fi
 
 echo "==> [4/4] Run dotfiles init"

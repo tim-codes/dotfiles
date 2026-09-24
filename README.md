@@ -49,7 +49,7 @@ curl -fsSL https://raw.githubusercontent.com/tim-codes/dotfiles/main/scripts/boo
 ```
 
 This installs Xcode Command Line Tools, wires `~/.ssh/config` to the 1Password
-SSH agent, clones this repo to `~/dev/dotfiles` (SSH, with submodules), then
+SSH agent, clones this repo to `~/dev/dotfiles` (SSH), then
 runs `scripts/init`: local config files, homebrew + deps, stow symlinks, fish
 plugins, fonts, alacritty (cask), tmux plugins (tpm), nvm/node, rust, poetry.
 Safe to re-run at any point if a step fails.
