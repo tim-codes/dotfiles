@@ -1,13 +1,23 @@
 source ~/.config/fish/common.fish
 
-# gcloud: sets CLOUDSDK_ROOT_DIR and puts the SDK's own bin on PATH.
+# gcloud: puts the SDK's own bin on PATH.
 # Anchored on brew's share/ symlink rather than the Caskroom: the cask was
 # renamed google-cloud-sdk -> gcloud-cli, and the old path silently stopped
 # matching, so this never loaded. share/ survives the rename, and checking both
 # prefixes covers Apple Silicon and Intel.
+#
+# This used to `source $gcloud_sdk/path.fish.inc`. That file does exactly one
+# thing — prepend $sdk/bin to PATH — but arrives at the path by readlink'ing
+# itself, sed'ing off the basename, then cd'ing in and back out to canonicalise
+# symlinks. Those two cd's each fired the --on-variable PWD nvm hook from
+# common.fish, ~300ms apiece, which is why this one line profiled at 603ms of a
+# 1356ms startup. That hook is cheap now, but the round-trip still buys nothing:
+# the bin dir is static per machine, so name it directly. Revisit if the SDK
+# ever starts exporting variables here as well as PATH — as of this writing the
+# whole file is one `set -gx PATH`.
 for gcloud_sdk in /opt/homebrew/share/google-cloud-sdk /usr/local/share/google-cloud-sdk
-  if test -f $gcloud_sdk/path.fish.inc
-    source $gcloud_sdk/path.fish.inc
+  if test -d $gcloud_sdk/bin
+    add_to_path $gcloud_sdk/bin
     break
   end
 end
