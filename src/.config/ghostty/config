@@ -36,9 +36,17 @@ font-size = 13
 quick-terminal-position = top
 quick-terminal-size = 45%
 quick-terminal-animation-duration = 0.15
-quick-terminal-autohide = true
+# Only the hotkey hides it. The default (true) also hides it whenever it loses
+# focus, which makes it useless for anything you want to watch while working in
+# another window - a running build, a tailed log, an agent mid-task.
+quick-terminal-autohide = false
 # follow between Spaces rather than yanking focus back to where it was opened
 quick-terminal-space-behavior = move
+
+# Dropdown-only, so keep it out of the dock and the app switcher. Ghostty
+# documents this as intended for exactly this use. Caveat from the same docs:
+# while hidden, macOS no longer switches keyboard layout automatically.
+macos-hidden = always
 
 # `global:` needs Accessibility permission; Ghostty prompts for it on first
 # load of a global keybind (System Settings > Privacy & Security >
