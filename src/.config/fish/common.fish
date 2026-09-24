@@ -217,6 +217,65 @@ function restow
     rf
 end
 
+# Switch the terminal colour theme for alacritty and ghostty together.
+#
+#   theme            pick interactively (althemer TUI)
+#   theme NAME       set directly
+#   theme -l         list available themes
+#
+# The alacritty themes under ~/.config/alacritty/themes are the single source
+# of truth; ghostty's equivalents are generated from them by
+# scripts/gen-ghostty-themes. Each terminal reads a small machine-local
+# indirection file naming the active theme, so a switch is two short writes
+# rather than any colour parsing.
+#
+# Alacritty picks the change up by itself (live_config_reload). Ghostty has no
+# auto-reload - that is an explicit upstream wontfix - so it is signalled with
+# SIGUSR2, which it handles ("reloading configuration in response to SIGUSR2").
+function theme -d "Switch the terminal theme (alacritty + ghostty)"
+    argparse l/list -- $argv
+    or return
+
+    set -l themes_dir $HOME/.config/alacritty/themes
+
+    if set -q _flag_list
+        for _t in $themes_dir/*.toml
+            basename $_t .toml
+        end
+        return 0
+    end
+
+    set -l name
+    if test (count $argv) -gt 0
+        set name $argv[1]
+    else if command -q althemer
+        # althemer owns the alacritty side; run it, then read back its choice.
+        althemer; or return $status
+        set name (string match -rg 'themes/([^/"]+)\.toml' -- (cat $HOME/.config/alacritty/theme.toml 2>/dev/null | string collect))
+    else
+        echo "theme: althemer not installed - pass a name (theme -l to list)" >&2
+        return 1
+    end
+
+    if test -z "$name"; or not test -f $themes_dir/$name.toml
+        echo "theme: unknown theme '$name' (theme -l to list)" >&2
+        return 1
+    end
+
+    printf '[general]\nimport = ["%s/%s.toml"]\n' $themes_dir $name >$HOME/.config/alacritty/theme.toml
+
+    set -l ghostty_theme $HOME/.config/ghostty/themes/$name
+    if test -f $ghostty_theme
+        printf 'config-file = themes/%s\n' $name >$HOME/.config/ghostty/theme.conf
+        # no-op when ghostty isn't running; never fail the switch over it
+        pkill -USR2 -x ghostty >/dev/null 2>&1
+    else
+        echo "theme: no ghostty theme for '$name' - run scripts/gen-ghostty-themes" >&2
+    end
+
+    echo "theme: $name"
+end
+
 alias pnpm="corepack pnpm"
 
 alias mp="mkdir -p"

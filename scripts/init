@@ -77,6 +77,16 @@ import = ["${HOME}/.config/alacritty/themes/material_prism.toml"]
 EOT
 fi
 
+# ghostty's equivalent indirection. The include in ghostty's config is marked
+# optional (?), so a missing file is not fatal - this just means a fresh
+# machine starts on the same theme as alacritty rather than ghostty's default.
+# The `theme` fish function rewrites both files together from then on.
+ghostty_theme="${HOME}/.config/ghostty/theme.conf"
+if [ ! -e "$ghostty_theme" ]; then
+  mkdir -p "$(dirname "$ghostty_theme")"
+  echo "config-file = themes/material_prism" > "$ghostty_theme"
+fi
+
 # create default gitconfig file
 if [ ! -e "${HOME}/.gpg.gitconfig" ]; then
   if [[ "$platform" == "mac" ]]; then

@@ -1,0 +1,49 @@
+# Ghostty exists here for exactly one job: the dropdown (quick) terminal.
+# Alacritty stays the daily driver for full windows. Ghostty is the one of the
+# two with a native quick-terminal, and confining it to a scratch overlay keeps
+# its known multi-day-uptime port-leak crash away from long-lived agent
+# sessions.
+#
+# theme.conf is the active-theme indirection, the exact mirror of alacritty's
+# theme.toml: machine-local, gitignored, rewritten by the `theme` function in
+# fish. The `?` prefix marks the include optional - without it a missing file
+# is a HARD error, which would break a fresh machine before the first theme
+# switch. The path is relative, resolved against the directory of the real file
+# (symlinks are followed), i.e. src/.config/ghostty/ in this repo.
+#
+# Note on ordering: a config-file include is applied AFTER the entire
+# containing file regardless of where the directive appears, so the theme
+# always wins over anything set below. That is deliberate.
+config-file = ?theme.conf
+
+# Match alacritty.toml so the dropdown is visually continuous with the
+# full-size windows.
+font-family = GeistMono Nerd Font Mono
+font-size = 13
+
+# --- quick terminal ---------------------------------------------------------
+# position is macOS-restart-only, not reloadable - changing it needs a full
+# Ghostty quit, not `theme` or SIGUSR2.
+quick-terminal-position = top
+quick-terminal-size = 45%
+quick-terminal-animation-duration = 0.15
+quick-terminal-autohide = true
+# follow between Spaces rather than yanking focus back to where it was opened
+quick-terminal-space-behavior = move
+
+# `global:` needs Accessibility permission; Ghostty prompts for it on first
+# load of a global keybind (System Settings > Privacy & Security >
+# Accessibility).
+keybind = global:cmd+grave_accent=toggle_quick_terminal
+
+# --- shell ------------------------------------------------------------------
+# Its own tmux session, deliberately NOT the one the Alacritty window is on:
+# two clients attached to one session make tmux size its windows to whichever
+# client was used last, so a half-height dropdown would reflow the full-screen
+# window every time it opened. -A attaches if `scratch` exists and creates it
+# otherwise, which also means every toggle after the first skips shell startup.
+#
+# This applies to every Ghostty surface, not just the quick terminal - Ghostty
+# has no per-surface-type config condition. Harmless while Ghostty is only ever
+# the dropdown.
+command = tmux new-session -A -s scratch
