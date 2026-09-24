@@ -1,3 +1,0 @@
-[submodule "src/.config/alacritty/themes"]
-	path = src/.config/alacritty/themes
-	url = https://github.com/alacritty/alacritty-theme
