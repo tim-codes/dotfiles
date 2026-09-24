@@ -298,6 +298,7 @@ alias ll="ls -l"
 alias la="ls -la"
 alias l="ll"
 
+alias ff="fastfetch"
 alias j="just"
 alias k="kubectl"
 alias python="python3"
