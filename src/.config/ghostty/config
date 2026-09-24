@@ -43,7 +43,21 @@ quick-terminal-space-behavior = move
 # `global:` needs Accessibility permission; Ghostty prompts for it on first
 # load of a global keybind (System Settings > Privacy & Security >
 # Accessibility).
-keybind = global:cmd+grave_accent=toggle_quick_terminal
+#
+# Two triggers for one action. A bare unmodified key is deliberate - this is
+# the classic quake-console binding - but note a global bind swallows the key
+# everywhere, so § can no longer be typed in any app.
+#
+# § is written as a literal character, which binds the *translated* key: it
+# follows the keyboard layout and simply never fires on a layout that has no
+# §, which is exactly the wanted fallback behaviour on ANSI keyboards.
+keybind = global:§=toggle_quick_terminal
+#
+# For keyboards without §. grave_accent is a *physical* key name - the
+# top-left position, which is where backtick sits on ANSI layouts. On this
+# machine's British/ISO layout that same physical key is §, so here this is
+# just Opt+§; it earns its place on ANSI keyboards.
+keybind = global:opt+grave_accent=toggle_quick_terminal
 
 # --- shell ------------------------------------------------------------------
 # `command` lives in local.conf (see above) because it needs tmux's absolute
