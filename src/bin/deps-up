@@ -3,6 +3,13 @@
 $DOTFILES_ROOT/scripts/brew-update
 $DOTFILES_ROOT/scripts/cargo-update
 
+# tmux plugins. setup-macbook only ever installs these, so without this they
+# stay pinned at whatever was current the day the machine was set up. TPM's
+# update_plugins is built for the command line and needs no running server.
+if command -v tmux >/dev/null && [ -x "$HOME/.tmux/plugins/tpm/bin/update_plugins" ]; then
+  $HOME/.tmux/plugins/tpm/bin/update_plugins all
+fi
+
 # todo: this is only working from native terminal, not emulator
 # fish -c "fisher update"
 

@@ -8,3 +8,6 @@ src/bin/*
 .claude
 src/.config/alacritty/local.toml
 src/.config/alacritty/theme.toml
+src/.config/ghostty/theme.conf
+src/.config/ghostty/local.conf
+src/.config/tmux/theme.conf

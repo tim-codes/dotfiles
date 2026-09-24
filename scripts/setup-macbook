@@ -157,11 +157,32 @@ if [[ "$alacritty_current" != "$ALACRITTY_VERSION" ]] \
   rm -rf "$(dirname "$alacritty_build_dir")"
 fi
 
+# Ghostty sets TERM=xterm-ghostty, which is not in the system terminfo db, so
+# tmux and ssh inside it fail with "missing or unsuitable terminal" until this
+# is installed. Ghostty ships a precompiled terminfo tree (unlike alacritty's
+# source .info above, which needs tic), so this is a copy into the same
+# ~/.terminfo that the alacritty entry lands in.
+if [[ -d /Applications/Ghostty.app/Contents/Resources/terminfo ]] \
+  && ! infocmp -1 xterm-ghostty >/dev/null 2>&1; then
+  mkdir -p "$HOME/.terminfo"
+  cp -R /Applications/Ghostty.app/Contents/Resources/terminfo/. "$HOME/.terminfo/"
+fi
+
 # install tmux plugin manager + plugins from .tmux.conf
 if [[ ! -d $HOME/.tmux/plugins/tpm ]]; then
-  git clone https://github.com/tmux-plugins/tpm $HOME/.tmux/plugins/tpm
+  git clone git@github.com:tmux-plugins/tpm $HOME/.tmux/plugins/tpm
 fi
 $HOME/.tmux/plugins/tpm/bin/install_plugins
+
+# tmux-agent-sidebar is a rust binary, and its .tmux entry script pops an
+# interactive install wizard when the binary is missing - which also means it
+# binds nothing that session. Build it up front instead. Built from source
+# rather than taking the release binary, same call as alacritty above.
+sidebar_dir="$HOME/.tmux/plugins/tmux-agent-sidebar"
+if [[ -f "$sidebar_dir/Cargo.toml" && ! -x "$sidebar_dir/target/release/tmux-agent-sidebar" ]] \
+  && command -v cargo >/dev/null; then
+  cargo build --release --manifest-path "$sidebar_dir/Cargo.toml"
+fi
 
 # override system bash
 #rm /bin/bash

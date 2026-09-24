@@ -123,6 +123,11 @@ brewCasks=(
   "betterdisplay:BetterDisplay.app"
   "firefox:Firefox.app"
   "gcloud-cli"
+  # dropdown/quick terminal only — Alacritty stays the daily driver. Ghostty is
+  # the one of the two with a native quick-terminal, and keeping it off the
+  # long-lived sessions sidesteps its known port-leak crash on multi-day uptime.
+  # Themes are generated from the Alacritty ones by scripts/gen-ghostty-themes.
+  "ghostty:Ghostty.app"
   "iterm2:iTerm.app"
   # headless docx/report rendering verification (soffice --convert-to pdf)
   "libreoffice:LibreOffice.app"

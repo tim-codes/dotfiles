@@ -1,0 +1,223 @@
+#!/bin/bash
+# Render the Alacritty theme files into the formats Ghostty and tmux need, so
+# one set of themes drives all three.
+#
+# Alacritty is the daily driver, Ghostty is the dropdown, and tmux draws the
+# status line inside both. They share no config language at all — TOML tables,
+# flat key=value, and tmux set-option respectively — so colours cannot be
+# shared by a symlink or an import. This script is the bridge.
+#
+# Why generate at build time rather than convert on each theme switch:
+#
+#   1. The output is committed, so a bad mapping shows up as a reviewable diff
+#      in a PR instead of appearing at runtime on some later theme switch.
+#   2. Switching themes then costs one small file write per target (the
+#      indirection files), with no parsing and no dependency on python at the
+#      moment you press the key.
+#   3. `--check` gives a cheap drift gate: if someone edits a theme under
+#      src/.config/alacritty/themes/ and forgets to regenerate, it is caught.
+#
+# The Alacritty themes are not uniform: all of them carry [colors.primary],
+# [colors.normal] and [colors.bright], but only some carry [colors.cursor] and
+# [colors.selection], and only catppuccin_mocha carries [colors.dim] (which has
+# no equivalent in either target and is dropped). Anything absent is simply not
+# emitted, leaving the target on its own default rather than an empty value.
+#
+# The tmux output sets catppuccin's own @thm_* palette variables. Catppuccin's
+# flavour files use `set -ogq`, where -o means "do not set if already set", so
+# sourcing our values BEFORE the plugin loads makes catppuccin render its whole
+# module system in the active theme's colours without being forked or replaced.
+# Catppuccin names 14 hues plus a 12-step neutral ramp; an ANSI palette gives
+# 16 colours and no ramp, so the hues are mapped by family and the ramp is
+# interpolated between background and foreground.
+#
+# Usage:
+#   scripts/gen-terminal-themes           regenerate all themes
+#   scripts/gen-terminal-themes --check   exit 1 if any output is stale
+#
+# Needs `python3` (3.11+, for tomllib). Uses `ghostty +validate-config` to check
+# each generated Ghostty file when Ghostty is installed, and skips that step
+# when not.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SRC_DIR="$REPO_ROOT/src/.config/alacritty/themes"
+GHOSTTY_DIR="$REPO_ROOT/src/.config/ghostty/themes"
+TMUX_DIR="$REPO_ROOT/src/.config/tmux/themes"
+GHOSTTY_BIN="/Applications/Ghostty.app/Contents/MacOS/ghostty"
+
+check_only=false
+if [[ "${1:-}" == "--check" ]]; then
+  check_only=true
+elif [[ $# -gt 0 ]]; then
+  printf 'unknown argument: %s\n' "$1" >&2
+  exit 2
+fi
+
+[[ -d "$SRC_DIR" ]] || { printf 'no %s\n' "$SRC_DIR" >&2; exit 1; }
+command -v python3 >/dev/null || { printf 'python3 is required\n' >&2; exit 1; }
+
+render() {
+  # $1 = source .toml path, $2 = "ghostty" | "tmux". Writes to stdout.
+  python3 - "$1" "$2" <<'PY'
+import pathlib, sys, tomllib
+
+ORDER = ("black", "red", "green", "yellow", "blue", "magenta", "cyan", "white")
+
+src, target = pathlib.Path(sys.argv[1]), sys.argv[2]
+colors = tomllib.loads(src.read_text()).get("colors", {})
+
+
+def get(table, field):
+    return colors.get(table, {}).get(field)
+
+
+def ansi(shade, name):
+    """bright.* falls back to normal.* so a theme without a bright block still maps."""
+    return get(shade, name) or get("normal", name)
+
+
+header = [
+    f"# Generated from {src.name} by scripts/gen-terminal-themes - do not edit.",
+    "# Edit the Alacritty theme and regenerate; all terminals share one source.",
+]
+
+if target == "ghostty":
+    out = list(header)
+
+    def emit(key, table, field):
+        value = get(table, field)
+        if value:
+            out.append(f"{key} = {value}")
+
+    emit("background", "primary", "background")
+    emit("foreground", "primary", "foreground")
+    emit("cursor-color", "cursor", "cursor")
+    emit("cursor-text", "cursor", "text")
+    emit("selection-background", "selection", "background")
+    emit("selection-foreground", "selection", "text")
+
+    for table, offset in (("normal", 0), ("bright", 8)):
+        group = colors.get(table, {})
+        for index, name in enumerate(ORDER):
+            if name in group:
+                out.append(f"palette = {index + offset}={group[name]}")
+
+    if not any(line.startswith("palette") for line in out):
+        sys.exit(f"{src.name}: no [colors.normal]/[colors.bright] palette found")
+
+    print("\n".join(out))
+    raise SystemExit(0)
+
+# --- tmux -------------------------------------------------------------------
+bg, fg = get("primary", "background"), get("primary", "foreground")
+if not bg or not fg:
+    sys.exit(f"{src.name}: [colors.primary] needs both background and foreground")
+
+
+def rgb(value):
+    v = value.lstrip("#")
+    return tuple(int(v[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def mix(a, b, t):
+    """Blend two hex colours; t=0 returns a, t=1 returns b."""
+    ca, cb = rgb(a), rgb(b)
+    return "#" + "".join(f"{round(x + (y - x) * t):02x}" for x, y in zip(ca, cb))
+
+
+# 14 named hues, mapped by colour family onto the ANSI palette.
+hues = {
+    "rosewater": ansi("bright", "white"),
+    "flamingo": ansi("normal", "white"),
+    "pink": ansi("bright", "magenta"),
+    "mauve": ansi("normal", "magenta"),
+    "red": ansi("normal", "red"),
+    "maroon": ansi("bright", "red"),
+    "peach": ansi("bright", "yellow"),
+    "yellow": ansi("normal", "yellow"),
+    "green": ansi("normal", "green"),
+    "teal": ansi("bright", "green"),
+    "sky": ansi("bright", "cyan"),
+    "sapphire": ansi("normal", "cyan"),
+    "blue": ansi("normal", "blue"),
+    "lavender": ansi("bright", "blue"),
+}
+
+# The neutral ramp has no ANSI equivalent, so interpolate it: crust/mantle sit
+# below the background, surface/overlay/subtext climb towards the foreground.
+ramp = {
+    "crust": mix(bg, "#000000", 0.30),
+    "mantle": mix(bg, "#000000", 0.15),
+    "surface_0": mix(bg, fg, 0.10),
+    "surface_1": mix(bg, fg, 0.18),
+    "surface_2": mix(bg, fg, 0.26),
+    "overlay_0": mix(bg, fg, 0.36),
+    "overlay_1": mix(bg, fg, 0.46),
+    "overlay_2": mix(bg, fg, 0.56),
+    "subtext_0": mix(bg, fg, 0.72),
+    "subtext_1": mix(bg, fg, 0.86),
+}
+
+out = list(header)
+out.append("")
+out.append("# Plain `set -g` (not catppuccin's `set -ogq`) so these still win")
+out.append("# when the config is re-sourced after a theme switch.")
+out.append(f'set -g @thm_bg "{bg}"')
+out.append(f'set -g @thm_fg "{fg}"')
+for name, value in list(hues.items()) + list(ramp.items()):
+    out.append(f'set -g @thm_{name} "{value}"')
+
+print("\n".join(out))
+PY
+}
+
+mkdir -p "$GHOSTTY_DIR" "$TMUX_DIR"
+
+stale=()
+generated=0
+
+for theme in "$SRC_DIR"/*.toml; do
+  name="$(basename "$theme" .toml)"
+
+  for target in ghostty tmux; do
+    if [[ "$target" == ghostty ]]; then
+      dest="$GHOSTTY_DIR/$name"
+    else
+      dest="$TMUX_DIR/$name.conf"
+    fi
+
+    rendered="$(render "$theme" "$target")"
+
+    if $check_only; then
+      if [[ ! -f "$dest" ]] || [[ "$rendered" != "$(cat "$dest")" ]]; then
+        stale+=("$target/$name")
+      fi
+      continue
+    fi
+
+    printf '%s\n' "$rendered" > "$dest"
+    generated=$((generated + 1))
+
+    # Catch a malformed mapping here rather than on the next theme switch.
+    if [[ "$target" == ghostty && -x "$GHOSTTY_BIN" ]]; then
+      if ! "$GHOSTTY_BIN" +validate-config --config-file="$dest" >/dev/null 2>&1; then
+        printf 'ghostty rejected generated theme: %s\n' "$dest" >&2
+        exit 1
+      fi
+    fi
+  done
+done
+
+if $check_only; then
+  if [[ ${#stale[@]} -gt 0 ]]; then
+    printf 'stale generated themes: %s\n' "${stale[*]}" >&2
+    printf 'run scripts/gen-terminal-themes to regenerate\n' >&2
+    exit 1
+  fi
+  printf 'terminal themes up to date\n'
+  exit 0
+fi
+
+printf 'generated %d theme files across ghostty and tmux\n' "$generated"
