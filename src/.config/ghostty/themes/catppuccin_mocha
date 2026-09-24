@@ -1,5 +1,5 @@
-# Generated from catppuccin_mocha.toml by scripts/gen-ghostty-themes - do not edit.
-# Edit the Alacritty theme and regenerate; both terminals share one source.
+# Generated from catppuccin_mocha.toml by scripts/gen-terminal-themes - do not edit.
+# Edit the Alacritty theme and regenerate; all terminals share one source.
 background = #1E1E2E
 foreground = #CDD6F4
 cursor-color = #F5E0DC

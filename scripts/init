@@ -87,6 +87,14 @@ if [ ! -e "$ghostty_theme" ]; then
   echo "config-file = themes/material_prism" > "$ghostty_theme"
 fi
 
+# and tmux's. Sourced with -q from .tmux.conf above the tpm line, so a missing
+# file is silent and catppuccin just renders its own mocha palette instead.
+tmux_theme="${HOME}/.config/tmux/theme.conf"
+if [ ! -e "$tmux_theme" ]; then
+  mkdir -p "$(dirname "$tmux_theme")"
+  echo "source-file ~/.config/tmux/themes/material_prism.conf" > "$tmux_theme"
+fi
+
 # create default gitconfig file
 if [ ! -e "${HOME}/.gpg.gitconfig" ]; then
   if [[ "$platform" == "mac" ]]; then

@@ -1,5 +1,5 @@
-# Generated from tokyo_night_darker.toml by scripts/gen-ghostty-themes - do not edit.
-# Edit the Alacritty theme and regenerate; both terminals share one source.
+# Generated from tokyo_night_darker.toml by scripts/gen-terminal-themes - do not edit.
+# Edit the Alacritty theme and regenerate; all terminals share one source.
 background = #0d0e13
 foreground = #a9b1d6
 palette = 0=#32344a

@@ -264,13 +264,25 @@ function theme -d "Switch the terminal theme (alacritty + ghostty)"
 
     printf '[general]\nimport = ["%s/%s.toml"]\n' $themes_dir $name >$HOME/.config/alacritty/theme.toml
 
-    set -l ghostty_theme $HOME/.config/ghostty/themes/$name
-    if test -f $ghostty_theme
+    if test -f $HOME/.config/ghostty/themes/$name
         printf 'config-file = themes/%s\n' $name >$HOME/.config/ghostty/theme.conf
         # no-op when ghostty isn't running; never fail the switch over it
         pkill -USR2 -x ghostty >/dev/null 2>&1
     else
-        echo "theme: no ghostty theme for '$name' - run scripts/gen-ghostty-themes" >&2
+        echo "theme: no ghostty theme for '$name' - run scripts/gen-terminal-themes" >&2
+    end
+
+    if test -f $HOME/.config/tmux/themes/$name.conf
+        printf 'source-file ~/.config/tmux/themes/%s.conf\n' $name >$HOME/.config/tmux/theme.conf
+        # Re-source the whole config rather than just the theme: catppuccin
+        # bakes the @thm_* palette into its module format strings when it
+        # loads, so the plugins have to run again for the status line to
+        # actually repaint.
+        if tmux has-session 2>/dev/null
+            tmux source-file $HOME/.tmux.conf >/dev/null 2>&1
+        end
+    else
+        echo "theme: no tmux theme for '$name' - run scripts/gen-terminal-themes" >&2
     end
 
     echo "theme: $name"
