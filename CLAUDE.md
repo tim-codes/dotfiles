@@ -10,7 +10,7 @@ This is a personal dotfiles repository for macOS and Linux development environme
 
 ### Initial Setup
 - `scripts/bootstrap` - Fresh-machine bootstrap (curl-able from main): Xcode CLT, 1Password SSH agent config, clone to ~/dev/dotfiles, then runs init
-- `~/dev/dotfiles/scripts/init` - Complete initial setup (creates configs, installs dependencies)
+- `~/dev/dotfiles/scripts/init` - Complete setup, safe to re-run on an existing machine: generated machine-local files (alacritty `local.toml`, ghostty `local.conf`, theme indirection) are re-rendered and converge (hand-edited ones like `local.sh` are create-once); ends with `claude-contexts` + `claude-sync`
 - `~/dev/dotfiles/scripts/setup-macbook` - macOS-specific setup
 - `~/dev/dotfiles/scripts/setup-linux` - Linux-specific setup
 
@@ -20,6 +20,7 @@ This is a personal dotfiles repository for macOS and Linux development environme
 - `~/dev/dotfiles/scripts/cargo-update` - Update Rust packages
 - `~/dev/dotfiles/scripts/firefox-prefs` - Link codified Firefox prefs into each installation's active profile (only needed for a new profile/machine; the link means repo edits apply on Firefox restart)
 - `restow` - Update symlinks after adding new files to src/
+- `~/dev/dotfiles/scripts/tmux-plugins [--update]` - Converge tmux plugins on `.tmux.conf` (install missing, remove dropped, build tmux-agent-sidebar); called by setup-macbook and deps-up
 
 ### Development
 - No build/compile step required - this is a configuration repository
