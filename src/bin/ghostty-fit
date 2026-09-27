@@ -18,6 +18,11 @@
 # Accessibility permission - Ghostty already has it for its global hotkey.
 set -euo pipefail
 
+if [[ "$(uname)" != "Darwin" ]]; then
+  echo "ghostty-fit: macOS only (moves the window via System Events)" >&2
+  exit 1
+fi
+
 gutter="${1:-48}"
 max_width="${2:-1440}"
 

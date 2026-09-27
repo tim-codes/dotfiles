@@ -73,6 +73,10 @@ keybind = global:§=toggle_quick_terminal
 # just Opt+§; it earns its place on ANSI keyboards.
 keybind = global:opt+grave_accent=toggle_quick_terminal
 
+# tmux prefix on Cmd+. : tmux can't see Cmd, so send its real prefix, C-a.
+# Same binding and reasoning in alacritty.toml (on Linux, super is Super).
+keybind = super+period=text:\x01
+
 # --- shell ------------------------------------------------------------------
 # `command` lives in local.conf (see above) because it needs tmux's absolute
 # path. It starts tmux in its own session, deliberately NOT the one the

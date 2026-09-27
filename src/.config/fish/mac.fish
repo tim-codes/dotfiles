@@ -61,3 +61,7 @@ source ~/.orbstack/shell/init2.fish 2>/dev/null || :
 for f in $HOME/dev/homelab/projects/*/files/fish/*.fish
   test -f $f; and source $f
 end
+
+# fit the Ghostty quick terminal to its current screen (run from inside it).
+# mac-only: ghostty-fit drives the window through System Events.
+alias gz="ghostty-fit"
