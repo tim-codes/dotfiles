@@ -1,0 +1,50 @@
+#!/bin/sh
+# Toggle the agent sidebar across every window of the CURRENT tmux session.
+#
+# tmux-agent-sidebar binds prefix+E to its own `toggle-all`, which enumerates
+# panes with `list-panes -a` - every pane on the server, by definition. That
+# reaches into the scratch session behind the ghostty dropdown, where a sidebar
+# in a half-height window is just noise. This is the same idea scoped with
+# `list-panes -s` instead, so it only ever touches the session you are in.
+#
+# Mirrors the plugin's own logic: if any sidebar is open in this session, close
+# them all; otherwise open one in every window of it.
+#
+# Bound to prefix+E in src/.tmux.conf, replacing the plugin's binding.
+
+set -eu
+
+bin="$(tmux show-options -gv @agent_sidebar_bin 2>/dev/null || true)"
+if [ -z "$bin" ] || [ ! -x "$bin" ]; then
+  exit 0
+fi
+
+# The session is passed in by the keybinding, expanded by tmux from the client
+# that pressed it. Do not fall back to `display-message` without a target: that
+# resolves to whatever tmux considers current, which is not necessarily the
+# session the key was pressed in.
+session="${1:-}"
+if [ -z "$session" ]; then
+  echo "usage: tmux-sidebar-session <session-name>" >&2
+  exit 2
+fi
+
+# @pane_role is the marker the plugin sets on a sidebar pane.
+if tmux list-panes -s -t "$session" -F '#{@pane_role}' | grep -qx sidebar; then
+  # A plain `[ ... ] && cmd` here would end the script under `set -e` the first
+  # time a pane is not a sidebar, because the failed test is the body's last
+  # command. Hence the explicit if.
+  tmux list-panes -s -t "$session" -F '#{pane_id} #{@pane_role}' |
+    while read -r pane role; do
+      if [ "$role" = sidebar ]; then
+        tmux kill-pane -t "$pane"
+      fi
+    done
+else
+  # One sidebar per window, so collapse the pane list to unique window ids.
+  tmux list-panes -s -t "$session" -F '#{window_id} #{pane_current_path}' |
+    awk '!seen[$1]++' |
+    while read -r window path; do
+      "$bin" toggle --create-only "$window" "$path"
+    done
+fi

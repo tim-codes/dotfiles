@@ -288,6 +288,13 @@ function theme -d "Switch the terminal theme (alacritty + ghostty)"
     echo "theme: $name"
 end
 
+# Terminal keymap cheatsheet in the pager - tmux bindings, alacritty, and the
+# ghostty dropdown, as actually configured here rather than tmux's defaults.
+# Rendered through md, so it picks mdcat for the tables like any other doc.
+function th -d "Terminal and tmux keymap cheatsheet"
+    md $HOME/.config/tmux/cheatsheet.md
+end
+
 alias pnpm="corepack pnpm"
 
 alias mp="mkdir -p"
