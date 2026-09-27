@@ -54,6 +54,13 @@ quick-terminal-space-behavior = move
 # documents this as intended for exactly this use. Caveat from the same docs:
 # while hidden, macOS no longer switches keyboard layout automatically.
 macos-hidden = always
+# ...and never create a normal window by itself: none at launch (the quick
+# terminal is created on first toggle), none restored after a restart. One
+# path can't be configured away - activating the already-running app with no
+# windows open (`open -a Ghostty`, Spotlight) makes Ghostty open a new window
+# unconditionally (applicationShouldHandleReopen) - so go in through the hotkey.
+initial-window = false
+window-save-state = never
 
 # `global:` needs Accessibility permission; Ghostty prompts for it on first
 # load of a global keybind (System Settings > Privacy & Security >

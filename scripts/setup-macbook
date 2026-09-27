@@ -179,7 +179,9 @@ if [[ -d /Applications/Ghostty.app ]]; then
   if ! osascript -e 'tell application "System Events" to get name of login items' 2>/dev/null | grep -q Ghostty; then
     osascript -e 'tell application "System Events" to make login item at end with properties {path:"/Applications/Ghostty.app", hidden:true}'
   fi
-  open -a Ghostty
+  # Only when not already running: activating a running Ghostty that has no
+  # windows makes it open a normal window, which every re-run of init would do.
+  pgrep -xq ghostty || open -a Ghostty
 fi
 
 # tpm + exactly the plugins .tmux.conf declares (installs missing, removes
