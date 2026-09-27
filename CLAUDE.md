@@ -10,6 +10,7 @@ This is a personal dotfiles repository for macOS and Linux development environme
 
 ### Initial Setup
 - `scripts/bootstrap` - Fresh-machine bootstrap (curl-able from main): Xcode CLT, 1Password SSH agent config, clone to ~/dev/dotfiles, then runs init
+- `~/dev/dotfiles/scripts/ssh-prereq` - Prerequisite, run first by bootstrap and init: routes ssh through the 1Password agent and verifies GitHub SSH auth (all clones are SSH-only). Manual part: 1Password installed, signed in, SSH agent enabled
 - `~/dev/dotfiles/scripts/init` - Complete setup, safe to re-run on an existing machine: generated machine-local files (alacritty `local.toml`, ghostty `local.conf`, theme indirection) are re-rendered and converge (hand-edited ones like `local.sh` are create-once); ends with `claude-contexts` + `claude-sync`
 - `~/dev/dotfiles/scripts/setup-macbook` - macOS-specific setup
 - `~/dev/dotfiles/scripts/setup-linux` - Linux-specific setup

@@ -4,6 +4,10 @@ local_root="${HOME}/.config/local.sh"
 local_fish="${HOME}/.config/fish/local.fish"
 dotfiles_root="${HOME}/dev/dotfiles"
 
+# 1Password SSH agent + GitHub SSH auth, before anything else: every clone
+# below (and in setup-macbook/cargo-update) is SSH-only
+"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ssh-prereq" || exit 1
+
 platform="linux"
 if [[ "$(uname)" == "Darwin" ]]; then
   platform="mac"

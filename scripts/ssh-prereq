@@ -1,0 +1,77 @@
+#!/bin/bash
+# Prerequisite for everything else in setup: git over SSH to GitHub through
+# the 1Password SSH agent. Every clone these scripts make is SSH-only (the
+# dotfiles repo, tpm and its plugins, alacritty, powerline fonts, cargo git
+# deps), so this runs FIRST - from bootstrap before the clone, and from init
+# before any package install - and stops setup with instructions when it is
+# not ready, instead of failing halfway through brew or cargo. Idempotent.
+#
+# Manual prereq, cannot be scripted: 1Password installed and signed in, with
+# Settings -> Developer:
+#   - "Use the SSH Agent" enabled
+#   - "Integrate with 1Password CLI" enabled
+#   - "Generate SSH config file with bookmarked hosts" enabled (optional)
+set -euo pipefail
+
+if [[ "$(uname)" == "Darwin" ]]; then
+  op_sock="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+else
+  op_sock="$HOME/.1password/agent.sock"
+fi
+op_ssh_config="$HOME/.ssh/1Password/config"
+
+mkdir -p "$HOME/.ssh"
+chmod 700 "$HOME/.ssh"
+touch "$HOME/.ssh/config"
+chmod 600 "$HOME/.ssh/config"
+
+# What ssh will actually use for github.com, after Includes, Host matching and
+# ~ expansion - a textual grep for the socket path misses an equivalent
+# "~/Library/..." spelling and appends a duplicate block.
+effective_agent="$(ssh -G github.com 2>/dev/null </dev/null | sed -n 's/^identityagent //p')"
+
+if [[ -S "$op_sock" && "$effective_agent" == "$op_sock" ]]; then
+  : # already routed through the 1Password agent
+elif [[ -S "$op_sock" ]]; then
+  if [[ -f "$op_ssh_config" ]]; then
+    # 1Password generates this file when "Generate SSH config file" is
+    # enabled; the Include must come before any Host blocks to apply globally
+    if ! grep -qF "Include ~/.ssh/1Password/config" "$HOME/.ssh/config"; then
+      printf 'Include ~/.ssh/1Password/config\n\n%s' "$(cat "$HOME/.ssh/config")" > "$HOME/.ssh/config.tmp"
+      mv "$HOME/.ssh/config.tmp" "$HOME/.ssh/config"
+      echo "ssh-prereq: added Include for 1Password-generated ssh config"
+    fi
+  else
+    cat <<EOT >> "$HOME/.ssh/config"
+
+Host *
+  IdentityAgent "$op_sock"
+EOT
+    echo "ssh-prereq: added IdentityAgent block for 1Password agent"
+  fi
+elif [[ "$(uname)" == "Darwin" ]]; then
+  echo "ssh-prereq: 1Password SSH agent socket not found at:" >&2
+  echo "  $op_sock" >&2
+  echo "Install 1Password, sign in, enable Settings -> Developer -> 'Use the SSH Agent', then re-run." >&2
+  exit 1
+fi
+# (linux without the socket - WSL, or an agent forwarded over ssh - falls
+# through to the auth check below, which is the real requirement)
+
+# pre-seed github's host key so no clone ever stops at a host-key prompt
+touch "$HOME/.ssh/known_hosts"
+if ! grep -q "^github.com" "$HOME/.ssh/known_hosts"; then
+  ssh-keyscan github.com >> "$HOME/.ssh/known_hosts" 2>/dev/null
+fi
+
+# The check that matters. May raise a 1Password approval prompt - which is
+# the point: answer it once here, not in the middle of an install.
+# `ssh -T` to github exits 1 even on success, so match the greeting instead.
+out="$(ssh -T -o ConnectTimeout=15 git@github.com 2>&1 || true)"
+if ! grep -q "successfully authenticated" <<<"$out"; then
+  echo "ssh-prereq: SSH auth to github.com failed:" >&2
+  echo "  $out" >&2
+  echo "Check the 1Password SSH agent holds a key registered with GitHub, then re-run." >&2
+  exit 1
+fi
+echo "ssh-prereq: github.com SSH auth OK"
