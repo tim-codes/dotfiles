@@ -30,6 +30,16 @@ fields, so they're inspectable but not cleanly resumable — this skill's
 relocate-and-rewrite remains the proper closedown; the hook only makes
 forgetting it non-fatal.
 
+**With worktrunk, prefer `wt remove <branch>` (or `wt merge`).** Its
+pre-remove hook (`src/.config/worktrunk/config.toml` in dotfiles) runs
+`worktree-relocate-transcripts`, which is steps 1-3 below scripted across
+every context dir, and blocks the removal if it fails or if a claude
+session is still running in the worktree. Claude's own worktrees go the same
+way via the worktrunk plugin's WorktreeRemove hook. The manual procedure
+below remains for repos/machines without worktrunk, for recovering an
+already-removed worktree, and for the Desktop caveat (step 4), which the
+script only reports.
+
 ## Procedure
 
 Definitions: `W` = absolute worktree path, `P` = absolute primary checkout

@@ -93,12 +93,14 @@ out a different branch in the primary checkout and every one of those live
 files changes content immediately, machine-wide, including mid-edit or
 half-finished branch state — until you check back out to `main`.
 
-To edit anything, `git worktree add ../dotfiles-<branch> <branch>` (or
-`-b <branch>` for a new one) and do the work there instead. The primary
+To edit anything, `wt switch --create <branch>` (worktrunk, config in
+`src/.config/worktrunk/config.toml`) or equivalently `git worktree add
+../dotfiles-<branch> -b <branch>`, and do the work there instead. The primary
 checkout stays parked on `main`, so the symlinks keep resolving to `main`'s
 content for the whole time a branch is being worked on, and the worktree
-branches, commits, pushes and gets removed (`git worktree remove`)
-independently of it.
+branches, commits, pushes and gets removed independently of it. Remove it with `wt remove <branch>`: worktrunk's pre-remove
+hook relocates the Claude transcripts of sessions that ran there first
+(see the worktree-closedown skill) - never a bare `git worktree remove`.
 
 ## Important Notes
 
