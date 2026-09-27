@@ -145,6 +145,16 @@ is_shared() {
     shared_skills | grep -qx "$1"
 }
 
+# Entries Claude Code itself writes into <context>/skills. Never adopted,
+# linked or pruned. synced/ is its per-ACCOUNT cache of claude.ai account
+# skills (manifest.json + a bucket dir, refreshed by Claude Code), so
+# adopting exxo's copy would move work-account state into the repo. The
+# personal context's copy lands in files/claude/skills/synced/ through the
+# whole-dir symlink and is gitignored.
+is_cc_managed() {
+    [ "$1" = "synced" ]
+}
+
 # Concatenate CLAUDE.md.shared with the optional CLAUDE.md.<account>
 # fragment into $1. The fragment is optional — absence just means this
 # account has no account-only instructions yet.
@@ -404,6 +414,7 @@ sync_skills_curated() {
         # broken link must still hit this loop body to get pruned below.
         [ -e "$entry" ] || [ -L "$entry" ] || continue
         name="$(basename "$entry")"
+        is_cc_managed "$name" && continue
         if [ -L "$entry" ]; then
             target="$(readlink "$entry")"
             if ! is_shared "$name" || [ ! -e "$entry" ] || [ "$target" != "$SRC_SKILLS/$name" ]; then
@@ -424,6 +435,7 @@ sync_skills_curated() {
     local linked=0 personal_only=0 skill_path skill
     for skill_path in "$SRC_SKILLS"/*/; do
         skill="$(basename "$skill_path")"
+        is_cc_managed "$skill" && continue
         if ! is_shared "$skill"; then
             personal_only=$((personal_only + 1))
             continue
