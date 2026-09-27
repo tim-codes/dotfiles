@@ -209,8 +209,8 @@ picker and the periodic transcript cleanup then deletes them for good.
 
 ## Orchestrator/subagent model policy
 
-Sessions run Fable at medium effort as the orchestrator — that's the pinned
-baseline (`model: fable`, `effortLevel: medium`), not something to restate
+Sessions run Opus at medium effort as the orchestrator — that's the pinned
+baseline (`model: opus`, `effortLevel: medium`), not something to restate
 per session. Delegate by default; inline is the exception. Before running
 any multi-step task inline, apply two tests:
 
@@ -233,8 +233,8 @@ stated reason:
 - `sonnet` and `opus` are both ordinary choices. Match the model to the
   task: how complex or multi-step the brief is, how design-sensitive the
   edit, how much precise instruction-following matters.
-- omit `model` (inherit Fable) — rare; only when the subtask needs frontier
-  judgment end-to-end, and say why.
+- `fable` — rare; only when the subtask needs frontier judgment end-to-end,
+  and say why. (Omitting `model` inherits the orchestrator's Opus.)
 
 On every launch, announce a numbered roster — **task** (agent type) —
 **model**, with a one-line brief per agent — so delegation and model

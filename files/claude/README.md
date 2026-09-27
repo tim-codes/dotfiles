@@ -164,15 +164,15 @@ pickers are per user-data dir; resume across the two profiles via the CLI.
 
 ## Changing model / effort — use the flags, not the slash commands
 
-The baseline pins `model: fable` and `effortLevel: medium` — the orchestrator tier; subagents get cheaper models per the CLAUDE.md.shared orchestrator/subagent policy. Both are *defaults
+The baseline pins `model: opus` (the alias tracks the current Opus, 5.5 as of 2026-09-27; previously `fable`) and `effortLevel: medium` — the orchestrator tier; subagents get models per the CLAUDE.md.shared orchestrator/subagent policy. Both are *defaults
 read at session start*, and there are two ways to change them for a session —
 only one of which leaves the file alone:
 
 | Do this | Effect |
 |---|---|
-| `claude --model fable --effort medium` | session only, **file untouched** |
+| `claude --model opus --effort medium` | session only, **file untouched** |
 | `/model` picker → `s` | session only, **file untouched** |
-| `/model fable` typed directly | **writes** `model` as your new default |
+| `/model opus` typed directly | **writes** `model` as your new default |
 | `/model` picker → `Enter` | **writes** `model` as your new default |
 | `/effort medium` in an interactive session | **writes** `effortLevel` |
 
