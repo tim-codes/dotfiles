@@ -37,7 +37,7 @@ function run(argv) {
   const procs = se.processes.whose({ bundleIdentifier: "com.mitchellh.ghostty" });
   if (procs.length === 0) throw new Error("Ghostty is not running");
   const wins = procs[0].windows;
-  // Ghostty is dropdown-only (macos-hidden), so its only window is the quick
+  // Ghostty is dropdown-only (initial-window = false), so its only window is the quick
   // terminal; a hidden quick terminal has no window at all.
   if (wins.length === 0) throw new Error("no Ghostty window - open the quick terminal first");
   const win = wins[0];

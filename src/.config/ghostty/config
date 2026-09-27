@@ -50,11 +50,14 @@ quick-terminal-autohide = false
 # follow between Spaces rather than yanking focus back to where it was opened
 quick-terminal-space-behavior = move
 
-# Dropdown-only, so keep it out of the dock and the app switcher. Ghostty
-# documents this as intended for exactly this use. Caveat from the same docs:
-# while hidden, macOS no longer switches keyboard layout automatically.
-macos-hidden = always
-# ...and never create a normal window by itself: none at launch (the quick
+# Visible in the dock and app switcher, on trial. `always` (hidden) is what
+# Ghostty suggests for dropdown-only use, but combined with autohide = false it
+# stranded the dropdown: Cmd+Tab away and there is no way to Cmd+Tab back, and
+# the hotkey's first press then hides the still-open (just unfocused) window,
+# so it takes two presses to return. 1.3.1 has no "focus if open" action.
+# Showing the app lets Cmd+Tab reach the open dropdown.
+macos-hidden = never
+# Never create a normal window by itself: none at launch (the quick
 # terminal is created on first toggle), none restored after a restart. One
 # path can't be configured away - activating the already-running app with no
 # windows open (`open -a Ghostty`, Spotlight) makes Ghostty open a new window
