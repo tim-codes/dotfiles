@@ -101,6 +101,14 @@ homelab credential guidance. In the Exxo context, the plugin's
 `exxo-common:run-with-secrets` is the only one. To make a repo skill
 cross-account, add its name to `shared_skills()`.
 
+Claude Code also writes into each context's skills dir itself: `synced/` is its
+per-account cache of claude.ai account skills (the `anthropic-skills:*` set —
+`manifest.json` plus a bucket dir, first seen 2026-09-27). In personal it lands
+in `files/claude/skills/synced/` through the symlink and is gitignored; in the
+curated contexts `claude-sync` skips it (`is_cc_managed()`) rather than
+adopting it, which would have moved exxo account state into the repo. Account
+skills are managed on claude.ai, never vendored here.
+
 Contexts are created by `scripts/claude-contexts`; the `claude`,
 `claude-personal`, `claude-exxo` and `claude-exxo-personal` shell wrappers
 select them via `CLAUDE_CONFIG_DIR` (see `src/.config/fish/common.fish`,
@@ -164,15 +172,15 @@ pickers are per user-data dir; resume across the two profiles via the CLI.
 
 ## Changing model / effort — use the flags, not the slash commands
 
-The baseline pins `model: fable` and `effortLevel: medium` — the orchestrator tier; subagents get cheaper models per the CLAUDE.md.shared orchestrator/subagent policy. Both are *defaults
+The baseline pins `model: opus` (the alias tracks the current Opus, 5.5 as of 2026-09-27; previously `fable`) and `effortLevel: medium` — the orchestrator tier; subagents get models per the CLAUDE.md.shared orchestrator/subagent policy. Both are *defaults
 read at session start*, and there are two ways to change them for a session —
 only one of which leaves the file alone:
 
 | Do this | Effect |
 |---|---|
-| `claude --model fable --effort medium` | session only, **file untouched** |
+| `claude --model opus --effort medium` | session only, **file untouched** |
 | `/model` picker → `s` | session only, **file untouched** |
-| `/model fable` typed directly | **writes** `model` as your new default |
+| `/model opus` typed directly | **writes** `model` as your new default |
 | `/model` picker → `Enter` | **writes** `model` as your new default |
 | `/effort medium` in an interactive session | **writes** `effortLevel` |
 

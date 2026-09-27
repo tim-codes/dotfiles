@@ -39,7 +39,7 @@ fisher update
 # install powerline fonts
 # see: https://github.com/powerline/powerline
 if ! ls $HOME/Library/Fonts | grep -qi powerline
-  git clone https://github.com/powerline/fonts.git powerline-fonts \
+  git clone git@github.com:powerline/fonts.git powerline-fonts \
     && cd powerline-fonts \
     && ./install.sh \
     && cd - \
@@ -139,7 +139,7 @@ if [[ "$alacritty_current" != "$ALACRITTY_VERSION" ]] \
   || ! infocmp -1 alacritty >/dev/null 2>&1 \
   || [[ ! -L /opt/homebrew/bin/alacritty ]]; then
   alacritty_build_dir="$(mktemp -d)/alacritty"
-  git clone --depth 1 --branch "v$ALACRITTY_VERSION" https://github.com/alacritty/alacritty.git "$alacritty_build_dir"
+  git clone --depth 1 --branch "v$ALACRITTY_VERSION" git@github.com:alacritty/alacritty.git "$alacritty_build_dir"
   (
     cd "$alacritty_build_dir"
     source $HOME/.cargo/env
@@ -162,27 +162,29 @@ fi
 # is installed. Ghostty ships a precompiled terminfo tree (unlike alacritty's
 # source .info above, which needs tic), so this is a copy into the same
 # ~/.terminfo that the alacritty entry lands in.
-if [[ -d /Applications/Ghostty.app/Contents/Resources/terminfo ]] \
-  && ! infocmp -1 xterm-ghostty >/dev/null 2>&1; then
+# Copied on every run, not only when missing, so a Ghostty upgrade's terminfo
+# replaces the old one.
+if [[ -d /Applications/Ghostty.app/Contents/Resources/terminfo ]]; then
   mkdir -p "$HOME/.terminfo"
   cp -R /Applications/Ghostty.app/Contents/Resources/terminfo/. "$HOME/.terminfo/"
 fi
 
-# install tmux plugin manager + plugins from .tmux.conf
-if [[ ! -d $HOME/.tmux/plugins/tpm ]]; then
-  git clone git@github.com:tmux-plugins/tpm $HOME/.tmux/plugins/tpm
+# Ghostty is dropdown-only (global quick-terminal hotkey, hidden from the dock),
+# so it must be running for the hotkey to do anything: start it at login, the
+# same way as LinearMouse above. Launched here, after the stow near the top -
+# a first launch before the stowed config exists makes Ghostty write its own
+# template, which then silently wins. That first launch also raises the
+# Accessibility prompt the global keybind needs: TCC-protected, approve once.
+if [[ -d /Applications/Ghostty.app ]]; then
+  if ! osascript -e 'tell application "System Events" to get name of login items' 2>/dev/null | grep -q Ghostty; then
+    osascript -e 'tell application "System Events" to make login item at end with properties {path:"/Applications/Ghostty.app", hidden:true}'
+  fi
+  open -a Ghostty
 fi
-$HOME/.tmux/plugins/tpm/bin/install_plugins
 
-# tmux-agent-sidebar is a rust binary, and its .tmux entry script pops an
-# interactive install wizard when the binary is missing - which also means it
-# binds nothing that session. Build it up front instead. Built from source
-# rather than taking the release binary, same call as alacritty above.
-sidebar_dir="$HOME/.tmux/plugins/tmux-agent-sidebar"
-if [[ -f "$sidebar_dir/Cargo.toml" && ! -x "$sidebar_dir/target/release/tmux-agent-sidebar" ]] \
-  && command -v cargo >/dev/null; then
-  cargo build --release --manifest-path "$sidebar_dir/Cargo.toml"
-fi
+# tpm + exactly the plugins .tmux.conf declares (installs missing, removes
+# dropped ones, builds tmux-agent-sidebar)
+$DOTFILES_ROOT/scripts/tmux-plugins
 
 # override system bash
 #rm /bin/bash

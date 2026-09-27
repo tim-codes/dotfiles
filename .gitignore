@@ -11,4 +11,11 @@ src/.config/alacritty/local.toml
 src/.config/alacritty/theme.toml
 src/.config/ghostty/theme.conf
 src/.config/ghostty/local.conf
+# scripts/init backs up a generated file it replaces; ~/.config/<app> is a
+# stow-folded link into src/, so the backups land here
+src/.config/alacritty/local.toml.bak-*
+src/.config/ghostty/local.conf.bak-*
 src/.config/tmux/theme.conf
+# Claude Code per-account cache of claude.ai account skills, written through
+# the ~/.claude-personal/skills whole-dir symlink (see scripts/claude-sync).
+files/claude/skills/synced/

@@ -198,6 +198,15 @@ private Exxo repo, so it vendors from upstream directly. Both repos pull from
 `mantinedev/skills` and never from each other, so the copies cannot
 chain-drift.
 
+Not a delivery path you manage: Claude Code itself caches the claude.ai
+ACCOUNT skills (`anthropic-skills:*` — docx, pdf, skill-creator, …) under
+`<context>/skills/synced/` (manifest.json + a bucket dir; first seen
+2026-09-27). It is per-account and self-refreshing. In personal it appears as
+`files/claude/skills/synced/` via the whole-dir symlink and is gitignored;
+claude-sync's curated path skips it (`is_cc_managed()`) instead of adopting it
+into the repo. Never vendor, commit or hand-edit it — account skills are
+managed on claude.ai.
+
 ## What is deliberately NOT shared or synced
 
 - **Permission approvals** — per repository, in `.claude/settings.local.json`

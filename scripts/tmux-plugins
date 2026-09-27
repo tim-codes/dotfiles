@@ -1,0 +1,47 @@
+#!/bin/bash
+# Converge ~/.tmux/plugins on exactly what ~/.tmux.conf declares. Safe to run
+# any number of times, from any starting state:
+#
+#   - clones tpm if missing
+#   - installs every declared plugin that is missing
+#   - (--update) pulls every plugin to its latest
+#   - removes plugins no longer declared (e.g. tmux-yank after it was dropped)
+#   - (re)builds tmux-agent-sidebar's rust binary
+#
+# Called by setup-macbook (install) and deps-up (--update). TPM's bin/ scripts
+# are built for the command line and need no running tmux server.
+set -euo pipefail
+
+update=0
+[ "${1:-}" = "--update" ] && update=1
+
+command -v tmux >/dev/null || { echo "tmux-plugins: tmux not installed, skipping" >&2; exit 0; }
+
+plugins="$HOME/.tmux/plugins"
+tpm="$plugins/tpm"
+
+if [ ! -d "$tpm" ]; then
+  git clone git@github.com:tmux-plugins/tpm "$tpm"
+fi
+
+"$tpm/bin/install_plugins"
+if [ "$update" = 1 ]; then
+  "$tpm/bin/update_plugins" all
+fi
+"$tpm/bin/clean_plugins"
+
+# tmux-agent-sidebar is a rust binary, and its .tmux entry script pops an
+# interactive install wizard when the binary is missing - which also means it
+# binds nothing that session. Build it up front instead, from source rather
+# than the release binary (same call as alacritty in setup-macbook). Always
+# run, not only when the binary is missing: cargo is incremental, so this is a
+# no-op when current and a rebuild after update_plugins moved the source.
+sidebar="$plugins/tmux-agent-sidebar"
+if [ -f "$sidebar/Cargo.toml" ]; then
+  [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
+  if command -v cargo >/dev/null; then
+    cargo build --release --manifest-path "$sidebar/Cargo.toml"
+  else
+    echo "tmux-plugins: cargo not installed - tmux-agent-sidebar left unbuilt" >&2
+  fi
+fi
