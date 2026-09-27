@@ -7,6 +7,7 @@ src/bin/*
 !src/bin/firefox-tab-watchdog
 !src/bin/tmux-sidebar-session
 !src/bin/ghostty-fit
+!src/bin/worktree-relocate-transcripts
 .claude
 src/.config/alacritty/local.toml
 src/.config/alacritty/theme.toml

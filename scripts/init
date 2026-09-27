@@ -176,6 +176,16 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ $platform == "mac" ]; then zsh -i -c "$script_dir/setup-macbook"; fi
 if [ $platform == "linux" ]; then "$script_dir/setup-linux"; fi
 
+# worktrunk shell integration: `wt switch` has to cd the parent shell, which
+# takes a shell function. The installer writes a lazy stub (sources the full
+# integration on first use, so no startup cost) into fish's functions/ and
+# completions/ - fisher-managed dirs, not stowed. Re-run every time so the
+# stub tracks the installed worktrunk version. fish only: zsh and bash are
+# variables-and-PATH fallbacks here.
+if command -v wt >/dev/null; then
+  wt config shell install fish --yes >/dev/null
+fi
+
 # Claude Code contexts and their repo-managed config (settings, CLAUDE.md, MCP
 # servers, skills). Both are idempotent; claude-sync needs jq, which the
 # platform setup above installs.

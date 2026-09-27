@@ -1,0 +1,17 @@
+# worktrunk (wt) user config - applies to every repo. Stowed from dotfiles;
+# `wt config` edits land here too since this is a symlink into the repo.
+# Reference: wt config --help, https://worktrunk.dev/config
+
+# Sibling worktrees, ../<repo>-<branch> (slashes in the branch -> -): the
+# layout the dotfiles CLAUDE.md, the worktree-closedown skill and the
+# transcript relocation below all assume. Never nested inside the repo
+# (.claude/worktrees-style): indexers and ripgrep would see the nested tree.
+worktree-path = "{{ repo_path }}/../{{ repo }}-{{ branch | sanitize }}"
+
+# Before any worktree removal - `wt remove`, `wt merge` cleanup, and Claude's
+# own worktrees via the worktrunk plugin's WorktreeRemove hook - move the
+# Claude transcripts of sessions that ran there into the primary checkout's
+# project slug. Blocking: if it fails, the worktree stays. Values are
+# shell-escaped by worktrunk, so no quotes around the template.
+[pre-remove]
+claude-transcripts = "~/bin/worktree-relocate-transcripts {{ worktree_path }}"
