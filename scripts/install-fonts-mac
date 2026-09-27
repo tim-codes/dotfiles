@@ -18,8 +18,21 @@ if [[ -z $(ls "$assets_dir"/*.zip 2>/dev/null) ]]; then
   exit 1
 fi
 
+fonts_dir="$HOME/Library/Fonts"
+installed_any=false
+
 # Loop through each .zip file in the assets directory
 for zip_file in "$assets_dir"/*.zip; do
+  # Skip the zip without extracting when every top-level font in it is already
+  # installed (the copies below only ever look at the top level)
+  missing=false
+  for entry in ${(f)"$(unzip -Z1 "$zip_file")"}; do
+    [[ "$entry" == */* || "$entry" != *.(woff2|ttf|otf) ]] && continue
+    [[ -e "$fonts_dir/$entry" ]] || { missing=true; break; }
+  done
+  $missing || continue
+  installed_any=true
+
   echo "Extracting $(basename "$zip_file")..."
 
   # Create a temporary directory to extract the fonts
@@ -36,7 +49,6 @@ for zip_file in "$assets_dir"/*.zip; do
   fi
 
   # Install the fonts to the macOS Fonts directory
-  fonts_dir="$HOME/Library/Fonts"
   woff2_files=("$temp_dir"/*.woff2)
   ttf_files=("$temp_dir"/*.ttf)
   otf_files=("$temp_dir"/*.otf)
@@ -80,4 +92,5 @@ for zip_file in "$assets_dir"/*.zip; do
   rm -rf "$temp_dir"
 done
 
-echo "All fonts installed successfully."
+$installed_any && echo "All fonts installed successfully."
+true

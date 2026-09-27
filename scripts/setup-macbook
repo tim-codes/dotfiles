@@ -28,13 +28,18 @@ cd -
 
 cat <<EOF | fish
 
-# if ! type -q fisher
+if ! type -q fisher
   echo "Installing fisher"
   curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source \
     && fisher install jorgebucaran/fisher
-# end
-# update/install fisher_plugins from file
-fisher update
+end
+# install/remove plugins to match fish_plugins - only when the installed set
+# differs (compared case-insensitively: fisher lowercases names). Updating
+# plugins that already match is deps-up's job, not init's. (\$ because this
+# heredoc is unquoted - zsh would expand the substitutions itself.)
+if test "\$(fisher list | string lower | sort)" != "\$(string lower < ~/.config/fish/fish_plugins | string trim | sort)"
+  fisher update
+end
 
 # install powerline fonts
 # see: https://github.com/powerline/powerline
@@ -86,8 +91,12 @@ open -a LinearMouse
 # install poetry
 pipx install poetry && pipx ensurepath
 
-# install nvm
-if ! command -v nvm &> /dev/null; then
+# install nvm + node - skipped once $NODE_VERSION resolves to an installed node.
+# Checked on disk, not with `command -v nvm`: nvm is a shell function, never
+# defined in this script's shell. (Sourcing nvm.sh to ask it would break under
+# set -u.) Newer node releases are deps-up's job, not init's.
+nvm_alias="$NVM_DIR/alias/$NODE_VERSION"
+if [[ ! -s "$NVM_DIR/nvm.sh" || ! -s "$nvm_alias" || ! -d "$NVM_DIR/versions/node/$(<"$nvm_alias")" ]]; then
   PROFILE=/dev/null bash -c 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash'
   source $HOME/.nvm/nvm.sh
   nvm install $NODE_VERSION
