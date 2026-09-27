@@ -1,0 +1,130 @@
+#!/bin/bash
+# Relocate the Claude Code transcripts of sessions that ran inside a git
+# worktree into the primary checkout's project slug, so they stay listed by
+# `--resume` and survive the worktree's removal. The scripted form of the
+# worktree-closedown skill's steps 1-3 (find, move, rewrite paths).
+#
+#   worktree-relocate-transcripts [-n] <worktree-path>
+#     -n  dry run: say what would move, change nothing
+#
+# Wired as worktrunk's pre-remove hook (src/.config/worktrunk/config.toml), so
+# it runs before `wt remove` / `wt merge` delete the worktree. Unlike the
+# fail-open preserve-worktree-transcripts.sh Claude hook, this one FAILS
+# CLOSED: a non-zero exit aborts the removal, which is the point - better a
+# worktree left behind than transcripts orphaned. Escape hatch when that is
+# really wanted: `wt remove --no-hooks`.
+#
+# Differences from the skill's by-hand procedure, because this runs outside
+# any Claude session:
+# - every context dir is scanned (~/.claude and ~/.claude-*), not just the
+#   current $CLAUDE_CONFIG_DIR; contexts that share a projects/ dir by
+#   symlink (exxo-personal -> exxo) are only processed once.
+# - a transcript is matched by the cwd recorded inside it, not by slug prefix
+#   alone: slug(W)-* would also match a sibling worktree named W-something.
+# - it refuses while a claude process still has its cwd in the worktree;
+#   moving a live session's transcript out from under it breaks that session.
+#
+# Not handled (reported, not fixed): Claude Desktop's own session records,
+# which embed cwd and win on resume - see the skill's step 4. Paths over ~200
+# chars get a truncate+hash slug that is not reproduced here.
+set -euo pipefail
+
+dry=0
+if [ "${1:-}" = -n ]; then dry=1; shift; fi
+if [ $# -ne 1 ] || [ ! -d "$1" ]; then
+    echo "usage: worktree-relocate-transcripts [-n] <worktree-path>" >&2
+    exit 2
+fi
+
+W="$(git -C "$1" rev-parse --show-toplevel)"
+git_dir="$(git -C "$W" rev-parse --path-format=absolute --git-dir)"
+common_dir="$(git -C "$W" rev-parse --path-format=absolute --git-common-dir)"
+if [ "$git_dir" = "$common_dir" ]; then
+    echo "worktree-relocate-transcripts: $W is the primary checkout, nothing to do" >&2
+    exit 0
+fi
+P="$(cd "$(dirname "$common_dir")" && pwd -P)"
+
+# Live sessions: any claude process whose cwd is the worktree or below it.
+# Not `lsof -c claude`: the CLI retitles its process to its version number
+# (e.g. "2.1.283"), which is what lsof matches on. ps still reports the
+# executable, so take the pids from there and ask lsof only for their cwds.
+live=""
+pids="$(ps -axo pid=,comm= | awk '{n = $2; sub(/.*\//, "", n)} n == "claude" {print $1}' |
+    paste -sd, - || true)"
+if [ -n "$pids" ]; then
+    live="$(lsof -a -d cwd -p "$pids" -Fn 2>/dev/null | sed -n 's/^n//p' |
+        awk -v w="$W" '$0 == w || index($0, w "/") == 1' || true)"
+fi
+if [ -n "$live" ]; then
+    echo "worktree-relocate-transcripts: a claude session is still running in $W - exit it first" >&2
+    exit 1
+fi
+
+slugify() { printf '%s' "$1" | LC_ALL=C sed 's/[^A-Za-z0-9]/-/g'; }
+slug_w="$(slugify "$W")"
+
+rewrite() { W="$W" P="$P" perl -pi -e 's/\Q$ENV{W}\E/$ENV{P}/g' "$1"; }
+
+# First cwd recorded in a transcript.
+first_cwd() { { grep -o -m1 '"cwd":"[^"]*"' "$1" || true; } | head -1 | sed 's/^"cwd":"//; s/"$//'; }
+
+moved=0
+seen=""
+for ctx in "$HOME/.claude" "$HOME"/.claude-*; do
+    projects="$ctx/projects"
+    [ -d "$projects" ] || continue
+    real="$(cd "$projects" && pwd -P)"
+    case " $seen " in *" $real "*) continue ;; esac
+    seen="$seen $real"
+
+    for dir in "$projects/$slug_w" "$projects/$slug_w"-*; do
+        [ -d "$dir" ] || continue
+        ours=0
+        for f in "$dir"/*.jsonl; do
+            [ -f "$f" ] || continue
+            cwd="$(first_cwd "$f")"
+            case "$cwd" in
+                "$W") mapped="$P" ;;
+                "$W"/*) mapped="$P${cwd#"$W"}" ;;
+                *) continue ;;   # a sibling worktree's session, not ours
+            esac
+            ours=1
+            uuid="$(basename "$f" .jsonl)"
+            dst="$projects/$(slugify "$mapped")"
+            echo "  ${ctx##*/}: $uuid -> $(basename "$dst")"
+            moved=$((moved + 1))
+            [ "$dry" -eq 1 ] && continue
+
+            mkdir -p "$dst"
+            # Overwrite: a same-uuid file already there is the raw safety copy
+            # from preserve-worktree-transcripts.sh; this rewritten one wins.
+            rm -rf "${dst:?}/$uuid" "$dst/$uuid.jsonl"
+            mv "$f" "$dst/"
+            # Exact-string W -> P in the transcript and any sidecar transcripts
+            # (subagents). JSON-safe: both are plain absolute paths.
+            rewrite "$dst/$uuid.jsonl"
+            if [ -d "$dir/$uuid" ]; then
+                mv "$dir/$uuid" "$dst/"
+                find "$dst/$uuid" -name '*.jsonl' -type f -print0 |
+                    while IFS= read -r -d '' t; do rewrite "$t"; done
+            fi
+        done
+        # Drop the slug dir once it is empty; anything left (memory/, a
+        # transcript with no cwd) stays put - say so rather than lose track.
+        if [ "$ours" -eq 1 ] && [ "$dry" -eq 0 ]; then
+            rmdir "$dir" 2>/dev/null ||
+                echo "worktree-relocate-transcripts: left in place: $dir ($(ls "$dir" | tr '\n' ' '))" >&2
+        fi
+    done
+done
+
+# Desktop session records are not rewritten here - flag them for the skill.
+desktop="$(grep -rlsF "\"$W" "$HOME/Library/Application Support"/*/claude-code-sessions 2>/dev/null || true)"
+if [ -n "$desktop" ]; then
+    echo "worktree-relocate-transcripts: Claude Desktop records still reference $W (fix by hand, app quit - worktree-closedown step 4):" >&2
+    printf '  %s\n' $desktop >&2
+fi
+
+verb=relocated; [ "$dry" -eq 1 ] && verb="would relocate"
+echo "worktree-relocate-transcripts: $verb $moved session(s) from $W to $P"
