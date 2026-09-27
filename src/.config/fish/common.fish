@@ -660,3 +660,79 @@ function claude-default --wraps claude --description 'claude in the retired defa
     __claude_ctx "" $argv
 end
 
+
+# wt: worktree + agent in one step. Makes (or reuses) ../<repo>-<branch> next to
+# the primary checkout - the convention the worktree-closedown skill expects -
+# and opens a tmux window there running claude, which tmux-claude-hatch and the
+# agent sidebar then pick up through their usual hooks.
+#
+# Not `claude --worktree`: that puts worktrees under .claude/worktrees/ on a
+# `worktree-<name>` branch and auto-removes clean ones on exit, bypassing the
+# transcript relocation worktree-closedown does. wt never removes anything.
+#
+# The window runs `fish -C <wrapper>` rather than claude directly: the context
+# wrappers above are fish functions, and -C leaves an interactive shell in the
+# worktree once claude exits.
+#
+# wt <branch>: worktree + claude in a new tmux window
+function wt -d "Create/reuse a git worktree and start claude in it (tmux window)"
+    argparse h/help n/no-claude 'c/context=' -- $argv
+    or return
+    if set -q _flag_help; or test (count $argv) -ne 1
+        echo "usage: wt [-c personal|exxo|exxo-personal] [-n] <branch>" >&2
+        echo "  -n  create/reuse the worktree only, don't start claude" >&2
+        return 2
+    end
+    set -l branch $argv[1]
+
+    set -l launcher claude
+    if set -q _flag_context
+        set launcher claude-$_flag_context
+        if not functions -q $launcher
+            echo "wt: no claude context '$_flag_context'" >&2
+            return 2
+        end
+    end
+
+    # The common dir is <primary>/.git from any worktree, so this resolves the
+    # primary checkout even when run from inside another worktree.
+    set -l common (git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+    or begin
+        echo "wt: not in a git repository" >&2
+        return 1
+    end
+    set -l primary (path dirname $common)
+    set -l repo (path basename $primary)
+    set -l slug (string replace -a / - -- $branch)
+    set -l dir (path dirname $primary)/$repo-$slug
+
+    if contains -- "worktree $dir" (git -C $primary worktree list --porcelain)
+        echo "wt: reusing $dir"
+    else
+        git -C $primary fetch --quiet origin 2>/dev/null
+        if git -C $primary show-ref --verify --quiet refs/heads/$branch
+            or git -C $primary show-ref --verify --quiet refs/remotes/origin/$branch
+            # Existing local branch, or DWIM: a new local branch tracking origin/<branch>.
+            git -C $primary worktree add $dir $branch
+            or return
+        else
+            # New branch off the remote default branch. --no-track so it doesn't
+            # inherit origin/main as its upstream; the first push sets it.
+            set -l base (git -C $primary symbolic-ref --quiet --short refs/remotes/origin/HEAD)
+            or set base HEAD
+            git -C $primary worktree add --no-track -b $branch $dir $base
+            or return
+        end
+    end
+
+    if set -q TMUX
+        if set -q _flag_no_claude
+            tmux new-window -c $dir -n $slug
+        else
+            tmux new-window -c $dir -n $slug fish -C $launcher
+        end
+    else
+        cd $dir
+        set -q _flag_no_claude; or $launcher
+    end
+end
