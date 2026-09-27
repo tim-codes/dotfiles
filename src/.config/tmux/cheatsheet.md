@@ -70,6 +70,22 @@ not a plain list, so the usual kill bindings don't apply. Inside it:
 | `C-a e` | Toggle agent sidebar — this window |
 | `C-a E` | Toggle agent sidebar — everywhere |
 
+## Worktrees (worktrunk)
+
+Shell commands, not keys. Worktrees land beside the repo as `../<repo>-<branch>`.
+
+| Command | Does |
+| --- | --- |
+| `wt switch -c <branch>` | New branch off the default branch, in a new worktree, and `cd` there |
+| `wt switch <branch>` | Go to a branch's worktree, creating it if needed |
+| `wt switch` | Picker over all worktrees |
+| `wt switch ^` / `-` | Default branch / previous worktree |
+| `wt switch -c <branch> -x fish -- -c claude` | …and start Claude there (`claude-exxo` for work) |
+| `wt list` | Worktrees with 🤖 working / 💬 waiting Claude sessions |
+| `wt list --full` | Adds CI status and summaries |
+| `wt merge` | Squash, rebase onto default, merge, remove the worktree |
+| `wt remove` | Remove this worktree and its branch, if merged |
+
 ## Copy and scrollback
 
 | Key | Does |
@@ -112,3 +128,8 @@ not a plain list, so the usual kill bindings don't apply. Inside it:
   defaults don't inherit the working directory.
 - `&` and `x` prompt y/n. In tree mode, `x` does not — it kills immediately.
 - `C-a k` clears scrollback; it moved off `C-k`, which pane navigation owns.
+- `wt switch -x claude` runs the bare binary, skipping the account wrappers
+  (it lands in the retired `~/.claude`). Go through fish: `-x fish -- -c claude`.
+- Remove worktrees with `wt remove` / `wt merge`, never `git worktree remove`:
+  worktrunk first moves the Claude transcripts to the main checkout, and
+  refuses while a session is still running in the worktree.
