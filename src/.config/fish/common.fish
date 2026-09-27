@@ -306,6 +306,8 @@ alias la="ls -la"
 alias l="ll"
 
 alias ff="fastfetch"
+# fit the Ghostty quick terminal to its current screen (run from inside it)
+alias gz="ghostty-fit"
 alias j="just"
 alias k="kubectl"
 alias python="python3"

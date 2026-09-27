@@ -1,0 +1,76 @@
+#!/bin/bash
+# Fit the open Ghostty quick terminal to the screen it is on: centred, with a
+# gutter of GUTTER points on every edge, and never wider than MAX_WIDTH points
+# (default 48 and 1440). Run it from inside the quick terminal - fish alias `gz`.
+#
+#   ghostty-fit [gutter] [max-width]
+#
+# Why a script rather than config: quick-terminal-size has no min/max, so
+# "screen minus gutter, capped at 1440" can't be written as config. And the size
+# sticks: Ghostty saves the quick terminal's frame per display (keyed by display
+# UUID, persisted across restarts) when it hides, and restores that frame on
+# every later show on that display instead of recomputing from config. So
+# fitting the window once per monitor is enough - each monitor then keeps its
+# own fitted size. quick-terminal-size in the config only covers a monitor
+# that has never been fitted.
+#
+# Uses System Events to move the window, so the app running it needs
+# Accessibility permission - Ghostty already has it for its global hotkey.
+set -euo pipefail
+
+gutter="${1:-48}"
+max_width="${2:-1440}"
+
+osascript -l JavaScript - "$gutter" "$max_width" <<'JXA'
+ObjC.import("AppKit");
+
+function run(argv) {
+  const gutter = Number(argv[0]);
+  const maxWidth = Number(argv[1]);
+
+  const se = Application("System Events");
+  const procs = se.processes.whose({ bundleIdentifier: "com.mitchellh.ghostty" });
+  if (procs.length === 0) throw new Error("Ghostty is not running");
+  const wins = procs[0].windows;
+  // Ghostty is dropdown-only (macos-hidden), so its only window is the quick
+  // terminal; a hidden quick terminal has no window at all.
+  if (wins.length === 0) throw new Error("no Ghostty window - open the quick terminal first");
+  const win = wins[0];
+
+  // System Events positions are top-left based, y down, from the primary
+  // screen's top-left. NSScreen frames are bottom-left based, y up.
+  const screens = $.NSScreen.screens;
+  const primaryHeight = screens.objectAtIndex(0).frame.size.height;
+  const [x, y] = win.position();
+  const [w, h] = win.size();
+  const cx = x + w / 2;
+  const cy = primaryHeight - (y + h / 2);
+
+  // The screen holding the window's centre (the window may start partly
+  // off-screen); fall back to the one whose centre is nearest.
+  let screen = null, best = Infinity;
+  for (let i = 0; i < screens.count; i++) {
+    const s = screens.objectAtIndex(i);
+    const f = s.frame;
+    if (cx >= f.origin.x && cx < f.origin.x + f.size.width &&
+        cy >= f.origin.y && cy < f.origin.y + f.size.height) { screen = s; break; }
+    const d = Math.hypot(cx - (f.origin.x + f.size.width / 2), cy - (f.origin.y + f.size.height / 2));
+    if (d < best) { best = d; screen = s; }
+  }
+
+  // visibleFrame excludes the menu bar and Dock
+  const v = screen.visibleFrame;
+  const width = Math.round(Math.min(v.size.width - 2 * gutter, maxWidth));
+  const height = Math.round(v.size.height - 2 * gutter);
+  const left = Math.round(v.origin.x + (v.size.width - width) / 2);
+  const bottom = v.origin.y + (v.size.height - height) / 2;
+  const top = Math.round(primaryHeight - (bottom + height));
+
+  // size, then position, then size again: macOS may clamp a resize that
+  // would push the window off the screen from its old position
+  win.size = [width, height];
+  win.position = [left, top];
+  win.size = [width, height];
+  return `${screen.localizedName.js}: ${width}x${height} at ${left},${top}`;
+}
+JXA
