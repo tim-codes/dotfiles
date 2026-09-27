@@ -41,7 +41,8 @@ font-size = 15
 # which config can't express (no min/max) - once per monitor.
 quick-terminal-position = center
 quick-terminal-size = 1440px,90%
-quick-terminal-animation-duration = 0.15
+# No slide: centred, it should just appear, like an iTerm2 hotkey window.
+quick-terminal-animation-duration = 0
 # Only the hotkey hides it. The default (true) also hides it whenever it loses
 # focus, which makes it useless for anything you want to watch while working in
 # another window - a running build, a tailed log, an agent mid-task.
