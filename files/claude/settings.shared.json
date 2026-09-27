@@ -317,7 +317,7 @@
   "tui": "fullscreen",
   "skipWorkflowUsageWarning": true,
   "theme": "auto",
-  "remoteControlAtStartup": false,
+  "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": false,
   "enabledPlugins": {
@@ -341,5 +341,13 @@
         "path": "/Users/tim/dev/dotfiles/files/claude/plugins"
       }
     }
+  },
+  "crossSessionInbound": "accept",
+  "dialogExpiry": "10m",
+  "permissions": {
+    "defaultMode": "auto"
+  },
+  "worktree": {
+    "baseRef": "fresh"
   }
 }
