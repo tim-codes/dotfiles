@@ -33,8 +33,14 @@ font-size = 15
 # --- quick terminal ---------------------------------------------------------
 # position is macOS-restart-only, not reloadable - changing it needs a full
 # Ghostty quit, not `theme` or SIGUSR2.
-quick-terminal-position = top
-quick-terminal-size = 45%
+# Centred floating window rather than a pull-down. Width,height for `center` on
+# a landscape screen, recomputed per screen on show. This is only the fallback
+# for a screen the quick terminal has never been fitted on: Ghostty remembers
+# the last frame per display and restores that instead, and `gz`
+# (src/bin/ghostty-fit) fits it to screen-minus-gutter capped at 1440 wide -
+# which config can't express (no min/max) - once per monitor.
+quick-terminal-position = center
+quick-terminal-size = 1440px,90%
 quick-terminal-animation-duration = 0.15
 # Only the hotkey hides it. The default (true) also hides it whenever it loses
 # focus, which makes it useless for anything you want to watch while working in
@@ -66,6 +72,10 @@ keybind = global:§=toggle_quick_terminal
 # machine's British/ISO layout that same physical key is §, so here this is
 # just Opt+§; it earns its place on ANSI keyboards.
 keybind = global:opt+grave_accent=toggle_quick_terminal
+
+# tmux prefix on Cmd+. : tmux can't see Cmd, so send its real prefix, C-a.
+# Same binding and reasoning in alacritty.toml (on Linux, super is Super).
+keybind = super+period=text:\x01
 
 # --- shell ------------------------------------------------------------------
 # `command` lives in local.conf (see above) because it needs tmux's absolute

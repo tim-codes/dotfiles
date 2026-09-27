@@ -35,6 +35,16 @@ family = "GeistMono Nerd Font Mono"
 dynamic_title = true
 dimensions = { columns = 100, lines = 50 }
 
+# tmux prefix on Cmd+. : tmux can't see Cmd, so send its real prefix, C-a.
+# Chosen over Cmd+\ because 1Password's default global autofill shortcut is
+# Cmd+\ (cleared on this machine, but back after a reset). Same binding in
+# the ghostty config. Cross-platform as is: on Linux "Command" is Super, so
+# Super+. does the same; if the desktop grabs that chord, C-a still works.
+[[keyboard.bindings]]
+key = "."
+mods = "Command"
+chars = "\u0001"
+
 [[keyboard.bindings]]
 key = "Return"
 mods = "Shift"
