@@ -34,6 +34,11 @@ family = "GeistMono Nerd Font Mono"
 # decorations = "none"
 dynamic_title = true
 dimensions = { columns = 100, lines = 50 }
+# Left Option is Alt (tmux's M-hjkl pane resize); right Option still composes
+# characters - on the UK layout that's # (Opt+3) and € (Opt+2). The explicit
+# Alt+arrow/delete bindings below win over this, so word motions are
+# unchanged. macOS-only; ignored elsewhere. Mirrored in the ghostty config.
+option_as_alt = "OnlyLeft"
 
 # tmux prefix on Cmd+. : tmux can't see Cmd, so send its real prefix, C-a.
 # Chosen over Cmd+\ because 1Password's default global autofill shortcut is
