@@ -47,7 +47,7 @@ not a plain list, so the usual kill bindings don't apply. Inside it:
 | `C-a !` | Break pane out into its own window |
 | `C-a {` / `}` | Swap pane with previous / next |
 | `C-a Space` | Cycle layouts |
-| `C-a M-←↑↓→` | Resize by 5 cells |
+| `M-h` `M-j` `M-k` `M-l` | Resize by 5 cells — no prefix, left `⌥` is `M-` |
 
 ## Sessions
 
@@ -128,6 +128,8 @@ Shell commands, not keys. Worktrees land beside the repo as `../<repo>-<branch>`
   defaults don't inherit the working directory.
 - `&` and `x` prompt y/n. In tree mode, `x` does not — it kills immediately.
 - `C-a k` clears scrollback; it moved off `C-k`, which pane navigation owns.
+- Only the left `⌥` is Alt (Alacritty, Ghostty). Type `#` / `€` with the
+  right one: `⌥3` / `⌥2`. iTerm2 keeps both as plain Option, so no `M-` there.
 - `wt switch -x claude` runs the bare binary, skipping the account wrappers
   (it lands in the retired `~/.claude`). Go through fish: `-x fish -- -c claude`.
 - Remove worktrees with `wt remove` / `wt merge`, never `git worktree remove`:

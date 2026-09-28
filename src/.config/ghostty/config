@@ -88,6 +88,19 @@ keybind = global:opt+grave_accent=toggle_quick_terminal
 # Same binding and reasoning in alacritty.toml (on Linux, super is Super).
 keybind = super+period=text:\x01
 
+# Left Option is Alt (tmux's M-hjkl pane resize); right Option still composes
+# characters - on the UK layout that's # (Opt+3) and € (Opt+2). Unset, Ghostty
+# picks per layout and a UK layout gets false. Mirrors option_as_alt in
+# alacritty.toml.
+macos-option-as-alt = left
+# macOS-style word-wise editing, same sequences as alacritty.toml. Without these
+# Opt+Left arrives as CSI 1;3D, which fish maps to prevd-or-backward-word - on
+# an empty line that cd's back instead of moving.
+keybind = alt+left=esc:b
+keybind = alt+right=esc:f
+keybind = alt+backspace=text:\x1b\x7f
+keybind = alt+delete=esc:d
+
 # --- shell ------------------------------------------------------------------
 # `command` lives in local.conf (see above) because it needs tmux's absolute
 # path. It starts tmux in its own session, deliberately NOT the one the
