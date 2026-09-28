@@ -106,6 +106,7 @@ Shell commands, not keys. Worktrees land beside the repo as `../<repo>-<branch>`
 | `⌥ §` | Same, for keyboards without a `§` key |
 | `⇧ Return` | Newline without submitting |
 | `⌥ ←` / `→` | Move by word on the command line |
+| `⌘ ←` / `→` | Start / end of the command line |
 | `⌥ ⌫` | Delete previous word |
 | `theme` | Switch theme everywhere at once |
 | `th` | This cheatsheet |

@@ -100,6 +100,10 @@ keybind = alt+left=esc:b
 keybind = alt+right=esc:f
 keybind = alt+backspace=text:\x1b\x7f
 keybind = alt+delete=esc:d
+# Cmd+Left/Right = Home/End. Ghostty's macOS default sends C-a/C-e, and C-a is
+# the tmux prefix; send the Home/End key sequences instead. Same in alacritty.toml.
+keybind = super+arrow_left=csi:H
+keybind = super+arrow_right=csi:F
 
 # --- shell ------------------------------------------------------------------
 # `command` lives in local.conf (see above) because it needs tmux's absolute
