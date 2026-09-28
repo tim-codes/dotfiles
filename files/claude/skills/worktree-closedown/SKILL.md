@@ -75,15 +75,37 @@ path (both from `git worktree list`), `CTX` = the session's config dir
    wins on resume — update it with the app quit, per the
    claude-workstation-setup skill. CLI-only sessions need nothing more.
 
-5. **Remove the worktree.** From the primary checkout:
-   `git -C <P> worktree remove <W>` (add `--force` only for genuinely
-   disposable uncommitted state, and say so). Delete the branch only if its
-   PR is merged: `git -C <P> branch -d <branch>`. Never
-   `rm -rf` a worktree directly — git keeps metadata in
-   `<P>/.git/worktrees/` that `git worktree remove` cleans up (`git worktree
-   prune` repairs the aftermath of a raw delete).
+5. **Check submodules for unsaved work** (skip if the repo has none, i.e. no
+   `.gitmodules`). A worktree's submodules are separate clones, so the
+   worktree's own `git status` can look clean while a submodule holds
+   uncommitted edits or local-only commits, and removing the worktree
+   destroys both. From `W`:
+   `git submodule foreach --recursive 'git status --porcelain; git log --oneline --branches --not --remotes'`.
+   Any output other than the `Entering '<path>'` lines means stop: push or
+   discard that work deliberately first. This applies
+   to the `wt remove` route too, since worktrunk doesn't check submodules
+   separately.
 
-6. **Report** what was preserved (session uuids, target slug) and what was
+6. **Remove the worktree.** With worktrunk, `wt remove <branch>` handles
+   submodules itself (verified on wt 0.79). Without it, run
+   `git -C <P> worktree remove <W>` from the primary checkout. If that fails
+   with `working trees containing submodules cannot be moved or removed`,
+   and step 5 was clean, clear the submodules first and retry:
+   `git -C <W> submodule deinit --all --force`, then
+   `rm -rf "$(git -C <W> rev-parse --absolute-git-dir)/modules"`, then the
+   same `worktree remove` without `--force`. The `modules` dir under the
+   worktree's own git dir (`<P>/.git/worktrees/<name>/modules`) holds the
+   submodule clones, and git refuses while it exists. `deinit` alone isn't
+   enough (verified on git 2.50). Prefer this to `--force`, which would also
+   discard any uncommitted state in the worktree itself; use `--force` only
+   for genuinely disposable state, and say so. Delete the branch only if its
+   PR is merged: `git -C <P> branch -d <branch>`. A squash-merged branch
+   needs `-D`, after confirming the PR is merged. Never `rm -rf` a worktree
+   directly: git keeps metadata in `<P>/.git/worktrees/` that
+   `git worktree remove` cleans up (`git worktree prune` repairs the
+   aftermath of a raw delete).
+
+7. **Report** what was preserved (session uuids, target slug) and what was
    removed, so the closedown is auditable from the conversation.
 
 ## Recovering sessions from an already-removed worktree
