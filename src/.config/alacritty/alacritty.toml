@@ -76,3 +76,16 @@ chars = "\u001B\u007F"
 key = "Delete"
 mods = "Alt"
 chars = "\u001Bd"
+
+# Cmd+Left/Right = Home/End, as in macOS text fields. Sends the Home/End key
+# sequences rather than C-a/C-e: C-a is the tmux prefix. Same in the ghostty
+# config. On Linux "Command" is Super.
+[[keyboard.bindings]]
+key = "Left"
+mods = "Command"
+chars = "\u001B[H"
+
+[[keyboard.bindings]]
+key = "Right"
+mods = "Command"
+chars = "\u001B[F"
