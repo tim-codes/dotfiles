@@ -74,8 +74,11 @@ Four properties of the merge, all deliberate:
 
 - Credential-bearing servers stay **out** of the repo. Secrets are referenced,
   never written, and a JSON fragment has nowhere to reference a 1Password item
-  from — so a token-bearing server (`notion`, `Sanity`) is added by hand with
+  from — so a token-bearing server (`notion`) is added by hand with
   `claude mcp add -s user` and merely preserved by the merge, never codified.
+  `Sanity` moved to `mcp.shared.json` (2026-09-28) once it went OAuth-only:
+  the tool now carries no `Authorization` header, so there's nothing left
+  to reference — see "Deferred follow-ups" below.
 - Both `--diff` and the apply path print server **names only, never values**.
   Both land in terminals and transcripts, and the live file holds real tokens.
 - The write is skipped when it would be a no-op, refuses to run if the file's
@@ -208,20 +211,31 @@ session started from. Nothing here touches them.
 ## Deferred follow-ups
 
 - `~/.claude-exxo-personal` still has no MCP servers of its own beyond what
-  `claude-sync` manages. `~/.claude-exxo` carries four hand-added ones —
-  `Sanity`, `notion`, `playwright`, `workos` — and `~/.claude-personal` three of
+  `claude-sync` manages. `~/.claude-exxo` carries three remaining hand-added
+  ones — `notion`, `playwright`, `workos` — and `~/.claude-personal` two of
   them (no `workos`). They hold live credentials, so they cannot be codified
   into `mcp.shared.json`; re-adding them by hand with `claude mcp add -s user`
   under `CLAUDE_CONFIG_DIR=~/.claude-exxo-personal` is outstanding
   (noted 2026-08-23).
-- The `notion` and `Sanity` entries hold plaintext bearer tokens in each
-  context's `.claude.json` (`env.NOTION_TOKEN` and an `Authorization` header
-  respectively). Nothing here can fix that — a user-scope MCP server has no
-  reference-at-invocation form, which is precisely why those two are hand-added
-  rather than codified, and the file never enters a repo. But it is host state
-  outside this repo's reach and a standing exposure worth recording rather than
-  rediscovering: anything that can read `$HOME` can read the tokens, and
-  rotation is the only mitigation available (noted 2026-08-23).
+- The `notion` entry holds a plaintext bearer token in each context's
+  `.claude.json` (`env.NOTION_TOKEN`). Nothing here can fix that — a
+  user-scope MCP server has no reference-at-invocation form, which is
+  precisely why it is hand-added rather than codified, and the file never
+  enters a repo. But it is host state outside this repo's reach and a
+  standing exposure worth recording rather than rediscovering: anything that
+  can read `$HOME` can read the token, and rotation is the only mitigation
+  available (noted 2026-08-23).
+
+(Resolved 2026-09-28: `mcp.sanity.io` went OAuth-only for Claude Code — no
+more `Authorization` header/token — so `Sanity` moved from a hand-added,
+per-context server to `files/claude/mcp.shared.json`. It now reaches every
+context, including `exxo-personal`, on the next `claude-sync`. OAuth tokens
+are still stored per context (in that context's credential store, not
+`.claude.json`), so account segregation is unaffected — an exxo Sanity login
+does not leak into personal or vice versa. Also found: the Sanity CLI's own
+`sanity mcp configure` (v8.x) hard-codes `~/.claude.json` and ignores
+`CLAUDE_CONFIG_DIR`, so it only ever touches the legacy default context —
+don't use it to add/reconfigure the server; edit the fragment instead.)
 
 (Resolved 2026-08-18: [Exxo-Labs/skills#4](https://github.com/Exxo-Labs/skills/pull/4)
 merged — the plugin's `purge-esc-cache` is now `purge-secret-cache`, plugin

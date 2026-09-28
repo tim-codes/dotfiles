@@ -233,12 +233,21 @@ managed on claude.ai.
   or `CLAUDE.md.shared`/`CLAUDE.md.<account>`) and re-run `claude-sync`.
 - An MCP server is missing in one context but present in another → check
   whether it's managed. Credential-free servers belong in
-  `files/claude/mcp.shared.json` and reach every context on the next
-  `claude-sync`; token-bearing ones (`notion`, `Sanity`) are hand-added per
-  context by design and simply haven't been added there yet — `claude mcp add
-  -s user` under that CLAUDE_CONFIG_DIR. `claude-sync --diff` lists the managed
-  names per context, and the unmanaged ones it is leaving alone, without
-  printing any values.
+  `files/claude/mcp.shared.json` (this now includes `Sanity`, OAuth-only
+  since 2026-09-28 and no longer token-bearing) and reach every context on
+  the next `claude-sync`; genuinely token-bearing ones (`notion`) are
+  hand-added per context by design and simply haven't been added there yet —
+  `claude mcp add -s user` under that CLAUDE_CONFIG_DIR. `claude-sync --diff`
+  lists the managed names per context, and the unmanaged ones it is leaving
+  alone, without printing any values.
+- `sanity mcp configure` (Sanity CLI v8.x) hard-codes `~/.claude.json` and
+  ignores `CLAUDE_CONFIG_DIR`, so it only ever reaches the legacy default
+  context, never a real one — don't use it; add/change the server via the
+  `mcp.shared.json` fragment instead.
+- Targeting another context inline (`CLAUDE_CONFIG_DIR=~/.claude-exxo claude
+  mcp ...`) has no effect for bare `claude` — the shell wrapper pins
+  `CLAUDE_CONFIG_DIR` to personal and overrides the inline value. Use `env
+  CLAUDE_CONFIG_DIR=<ctx> claude ...` or `command claude` instead.
 - Two skills with one name → check both delivery paths; fix by editing
   `shared_skills()` in `claude-sync` (repo skills are personal-only unless
   named there), not by hand-deleting links.

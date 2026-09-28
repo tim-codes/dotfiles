@@ -5,6 +5,10 @@
       "command": "npx",
       "args": ["-y", "@mantine/mcp-server"],
       "env": {}
+    },
+    "Sanity": {
+      "type": "http",
+      "url": "https://mcp.sanity.io"
     }
   }
 }
