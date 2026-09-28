@@ -35,6 +35,25 @@ not a plain list, so the usual kill and rename bindings don't apply. Inside it:
 | `C-a .` | Move window to another index |
 | `C-a f` | Find window — fzf, type to filter |
 
+## Finding and organising (tmux-fzf)
+
+A full-window fzf popup: type to filter, with a preview of the selection.
+
+| Key | Does |
+| --- | --- |
+| `C-a f` | Jump to a window — type to filter, `Enter` to switch |
+| `C-a F` | Menu: window / session / pane / command / keybinding |
+| `C-a F` → `window` | switch, link, move, swap, rename, kill |
+| `C-a F` → `session` | switch, new, rename, detach, kill |
+| `C-a F` → `pane` | switch, break, join, swap, layout, kill, resize |
+| `↑` `↓` / `C-k` `C-j` | Move |
+| `Tab` / `S-Tab` | Mark / unmark for multi-select (e.g. kill several) |
+| `Esc` | Back out |
+
+**Rename a window:** `C-a F` → `window` → `rename` → pick the window → type
+the name at the `Window Name:` prompt (a strip at the top) → `Enter`. For the
+current window, `C-a ,` is quicker.
+
 ## Panes
 
 | Key | Does |
