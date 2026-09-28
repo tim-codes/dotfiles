@@ -4,10 +4,10 @@ Prefix is `C-a` (not `C-b`). Alacritty attaches to session `main`; the Ghostty
 dropdown attaches to `scratch` — kept apart so the half-height dropdown never
 reflows the full-screen window.
 
-## Closing things from the window list
+## Closing and renaming from the window list
 
 `C-a w` opens **tree mode**, a browsable tree of sessions, windows and panes —
-not a plain list, so the usual kill bindings don't apply. Inside it:
+not a plain list, so the usual kill and rename bindings don't apply. Inside it:
 
 | Key | Does |
 | --- | --- |
@@ -15,7 +15,8 @@ not a plain list, so the usual kill bindings don't apply. Inside it:
 | `x` | Kill selected item — no confirmation |
 | `X` | Kill all tagged items |
 | `t` | Tag / untag an item |
-| `Enter` | Switch to it |
+| `:` then `rename-window -t %% <name>` | Rename selected window — `%%` is the selection |
+| `Enter` | Switch to it (then `C-a ,` to rename) |
 | `f` | Filter |
 | `q` | Exit |
 
