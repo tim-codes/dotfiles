@@ -33,7 +33,7 @@ not a plain list, so the usual kill and rename bindings don't apply. Inside it:
 | `C-a C-n` / `C-p` | Next / previous window |
 | `C-a ,` | Rename window |
 | `C-a .` | Move window to another index |
-| `C-a f` | Find window by name |
+| `C-a f` | Find window — fzf, type to filter |
 
 ## Panes
 
