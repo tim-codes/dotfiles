@@ -32,9 +32,10 @@ not a plain list, so the usual kill and rename bindings don't apply. Inside it:
 | `C-a a` | Last window |
 | `C-a C-n` / `C-p` | Next / previous window |
 | `C-a ,` | Rename window |
-| `C-a .` / `C-a f` | tmux-home — every window, type to filter |
+| `C-a .` | tmux-home — every window, type to filter |
+| `C-a f` | Find window — tmux-fzf, type to filter |
 
-## tmux-home (`C-a .` / `C-a f`)
+## tmux-home (`C-a .`)
 
 A full-window list of every window, session name first, current session on
 top, with a preview.
@@ -55,6 +56,7 @@ A full-window fzf popup: type to filter, with a preview of the selection.
 
 | Key | Does |
 | --- | --- |
+| `C-a f` | Jump to a window — type to filter, `Enter` to switch |
 | `C-a F` | Menu: window / session / pane / command / keybinding |
 | `C-a F` → `window` | switch, link, move, swap, rename, kill |
 | `C-a F` → `session` | switch, new, rename, detach, kill |
