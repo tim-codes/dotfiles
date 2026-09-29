@@ -26,16 +26,15 @@ not a plain list, so the usual kill and rename bindings don't apply. Inside it:
 | --- | --- |
 | `C-a c` | New window (opens in `$HOME`) |
 | `C-a &` | Kill window (asks y/n) |
-| `C-a w` | tmux-home — every window, type to filter |
+| `C-a w` | Tree mode — browse everything |
 | `C-a F` | fzf menu — rename, move, swap, kill windows / sessions / panes |
 | `C-a 0`…`9` | Jump to window by number |
 | `C-a a` | Last window |
 | `C-a C-n` / `C-p` | Next / previous window |
 | `C-a ,` | Rename window |
-| `C-a .` | Move window to another index |
-| `C-a f` | tmux-home (same as `C-a w`) |
+| `C-a .` / `C-a f` | tmux-home — every window, type to filter |
 
-## tmux-home (`C-a w` / `C-a f`)
+## tmux-home (`C-a .` / `C-a f`)
 
 A full-window list of every window, session name first, current session on
 top, with a preview.
