@@ -153,6 +153,7 @@ Shell commands, not keys. Worktrees land beside the repo as `../<repo>-<branch>`
 | Key | Does |
 | --- | --- |
 | `C-a R` | Reload `~/.tmux.conf` |
+| `C-a :` `rt` | Same, from the command prompt |
 | `C-a I` | Install plugins declared in the config |
 | `C-a U` | Update plugins |
 | `C-a ?` | List every binding tmux knows |
