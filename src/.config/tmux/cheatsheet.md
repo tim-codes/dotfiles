@@ -26,22 +26,36 @@ not a plain list, so the usual kill and rename bindings don't apply. Inside it:
 | --- | --- |
 | `C-a c` | New window (opens in `$HOME`) |
 | `C-a &` | Kill window (asks y/n) |
-| `C-a w` | Tree mode — browse everything |
+| `C-a w` | tmux-home — every window, type to filter |
 | `C-a F` | fzf menu — rename, move, swap, kill windows / sessions / panes |
 | `C-a 0`…`9` | Jump to window by number |
 | `C-a a` | Last window |
 | `C-a C-n` / `C-p` | Next / previous window |
 | `C-a ,` | Rename window |
 | `C-a .` | Move window to another index |
-| `C-a f` | Find window — fzf, type to filter |
+| `C-a f` | tmux-home (same as `C-a w`) |
 
-## Finding and organising (tmux-fzf)
+## tmux-home (`C-a w` / `C-a f`)
+
+A full-window list of every window, session name first, current session on
+top, with a preview.
+
+| Key | Does |
+| --- | --- |
+| type | Filter by session, window name, command or path |
+| `↑` `↓` / `C-n` `C-p` / `C-j` `C-k` | Move |
+| `Enter` | Switch to that window and close |
+| `C-r` | Rename in place (`Enter` saves, `Esc` cancels) |
+| `M-r` | Back to the automatic name |
+| `C-o` / `F1` | Toggle preview / help |
+| `Esc` | Clear the filter, then close |
+
+## Organising (tmux-fzf)
 
 A full-window fzf popup: type to filter, with a preview of the selection.
 
 | Key | Does |
 | --- | --- |
-| `C-a f` | Jump to a window — type to filter, `Enter` to switch |
 | `C-a F` | Menu: window / session / pane / command / keybinding |
 | `C-a F` → `window` | switch, link, move, swap, rename, kill |
 | `C-a F` → `session` | switch, new, rename, detach, kill |
