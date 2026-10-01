@@ -31,6 +31,15 @@
             "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude notification # tmux-agent-sidebar"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude Notification >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -50,6 +59,15 @@
             "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude activity-log # tmux-agent-sidebar"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude PostToolUse >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [
@@ -58,6 +76,15 @@
           {
             "type": "command",
             "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' ToolFail # notchbar-agents-claude-hook"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude PostToolUseFailure >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
           }
         ]
       }
@@ -136,6 +163,15 @@
             "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude session-end # tmux-agent-sidebar"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SessionEnd >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SessionStart": [
@@ -161,6 +197,15 @@
           {
             "type": "command",
             "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude session-start # tmux-agent-sidebar"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SessionStart >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
           }
         ]
       }
@@ -195,6 +240,15 @@
             "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude stop # tmux-agent-sidebar"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude Stop >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -222,6 +276,15 @@
             "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude user-prompt-submit # tmux-agent-sidebar"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude UserPromptSubmit >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "StopFailure": [
@@ -233,6 +296,15 @@
             "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude stop-failure # tmux-agent-sidebar"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude StopFailure >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PermissionDenied": [
@@ -242,6 +314,15 @@
           {
             "type": "command",
             "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude permission-denied # tmux-agent-sidebar"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude PermissionDenied >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
           }
         ]
       }
@@ -266,6 +347,15 @@
             "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude subagent-start # tmux-agent-sidebar"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SubagentStart >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SubagentStop": [
@@ -275,6 +365,15 @@
           {
             "type": "command",
             "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude subagent-stop # tmux-agent-sidebar"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SubagentStop >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
           }
         ]
       }
