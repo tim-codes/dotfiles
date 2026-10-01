@@ -19,8 +19,9 @@
 # - every context dir is scanned (~/.claude and ~/.claude-*), not just the
 #   current $CLAUDE_CONFIG_DIR; contexts that share a projects/ dir by
 #   symlink (exxo-personal -> exxo) are only processed once.
-# - a transcript is matched by the cwd recorded inside it, not by slug prefix
-#   alone: slug(W)-* would also match a sibling worktree named W-something.
+# - a transcript is matched by the cwds recorded inside it (any of them, not
+#   just the first), not by slug prefix alone: slug(W)-* would also match a
+#   sibling worktree named W-something.
 # - it refuses while a claude process still has its cwd in the worktree;
 #   moving a live session's transcript out from under it breaks that session.
 #
@@ -66,8 +67,11 @@ slug_w="$(slugify "$W")"
 
 rewrite() { W="$W" P="$P" perl -pi -e 's/\Q$ENV{W}\E/$ENV{P}/g' "$1"; }
 
-# First cwd recorded in a transcript.
-first_cwd() { { grep -o -m1 '"cwd":"[^"]*"' "$1" || true; } | head -1 | sed 's/^"cwd":"//; s/"$//'; }
+# Whether a transcript ever recorded a cwd at or below the worktree. Any cwd,
+# not the first: a session that started in the primary checkout and moved
+# into the worktree (claude --worktree) still lands in the worktree's slug,
+# but opens with cwd = P.
+in_worktree() { grep -qF -e "\"cwd\":\"$W\"" -e "\"cwd\":\"$W/" "$1"; }
 
 moved=0
 seen=""
@@ -80,18 +84,15 @@ for ctx in "$HOME/.claude" "$HOME"/.claude-*; do
 
     for dir in "$projects/$slug_w" "$projects/$slug_w"-*; do
         [ -d "$dir" ] || continue
+        # The slug dir names the launch dir (W or a subdir of it); the same
+        # subdir under P is slug(P) plus the same suffix.
+        dst="$projects/$(slugify "$P")${dir#"$projects/$slug_w"}"
         ours=0
         for f in "$dir"/*.jsonl; do
             [ -f "$f" ] || continue
-            cwd="$(first_cwd "$f")"
-            case "$cwd" in
-                "$W") mapped="$P" ;;
-                "$W"/*) mapped="$P${cwd#"$W"}" ;;
-                *) continue ;;   # a sibling worktree's session, not ours
-            esac
+            in_worktree "$f" || continue   # a sibling worktree's session, not ours
             ours=1
             uuid="$(basename "$f" .jsonl)"
-            dst="$projects/$(slugify "$mapped")"
             echo "  ${ctx##*/}: $uuid -> $(basename "$dst")"
             moved=$((moved + 1))
             [ "$dry" -eq 1 ] && continue
