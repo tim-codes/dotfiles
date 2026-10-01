@@ -32,10 +32,25 @@ not a plain list, so the usual kill and rename bindings don't apply. Inside it:
 | `C-a a` | Last window |
 | `C-a C-n` / `C-p` | Next / previous window |
 | `C-a ,` | Rename window |
-| `C-a .` | Move window to another index |
-| `C-a f` | Find window — fzf, type to filter |
+| `C-a .` | tmux-home — every window, type to filter |
+| `C-a f` | Find window — tmux-fzf, type to filter |
 
-## Finding and organising (tmux-fzf)
+## tmux-home (`C-a .`)
+
+A full-window list of every window, session name first, current session on
+top, with a preview.
+
+| Key | Does |
+| --- | --- |
+| type | Filter by session, window name, command or path |
+| `↑` `↓` / `C-n` `C-p` / `C-j` `C-k` | Move |
+| `Enter` | Switch to that window and close |
+| `C-r` | Rename in place (`Enter` saves, `Esc` cancels) |
+| `M-r` | Back to the automatic name |
+| `C-o` / `F1` | Toggle preview / help |
+| `Esc` | Clear the filter, then close |
+
+## Organising (tmux-fzf)
 
 A full-window fzf popup: type to filter, with a preview of the selection.
 
@@ -138,6 +153,7 @@ Shell commands, not keys. Worktrees land beside the repo as `../<repo>-<branch>`
 | Key | Does |
 | --- | --- |
 | `C-a R` | Reload `~/.tmux.conf` |
+| `C-a :` `rt` | Same, from the command prompt |
 | `C-a I` | Install plugins declared in the config |
 | `C-a U` | Update plugins |
 | `C-a ?` | List every binding tmux knows |

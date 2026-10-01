@@ -15,6 +15,13 @@ cargoGitDeps=(
   ssh://git@github.com/xdagiz/althemer
 )
 
+# Keep the toolchain itself current first: nothing else updates rustup's
+# stable channel, and it had drifted a year behind (1.88 -> 1.98) before this.
+if command -v rustup >/dev/null; then
+  rustup self update
+  rustup update stable
+fi
+
 cargo install $cargoDeps
 
 for repo in $cargoGitDeps; do
