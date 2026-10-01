@@ -6,7 +6,7 @@
 #   - installs every declared plugin that is missing
 #   - (--update) pulls every plugin to its latest
 #   - removes plugins no longer declared (e.g. tmux-yank after it was dropped)
-#   - (re)builds tmux-agent-sidebar's rust binary
+#   - (re)builds the rust plugins (tmux-agent-sidebar, tmux-home)
 #
 # Called by setup-macbook (install) and deps-up (--update). TPM's bin/ scripts
 # are built for the command line and need no running tmux server.
@@ -30,18 +30,20 @@ if [ "$update" = 1 ]; then
 fi
 "$tpm/bin/clean_plugins"
 
-# tmux-agent-sidebar is a rust binary, and its .tmux entry script pops an
-# interactive install wizard when the binary is missing - which also means it
-# binds nothing that session. Build it up front instead, from source rather
-# than the release binary (same call as alacritty in setup-macbook). Always
-# run, not only when the binary is missing: cargo is incremental, so this is a
-# no-op when current and a rebuild after update_plugins moved the source.
-sidebar="$plugins/tmux-agent-sidebar"
-if [ -f "$sidebar/Cargo.toml" ]; then
-  [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
+# Rust plugins are built here rather than by their own .tmux entry scripts:
+# tmux-agent-sidebar pops an interactive install wizard when its binary is
+# missing (and binds nothing that session), and tmux-home falls back to its
+# bash popup until it is built. Build from source, not release binaries (same
+# call as alacritty in setup-macbook). Always run, not only when the binary is
+# missing: cargo is incremental, so this is a no-op when current and a rebuild
+# after update_plugins moved the source.
+[ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
+for rust_plugin in tmux-agent-sidebar tmux-home; do
+  dir="$plugins/$rust_plugin"
+  [ -f "$dir/Cargo.toml" ] || continue
   if command -v cargo >/dev/null; then
-    cargo build --release --manifest-path "$sidebar/Cargo.toml"
+    cargo build --release --manifest-path "$dir/Cargo.toml"
   else
-    echo "tmux-plugins: cargo not installed - tmux-agent-sidebar left unbuilt" >&2
+    echo "tmux-plugins: cargo not installed - $rust_plugin left unbuilt" >&2
   fi
-fi
+done
