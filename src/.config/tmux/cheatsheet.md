@@ -166,6 +166,9 @@ Shell commands, not keys. Worktrees land beside the repo as `../<repo>-<branch>`
   defaults don't inherit the working directory.
 - `&` and `x` prompt y/n. In tree mode, `x` does not — it kills immediately.
 - `C-a k` clears scrollback; it moved off `C-k`, which pane navigation owns.
+- Mouse is on: click focuses panes and windows, drag resizes, the wheel over a
+  pane scrolls into copy-mode (`q` leaves). Drag-select copies into tmux; hold
+  `⌥` for the terminal's own selection.
 - Only the left `⌥` is Alt (Alacritty, Ghostty). Type `#` / `€` with the
   right one: `⌥3` / `⌥2`. iTerm2 keeps both as plain Option, so no `M-` there.
 - `wt switch -x claude` runs the bare binary, skipping the account wrappers
