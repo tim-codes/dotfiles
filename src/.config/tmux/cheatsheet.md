@@ -103,8 +103,12 @@ current window, `C-a ,` is quicker.
 | --- | --- |
 | `C-a u` | Agent picker — working / waiting / idle |
 | `C-a y` | Launch an agent for this directory |
-| `C-a e` | Toggle agent sidebar — this window |
-| `C-a E` | Toggle agent sidebar — everywhere |
+| `C-a e` | Toggle tmux-home sidebar — this window |
+| `C-a E` | Toggle tmux-home sidebar — every window in this session |
+
+The sidebar is read-only: NEEDS YOU across the server, this session's
+windows with agent status and git badges. New windows get one by themselves
+(not in `scratch`); `q` in a sidebar closes it.
 
 ## Worktrees (worktrunk)
 
