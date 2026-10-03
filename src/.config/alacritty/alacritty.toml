@@ -12,6 +12,16 @@ import = [
   "~/.config/alacritty/local.toml",
 ]
 
+# Errors only in the message bar (default Warn). Claude Code's copy-on-select
+# writes the clipboard several ways at once under tmux - pbcopy, plus OSC 52
+# both raw (tmux re-emits it, set-clipboard on) and DCS-passthrough - so
+# alacritty's NSPasteboard write occasionally loses the race to pbcopy and
+# warns "NSPasteboard#writeObjects: returned false". Harmless: pbcopy already
+# put the same text there. Cost: config typo warnings (unused keys) are hidden
+# too - run `alacritty -v` to see them. Read at startup only, not live-reloaded.
+[debug]
+log_level = "Error"
+
 [font]
 size = 15
 
