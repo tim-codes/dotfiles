@@ -127,6 +127,47 @@ that has vanished, never overwrites an existing `dest`, and won't remove a
 directory that still holds video files. A wrong plan gets rejected, not
 executed - so the model's output never needs to be trusted blindly.
 
+## Verify TV numbering against TheTVDB when it might be off
+
+`--apply-plan` checks that a plan is *safe*, not that its numbering is
+*correct*. Plex matches TV against TheTVDB's **official (aired) order**, so a
+file labelled with the wrong `SxxEyy` gets the wrong title, art and watched
+state, and nothing complains. Whenever there's reason to doubt the
+release's numbering, check it against TVDB before applying the plan.
+
+**When to check** (any one of these is enough):
+- the release uses its own scheme - "Book 2", "Volume", "Part 1 of 3",
+  `S02 E08` with a space, `1x08`, absolute or anime numbering, DVD order
+- shorts, webisodes, OVAs, recaps or "specials" mixed into a pack (these
+  belong in Season 0 - see below)
+- folder numbering and file numbering disagree (Korra's `Book 2a`/`2b` folders
+  hold the Republic City Hustle shorts and Season 2 respectively)
+- gaps, duplicates, or a season episode count that looks wrong for the show
+- double episodes (`S01E01-E02`), or a two-parter that might be one TVDB entry
+- a title that's ambiguous, a remake or reboot, or shares its name with another show
+
+**How to check:**
+1. Fetch the official order with WebFetch:
+   `https://thetvdb.com/series/<slug>/allseasons/official` for the main
+   seasons, and `https://thetvdb.com/series/<slug>/seasons/official/0` for
+   specials. Ask for one `SxxEyy Title` line per episode. If you don't know
+   the slug, a quick web search for "thetvdb <show>" will give it.
+2. **Diff it in code, not by eye.** Save the TVDB list to the scratchpad,
+   pull `SxxEyy` and the title out of each release filename, and compare them.
+   Report the counts per season and every mismatch. Expect cosmetic
+   differences ("Part 1 of 2" vs "(1)", a trailing "…"), so normalise those
+   first and only look closely at what's left.
+3. Build the plan's `dest`s from the **TVDB** numbering, not the release's.
+   Anything that maps to no TVDB entry goes to `skip`, not a guess.
+
+**Specials** go in `TV Shows/<tier>/<Show>/Season 0/<Show> S00Eyy.<ext>`, with
+`yy` from TVDB's season-0 list. That follows the library's `Season N` style.
+The library had no specials folders before 2026-10-06; *The Legend of Korra*
+`Season 0` (Republic City Hustle = S00E01-E03) is the first.
+
+Mention what you checked against in the report (e.g. "52/52 titles match
+TVDB's official order; shorts are S00E01-E03").
+
 ## What it does
 
 - **Classifies** an entry as TV if any contained (fully-downloaded) video
@@ -155,6 +196,18 @@ executed - so the model's output never needs to be trusted blindly.
 
 ## Judgment calls / things to check after running
 
+- **If a dry run files a multi-episode pack as a MOVIE, stop.** The built-in
+  TV regex needs `SxxEyy` with no gap. `S02 E08` with a space, and Book or
+  Part naming, fall through to the movie path: it would move one episode
+  into `Movies/` and pile every other episode's subtitles beside it. Switch
+  to `--apply-plan` and the TVDB check above.
+- **A box set with only some folders on disk** is usually a partial selection
+  in Transmission (the operator ticked only some parts), not a stalled
+  download. Ask rather than wait. To confirm nothing is still being written,
+  check that the entry's `du -sb` stays the same over about 30 seconds.
+- `pgrep -f sort-completed` run inside the same `ssh` command matches that
+  command's own line, so it reports a run that isn't there. Use
+  `pgrep -af ... | grep -v pgrep` or check the pid printed by `--detach`.
 - Read the final summary's **Conflicts** and **Flagged** sections - nothing
   in those was moved.
 - Verify the run: destination files exist with `tim:smb-users` ownership,
