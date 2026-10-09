@@ -24,15 +24,6 @@
         ]
       },
       {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude notification # tmux-agent-sidebar"
-          }
-        ]
-      },
-      {
         "hooks": [
           {
             "type": "command",
@@ -48,15 +39,6 @@
           {
             "type": "command",
             "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Auto # notchbar-agents-claude-hook"
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude activity-log # tmux-agent-sidebar"
           }
         ]
       },
@@ -156,15 +138,6 @@
         ]
       },
       {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude session-end # tmux-agent-sidebar"
-          }
-        ]
-      },
-      {
         "hooks": [
           {
             "type": "command",
@@ -188,15 +161,6 @@
           {
             "type": "command",
             "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/refresh-cache.sh\" # tmux-claude-hatch"
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude session-start # tmux-agent-sidebar"
           }
         ]
       },
@@ -233,15 +197,6 @@
         ]
       },
       {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude stop # tmux-agent-sidebar"
-          }
-        ]
-      },
-      {
         "hooks": [
           {
             "type": "command",
@@ -269,15 +224,6 @@
         ]
       },
       {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude user-prompt-submit # tmux-agent-sidebar"
-          }
-        ]
-      },
-      {
         "hooks": [
           {
             "type": "command",
@@ -288,15 +234,6 @@
       }
     ],
     "StopFailure": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude stop-failure # tmux-agent-sidebar"
-          }
-        ]
-      },
       {
         "hooks": [
           {
@@ -309,15 +246,6 @@
     ],
     "PermissionDenied": [
       {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude permission-denied # tmux-agent-sidebar"
-          }
-        ]
-      },
-      {
         "hooks": [
           {
             "type": "command",
@@ -327,27 +255,7 @@
         ]
       }
     ],
-    "CwdChanged": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude cwd-changed # tmux-agent-sidebar"
-          }
-        ]
-      }
-    ],
     "SubagentStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude subagent-start # tmux-agent-sidebar"
-          }
-        ]
-      },
       {
         "hooks": [
           {
@@ -360,53 +268,11 @@
     ],
     "SubagentStop": [
       {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude subagent-stop # tmux-agent-sidebar"
-          }
-        ]
-      },
-      {
         "hooks": [
           {
             "type": "command",
             "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SubagentStop >/dev/null 2>&1 || true # tmux-home",
             "timeout": 5
-          }
-        ]
-      }
-    ],
-    "TaskCreated": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude task-created # tmux-agent-sidebar"
-          }
-        ]
-      }
-    ],
-    "TaskCompleted": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude task-completed # tmux-agent-sidebar"
-          }
-        ]
-      }
-    ],
-    "TeammateIdle": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-agent-sidebar/hook.sh\" claude teammate-idle # tmux-agent-sidebar"
           }
         ]
       }
