@@ -193,6 +193,25 @@ end
 # ~~~~~~~~~~~~~~~~~ #
 
 alias t="tmux"
+
+# Attach to the tmux session that belongs to this terminal: `scratch` in
+# ghostty (its dropdown's session), `main` everywhere else (alacritty). Both
+# exist from login (dev.tim.tmux-server LaunchAgent + continuum restore), so
+# this attaches rather than creating. Inside tmux $TERM is tmux's own, so ask
+# tmux for the outer terminal and switch the client instead of nesting.
+function tx -d "Attach to this terminal's tmux session (ghostty: scratch, else main)"
+    set -l term $TERM
+    if set -q TMUX
+        set term (tmux display-message -p '#{client_termname}')
+    end
+    set -l target main
+    string match -q '*ghostty*' -- $term; and set target scratch
+    if set -q TMUX
+        tmux switch-client -t $target
+    else
+        tmux attach -t $target
+    end
+end
 alias rf="source ~/.config/fish/config.fish"
 alias cl="cd ~/Claude && claude"
 
