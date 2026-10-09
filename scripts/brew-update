@@ -138,6 +138,11 @@ brewCasks=(
   # src/.config/linearmouse); Logi Options+ keeps owning the MX mice — see
   # docs/adr/2026-08-17-per-device-scroll-direction.md
   "linearmouse:LinearMouse.app"
+  # the Docker engine on macOS (both machines) — replaces Docker Desktop, which
+  # must not be installed alongside: it owns /var/run/docker.sock and the
+  # /usr/local/bin/docker* symlinks, and its "desktop" credsStore helper
+  # disappears with it (~/.docker/config.json uses "osxkeychain", which
+  # OrbStack ships). OrbStack provides the CLI, compose and buildx plugins.
   "orbstack:OrbStack.app"
 )
 
