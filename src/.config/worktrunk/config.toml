@@ -15,3 +15,14 @@ worktree-path = "{{ repo_path }}/../{{ repo }}-{{ branch | sanitize }}"
 # shell-escaped by worktrunk, so no quotes around the template.
 [pre-remove]
 claude-transcripts = "~/bin/worktree-relocate-transcripts {{ worktree_path }}"
+
+# Every new worktree gets the primary checkout's local, gitignored config
+# (.env, .env.local, agent.env, .envrc, *.local.*) copied in: standard
+# procedure, so nobody asks the operator to hand-copy them. pre-start rather
+# than post-start so the files exist before any project post-start hook (dev
+# server, install) wants them. Fail-open (a missing .env must never abort
+# worktree creation), never overwrites, prints names only. For worktrees made
+# without wt, run the script by hand: worktree-copy-local-env <worktree>.
+# The -x guard covers the window between merging this and re-running stow.
+[pre-start]
+copy-local-env = "[ ! -x ~/bin/worktree-copy-local-env ] || ~/bin/worktree-copy-local-env {{ worktree_path }} {{ primary_worktree_path }}"
