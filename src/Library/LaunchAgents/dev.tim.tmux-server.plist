@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.tim.tmux-server</string>
+
+  <!-- Start the tmux server at login so tmux-continuum restores the saved
+       sessions (and tmux-home resumes their Claude sessions) without waiting
+       for a terminal to be opened. Nothing else starts tmux at login:
+       alacritty opens plain fish and the ghostty dropdown only starts tmux
+       when it is first shown.
+
+       A detached `scratch` session - the one the ghostty dropdown attaches to
+       with `new-session -A -s scratch` - so the dropdown picks it up and
+       continuum restores `main` alongside it. Skipped if a server already has
+       it. Through a login shell so PATH (homebrew, from common.sh) and $HOME
+       resolve and the server's global environment is the normal one, not
+       launchd's bare one. The tmux-home daemon needs no agent of its own: its
+       plugin starts one per server when TPM loads, so it comes up with this. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>tmux has-session -t scratch 2>/dev/null || exec tmux new-session -d -s scratch</string>
+  </array>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <!-- One-shot: the job exits as soon as the server has forked. The server
+       must outlive it - by default launchd kills a finished job's process
+       group - and must not be throttled like a Background job, since it hosts
+       every interactive shell. -->
+  <key>KeepAlive</key>
+  <false/>
+  <key>AbandonProcessGroup</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Interactive</string>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/tmux-server-boot.out</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/tmux-server-boot.err</string>
+</dict>
+</plist>
