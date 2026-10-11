@@ -69,19 +69,24 @@ window-save-state = never
 # load of a global keybind (System Settings > Privacy & Security >
 # Accessibility).
 #
-# Two triggers for one action. A bare unmodified key is deliberate - this is
-# the classic quake-console binding - but note a global bind swallows the key
-# everywhere, so § can no longer be typed in any app.
+# The § key (top-left, ISO/UK Mac) opens tmux-home, and Shift+§ toggles the
+# dropdown. Both are literal-§ / physical-key choices made with care:
 #
-# § is written as a literal character, which binds the *translated* key: it
-# follows the keyboard layout and simply never fires on a layout that has no
-# §, which is exactly the wanted fallback behaviour on ANSI keyboards.
-keybind = global:§=toggle_quick_terminal
+# Plain § is NOT global - it only acts inside a Ghostty window, where it sends
+# the tmux prefix (C-a) then `.` (tmux-home, "every window, type to filter").
+# Outside Ghostty § types normally again. It is written as a literal character,
+# which binds the *translated* key: it follows the keyboard layout and simply
+# never fires on a layout that has no §.
+keybind = §=text:\x01.
 #
-# For keyboards without §. grave_accent is a *physical* key name - the
-# top-left position, which is where backtick sits on ANSI layouts. On this
-# machine's British/ISO layout that same physical key is §, so here this is
-# just Opt+§; it earns its place on ANSI keyboards.
+# The dropdown moves to Shift+§, global so it works from any app. grave_accent
+# is a *physical* key name - the top-left position, which is where backtick
+# sits on ANSI layouts and where § sits on this machine's British/ISO layout
+# (Shift+§ there types ±; a global bind swallows that chord everywhere).
+keybind = global:shift+grave_accent=toggle_quick_terminal
+#
+# Non-Mac-layout overload, kept: Opt+grave_accent is Opt+§ on ISO, and the
+# only chord that is not a typed character on ANSI keyboards, which have no §.
 keybind = global:opt+grave_accent=toggle_quick_terminal
 
 # tmux prefix on Cmd+. : tmux can't see Cmd, so send its real prefix, C-a.
