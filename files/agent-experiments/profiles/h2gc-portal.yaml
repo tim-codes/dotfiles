@@ -1,0 +1,33 @@
+version: 1
+id: exxo-h2gc-portal
+name: Exxo h2gc portal read-only pilot
+extends: exxo
+policy: contract/policy.md
+audience: project
+capabilities:
+  - h2gc-repo-skills
+exclusions:
+  - homelab-run-with-secrets
+  - mantine
+  - credential-mcp
+downstream:
+  repository: /Users/tim/dev/exxo/h2gc/h2gc-portal
+  authoritative_instructions:
+    - /Users/tim/dev/exxo/h2gc/h2gc-portal/AGENTS.md
+    - /Users/tim/dev/exxo/h2gc/h2gc-portal/openspec/AGENTS.md
+    - /Users/tim/dev/exxo/h2gc/h2gc-portal/CLAUDE.md
+  boundary_references:
+    - /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/settings.json
+    - /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/vendor/skills
+    - /Users/tim/dev/exxo/h2gc/h2gc-portal/Justfile
+    - /Users/tim/dev/exxo/h2gc/h2gc-portal/agent/run
+  staleness_check: just skills-check
+  platform_ops: agent/run -- <command>
+  application_environment: remains owned by just install and existing project recipes
+constraints:
+  - Read the downstream AGENTS.md before planning work and follow its OpenSpec routing.
+  - Treat CLAUDE.md as authoritative project guidance where it is vendor-neutral.
+  - Use only the existing pinned project skill path; never create a second delivery path.
+  - The pilot is read-only and must not change any file in the downstream repository.
+  - Never materialise agent.env, resolved values, MCP tokens, or Claude permission entries.
+  - agent/run may be named for manual platform operations only; it grants no direct secret-reading authority.

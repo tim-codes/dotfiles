@@ -1,0 +1,549 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "json"
+require "open3"
+require "pathname"
+require "yaml"
+
+class ExperimentError < StandardError; end
+
+class AgentExperiment
+  PROFILE_ALIASES = {
+    "exxo" => "exxo.yaml",
+    "h2gc-portal" => "h2gc-portal.yaml",
+    "exxo-h2gc-portal" => "h2gc-portal.yaml"
+  }.freeze
+
+  REQUIRED_CAPABILITY_FIELDS = %w[
+    id name source_repository source_root required_paths invocation_contract
+    allowed_audience delivery_mode experiment_status collision_key
+  ].freeze
+
+  SECRET_SHAPES = [
+    /\bgh[pousr]_[A-Za-z0-9]{20,}\b/,
+    /\bsk-[A-Za-z0-9]{16,}\b/,
+    /\bAKIA[0-9A-Z]{16}\b/,
+    /\bBearer\s+\S+/i
+  ].freeze
+
+  attr_reader :repo_root, :experiment_root
+
+  def initialize
+    @repo_root = File.expand_path("..", __dir__)
+    @experiment_root = ENV.fetch(
+      "AGENT_EXPERIMENT_ROOT",
+      File.join(@repo_root, "files", "agent-experiments")
+    )
+  end
+
+  def run(argv)
+    command = argv.shift
+    options = parse_options(argv)
+
+    case command
+    when "inspect" then inspect_adapter(options)
+    when "validate" then validate_command(options)
+    when "render" then render_command(options)
+    when "stage" then stage_command(options)
+    when "help", "--help", "-h", nil then puts usage
+    else raise ExperimentError, "unknown subcommand: #{command}"
+    end
+  end
+
+  private
+
+  def usage
+    <<~TEXT
+      Usage:
+        agent-experiment inspect --adapter codex-air [--profile NAME]
+        agent-experiment validate --profile NAME [--profile-file PATH] [--capabilities-file PATH]
+        agent-experiment render --profile NAME [--profile-file PATH] [--capabilities-file PATH]
+        agent-experiment stage --profile NAME --destination ABSOLUTE_EMPTY_DIRECTORY
+
+      render writes only to stdout. stage is the only subcommand that writes files.
+    TEXT
+  end
+
+  def parse_options(argv)
+    options = {}
+    until argv.empty?
+      flag = argv.shift
+      case flag
+      when "--adapter", "--profile", "--profile-file", "--capabilities-file", "--destination"
+        raise ExperimentError, "#{flag} requires a value" if argv.empty?
+        options[flag.delete_prefix("--").tr("-", "_").to_sym] = argv.shift
+      when "--help", "-h"
+        puts usage
+        exit 0
+      else
+        raise ExperimentError, "unknown option: #{flag}"
+      end
+    end
+    options
+  end
+
+  def yaml_file(path)
+    raise ExperimentError, "missing YAML file: #{path}" unless File.file?(path)
+    value = YAML.safe_load(File.read(path), [], [], false)
+    raise ExperimentError, "YAML document must be a mapping: #{path}" unless value.is_a?(Hash)
+    value
+  rescue Psych::Exception => e
+    raise ExperimentError, "invalid YAML at #{path}: #{e.class}"
+  end
+
+  def capabilities_path(options)
+    File.expand_path(options[:capabilities_file] || File.join(experiment_root, "contract", "capabilities.yaml"))
+  end
+
+  def profile_path(options)
+    return File.expand_path(options[:profile_file]) if options[:profile_file]
+
+    name = options[:profile]
+    raise ExperimentError, "--profile is required" unless name
+    filename = PROFILE_ALIASES[name]
+    raise ExperimentError, "unknown profile: #{name}" unless filename
+    File.join(experiment_root, "profiles", filename)
+  end
+
+  def load_profile(options)
+    path = profile_path(options)
+    profile = yaml_file(path)
+    profile["_source_path"] = path
+
+    if profile["extends"]
+      base_name = profile["extends"]
+      base_filename = PROFILE_ALIASES[base_name]
+      raise ExperimentError, "unknown base profile: #{base_name}" unless base_filename
+      base_path = File.join(experiment_root, "profiles", base_filename)
+      base = yaml_file(base_path)
+      profile = merge_profiles(base, profile)
+      profile["_base_source_path"] = base_path
+      profile["_source_path"] = path
+    end
+    profile
+  end
+
+  def merge_profiles(base, overlay)
+    merged = base.merge(overlay)
+    merged["capabilities"] = Array(base["capabilities"]) + Array(overlay["capabilities"])
+    merged["exclusions"] = (Array(base["exclusions"]) + Array(overlay["exclusions"])).uniq
+    merged["constraints"] = Array(base["constraints"]) + Array(overlay["constraints"])
+    merged
+  end
+
+  def load_catalogue(options)
+    path = capabilities_path(options)
+    document = yaml_file(path)
+    list = document["capabilities"]
+    raise ExperimentError, "capabilities must be a list: #{path}" unless list.is_a?(Array)
+    [document, path]
+  end
+
+  def adapter_manifest_path(adapter = "codex-air")
+    File.join(experiment_root, "adapters", adapter, "skill-manifest.yaml")
+  end
+
+  def validate_all(options)
+    profile = load_profile(options)
+    catalogue, catalogue_path = load_catalogue(options)
+    adapter = options[:adapter] || "codex-air"
+    adapter_path = adapter_manifest_path(adapter)
+    adapter_manifest = yaml_file(adapter_path)
+    errors = []
+
+    errors << "profile version must be 1" unless profile["version"] == 1
+    %w[id name policy audience capabilities exclusions constraints].each do |field|
+      errors << "profile missing field: #{field}" unless profile.key?(field)
+    end
+    errors << "capability catalogue version must be 1" unless catalogue["version"] == 1
+
+    capability_list = catalogue["capabilities"]
+    ids = capability_list.map { |capability| capability["id"] }
+    ids.group_by(&:itself).each do |id, occurrences|
+      errors << "duplicate capability id: #{id}" if id && occurrences.length > 1
+    end
+
+    capability_list.each_with_index do |capability, index|
+      unless capability.is_a?(Hash)
+        errors << "capability #{index} must be a mapping"
+        next
+      end
+      REQUIRED_CAPABILITY_FIELDS.each do |field|
+        errors << "capability #{capability["id"] || index} missing field: #{field}" unless capability.key?(field)
+      end
+      errors << "capability #{capability["id"] || index} required_paths must be a list" unless capability["required_paths"].is_a?(Array)
+      errors << "capability #{capability["id"] || index} allowed_audience must be a list" unless capability["allowed_audience"].is_a?(Array)
+    end
+
+    selected_ids = Array(profile["capabilities"])
+    selected = selected_ids.each_with_object([]) do |id, capabilities|
+      capability = capability_list.find { |entry| entry["id"] == id }
+      errors << "profile selects unknown capability: #{id}" unless capability
+      capabilities << capability if capability
+    end
+
+    selected.group_by { |capability| capability["collision_key"] }.each do |key, capabilities|
+      next if key.nil? || capabilities.length < 2
+      names = capabilities.map { |capability| capability["id"] }.sort.join(", ")
+      errors << "capability collision on '#{key}': #{names}; select exactly one delivery path"
+    end
+
+    selected.each do |capability|
+      if capability["experiment_status"] != "approved"
+        errors << "capability #{capability["id"]} is #{capability["experiment_status"]} and cannot be selected"
+      end
+      root = capability["source_root"]
+      errors << "missing capability source root for #{capability["id"]}: #{root}" unless root && File.exist?(root)
+      Array(capability["required_paths"]).each do |required_path|
+        errors << "missing referenced path for #{capability["id"]}: #{required_path}" unless File.exist?(required_path)
+      end
+      unless adapter_manifest.fetch("mappings", {}).key?(capability["id"])
+        errors << "adapter #{adapter} has no mapping for capability #{capability["id"]}"
+      end
+    end
+
+    exclusions = Array(profile["exclusions"])
+    overlap = selected_ids & exclusions
+    errors << "profile both selects and excludes: #{overlap.sort.join(", ")}" unless overlap.empty?
+
+    policy_path = File.join(experiment_root, profile.fetch("policy", ""))
+    errors << "missing portable policy: #{policy_path}" unless File.file?(policy_path)
+    validate_downstream(profile, errors)
+    scan_for_secret_shapes(catalogue, "capabilities", errors)
+    scan_for_secret_shapes(profile.reject { |key, _| key.start_with?("_") }, "profile", errors)
+
+    {
+      profile: profile,
+      profile_path: profile["_source_path"],
+      catalogue: catalogue,
+      catalogue_path: catalogue_path,
+      capabilities: selected,
+      adapter: adapter,
+      adapter_manifest: adapter_manifest,
+      adapter_path: adapter_path,
+      policy_path: policy_path,
+      errors: errors
+    }
+  end
+
+  def validate_downstream(profile, errors)
+    downstream = profile["downstream"]
+    return unless downstream
+
+    repository = downstream["repository"]
+    errors << "downstream repository is missing: #{repository}" unless repository && Dir.exist?(repository)
+    Array(downstream["authoritative_instructions"]).each do |path|
+      errors << "missing downstream instruction: #{path}" unless File.file?(path)
+    end
+    Array(downstream["boundary_references"]).each do |path|
+      errors << "missing downstream boundary reference: #{path}" unless File.exist?(path)
+    end
+  end
+
+  def scan_for_secret_shapes(value, location, errors)
+    case value
+    when Hash
+      value.each { |key, child| scan_for_secret_shapes(child, "#{location}.#{key}", errors) }
+    when Array
+      value.each_with_index { |child, index| scan_for_secret_shapes(child, "#{location}[#{index}]", errors) }
+    when String
+      if SECRET_SHAPES.any? { |shape| value.match?(shape) }
+        errors << "credential-shaped value rejected at #{location} (value redacted)"
+      end
+    end
+  end
+
+  def assert_valid!(result)
+    return if result[:errors].empty?
+    raise ExperimentError, "validation failed:\n  - #{result[:errors].join("\n  - ")}"
+  end
+
+  def validate_command(options)
+    result = validate_all(options)
+    assert_valid!(result)
+    puts "valid profile: #{result[:profile]["id"]}"
+    puts "adapter: #{result[:adapter]}"
+    puts "capabilities: #{result[:capabilities].map { |capability| capability["id"] }.sort.join(", ")}"
+    puts "sources: all declared files and directories exist"
+    puts "collisions: none"
+    puts "credential-shaped values: none"
+  end
+
+  def render_command(options)
+    result = validate_all(options)
+    assert_valid!(result)
+    bundle = render_bundle(result)
+    bundle.keys.sort.each do |name|
+      puts "--- #{name} ---"
+      print bundle.fetch(name)
+      puts unless bundle.fetch(name).end_with?("\n")
+    end
+  end
+
+  def render_bundle(result)
+    profile = result[:profile]
+    template_path = File.join(experiment_root, "adapters", result[:adapter], "AGENTS.md.tmpl")
+    template = File.read(template_path)
+    policy = File.read(result[:policy_path]).rstrip
+
+    capability_lines = result[:capabilities].sort_by { |capability| capability["id"] }.map do |capability|
+      "- `#{capability["id"]}` — #{capability["delivery_mode"]}; invoke as `#{capability["invocation_contract"]}`; source `#{capability["source_repository"]}`."
+    end.join("\n")
+
+    downstream = profile["downstream"]
+    downstream_lines = if downstream
+      lines = ["- Repository (read-only): `#{downstream["repository"]}`"]
+      Array(downstream["authoritative_instructions"]).each { |path| lines << "- Authoritative instruction: `#{path}`" }
+      lines << "- Skill staleness check: `#{downstream["staleness_check"]}`"
+      lines << "- Manual platform operations boundary: `#{downstream["platform_ops"]}`"
+      lines.join("\n")
+    else
+      "- No downstream repository is selected."
+    end
+
+    replacements = {
+      "{{PROFILE_ID}}" => profile["id"],
+      "{{POLICY_SOURCE}}" => relative_experiment_path(result[:policy_path]),
+      "{{PROFILE_SOURCE}}" => relative_experiment_path(result[:profile_path]),
+      "{{CAPABILITIES_SOURCE}}" => relative_experiment_path(result[:catalogue_path]),
+      "{{ADAPTER_SOURCE}}" => relative_experiment_path(result[:adapter_path]),
+      "{{POLICY_BODY}}" => policy,
+      "{{CAPABILITY_LINES}}" => capability_lines,
+      "{{DOWNSTREAM_LINES}}" => downstream_lines,
+      "{{EXCLUSION_LINES}}" => Array(profile["exclusions"]).sort.map { |id| "`#{id}`" }.join(", ")
+    }
+    agents = replacements.reduce(template) { |text, (needle, value)| text.gsub(needle, value.to_s) }
+    raise ExperimentError, "unresolved adapter template placeholder" if agents.match?(/\{\{[A-Z_]+\}\}/)
+    agents = agents.rstrip + "\n"
+
+    profile_reference = {
+      "profile" => profile["id"],
+      "policy" => relative_experiment_path(result[:policy_path]),
+      "capabilities" => result[:capabilities].map { |capability| capability["id"] }.sort,
+      "excluded" => Array(profile["exclusions"]).sort,
+      "downstream_repository" => downstream && downstream["repository"],
+      "authoritative_instructions" => downstream ? Array(downstream["authoritative_instructions"]).sort : []
+    }
+
+    source_manifest = build_source_manifest(result, template_path)
+    {
+      "AGENTS.md" => agents,
+      "PROFILE.json" => JSON.pretty_generate(profile_reference) + "\n",
+      "source-manifest.json" => JSON.pretty_generate(source_manifest) + "\n"
+    }
+  end
+
+  def relative_experiment_path(path)
+    pathname = Pathname.new(File.expand_path(path))
+    root = Pathname.new(File.expand_path(experiment_root))
+    pathname.relative_path_from(root).to_s
+  rescue ArgumentError
+    File.expand_path(path)
+  end
+
+  def build_source_manifest(result, template_path)
+    profile = result[:profile]
+    files = [
+      result[:policy_path], result[:catalogue_path], result[:profile_path],
+      profile["_base_source_path"], result[:adapter_path], template_path
+    ].compact
+    result[:capabilities].each { |capability| files.concat(Array(capability["required_paths"])) }
+    if profile["downstream"]
+      files.concat(Array(profile["downstream"]["authoritative_instructions"]))
+      files.concat(Array(profile["downstream"]["boundary_references"]))
+    end
+    file_entries = files.uniq.select { |path| File.file?(path) }.sort.map do |path|
+      { "path" => path, "sha256" => Digest::SHA256.file(path).hexdigest }
+    end
+
+    roots = result[:capabilities].map { |capability| [capability["source_repository"], capability["source_root"]] }
+    if profile["downstream"]
+      roots << ["exxo/h2gc/h2gc-portal", profile["downstream"]["repository"]]
+      roots << ["exxo/skills pinned submodule", File.join(profile["downstream"]["repository"], ".claude", "vendor", "skills")]
+    end
+    sources = roots.uniq.sort_by { |name, path| [name.to_s, path.to_s] }.map do |name, path|
+      { "name" => name, "path" => path, "revision" => git_revision(path) }
+    end
+
+    {
+      "profile" => profile["id"],
+      "adapter" => result[:adapter],
+      "capabilities" => result[:capabilities].map { |capability| capability["id"] }.sort,
+      "sources" => sources,
+      "files" => file_entries
+    }
+  end
+
+  def git_revision(path)
+    stdout, status = Open3.capture2("git", "-C", path, "rev-parse", "HEAD")
+    status.success? ? stdout.strip : "not-a-git-source"
+  rescue Errno::ENOENT
+    "git-unavailable"
+  end
+
+  def inspect_adapter(options)
+    adapter = options[:adapter] || "codex-air"
+    raise ExperimentError, "unsupported adapter: #{adapter}" unless adapter == "codex-air"
+    profile_name = options[:profile] || "exxo-h2gc-portal"
+    result = validate_all(options.merge(profile: profile_name, adapter: adapter))
+
+    home = Dir.home
+    codex_home = File.expand_path(ENV.fetch("CODEX_HOME", File.join(home, ".codex")))
+    user_skills = File.join(home, ".agents", "skills")
+    repo_skill_roots = repository_skill_roots(Dir.pwd)
+    air_candidates = [
+      "/Applications/Air.app",
+      File.join(home, "Applications", "Air.app"),
+      File.join(home, "Library", "Application Support", "Air"),
+      File.join(home, "Library", "Application Support", "JetBrains", "Air"),
+      File.join(home, "Library", "Caches", "JetBrains", "Air"),
+      File.join(home, "Library", "Logs", "JetBrains", "Air")
+    ]
+
+    puts "adapter: codex-air"
+    puts "probe mode: read-only; paths and names only"
+    puts "Codex documented instruction precedence:"
+    puts "  1. #{codex_home}/AGENTS.override.md (if non-empty), otherwise #{codex_home}/AGENTS.md"
+    puts "  2. project root to current directory: AGENTS.override.md, then AGENTS.md, then configured fallbacks"
+    puts "Codex documented skill roots:"
+    puts "  user: #{user_skills} (#{existence(user_skills)})"
+    repo_skill_roots.each { |path| puts "  repository: #{path} (#{existence(path)})" }
+    puts "  admin: /etc/codex/skills (#{existence("/etc/codex/skills")})"
+    puts "Codex supported metadata names: SKILL.md; optional agents/openai.yaml"
+    puts "Codex locally visible user skill names: #{child_directory_names(user_skills).join(", ").then { |names| names.empty? ? "(none)" : names }}"
+    puts "Air candidate application paths (presence is not discovery support):"
+    air_candidates.each { |path| puts "  #{path} (#{existence(path)})" }
+    puts "Air user-level instructions/skill discovery: unknown; no install path is claimed"
+    puts "Profile capability availability:"
+    result[:capabilities].sort_by { |capability| capability["id"] }.each do |capability|
+      available = File.exist?(capability["source_root"]) && Array(capability["required_paths"]).all? { |path| File.exist?(path) }
+      puts "  #{capability["id"]}: #{available ? "available" : "unavailable"} (#{capability["delivery_mode"]})"
+    end
+    unless result[:errors].empty?
+      puts "Profile validation issues: #{result[:errors].length} (run validate for redacted diagnostics)"
+    end
+  end
+
+  def repository_skill_roots(start)
+    current = Pathname.new(File.expand_path(start))
+    roots = []
+    loop do
+      roots << File.join(current.to_s, ".agents", "skills")
+      break if File.exist?(File.join(current.to_s, ".git")) || current.root?
+      current = current.parent
+    end
+    roots.uniq
+  end
+
+  def child_directory_names(path)
+    return [] unless Dir.exist?(path)
+    Dir.children(path).select { |name| File.directory?(File.join(path, name)) }.sort
+  rescue SystemCallError
+    []
+  end
+
+  def existence(path)
+    File.exist?(path) ? "present" : "absent"
+  end
+
+  def stage_command(options)
+    destination_text = options[:destination]
+    raise ExperimentError, "--destination is required" unless destination_text
+    raise ExperimentError, "stage destination must be an absolute path" unless Pathname.new(destination_text).absolute?
+
+    destination = File.expand_path(destination_text)
+    reject_protected_destination!(destination)
+    raise ExperimentError, "stage destination must already exist as a directory: #{destination}" unless Dir.exist?(destination)
+    raise ExperimentError, "stage destination must not be a symlink: #{destination}" if File.symlink?(destination)
+    raise ExperimentError, "stage destination must be empty: #{destination}" unless Dir.children(destination).empty?
+
+    result = validate_all(options)
+    assert_valid!(result)
+    bundle = render_bundle(result)
+    temporary = File.join(destination, ".agent-experiment-stage-#{Process.pid}")
+    raise ExperimentError, "temporary stage path already exists: #{temporary}" if File.exist?(temporary)
+
+    begin
+      Dir.mkdir(temporary, 0o700)
+      bundle.each { |name, content| File.write(File.join(temporary, name), content, mode: "w", perm: 0o600) }
+      bundle.keys.sort.each { |name| File.rename(File.join(temporary, name), File.join(destination, name)) }
+      Dir.rmdir(temporary)
+    rescue StandardError
+      FileUtils.remove_entry_secure(temporary) if File.exist?(temporary)
+      bundle.keys.each do |name|
+        staged = File.join(destination, name)
+        File.delete(staged) if File.file?(staged)
+      end
+      raise
+    end
+
+    puts "staged profile #{result[:profile]["id"]} at #{destination}"
+    puts "files: #{bundle.keys.sort.join(", ")}"
+  end
+
+  def reject_protected_destination!(destination)
+    home = File.expand_path(Dir.home)
+    lexical = File.expand_path(destination)
+    home_relative = begin
+      Pathname.new(lexical).relative_path_from(Pathname.new(home)).to_s
+    rescue ArgumentError
+      nil
+    end
+
+    if home_relative && (home_relative == ".claude" || home_relative.start_with?(".claude/", ".claude-"))
+      raise ExperimentError, "protected live destination rejected: #{destination}"
+    end
+
+    protected_paths = [
+      File.join(home, "claude"),
+      File.join(home, ".claude"),
+      File.join(home, ".codex"),
+      File.join(home, ".agents"),
+      File.join(home, "Library", "Application Support", "Codex"),
+      File.join(home, "Library", "Application Support", "Air"),
+      File.join(home, "Library", "Application Support", "JetBrains", "Air"),
+      File.join(home, "Library", "Caches", "JetBrains", "Air"),
+      File.join(home, "Library", "Logs", "JetBrains", "Air"),
+      File.join(home, "Library", "Application Support", "OpenAI"),
+      File.join(home, "Applications", "Air.app"),
+      "/Applications/Air.app",
+      File.join(repo_root, "files", "claude"),
+      "/Users/tim/dev/dotfiles/files/claude",
+      "/Users/tim/dev/exxo/h2gc/h2gc-portal"
+    ]
+    protected_paths.concat(Dir.glob(File.join(home, ".claude-*")))
+
+    resolved_destination = resolve_existing_path(lexical)
+    protected_paths.uniq.each do |protected_path|
+      protected = resolve_existing_path(File.expand_path(protected_path))
+      if path_equal_or_descendant?(lexical, File.expand_path(protected_path)) ||
+         path_equal_or_descendant?(resolved_destination, protected)
+        raise ExperimentError, "protected live destination rejected: #{destination}"
+      end
+    end
+  end
+
+  def resolve_existing_path(path)
+    File.exist?(path) ? File.realpath(path) : File.expand_path(path)
+  rescue SystemCallError
+    File.expand_path(path)
+  end
+
+  def path_equal_or_descendant?(candidate, parent)
+    candidate == parent || candidate.start_with?(parent.end_with?(File::SEPARATOR) ? parent : "#{parent}#{File::SEPARATOR}")
+  end
+end
+
+begin
+  AgentExperiment.new.run(ARGV)
+rescue ExperimentError => e
+  warn "agent-experiment: #{e.message}"
+  exit 1
+rescue StandardError => e
+  warn "agent-experiment: internal error (#{e.class}); no credential values were printed"
+  warn e.backtrace.join("\n") if ENV["AGENT_EXPERIMENT_DEBUG"] == "1"
+  exit 1
+end
