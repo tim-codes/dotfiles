@@ -79,15 +79,18 @@ window-save-state = never
 # never fires on a layout that has no §.
 keybind = §=text:\x01.
 #
-# Opt changes the translated character, so the dropdown chord can't use the
-# literal §; it binds physical keys. Which one depends on the keyboard: on an
-# ISO Mac the § key is the ISO-section key, which Ghostty names intl_backslash
-# - NOT grave_accent, which on ISO is the separate `/~ key beside left Shift.
-# On ANSI (no § key) the equivalent top-left key is grave_accent. Bind both so
-# the chord is "the key left of 1" everywhere; on ISO the grave_accent bind
-# also catches Opt+` (the dead-key accent).
 # Dropdown: Opt+§. Global, so it swallows that chord in every app.
-keybind = global:opt+intl_backslash=toggle_quick_terminal
+#
+# Written as the literal §, not a physical key name. Measured on this machine
+# (CGEventTap): the § key is keycode 10 (ISO section; the separate `/~ key is
+# 50), and Opt+§ arrives with no characters but charactersIgnoringModifiers
+# "§" - the unshifted character, which is what a literal binding matches. The
+# physical name for keycode 10 (intl_backslash) did not fire as a global bind.
+keybind = global:opt+§=toggle_quick_terminal
+#
+# For keyboards without §: grave_accent is the top-left physical key on ANSI.
+# On an ISO Mac this is the separate backtick key, so it also catches Opt+`
+# (the dead-key accent).
 keybind = global:opt+grave_accent=toggle_quick_terminal
 
 # tmux prefix on Cmd+. : tmux can't see Cmd, so send its real prefix, C-a.
