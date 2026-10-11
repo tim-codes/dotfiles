@@ -1,0 +1,72 @@
+#!/bin/bash
+# Copy the primary checkout's local, gitignored config files (.env, .env.local,
+# agent.env, .envrc, *.local.*) into a git worktree, so a fresh worktree is
+# runnable without anyone asking the operator to hand-copy them.
+#
+#   worktree-copy-local-env [-n] <worktree> [<source-checkout>]
+#     -n  dry run: list what would be copied, change nothing
+#     <source-checkout> defaults to the repo's primary worktree.
+#
+# Wired as worktrunk's user-level pre-start hook (src/.config/worktrunk/
+# config.toml), so it runs once whenever `wt switch --create` makes a worktree
+# - pre-start rather than post-start because it blocks, so the files exist
+# before any project post-start hook (dev server, install) wants them. Run it by
+# hand for a worktree made without wt (`git worktree add`, EnterWorktree, an
+# isolation: "worktree" agent) - safe to repeat.
+#
+# Looks at the repo root and one level into apps/* and packages/*. A file is
+# copied only when ALL hold:
+#   - it is gitignored in the source checkout and not tracked (tracked files
+#     arrive with the branch anyway);
+#   - it is a regular file, not a symlink (symlinks are typically recreated by
+#     the repo's own install step, and would dangle or alias the source);
+#   - the destination does not already exist (never overwrites) and the
+#     destination directory does (a branch without apps/foo gets no apps/foo).
+# Names are printed, contents never are. Mode is preserved (.env is often 0600).
+#
+# FAIL-OPEN on purpose: a pre-start hook that exits non-zero aborts worktree
+# creation, and a missing .env is recoverable where a missing worktree is not.
+# Problems are warned about on stderr and the exit status stays 0.
+set -u
+
+dry=0
+if [ "${1:-}" = -n ]; then dry=1; shift; fi
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+    echo "usage: worktree-copy-local-env [-n] <worktree> [<source-checkout>]" >&2
+    exit 2
+fi
+
+warn() { echo "worktree-copy-local-env: warning: $*" >&2; }
+
+dest="$(git -C "$1" rev-parse --show-toplevel 2>/dev/null)" || { warn "not a git worktree: $1"; exit 0; }
+if [ $# -eq 2 ]; then
+    src="$(git -C "$2" rev-parse --show-toplevel 2>/dev/null)" || { warn "not a git checkout: $2"; exit 0; }
+else
+    # First entry of `git worktree list` is the primary (main) worktree.
+    src="$(git -C "$dest" worktree list --porcelain | sed -n '1s/^worktree //p')"
+fi
+[ -d "$src" ] || { warn "source checkout not found: ${src:-<empty>}"; exit 0; }
+[ "$src" = "$dest" ] && exit 0
+
+# Globs anchored on $src, not the cwd: run by hand from elsewhere, a bare
+# apps/* would match nothing and silently skip every subdirectory.
+for dir in "$src" "$src"/apps/* "$src"/packages/*; do
+    [ -d "$dir" ] || continue
+    sub="${dir#"$src"}"; sub="${sub#/}"; sub="${sub:-.}"
+    [ -d "$dest/$sub" ] || continue
+    while IFS= read -r f; do
+        rel="${f#"$src"/}"; rel="${rel#./}"
+        [ -f "$f" ] && [ ! -L "$f" ] || continue
+        [ -e "$dest/$rel" ] || [ -L "$dest/$rel" ] && continue
+        git -C "$src" check-ignore -q -- "$rel" || continue
+        git -C "$src" ls-files --error-unmatch -- "$rel" >/dev/null 2>&1 && continue
+        if [ "$dry" -eq 0 ]; then
+            cp -p "$f" "$dest/$rel" || { warn "could not copy $rel"; continue; }
+        fi
+        if [ "$dry" -eq 1 ]; then echo "worktree-copy-local-env: would copy $rel"; else echo "worktree-copy-local-env: copied $rel"; fi
+    done < <(find "$src/$sub" -maxdepth 1 -type f \
+        \( -name .env -o -name .env.local -o -name '.env.*.local' \
+           -o -name agent.env -o -name .envrc -o -name '*.local.*' \) | sort)
+done
+
+exit 0
