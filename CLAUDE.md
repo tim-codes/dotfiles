@@ -102,6 +102,13 @@ branches, commits, pushes and gets removed independently of it. Remove it with `
 hook relocates the Claude transcripts of sessions that ran there first
 (see the worktree-closedown skill) - never a bare `git worktree remove`.
 
+New worktrees also get the primary checkout's gitignored local config (`.env`,
+`.env.local`, `agent.env`, `.envrc`, `*.local.*`, at the root and in
+`apps/*`/`packages/*`) copied in automatically: worktrunk's `pre-start` hook
+runs `src/bin/worktree-copy-local-env` (no overwrite, names printed, never
+contents, fail-open). For a worktree made without `wt`, run
+`worktree-copy-local-env <worktree>` yourself - don't ask the operator to.
+
 ## Important Notes
 
 - The init script should be run from native terminal (not alacritty) for best compatibility
