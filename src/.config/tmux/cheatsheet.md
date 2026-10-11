@@ -143,6 +143,7 @@ Shell commands, not keys. Worktrees land beside the repo as `../<repo>-<branch>`
 | Key | Does |
 | --- | --- |
 | `§` | tmux-home (`C-a .`) — in Ghostty and Alacritty |
+| `⌥ \\` | tmux-home toggle (`C-a .`; again closes it) — in Ghostty and Alacritty, left Option |
 | `⌥ §` | Toggle the Ghostty dropdown — global, from any app |
 | `⇧ Return` | Newline without submitting |
 | `⌥ ←` / `→` | Move by word on the command line |

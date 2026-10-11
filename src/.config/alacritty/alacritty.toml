@@ -67,6 +67,13 @@ chars = "\u0001"
 key = "§"
 chars = "\u0001."
 
+# Opt+\ also opens tmux-home, same as the ghostty config: sends C-a ., and the
+# popup closes on the same chord. Left Option only (option_as_alt above).
+[[keyboard.bindings]]
+key = "\\"
+mods = "Alt"
+chars = "\u0001."
+
 [[keyboard.bindings]]
 key = "Return"
 mods = "Shift"

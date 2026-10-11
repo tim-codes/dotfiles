@@ -79,6 +79,12 @@ window-save-state = never
 # never fires on a layout that has no §.
 keybind = §=text:\x01.
 #
+# Opt+\ also opens tmux-home, for keyboards and moments without §. Sent as the
+# same C-a . text, so pressing it again inside the popup closes it (the popup
+# reads the open chord as its toggle). The physical backslash key with left
+# Option (Alt, see macos-option-as-alt below); same binding in alacritty.toml.
+keybind = alt+backslash=text:\x01.
+#
 # Dropdown: Opt+§. Global, so it swallows that chord in every app.
 #
 # Written as the literal §, not a physical key name. Measured on this machine
