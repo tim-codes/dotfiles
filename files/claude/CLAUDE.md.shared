@@ -156,6 +156,18 @@ just add a small tool to it) needs to survive a reinstall or a new machine —
 otherwise the workstation's real state silently diverges from what the repo
 says it is, and the next reproduction from source control is wrong.
 
+## Docker not running: start OrbStack, don't ask
+
+If a command fails because Docker isn't running (e.g. "Cannot connect to the
+Docker daemon at unix:///Users/tim/.orbstack/run/docker.sock"), start it with
+`orb start` without asking the operator. Wait until `docker info` succeeds,
+then carry on — e.g. starting the shared `exxo-1p-cache` secret-cache container.
+
+**Why:** the operator said so on 11 Oct 2026. OrbStack is a routine, safe local
+service, and stopping to ask costs a round trip for nothing. Without Docker the
+secret cache can't run, so every credential resolution falls back to a fresh
+1Password approval.
+
 ## Secrets are referenced, never written
 
 A secret never appears as a literal value — not in a config file
