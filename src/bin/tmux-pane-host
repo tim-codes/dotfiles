@@ -1,0 +1,45 @@
+#!/bin/sh
+# Print the host a tmux pane is looking at, for the status-line host chip.
+#
+#   tmux-pane-host <pane_tty>
+#
+# If the pane's foreground job is an ssh or mosh session, print "→ <host>"
+# (the destination as typed: an ssh_config alias stays an alias, user@ is
+# dropped). Otherwise print this machine's short hostname. tmux's own #H is
+# the host the *server* runs on, which never changes when a pane ssh's away -
+# that is the case this exists for.
+#
+# Called from status-right in src/.tmux.conf with #{pane_tty}, so tmux re-runs
+# it as soon as the active pane changes (the command string changes), and on
+# status-interval otherwise.
+
+tty="${1#/dev/}"
+local_host() { hostname -s 2>/dev/null || hostname | cut -d. -f1; }
+
+[ -n "$tty" ] || { local_host; exit 0; }
+
+# Foreground processes on the tty ('+' in stat), first ssh/mosh among them.
+# ssh options that take a value (ssh(1)) are skipped with their argument; the
+# first remaining word is the destination.
+host=$(ps -t "$tty" -o stat= -o args= 2>/dev/null | awk '
+  $1 !~ /\+/ { next }
+  {
+    cmd = $2; sub(/.*\//, "", cmd)
+    if (cmd != "ssh" && cmd != "mosh" && cmd != "mosh-client") next
+    if (cmd == "mosh-client") next   # mosh-client argv has no hostname
+    for (i = 3; i <= NF; i++) {
+      w = $i
+      if (w ~ /^-/) {
+        if (cmd == "ssh" && w ~ /^-[BbcDEeFIiJLlmOopPQRSWw]$/) i++
+        continue
+      }
+      sub(/^ssh:\/\//, "", w); sub(/.*@/, "", w); sub(/:[0-9]+$/, "", w)
+      print w; exit
+    }
+  }')
+
+if [ -n "$host" ]; then
+  printf '→ %s\n' "$host"
+else
+  local_host
+fi
