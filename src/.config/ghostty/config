@@ -69,24 +69,24 @@ window-save-state = never
 # load of a global keybind (System Settings > Privacy & Security >
 # Accessibility).
 #
-# The § key (top-left, ISO/UK Mac) opens tmux-home, and Shift+§ toggles the
-# dropdown. Both are literal-§ / physical-key choices made with care:
+# The § key (top-left, ISO/UK Mac) is the tmux key:
+#   §        opens tmux-home (C-a . - "every window, type to filter")
+#   Shift+§  sends the tmux prefix (C-a), an extra binding beside Cmd+.
+#   Opt+§    toggles the dropdown, from any app
 #
-# Plain § is NOT global - it only acts inside a Ghostty window, where it sends
-# the tmux prefix (C-a) then `.` (tmux-home, "every window, type to filter").
-# Outside Ghostty § types normally again. It is written as a literal character,
+# Plain § and Shift+§ are NOT global - they only act inside a Ghostty window,
+# so outside it § (and ±) type normally. § is written as a literal character,
 # which binds the *translated* key: it follows the keyboard layout and simply
 # never fires on a layout that has no §.
 keybind = §=text:\x01.
 #
-# The dropdown moves to Shift+§, global so it works from any app. grave_accent
-# is a *physical* key name - the top-left position, which is where backtick
-# sits on ANSI layouts and where § sits on this machine's British/ISO layout
-# (Shift+§ there types ±; a global bind swallows that chord everywhere).
-keybind = global:shift+grave_accent=toggle_quick_terminal
+# grave_accent is a *physical* key name - the top-left position, which is where
+# backtick sits on ANSI layouts and where § sits on this machine's British/ISO
+# layout (Shift+§ there is ±; a literal ± would bind the translated key).
+keybind = shift+grave_accent=text:\x01
 #
-# Non-Mac-layout overload, kept: Opt+grave_accent is Opt+§ on ISO, and the
-# only chord that is not a typed character on ANSI keyboards, which have no §.
+# Dropdown: Opt+§ on ISO, mirroring the non-Mac binding. On ANSI keyboards
+# (no §) it is Opt+backtick. Global, so it swallows that chord in every app.
 keybind = global:opt+grave_accent=toggle_quick_terminal
 
 # tmux prefix on Cmd+. : tmux can't see Cmd, so send its real prefix, C-a.
