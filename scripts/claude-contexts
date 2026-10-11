@@ -63,7 +63,7 @@ if [ "$adopt" = 1 ]; then
     # Per-account data worth carrying over. Deliberately NOT copied (machine/
     # runtime state, regenerated per context): daemon*, telemetry, cache,
     # shell-snapshots, session-env, chrome, downloads, jobs, backups,
-    # skills (fanned out by homelab's sync-claude-config.sh), *.json caches.
+    # skills (linked in by scripts/claude-sync), *.json caches.
     for item in history.jsonl projects file-history paste-cache plans tasks sessions todos plugins; do
         src="$legacy/$item"
         [ -e "$src" ] || continue
@@ -76,5 +76,5 @@ if [ "$adopt" = 1 ]; then
     done
 fi
 
-echo "Done. Run homelab's projects/macos-common/sync-claude-config.sh (if the"
-echo "repo is present) to fan the lab skills into the new contexts."
+echo "Done. Run scripts/claude-sync to write settings, CLAUDE.md, MCP servers"
+echo "and skills into the new contexts."
