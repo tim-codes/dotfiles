@@ -71,23 +71,23 @@ window-save-state = never
 #
 # The § key (top-left, ISO/UK Mac) is the tmux key:
 #   §        opens tmux-home (C-a . - "every window, type to filter")
-#   Shift+§  sends the tmux prefix (C-a), an extra binding beside Cmd+.;
-#            on ANSI/non-Mac layouts the same key is Shift+backtick (~)
 #   Opt+§    toggles the dropdown, from any app
 #
-# Plain § and Shift+§ are NOT global - they only act inside a Ghostty window,
-# so outside it § (and ±) type normally. § is written as a literal character,
+# Plain § is NOT global - it only acts inside a Ghostty window, so outside it
+# § types normally. § is written as a literal character,
 # which binds the *translated* key: it follows the keyboard layout and simply
 # never fires on a layout that has no §.
 keybind = §=text:\x01.
 #
-# grave_accent is a *physical* key name - the top-left position, which is where
-# backtick sits on ANSI layouts and where § sits on this machine's British/ISO
-# layout (Shift+§ there is ±; a literal ± would bind the translated key).
-keybind = shift+grave_accent=text:\x01
-#
-# Dropdown: Opt+§ on ISO, mirroring the non-Mac binding. On ANSI keyboards
-# (no §) it is Opt+backtick. Global, so it swallows that chord in every app.
+# Opt changes the translated character, so the dropdown chord can't use the
+# literal §; it binds physical keys. Which one depends on the keyboard: on an
+# ISO Mac the § key is the ISO-section key, which Ghostty names intl_backslash
+# - NOT grave_accent, which on ISO is the separate `/~ key beside left Shift.
+# On ANSI (no § key) the equivalent top-left key is grave_accent. Bind both so
+# the chord is "the key left of 1" everywhere; on ISO the grave_accent bind
+# also catches Opt+` (the dead-key accent).
+# Dropdown: Opt+§. Global, so it swallows that chord in every app.
+keybind = global:opt+intl_backslash=toggle_quick_terminal
 keybind = global:opt+grave_accent=toggle_quick_terminal
 
 # tmux prefix on Cmd+. : tmux can't see Cmd, so send its real prefix, C-a.
