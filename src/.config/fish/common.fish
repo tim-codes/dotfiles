@@ -199,6 +199,8 @@ alias t="tmux"
 # exist from login (dev.tim.tmux-server LaunchAgent + continuum restore), so
 # this attaches rather than creating. Inside tmux $TERM is tmux's own, so ask
 # tmux for the outer terminal and switch the client instead of nesting.
+# Right after login the server or the restore can still be catching up, so
+# outside tmux poll up to 5s for the session before letting attach fail.
 function tx -d "Attach to this terminal's tmux session (ghostty: scratch, else main)"
     set -l term $TERM
     if set -q TMUX
@@ -209,6 +211,13 @@ function tx -d "Attach to this terminal's tmux session (ghostty: scratch, else m
     if set -q TMUX
         tmux switch-client -t $target
     else
+        if not tmux has-session -t $target 2>/dev/null
+            echo "tx: waiting for tmux session '$target'..." >&2
+            for i in (seq 20)
+                sleep 0.25
+                tmux has-session -t $target 2>/dev/null; and break
+            end
+        end
         tmux attach -t $target
     end
 end
