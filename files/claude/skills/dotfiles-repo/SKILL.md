@@ -88,6 +88,12 @@ symlinks keep resolving to `main`'s content for as long as the branch is
 being worked on. Full detail: `~/dev/dotfiles/CLAUDE.md`, "Editing
 Workflow" section.
 
+Worktrunk's `pre-start` hook copies the primary checkout's gitignored local
+config (`.env`, `agent.env`, `*.local.*`, ...) into any new worktree; for one
+made with `git worktree add`, run `worktree-copy-local-env <worktree>` by
+hand. Dotfiles has little local config, so this rarely matters here, but the
+procedure is the same in every repo.
+
 ## Shipping the change
 
 Standard shared git-workflow instruction applies as-is: branch (in a

@@ -195,6 +195,19 @@ the installed version (the docs under `node_modules/<pkg>/`, `--help`,
 as a hypothesis to check, and when an answer came from research, say what
 it was checked against.
 
+## New worktrees: local config is copied in, never asked for
+
+A new worktree gets the primary checkout's gitignored local config (`.env`,
+`.env.local`, `agent.env`, `.envrc`, `*.local.*`) copied in as standard
+procedure — worktrunk's `pre-start` hook does it on `wt switch --create`. For a
+worktree made any other way (`git worktree add`, EnterWorktree, a subagent's
+`isolation: "worktree"`), run `worktree-copy-local-env <worktree>` yourself;
+don't ask the operator to copy them. Names are printed, never contents.
+
+**Why:** a worktree without its `.env` fails in confusing ways, and asking the
+operator each time is a round-trip for something fully mechanical and safe
+(no overwrite, ignored files only).
+
 ## Worktree closedown: preserve transcripts first
 
 Never confirm Claude Code's built-in "clean up the worktree?" prompt, and
