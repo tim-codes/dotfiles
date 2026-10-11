@@ -61,19 +61,11 @@ mods = "Command"
 chars = "\u0001"
 
 # The § key is the tmux key, mirroring the ghostty config: § opens tmux-home
-# (C-a .), Shift+§ sends the prefix. Alacritty matches a binding's key against
-# the unshifted character, so Shift+§ is written as "§" + Shift (not "±"). Like
-# ghostty's literal §, it follows the layout and never fires on one without a
-# §. ANSI's grave key has no layout-safe equivalent here (alacritty has only
-# platform-specific scancodes, and a plain "`" bind would eat ~ on ISO).
+# (C-a .). Like ghostty's literal §, it follows the layout and never fires on
+# one without a §.
 [[keyboard.bindings]]
 key = "§"
 chars = "\u0001."
-
-[[keyboard.bindings]]
-key = "§"
-mods = "Shift"
-chars = "\u0001"
 
 [[keyboard.bindings]]
 key = "Return"
