@@ -71,7 +71,8 @@ window-save-state = never
 #
 # The § key (top-left, ISO/UK Mac) is the tmux key:
 #   §        opens tmux-home (C-a . - "every window, type to filter")
-#   Shift+§  sends the tmux prefix (C-a), an extra binding beside Cmd+.
+#   Shift+§  sends the tmux prefix (C-a), an extra binding beside Cmd+.;
+#            on ANSI/non-Mac layouts the same key is Shift+backtick (~)
 #   Opt+§    toggles the dropdown, from any app
 #
 # Plain § and Shift+§ are NOT global - they only act inside a Ghostty window,
