@@ -69,19 +69,25 @@ window-save-state = never
 # load of a global keybind (System Settings > Privacy & Security >
 # Accessibility).
 #
-# Two triggers for one action. A bare unmodified key is deliberate - this is
-# the classic quake-console binding - but note a global bind swallows the key
-# everywhere, so § can no longer be typed in any app.
+# The § key (top-left, ISO/UK Mac) is the tmux key:
+#   §        opens tmux-home (C-a . - "every window, type to filter")
+#   Shift+§  sends the tmux prefix (C-a), an extra binding beside Cmd+.;
+#            on ANSI/non-Mac layouts the same key is Shift+backtick (~)
+#   Opt+§    toggles the dropdown, from any app
 #
-# § is written as a literal character, which binds the *translated* key: it
-# follows the keyboard layout and simply never fires on a layout that has no
-# §, which is exactly the wanted fallback behaviour on ANSI keyboards.
-keybind = global:§=toggle_quick_terminal
+# Plain § and Shift+§ are NOT global - they only act inside a Ghostty window,
+# so outside it § (and ±) type normally. § is written as a literal character,
+# which binds the *translated* key: it follows the keyboard layout and simply
+# never fires on a layout that has no §.
+keybind = §=text:\x01.
 #
-# For keyboards without §. grave_accent is a *physical* key name - the
-# top-left position, which is where backtick sits on ANSI layouts. On this
-# machine's British/ISO layout that same physical key is §, so here this is
-# just Opt+§; it earns its place on ANSI keyboards.
+# grave_accent is a *physical* key name - the top-left position, which is where
+# backtick sits on ANSI layouts and where § sits on this machine's British/ISO
+# layout (Shift+§ there is ±; a literal ± would bind the translated key).
+keybind = shift+grave_accent=text:\x01
+#
+# Dropdown: Opt+§ on ISO, mirroring the non-Mac binding. On ANSI keyboards
+# (no §) it is Opt+backtick. Global, so it swallows that chord in every app.
 keybind = global:opt+grave_accent=toggle_quick_terminal
 
 # tmux prefix on Cmd+. : tmux can't see Cmd, so send its real prefix, C-a.
