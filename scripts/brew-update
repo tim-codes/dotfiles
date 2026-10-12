@@ -18,6 +18,8 @@ brewDeps=(
   ctop
   diff-so-fancy
   docker-compose
+  # Open XML SDK validation/editing of Office files (exxo-common office-files skill)
+  dotnet
   fd
   fish
   fish-lsp
