@@ -133,6 +133,17 @@ command that needs privilege escalation or interactive confirmation on its
 own, not buried in a compound command — the prompt has to be legible to the
 person answering it.
 
+When you are about to trigger something the operator must answer — a GUI
+permission dialog (e.g. Excel's Grant File Access), Touch ID, a device-code
+sign-in — tell them first: what will appear, what to click, and that you are
+waiting. Then wait generously (at least 10 minutes) rather than polling for a
+few seconds, and never auto-cancel a prompt meant for them. Probes that might
+raise a prompt as a side effect count too: warn before running them, or don't
+run them.
+
+**Why:** the operator asked for this on 12 Oct 2026 after several dialogs were
+raised without warning and cancelled within seconds.
+
 ## Installing a missing dependency on the workstation: fine ad hoc, persist the rest
 
 If a task needs a dependency that isn't installed on the local workstation
