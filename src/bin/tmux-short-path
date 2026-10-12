@@ -1,0 +1,17 @@
+#!/bin/sh
+# Print a pane's path abbreviated like fish's prompt_pwd (dir length 1), for
+# the per-pane directory chip: $HOME becomes ~, every component but the last
+# shrinks to its first character (keeping a leading dot), so
+# /Users/tim/dev/dotfiles/src -> ~/d/d/src.
+#
+#   tmux-short-path <pane_current_path>
+#
+# Called from the directory chip in src/.tmux.conf. A script rather than an
+# inline #(): the sed needs parentheses, which would end tmux's #() early.
+
+p="$1"
+case "$p" in
+    "$HOME") p="~" ;;
+    "$HOME"/*) p="~${p#"$HOME"}" ;;
+esac
+printf '%s\n' "$p" | sed -E 's|(\.?[^/])[^/]*/|\1/|g'
