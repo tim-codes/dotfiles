@@ -8,6 +8,7 @@ src/bin/*
 !src/bin/tmux-sidebar-session
 !src/bin/tmux-pane-host
 !src/bin/tmux-client-detach-hint
+!src/bin/tmux-short-path
 !src/bin/ghostty-fit
 !src/bin/worktree-relocate-transcripts
 !src/bin/worktree-copy-local-env
