@@ -1,0 +1,22 @@
+#!/bin/sh
+# Print the detach hint for a tmux client that is attached over ssh, for the
+# status-left info area.
+#
+#   tmux-client-detach-hint <client_pid>
+#
+# Walks up from the tmux client process; if an sshd (sshd-session on current
+# macOS) is among its ancestors, the client came in over ssh - homelab's tm2,
+# or a manual ssh + attach - where C-d / C-c go to the remote pane and
+# detaching is the way back out. A local client prints nothing.
+#
+# Called from status-left in src/.tmux.conf with #{client_pid}. Status lines
+# are drawn per client, so each attached client gets its own answer even when
+# a local and a remote client share a session.
+
+pid="$1"
+while [ -n "$pid" ] && [ "$pid" -gt 1 ] 2>/dev/null; do
+    case "$(ps -o comm= -p "$pid" 2>/dev/null)" in
+        *sshd*) printf ' tm2 detach: (C-a d)\n'; exit 0 ;;
+    esac
+    pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+done
