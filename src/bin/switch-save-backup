@@ -1,0 +1,64 @@
+#!/bin/zsh
+# switch-save-backup — snapshot Astris (Switch emulator) game saves whenever they change.
+#
+# Why this exists: neither Astris/Ryujinx nor the games have an autosave or
+# save-state feature, and a crash or a bad write can leave the only save copy
+# broken. launchd runs this every ~2 minutes. Each run checks every save
+# folder; one that changed since its last snapshot is copied to a timestamped
+# folder. It only captures what the game itself has saved: progress since the
+# last in-game save is not recoverable by anything outside the game.
+#
+# A save is only copied once its files have been quiet for SETTLE_SECS, so a
+# snapshot never catches the game halfway through writing. A folder still
+# being written is simply picked up on the next run.
+#
+# Layout: $DEST_ROOT/<save-id>/<YYYY-mm-dd-HHMMSS>/ — the newest KEEP per save
+# id are kept, older ones are pruned. Manual backups elsewhere under
+# save-backups/ are never touched.
+#
+# Restore: close Astris, then copy a snapshot's contents back over
+# $SAVE_ROOT/<save-id>/.
+
+set -u
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+zmodload zsh/datetime
+
+SAVE_ROOT=${SWITCH_SAVE_ROOT:-$HOME/rom/switch/astris/bis/user/save}
+DEST_ROOT=${SWITCH_SAVE_BACKUP_ROOT:-$HOME/rom/switch/save-backups/auto}
+KEEP=${SWITCH_SAVE_BACKUP_KEEP:-60}
+SETTLE_SECS=${SWITCH_SAVE_BACKUP_SETTLE:-20}
+
+log() { print -r -- "$(strftime '%Y-%m-%d %H:%M:%S' $EPOCHSECONDS) $*"; }
+
+[[ -d $SAVE_ROOT ]] || { log "save root missing: $SAVE_ROOT"; exit 0; }
+mkdir -p "$DEST_ROOT"
+
+for src in $SAVE_ROOT/*(N/); do
+  id=${src:t}
+  dest=$DEST_ROOT/$id
+  # Fingerprint: every file's relative path, size and mtime.
+  listing=$(cd "$src" && find . -type f -exec stat -f '%N %z %m' {} + | sort)
+  [[ -n $listing ]] || continue
+  fp=$(print -r -- "$listing" | md5 -q)
+  [[ -f $dest/.last && $(<$dest/.last) == $fp ]] && continue
+
+  newest=$(print -r -- "$listing" | awk '{print $NF}' | sort -n | tail -1)
+  (( EPOCHSECONDS - newest < SETTLE_SECS )) && { log "$id: still being written, retry next run"; continue; }
+
+  stamp=$(strftime '%Y-%m-%d-%H%M%S' $EPOCHSECONDS)
+  mkdir -p "$dest"
+  # Copy to a temp name, then rename, so a half-finished copy never looks like a snapshot.
+  if cp -Rp "$src" "$dest/.tmp-$stamp" && mv "$dest/.tmp-$stamp" "$dest/$stamp"; then
+    print -r -- "$fp" > "$dest/.last"
+    log "$id: snapshot $stamp"
+  else
+    rm -rf "$dest/.tmp-$stamp"
+    log "$id: copy FAILED"
+    continue
+  fi
+
+  # Prune: keep the newest $KEEP snapshots for this save id.
+  old=($dest/<->-<->-<->-<->(N/On))
+  (( ${#old} > KEEP )) && rm -rf -- ${old[KEEP+1,-1]} && log "$id: pruned $(( ${#old} - KEEP ))"
+done
+exit 0
