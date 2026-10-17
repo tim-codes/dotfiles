@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.tim.switch-save-backup</string>
+
+  <!-- Run through a login shell so $HOME expands: launchd does no variable
+       substitution in ProgramArguments. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>exec "$HOME/bin/switch-save-backup"</string>
+  </array>
+
+  <!-- Every ~2 minutes; the script exits immediately when no save changed. -->
+  <key>StartInterval</key>
+  <integer>120</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>LowPriorityIO</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/switch-save-backup.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/switch-save-backup.err</string>
+</dict>
+</plist>
