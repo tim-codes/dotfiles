@@ -1,0 +1,85 @@
+version: 1
+capabilities:
+  - id: run-with-secrets
+    name: Run with Exxo secrets
+    source_repository: exxo/skills
+    source_root: /Users/tim/dev/exxo/skills
+    required_paths:
+      - /Users/tim/dev/exxo/skills/common/skills/run-with-secrets/SKILL.md
+      - /Users/tim/dev/exxo/skills/common/skills/run-with-secrets/delegation-brief.md
+    invocation_contract: agent/run -- <command>
+    allowed_audience: [exxo, project]
+    delivery_mode: instruction-only
+    experiment_status: approved
+    collision_key: run-with-secrets
+
+  - id: agent-tooling
+    name: Exxo agent credential tooling
+    source_repository: exxo/agent-tooling
+    source_root: /Users/tim/dev/exxo/agent-tooling
+    required_paths:
+      - /Users/tim/dev/exxo/agent-tooling/README.md
+      - /Users/tim/dev/exxo/agent-tooling/package.json
+    invocation_contract: agent-run -- <command>; agent-tooling <subcommand>
+    allowed_audience: [exxo]
+    delivery_mode: executable
+    experiment_status: approved
+    collision_key: exxo-agent-tooling
+
+  - id: h2gc-repo-skills
+    name: h2gc portal pinned repository skills
+    source_repository: exxo/skills (through h2gc pinned submodule)
+    source_root: /Users/tim/dev/exxo/h2gc/h2gc-portal
+    required_paths:
+      - /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/vendor/skills
+      - /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/skills/backend-patterns/SKILL.md
+      - /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/skills/deployment-infra/SKILL.md
+      - /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/skills/docs-conventions/SKILL.md
+      - /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/skills/insights-fragments/SKILL.md
+      - /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/skills/keyword-shorthand/SKILL.md
+      - /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/skills/observability/SKILL.md
+      - /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/skills/portal-frontend/SKILL.md
+      - /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/skills/portal-styling/SKILL.md
+      - /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/skills/subscriber-api/SKILL.md
+      - /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/skills/testing-conventions/SKILL.md
+      - /Users/tim/dev/exxo/h2gc/h2gc-portal/.claude/skills/typescript-conventions/SKILL.md
+    invocation_contract: read existing project skill SKILL.md when applicable
+    allowed_audience: [project]
+    delivery_mode: reference-only
+    experiment_status: approved
+    collision_key: h2gc-repo-skills
+
+  - id: homelab-run-with-secrets
+    name: Personal homelab secret wrapper
+    source_repository: dotfiles/files/claude
+    source_root: /Users/tim/dev/dotfiles/files/claude
+    required_paths:
+      - /Users/tim/dev/dotfiles/files/claude/skills/run-with-secrets/SKILL.md
+    invocation_contract: provider-specific homelab wrapper
+    allowed_audience: [personal]
+    delivery_mode: reference-only
+    experiment_status: excluded
+    collision_key: run-with-secrets
+
+  - id: mantine
+    name: Mantine skills and MCP
+    source_repository: dotfiles/files/claude and exxo/skills
+    source_root: /Users/tim/dev/dotfiles/files/claude
+    required_paths:
+      - /Users/tim/dev/dotfiles/files/claude/vendor/mantine.lock.json
+    invocation_contract: no portable invocation proven
+    allowed_audience: [personal, exxo]
+    delivery_mode: reference-only
+    experiment_status: excluded
+    collision_key: mantine
+
+  - id: credential-mcp
+    name: Credential-bearing MCP servers
+    source_repository: live provider configuration (values intentionally unread)
+    source_root: /Users/tim/dev/dotfiles
+    required_paths: []
+    invocation_contract: no credential-safe Codex/Air delivery proven
+    allowed_audience: []
+    delivery_mode: reference-only
+    experiment_status: excluded
+    collision_key: credential-mcp
