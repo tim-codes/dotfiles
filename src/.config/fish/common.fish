@@ -199,15 +199,20 @@ alias t="tmux"
 # exist from login (dev.tim.tmux-server LaunchAgent + continuum restore), so
 # this attaches rather than creating. Inside tmux $TERM is tmux's own, so ask
 # tmux for the outer terminal and switch the client instead of nesting.
+# `tx <session>` targets that session instead (e.g. `tx h2gc`); tab completes
+# the running sessions.
 # Right after login the server or the restore can still be catching up, so
 # outside tmux poll up to 5s for the session before letting attach fail.
-function tx -d "Attach to this terminal's tmux session (ghostty: scratch, else main)"
-    set -l term $TERM
-    if set -q TMUX
-        set term (tmux display-message -p '#{client_termname}')
+function tx -d "Attach to a tmux session (default: ghostty scratch, else main)"
+    set -l target $argv[1]
+    if test -z "$target"
+        set -l term $TERM
+        if set -q TMUX
+            set term (tmux display-message -p '#{client_termname}')
+        end
+        set target main
+        string match -q '*ghostty*' -- $term; and set target scratch
     end
-    set -l target main
-    string match -q '*ghostty*' -- $term; and set target scratch
     if set -q TMUX
         tmux switch-client -t $target
     else
@@ -221,6 +226,7 @@ function tx -d "Attach to this terminal's tmux session (ghostty: scratch, else m
         tmux attach -t $target
     end
 end
+complete -c tx -f -a "(tmux list-sessions -F '#S' 2>/dev/null)"
 alias rf="source ~/.config/fish/config.fish"
 alias cl="cd ~/Claude && claude"
 
