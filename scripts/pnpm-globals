@@ -5,7 +5,6 @@ packages=(
   prettier@latest
   opencommit@latest
   chatgpt-cli@latest
-  @anthropic-ai/claude-code@latest
   @fission-ai/openspec@latest
   npm-check-updates@latest
   typescript@latest
