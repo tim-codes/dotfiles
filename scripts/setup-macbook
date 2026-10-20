@@ -194,7 +194,7 @@ if [[ -d /Applications/Ghostty.app ]]; then
 fi
 
 # tpm + exactly the plugins .tmux.conf declares (installs missing, removes
-# dropped ones, builds tmux-agent-sidebar)
+# dropped ones, builds tmux-home)
 $DOTFILES_ROOT/scripts/tmux-plugins
 
 # override system bash

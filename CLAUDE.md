@@ -21,7 +21,7 @@ This is a personal dotfiles repository for macOS and Linux development environme
 - `~/dev/dotfiles/scripts/cargo-update` - Update Rust packages
 - `~/dev/dotfiles/scripts/firefox-prefs` - Link codified Firefox prefs into each installation's active profile (only needed for a new profile/machine; the link means repo edits apply on Firefox restart)
 - `restow` - Update symlinks after adding new files to src/
-- `~/dev/dotfiles/scripts/tmux-plugins [--update]` - Converge tmux plugins on `.tmux.conf` (install missing, remove dropped, build tmux-agent-sidebar); called by setup-macbook and deps-up
+- `~/dev/dotfiles/scripts/tmux-plugins [--update]` - Converge tmux plugins on `.tmux.conf` (install missing, remove dropped, build tmux-home); called by setup-macbook and deps-up
 
 ### Development
 - No build/compile step required - this is a configuration repository

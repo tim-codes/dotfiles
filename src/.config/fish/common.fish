@@ -196,7 +196,7 @@ alias t="tmux"
 
 # Attach to the tmux session that belongs to this terminal: `scratch` in
 # ghostty (its dropdown's session), `main` everywhere else (alacritty). Both
-# exist from login (dev.tim.tmux-server LaunchAgent + continuum restore), so
+# exist from login (dev.tim.tmux-server LaunchAgent + restore-once.sh), so
 # this attaches rather than creating. Inside tmux $TERM is tmux's own, so ask
 # tmux for the outer terminal and switch the client instead of nesting.
 # `tx <session>` targets that session instead (e.g. `tx h2gc`); tab completes
