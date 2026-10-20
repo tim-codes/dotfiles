@@ -21,6 +21,7 @@ src/.config/ghostty/local.conf
 src/.config/alacritty/local.toml.bak-*
 src/.config/ghostty/local.conf.bak-*
 src/.config/tmux/theme.conf
+src/.config/tmux/theme-scratch.conf
 # Claude Code per-account cache of claude.ai account skills, written through
 # the ~/.claude-personal/skills whole-dir symlink (see scripts/claude-sync).
 files/claude/skills/synced/
