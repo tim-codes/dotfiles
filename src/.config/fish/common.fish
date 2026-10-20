@@ -255,7 +255,7 @@ end
 #
 #   theme            pick interactively (althemer TUI in alacritty, fzf in ghostty)
 #   theme NAME       set directly
-#   theme -s/--sync  set alacritty, ghostty and tmux together (either form above)
+#   theme -s/--sync  pick in althemer, then set alacritty, ghostty and tmux together
 #   theme -l         list available themes
 #
 # Without --sync only the invoking terminal changes, so the ghostty dropdown and
@@ -289,7 +289,12 @@ function theme -d "Switch the terminal theme (invoking terminal, or all with --s
     end
 
     set -l targets alacritty ghostty
-    if not set -q _flag_sync
+    if set -q _flag_sync
+        if test (count $argv) -gt 0
+            echo "theme: --sync takes no name; it opens the picker" >&2
+            return 1
+        end
+    else
         set -l term
         if set -q TMUX
             set term (tmux display-message -p '#{client_termname}' 2>/dev/null)
