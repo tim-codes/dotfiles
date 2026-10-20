@@ -29,6 +29,7 @@ not a plain list, so the usual kill and rename bindings don't apply. Inside it:
 | `C-a w` | Tree mode — browse everything |
 | `C-a F` | fzf menu — rename, move, swap, kill windows / sessions / panes |
 | `C-a 0`…`9` | Jump to window by number |
+| `⌘⌥1`…`⌘⌥0` | Jump to window 1…10 — no prefix; works in tmux-home and a focused sidebar too (Alacritty, Ghostty) |
 | `C-a a` | Last window |
 | `C-a C-n` / `C-p` | Next / previous window |
 | `C-a ,` | Rename window |
