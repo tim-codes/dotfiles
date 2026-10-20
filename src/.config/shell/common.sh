@@ -25,6 +25,8 @@ export KUBE_CONFIG_PATH="$HOME/.kube/config"
 export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/application_default_credentials.json"
 # enable IAP ssh tunnel to use numpy on system to increase performance
 export CLOUDSDK_PYTHON_SITEPACKAGES=1
+# pin gcloud to Python 3.12; 3.14 breaks it (ssl.PROTOCOL_TLSv1 removed)
+export CLOUDSDK_PYTHON=/opt/homebrew/opt/python@3.12/bin/python3.12
 # for getting claude code to use LSP plugins properly
 # (https://github.com/anthropics/claude-code/issues/15148)
 export ENABLE_LSP_TOOL=1

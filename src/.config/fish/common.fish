@@ -53,6 +53,8 @@ set -x KUBE_CONFIG_PATH "$HOME/.kube/config"
 set -x GOOGLE_APPLICATION_CREDENTIALS "$HOME/.config/gcloud/application_default_credentials.json"
 # enable IAP ssh tunnel to use numpy on system to increase performance
 set -x CLOUDSDK_PYTHON_SITEPACKAGES 1
+# pin gcloud to Python 3.12; 3.14 breaks it (ssl.PROTOCOL_TLSv1 removed)
+set -x CLOUDSDK_PYTHON /opt/homebrew/opt/python@3.12/bin/python3.12
 # enable TTY for GPG signing prompt
 set -x GPG_TTY $(tty)
 # for getting claude code to use LSP plugins properly

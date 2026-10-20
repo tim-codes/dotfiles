@@ -64,6 +64,9 @@ brewDeps=(
   # pdftoppm for rasterising PDF pages — Claude Code needs it to visually
   # inspect PDFs (e.g. verifying generated Exxo report renders)
   poppler
+  # pinned interpreter for the gcloud CLI (see CLOUDSDK_PYTHON); Python 3.14
+  # breaks gcloud storage with ssl.PROTOCOL_TLSv1
+  "python@3.12"
   # from pulumi's own tap (its homebrew/core formula conflicts with the tap one
   # and brew refuses to upgrade across taps)
   "pulumi/tap/pulumi"
