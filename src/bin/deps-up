@@ -4,7 +4,7 @@ $DOTFILES_ROOT/scripts/brew-update
 $DOTFILES_ROOT/scripts/cargo-update
 
 # tmux plugins: converge on .tmux.conf (install new, drop removed), pull
-# everything to latest, and rebuild tmux-agent-sidebar against the new source.
+# everything to latest, and rebuild tmux-home against the new source.
 $DOTFILES_ROOT/scripts/tmux-plugins --update
 
 # todo: this is only working from native terminal, not emulator
