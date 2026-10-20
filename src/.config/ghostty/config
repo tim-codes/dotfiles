@@ -25,9 +25,11 @@ config-file = ?theme.conf
 # bare `tmux` is not found.
 config-file = ?local.conf
 
-# Match alacritty.toml so the dropdown is visually continuous with the
-# full-size windows.
-font-family = GeistMono Nerd Font Mono
+# Deliberately NOT alacritty.toml's GeistMono: a different face makes the
+# dropdown unmistakable from the full-size alacritty windows at a glance.
+# Comic Mono has no Nerd Font glyphs; Ghostty's built-in symbol fallback
+# covers the icons. Size still matches alacritty.
+font-family = Comic Mono
 font-size = 15
 
 # --- quick terminal ---------------------------------------------------------
