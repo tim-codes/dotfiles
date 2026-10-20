@@ -5,16 +5,17 @@
   <key>Label</key>
   <string>dev.tim.tmux-server</string>
 
-  <!-- Start the tmux server at login so tmux-continuum restores the saved
-       sessions (and tmux-home resumes their Claude sessions) without waiting
+  <!-- Start the tmux server at login so .tmux.conf's restore-once.sh
+       restores the saved sessions (and tmux-home resumes their Claude
+       sessions) without waiting
        for a terminal to be opened. Nothing else starts tmux at login:
        alacritty opens plain fish and the ghostty dropdown only starts tmux
        when it is first shown.
 
        A detached `scratch` session - the one the ghostty dropdown attaches to
        with `new-session -A -s scratch` - so the dropdown picks it up and
-       continuum restores `main` alongside it. Skipped if a server already has
-       it. Through a login shell so PATH (homebrew, from common.sh) and $HOME
+       the restore brings `main` back alongside it. Skipped if a server
+       already has it. Through a login shell so PATH (homebrew, from common.sh) and $HOME
        resolve and the server's global environment is the normal one, not
        launchd's bare one. The tmux-home daemon needs no agent of its own: its
        plugin starts one per server when TPM loads, so it comes up with this. -->
