@@ -29,6 +29,7 @@ not a plain list, so the usual kill and rename bindings don't apply. Inside it:
 | `C-a w` | Tree mode — browse everything |
 | `C-a F` | fzf menu — rename, move, swap, kill windows / sessions / panes |
 | `C-a 0`…`9` | Jump to window by number |
+| `⌘⌥1`…`⌘⌥0` | Jump to window 1…10 — no prefix; works in tmux-home and a focused sidebar too (Alacritty, Ghostty) |
 | `C-a a` | Last window |
 | `C-a C-n` / `C-p` | Next / previous window |
 | `C-a ,` | Rename window |
@@ -103,12 +104,13 @@ current window, `C-a ,` is quicker.
 | --- | --- |
 | `C-a u` | Agent picker — working / waiting / idle |
 | `C-a y` | Launch an agent for this directory |
-| `C-a e` | Toggle tmux-home sidebar — this window |
-| `C-a E` | Toggle tmux-home sidebar — every window in this session |
+| `C-a e` | Pin / unpin tmux-home sidebars — every window in this session |
+| `C-a E` | Toggle tmux-home sidebar — this window |
 
 The sidebar is read-only: NEEDS YOU across the server, this session's
 windows with agent status and git badges. New windows get one by themselves
-(not in `scratch`); `q` in a sidebar closes it.
+(not in `scratch`); `q` in a sidebar closes it. While the current window has
+one, the status line's window chips are hidden (the sidebar lists them).
 
 ## Worktrees (worktrunk)
 

@@ -119,6 +119,22 @@ keybind = alt+delete=esc:d
 # the tmux prefix; send the Home/End key sequences instead. Same in alacritty.toml.
 keybind = super+arrow_left=csi:H
 keybind = super+arrow_right=csi:F
+# Cmd+Opt+1 ... Cmd+Opt+0 = tmux window 1 ... 10 of the session: each sends
+# Ctrl+Alt+Shift+F1 ... F10 (CSI 1;8P ... CSI 21;8~; 3 is F12, CSI 24;8~ - see
+# alacritty.toml), which tmux-home binds (@home-switch-keys in .tmux.conf).
+# Same in alacritty.toml. Physical digit
+# keys, so the layout and right Option's characters don't matter. Ghostty's
+# own super+digit goto_tab binds are untouched.
+keybind = super+alt+digit_1=csi:1;8P
+keybind = super+alt+digit_2=csi:1;8Q
+keybind = super+alt+digit_3=csi:24;8~
+keybind = super+alt+digit_4=csi:1;8S
+keybind = super+alt+digit_5=csi:15;8~
+keybind = super+alt+digit_6=csi:17;8~
+keybind = super+alt+digit_7=csi:18;8~
+keybind = super+alt+digit_8=csi:19;8~
+keybind = super+alt+digit_9=csi:20;8~
+keybind = super+alt+digit_0=csi:21;8~
 
 # --- shell ------------------------------------------------------------------
 # `command` lives in local.conf (see above) because it needs tmux's absolute

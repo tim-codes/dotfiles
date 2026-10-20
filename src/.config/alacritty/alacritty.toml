@@ -113,3 +113,60 @@ chars = "\u001B[H"
 key = "Right"
 mods = "Command"
 chars = "\u001B[F"
+
+# Cmd+Opt+1 ... Cmd+Opt+0 = tmux window 1 ... 10 of the session, the tmux
+# counterpart of Cmd+1 ... (alacritty's own tab switching; no default uses
+# Cmd+Opt+digit). tmux can't see Cmd, so each sends a function key no app uses,
+# Ctrl+Alt+Shift+F1 ... F10 (xterm's CSI 1;8P ... CSI 21;8~), which tmux-home
+# binds (@home-switch-keys in .tmux.conf) and its popup reads too. 3 is F12
+# (CSI 24;8~), not F3: F3's CSI 1;8R looks like a cursor position report to
+# the popup. Same in the ghostty config.
+[[keyboard.bindings]]
+key = "1"
+mods = "Command|Alt"
+chars = "\u001B[1;8P"
+
+[[keyboard.bindings]]
+key = "2"
+mods = "Command|Alt"
+chars = "\u001B[1;8Q"
+
+[[keyboard.bindings]]
+key = "3"
+mods = "Command|Alt"
+chars = "\u001B[24;8~"
+
+[[keyboard.bindings]]
+key = "4"
+mods = "Command|Alt"
+chars = "\u001B[1;8S"
+
+[[keyboard.bindings]]
+key = "5"
+mods = "Command|Alt"
+chars = "\u001B[15;8~"
+
+[[keyboard.bindings]]
+key = "6"
+mods = "Command|Alt"
+chars = "\u001B[17;8~"
+
+[[keyboard.bindings]]
+key = "7"
+mods = "Command|Alt"
+chars = "\u001B[18;8~"
+
+[[keyboard.bindings]]
+key = "8"
+mods = "Command|Alt"
+chars = "\u001B[19;8~"
+
+[[keyboard.bindings]]
+key = "9"
+mods = "Command|Alt"
+chars = "\u001B[20;8~"
+
+[[keyboard.bindings]]
+key = "0"
+mods = "Command|Alt"
+chars = "\u001B[21;8~"
