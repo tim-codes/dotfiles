@@ -255,13 +255,14 @@ end
 #
 #   theme            pick interactively (althemer TUI in alacritty, fzf in ghostty)
 #   theme NAME       set directly
-#   theme -s/--sync  pick in althemer, then set alacritty, ghostty and tmux together
+#   theme -s/--sync  pick in althemer, then set every terminal and tmux session
 #   theme -l         list available themes
 #
 # Without --sync only the invoking terminal changes, so the ghostty dropdown and
-# the alacritty windows can wear different themes. tmux has one palette shared
-# by every client, so it follows alacritty (the main terminal) and --sync; a
-# ghostty-only switch leaves it alone. The terminal is read from the tmux
+# the alacritty windows can wear different themes. tmux's global palette
+# follows alacritty (the main terminal); ghostty's theme goes to the scratch
+# session - the dropdown's - as session-scoped overrides in
+# ~/.config/tmux/theme-scratch.conf, which --sync removes. The terminal is read from the tmux
 # client when inside tmux (client_termname), else from the environment; an
 # unrecognised one (e.g. a tm2 ssh attach) is refused rather than guessed.
 #
@@ -290,10 +291,7 @@ function theme -d "Switch the terminal theme (invoking terminal, or all with --s
 
     set -l targets alacritty ghostty
     if set -q _flag_sync
-        if test (count $argv) -gt 0
-            echo "theme: --sync takes no name; it opens the picker" >&2
-            return 1
-        end
+        set argv
     else
         set -l term
         if set -q TMUX
@@ -354,6 +352,29 @@ function theme -d "Switch the terminal theme (invoking terminal, or all with --s
             pkill -USR2 -x ghostty >/dev/null 2>&1
         else
             echo "theme: no ghostty theme for '$name' - run scripts/gen-terminal-themes" >&2
+        end
+    end
+
+    set -l scratch_conf $HOME/.config/tmux/theme-scratch.conf
+    if contains ghostty $targets; and test -f $scratch_conf; and tmux has-session -t =scratch 2>/dev/null
+        # Drop the old override first: --sync wants scratch back on the global
+        # palette, and a new override must not inherit a stale one's leftovers.
+        string replace -rf '^set -t =scratch: (?:-F )?(\S+) .*' 'set -u -t =scratch: $1' <$scratch_conf | tmux source-file - 2>/dev/null
+    end
+    if set -q _flag_sync
+        rm -f $scratch_conf
+    else if contains ghostty $targets; and test -f $HOME/.config/tmux/themes/$name.conf
+        # The palette as scratch-session options: catppuccin's formats that
+        # reference #{@thm_*} resolve per session. status-style is baked to
+        # literal colours at load, so it is restated from that palette here.
+        begin
+            string replace -rf '^set -g (@thm_\S+ .*)' 'set -t =scratch: $1' <$HOME/.config/tmux/themes/$name.conf
+            echo 'set -t =scratch: -F status-style "bg=#{@thm_mantle},fg=#{@thm_fg}"'
+            echo 'set -t =scratch: -F message-style "fg=#{@thm_teal},bg=#{@thm_surface_0},fill=#{@thm_surface_0}"'
+            echo 'set -t =scratch: -F message-command-style "fg=#{@thm_teal},bg=#{@thm_surface_0},fill=#{@thm_surface_0}"'
+        end >$scratch_conf
+        if tmux has-session -t =scratch 2>/dev/null
+            tmux source-file $scratch_conf
         end
     end
 
