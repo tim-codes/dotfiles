@@ -9,7 +9,8 @@
 #
 # Warns only, never fixes and never blocks: always exits 0. With
 # submodule.recurse enabled the drift cannot happen, so this stays dormant and
-# is only a safety net for machines/accounts where that config hasn't landed.
+# is only a safety net for repos that haven't opted in (submodule.recurse is
+# deliberately not global; see src/.gitconfig).
 #
 # Silence ladder, cheapest check first — stay quiet when:
 #   1. this is a file checkout, not a branch switch;
@@ -62,7 +63,8 @@ if [ -n "$drifted" ]; then
     printf '⚠ submodule checkout is out of sync after this branch switch:\n' >&2
     printf '    %s\n' $drifted >&2
     printf '  fix: git submodule update --init --recursive\n' >&2
-    printf '  or enable it permanently: git config --global submodule.recurse true\n' >&2
+    printf '  stop it recurring: just git-config-enable (if the repo has it),\n' >&2
+    printf '    or opt in locally: git config --local submodule.recurse true\n' >&2
 fi
 
 chain
