@@ -26,10 +26,13 @@ set fish_theme eden
 # Make the blue color for directories more readable
 set -x LSCOLORS Exfxcxdxbxegedabagacad
 
-# Allow gcloud to use system-installed Python packages (grpcio for log tailing)
+# gcloud runs on the python@3.12 virtualenv built by scripts/gcloud-setup (the
+# Homebrew default, 3.14, breaks it: ssl.PROTOCOL_TLSv1 removed). It also holds
+# numpy and grpcio. gcloud launches python with -S (no site-packages) unless
+# SITEPACKAGES=1 or VIRTUAL_ENV is set; here that only exposes the
+# virtualenv's own packages (include-system-site-packages = false).
+set -x CLOUDSDK_PYTHON "$HOME/.config/gcloud/virtenv/bin/python"
 set -x CLOUDSDK_PYTHON_SITEPACKAGES 1
-# pin gcloud to Python 3.12; 3.14 breaks it (ssl.PROTOCOL_TLSv1 removed)
-set -x CLOUDSDK_PYTHON /opt/homebrew/opt/python@3.12/bin/python3.12
 
 # delete fish greeting in new shell
 set -U fish_greeting ""

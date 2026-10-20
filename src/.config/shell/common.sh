@@ -23,10 +23,13 @@ fi
 
 export KUBE_CONFIG_PATH="$HOME/.kube/config"
 export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/application_default_credentials.json"
-# enable IAP ssh tunnel to use numpy on system to increase performance
+# gcloud runs on the python@3.12 virtualenv built by scripts/gcloud-setup (the
+# Homebrew default, 3.14, breaks it: ssl.PROTOCOL_TLSv1 removed). It also holds
+# numpy for IAP tunnels. gcloud launches python with -S (no site-packages)
+# unless SITEPACKAGES=1 or VIRTUAL_ENV is set; here that only exposes the
+# virtualenv's own packages (include-system-site-packages = false).
+export CLOUDSDK_PYTHON="$HOME/.config/gcloud/virtenv/bin/python"
 export CLOUDSDK_PYTHON_SITEPACKAGES=1
-# pin gcloud to Python 3.12; 3.14 breaks it (ssl.PROTOCOL_TLSv1 removed)
-export CLOUDSDK_PYTHON=/opt/homebrew/opt/python@3.12/bin/python3.12
 # for getting claude code to use LSP plugins properly
 # (https://github.com/anthropics/claude-code/issues/15148)
 export ENABLE_LSP_TOOL=1
