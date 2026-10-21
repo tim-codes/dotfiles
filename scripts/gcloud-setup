@@ -1,0 +1,48 @@
+#!/bin/zsh
+# Idempotent gcloud CLI Python setup. Safe to re-run; changes nothing on a
+# correctly set-up machine.
+#
+# Homebrew's gcloud-cli cask has no bundled Python, so gcloud runs on whatever
+# Python it finds. Homebrew's default (3.14) breaks it (ssl.PROTOCOL_TLSv1 is
+# gone), so gcloud is pinned to a python@3.12 virtualenv that also carries
+# numpy (the optional prerequisite behind IAP TCP tunnel throughput). Shell
+# side: CLOUDSDK_PYTHON points at the virtualenv's python (src/.config/shell/
+# common.sh and the fish equivalents). Both packages come from brew-update.
+
+set -e
+
+if ! command -v gcloud >/dev/null; then
+  echo "gcloud-setup: gcloud not installed (brew-update installs the gcloud-cli cask), skipping"
+  exit 0
+fi
+
+py312="$(brew --prefix python@3.12)/bin/python3.12"
+if [[ ! -x $py312 ]]; then
+  echo "gcloud-setup: $py312 missing (brew-update installs python@3.12)" >&2
+  exit 1
+fi
+
+venv="$HOME/.config/gcloud/virtenv"
+want="$($py312 -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+
+# Run gcloud's own virtualenv tooling on the pinned interpreter, not 3.14.
+export CLOUDSDK_PYTHON="$py312"
+unset CLOUDSDK_PYTHON_SITEPACKAGES
+
+have="$(gcloud config virtualenv describe 2>/dev/null | awk '/^python_version/ {getline; print $1}')"
+if [[ $have != $want.* ]]; then
+  echo "gcloud-setup: virtualenv python is '${have:-none}', want $want.x; recreating"
+  gcloud config virtualenv delete --quiet 2>/dev/null || true
+  gcloud config virtualenv create --quiet --python-to-use="$py312"
+fi
+
+# `describe` reports enabled: true/false
+if ! gcloud config virtualenv describe 2>/dev/null | grep -q '^enabled: true'; then
+  gcloud config virtualenv enable
+fi
+
+if ! "$venv/bin/python" -c 'import numpy' 2>/dev/null; then
+  "$venv/bin/pip" install --quiet --upgrade numpy
+fi
+
+"$venv/bin/python" -c 'import numpy, ssl; print("gcloud-setup: ok, python", __import__("sys").version.split()[0], "numpy", numpy.__version__)'

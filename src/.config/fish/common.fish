@@ -51,7 +51,12 @@ alias ppath="print_path"
 
 set -x KUBE_CONFIG_PATH "$HOME/.kube/config"
 set -x GOOGLE_APPLICATION_CREDENTIALS "$HOME/.config/gcloud/application_default_credentials.json"
-# enable IAP ssh tunnel to use numpy on system to increase performance
+# gcloud runs on the python@3.12 virtualenv built by scripts/gcloud-setup (the
+# Homebrew default, 3.14, breaks it: ssl.PROTOCOL_TLSv1 removed). It also holds
+# numpy for IAP tunnels. gcloud launches python with -S (no site-packages)
+# unless SITEPACKAGES=1 or VIRTUAL_ENV is set; here that only exposes the
+# virtualenv's own packages (include-system-site-packages = false).
+set -x CLOUDSDK_PYTHON "$HOME/.config/gcloud/virtenv/bin/python"
 set -x CLOUDSDK_PYTHON_SITEPACKAGES 1
 # enable TTY for GPG signing prompt
 set -x GPG_TTY $(tty)

@@ -18,6 +18,7 @@ This is a personal dotfiles repository for macOS and Linux development environme
 ### Maintenance
 - `~/dev/dotfiles/src/bin/deps-up` - Update all dependencies (brew, cargo, npm, pnpm)
 - `~/dev/dotfiles/scripts/brew-update` - Update Homebrew packages
+- `~/dev/dotfiles/scripts/gcloud-setup` - Idempotent gcloud Python setup: python@3.12 virtualenv (`~/.config/gcloud/virtenv`) with numpy; called by setup-macbook and deps-up. Shell configs export `CLOUDSDK_PYTHON` at the virtualenv python (Homebrew default 3.14 breaks gcloud)
 - `~/dev/dotfiles/scripts/cargo-update` - Update Rust packages
 - `~/dev/dotfiles/scripts/firefox-prefs` - Link codified Firefox prefs into each installation's active profile (only needed for a new profile/machine; the link means repo edits apply on Firefox restart)
 - `restow` - Update symlinks after adding new files to src/
