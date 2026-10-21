@@ -7,6 +7,10 @@ packages=(
   chatgpt-cli@latest
   @fission-ai/openspec@latest
   npm-check-updates@latest
+  # ad-hoc process runners for one-off dev loops outside a repo; anything
+  # else project-level comes from the repo's own deps
+  concurrently@latest
+  nodemon@latest
   typescript@latest
   typescript-language-server@latest
   # language servers for Claude Code code intelligence (LSP plugins declare
