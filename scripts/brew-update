@@ -6,6 +6,9 @@ brewDeps=(
   bash
   bat
   btop
+  # Cloud SQL Auth Proxy: attended psql against IAM-auth-only Cloud SQL
+  # instances (the exxo platform Postgres) as yourself via ADC — no passwords
+  cloud-sql-proxy
   colordiff
   composer
   # macOS ships no timeout(1)/nproc/shuf, so Linux-written scripts and agent
@@ -45,6 +48,10 @@ brewDeps=(
   k9s
   lazydocker
   lazygit
+  # psql for those proxied Cloud SQL Postgres sessions. Keg-only (it would
+  # clash with a full postgresql install), so call it as
+  # /opt/homebrew/opt/libpq/bin/psql
+  libpq
   lsd
   mdcat
   mysql-client
