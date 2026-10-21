@@ -101,6 +101,8 @@ dedupe_path() {
 # homebrew forced in front so its bash/tools beat the system copies
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH_BASE"
 
+# $PNPM_HOME/bin before $PNPM_HOME: pnpm >= 11 puts global bins in bin/, and the
+# pre-11 shims left in $PNPM_HOME must not shadow the current installs
 add_to_path \
     "/usr/local/bin" \
     "$HOME/.local/bin" \
@@ -109,8 +111,8 @@ add_to_path \
     "$HOME/bin" \
     "$GOPATH/bin" \
     "$GOROOT/bin" \
-    "$PNPM_HOME" \
     "$PNPM_HOME/bin" \
+    "$PNPM_HOME" \
     "$HOME/.orbstack/bin" \
     "$HOME/.yarn/bin" \
     "$HOME/.config/yarn/global/node_modules/.bin" \

@@ -24,6 +24,8 @@ end
 # note: forcing homebrew in front so we have homebrew bash in front of system bash
 # always include system paths to ensure basic commands (cat, curl, tty) are available
 set -x PATH "/opt/homebrew/bin" "/opt/homebrew/sbin" (string split ':' $PATH_BASE)
+# $PNPM_HOME/bin before $PNPM_HOME: pnpm >= 11 puts global bins in bin/, and the
+# pre-11 shims left in $PNPM_HOME must not shadow the current installs
 add_to_path \
   "/usr/local/bin" \
   "/usr/bin" \
@@ -35,8 +37,8 @@ add_to_path \
   "$HOME/bin" \
   "$GOPATH/bin" \
   "$GOROOT/bin" \
-  "$PNPM_HOME" \
   "$PNPM_HOME/bin" \
+  "$PNPM_HOME" \
   "$HOME/.yarn/bin" \
   "$HOME/.config/yarn/global/node_modules/.bin" \
   "/opt/homebrew/opt/mysql-client/bin"
