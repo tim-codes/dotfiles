@@ -97,7 +97,7 @@
 
 ### Task 5: Baseline
 
-- [ ] **Step 1:** `scripts/claude-usage-scan --json > docs/superpowers/specs/2026-10-23-usage-baseline.json`; check it with `grep -cE 'sk-|ghp_|xox|AKIA|eyJ' ` → 0 hits outside `<redacted>`.
+- [ ] **Step 1:** `scripts/claude-usage-scan --json --aggregate-only > docs/superpowers/specs/2026-10-23-usage-baseline.json` (aggregate-only added during execution: the repo is public, so no task descriptions, project names or UUID server names); check it with `grep -cE 'sk-|ghp_|xox|AKIA|eyJ' ` → 0 hits outside `<redacted>`.
 - [ ] **Step 2:** `scripts/claude-usage-scan --compare docs/superpowers/specs/2026-10-23-usage-baseline.json --current docs/superpowers/specs/2026-10-23-usage-baseline.json` shows zero deltas.
 - [ ] **Step 3: Commit;** add the 30-day re-run (2026-11-22) to the spec backlog.
 
