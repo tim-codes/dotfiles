@@ -1,0 +1,514 @@
+#!/usr/bin/env -S python3 -I
+"""Aggregate Claude Code transcript usage: subagent delegations, MCP, skills, sessions.
+
+Streams JSONL line by line; stdlib only; runs isolated (python3 -I). Prints only
+aggregates and short, redacted description labels (never prompts or tool results).
+
+Usage:
+  claude-usage-scan [--root DIR ...] [--since YYYY-MM-DD] [--top N] [--json]
+  claude-usage-scan --compare BASE.json [--current CUR.json] [--json] [...scan options]
+Default roots: ~/.claude-personal/projects ~/.claude-exxo/projects ~/.claude-exxo-personal/projects
+--since sets the "window" period (default: 30 days before today); all-time is always computed.
+--compare diffs the per-period headline metrics (general-purpose share of subagent
+tokens and calls, subagent tokens by agent type, MCP calls by server, long sessions)
+of BASE against CUR, or against a fresh scan when --current is omitted.
+Baseline: docs/superpowers/specs/2026-10-23-usage-baseline.json in the dotfiles repo.
+"""
+import argparse, collections, datetime as dt, glob, json, os, re, statistics, sys
+
+DEFAULT_ROOTS = [os.path.expanduser(p) for p in (
+    "~/.claude-personal/projects", "~/.claude-exxo/projects", "~/.claude-exxo-personal/projects")]
+
+TS_RE = re.compile(r'"timestamp":"([0-9T:\-\.Z+]+)"')
+SECRET_RE = re.compile(
+    r'(sk-[A-Za-z0-9_\-]{8,}|gh[pousr]_[A-Za-z0-9]{8,}|xox[abpr]-[A-Za-z0-9\-]{8,}|'
+    r'AKIA[0-9A-Z]{12,}|eyJ[A-Za-z0-9_\-]{10,}|[A-Za-z0-9+/_\-]{32,}|[0-9a-f]{24,})')
+STOP = set("a an the of to for and or in on with from into via by at as is be this that "
+           "it its all any new up out vs".split())
+
+# Ordered taxonomy: first match wins. Patterns run on the lowercased description
+# (and, if nothing matches, on the head of the prompt).
+THEMES = [
+    ("notion",                r"\bnotion\b"),
+    ("slack",                 r"\bslack\b"),
+    ("linear",                r"\blinear\b"),
+    ("vercel",                r"\bvercel\b"),
+    ("sanity/cms",            r"\bsanity\b|\bgroq\b|\bcms\b|\bstudio\b"),
+    ("datadog/observability", r"datadog|\bmonitor(s|ing)?\b|observab"),
+    ("m365/office docs",      r"sharepoint|onedrive|outlook|\bteams\b|\bm365\b|docx|xlsx|pptx|excel|\bword\b|email|calendar"),
+    ("secrets/1password",     r"1password|\bop (read|item)|secret|credential|\btokens?\b|vault"),
+    ("homelab/ssh/hosts",     r"homelab|\bssh\b|\bzima\b|\bragnar\b|\bodin\b|ansible|playbook|unifi|\bnas\b|proxmox|tailscale|router|\bdns\b|dotfiles|tmux"),
+    ("infra/pulumi/cloud",    r"pulumi|terraform|\binfra|\baws\b|\bgcp\b|azure|cloudflare|\bdeploy|k8s|kubernetes|docker|iam\b|workos"),
+    ("review/audit",          r"review|audit|critique|verify|verification|validat|\bcheck|assess|evaluat|\bvet\b|sanity-check"),
+    ("investigate/debug",     r"investigat|debug|diagnos|\bwhy\b|root cause|failure|failing|broken|\bfix|\bbug|error|crash|triage|regression"),
+    ("ci/test/log forensics", r"\bci\b|workflow run|github actions|\btests?\b|testing|pytest|vitest|\blogs?\b|build fail|flaky|lint|typecheck|smoke|benchmark"),
+    ("git/pr ops",            r"\bgit\b|\bpr\b|\bprs\b|pull request|merge|rebase|branch|commit|worktree|\bgh\b|release|close ?down"),
+    ("implement (plan lane/task)", r"\blane\b|\btask \d|\beng-\d+|\bwave\b|\bphase \d|\bpass \d|\bpr [a-z]\b"),
+    ("browser/ui testing",    r"browser|playwright|chrome|screenshot|visual (sweep|check|qa)|\be2e\b"),
+    ("docs/web research",     r"\bdocs?\b|documentation|\bweb\b|fetch|research|look ?up|upstream|changelog|pricing|compare|deep-dive|study"),
+    ("data/analysis/report",  r"analy[sz]|report|transcript|usage|metrics|stats|aggregate|csv|spreadsheet|memo|summar|extract|digest|evidence"),
+    ("search/locate/explore", r"\bfind\b|locate|search|explore|\bmap\b|survey|scan|inventory|\blist\b|where\b|grep|sweep|inspect|\bread\b|understand|trace|recon|context"),
+    ("write code/implement",  r"implement|write|build|\badd\b|create|refactor|\bport\b|migrat|update|edit|scaffold|convert|generate|wire|apply|rewrite|draft|set ?up|install|configure|polish|remove|rename|upgrade|bump"),
+    ("plan/design",           r"plan|design|architect|propos|strategy|\bspec\b|adr\b|openspec"),
+]
+GENERIC = {"review/audit", "investigate/debug", "ci/test/log forensics", "git/pr ops",
+           "implement (plan lane/task)", "browser/ui testing", "docs/web research",
+           "data/analysis/report", "search/locate/explore", "write code/implement", "plan/design"}
+THEMES_C = [(n, re.compile(p)) for n, p in THEMES]
+MCP_FAMILIES = ("notion", "vercel", "linear", "slack", "figma", "sanity", "chrome", "playwright",
+                "microsoft", "datadog", "workos", "gmail", "calendar", "drive")
+GP_TYPES = {"general-purpose", "(default)"}
+
+
+def redact(s):
+    return SECRET_RE.sub("<redacted>", s)
+
+
+def theme_of(desc, prompt_head):
+    d = desc.lower()
+    for name, rx in THEMES_C:
+        if rx.search(d):
+            return name, "desc"
+    p = prompt_head.lower()
+    for name, rx in THEMES_C:
+        if name not in GENERIC:
+            continue  # briefs restate env rules (secrets, ssh, Linear refs): too noisy
+        if rx.search(p):
+            return name, "prompt"
+    return "other/unclassified", "none"
+
+
+def norm_label(desc):
+    """leading verb + key noun, for 'other' bucket inspection."""
+    words = [w for w in re.findall(r"[a-z0-9][a-z0-9\-]*", desc.lower()) if w not in STOP]
+    return " ".join(words[:2]) if words else "(empty)"
+
+
+def parse_ts(s):
+    try:
+        return dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def tok_weight(u):
+    """Model-agnostic cost proxy in input-token-equivalents:
+    input + 1.25*cache_write + 0.1*cache_read + 5*output."""
+    if not isinstance(u, dict):
+        return 0, 0, 0
+    i = u.get("input_tokens") or 0
+    cw = u.get("cache_creation_input_tokens") or 0
+    cr = u.get("cache_read_input_tokens") or 0
+    o = u.get("output_tokens") or 0
+    return i + 1.25 * cw + 0.1 * cr + 5 * o, o, i + cw + cr
+
+
+class Period:
+    def __init__(self):
+        self.agent = collections.Counter()           # (acct, type, model) -> n
+        self.agent_plen = collections.defaultdict(list)  # (type, model) -> [chars]
+        self.agent_proj = collections.Counter()       # (type, model, proj) -> n
+        self.gp_theme = collections.Counter()
+        self.gp_theme_chars = collections.Counter()
+        self.gp_theme_tok = collections.Counter()
+        self.gp_theme_src = collections.Counter()
+        self.gp_theme_ex = collections.defaultdict(collections.Counter)
+        self.gp_other_lbl = collections.Counter()
+        self.gp_chars = 0
+        self.mcp = collections.Counter()              # (acct, server) -> n
+        self.mcp_sess = collections.defaultdict(set)  # (acct, server) -> sessions
+        self.toolsearch = collections.Counter()       # keyword -> n
+        self.skill = collections.Counter()
+        self.skill_ns = collections.Counter()
+        self.skill_sess = collections.defaultdict(set)
+        self.tok_main = collections.Counter()         # acct -> weighted
+        self.tok_sub = collections.Counter()          # (acct, agentType, model) -> weighted
+        self.tok_sub_out = collections.Counter()
+        self.tok_model = collections.Counter()        # (scope, actual model) -> weighted
+        self.agent_per_sess = collections.Counter()
+        self.gp_theme_model = collections.Counter()   # (theme, model) -> n
+        self.mcp_fam = collections.Counter()          # (acct, family, main|sub) -> n
+        self.mcp_fam_sess = collections.defaultdict(set)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--root", action="append", help="projects dir (repeatable)")
+    ap.add_argument("--since", help="window start YYYY-MM-DD (default today-30d)")
+    ap.add_argument("--top", type=int, default=15)
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--compare", metavar="BASE.json", help="diff headline metrics against a saved --json run")
+    ap.add_argument("--current", metavar="CUR.json", help="with --compare: compare against this saved run instead of scanning")
+    a = ap.parse_args()
+    if a.current and not a.compare:
+        ap.error("--current needs --compare")
+    if a.compare:
+        with open(a.compare) as f:
+            base = json.load(f)
+        if a.current:
+            with open(a.current) as f:
+                cur = json.load(f)
+        else:
+            cur = scan(a)
+        cmp = compare(base, cur)
+        if a.json:
+            json.dump(cmp, sys.stdout, indent=1)
+        else:
+            print_compare(cmp, base, cur)
+        return
+    out = scan(a)
+    if a.json:
+        json.dump(out, sys.stdout, indent=1, default=str)
+        return
+    print_report(out, a.top)
+
+
+def scan(a):
+    roots, _seen_real = [], set()
+    for r in (a.root or DEFAULT_ROOTS):
+        rp = os.path.realpath(r)
+        if os.path.isdir(rp) and rp not in _seen_real:  # aliased config dirs share one store
+            _seen_real.add(rp); roots.append(r)
+    since = (dt.datetime.fromisoformat(a.since).replace(tzinfo=dt.timezone.utc) if a.since
+             else dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=30))
+
+    P = {"all": Period(), "window": Period()}
+    seen_tool = set()
+    seen_msg = set()
+    sessions = {}   # sid -> [acct, first, last, n_agent_calls]
+    sub_meta = {}   # agent file path -> (type, model, desc, toolUseId)
+    tool_info = {}  # toolUseId -> (type, model)  from parent Agent calls
+    files = []
+    tid_theme = {}   # Agent tool_use id -> GP theme
+    file_tid = {}    # subagent file -> parent toolUseId (from meta)
+    file_tok = collections.defaultdict(lambda: [0.0, 0.0])  # subagent file -> [all, window]
+    for r in roots:
+        acct = os.path.basename(os.path.dirname(r.rstrip("/"))).lstrip(".").replace("claude-", "") or r
+        for f in glob.glob(os.path.join(r, "**", "*.jsonl"), recursive=True):
+            files.append((acct, f))
+    # parents first so tool_info exists when subagent files are processed
+    files.sort(key=lambda x: ("/subagents/" in x[1] or os.path.basename(x[1]).startswith("agent-"), x[1]))
+    bad = 0
+    nlines = 0
+    for acct, f in files:
+        is_sub = "/subagents/" in f or os.path.basename(f).startswith("agent-")
+        meta = None
+        if is_sub:
+            mp = f[:-6] + ".meta.json"
+            try:
+                with open(mp) as mf:
+                    m = json.load(mf)
+                meta = (m.get("agentType") or "(default)", m.get("model") or "inherit", m.get("toolUseId"))
+                file_tid[f] = meta[2]
+            except Exception:
+                meta = None
+        try:
+            fh = open(f, "r", errors="replace")
+        except OSError:
+            continue
+        with fh:
+            for line in fh:
+                nlines += 1
+                mt = TS_RE.search(line)
+                ts = parse_ts(mt.group(1)) if mt else None
+                if '"type":"assistant"' not in line:
+                    if not is_sub and ts and '"sessionId"' in line:
+                        ms = re.search(r'"sessionId":"([^"]+)"', line)
+                        if ms:
+                            s = sessions.setdefault(ms.group(1), [acct, ts, ts, 0])
+                            s[1] = min(s[1], ts); s[2] = max(s[2], ts)
+                    continue
+                try:
+                    o = json.loads(line)
+                except Exception:
+                    bad += 1
+                    continue
+                if o.get("type") != "assistant":
+                    continue
+                msg = o.get("message") or {}
+                sid = o.get("sessionId") or "?"
+                cwd = o.get("cwd") or ""
+                proj = os.path.basename(cwd.rstrip("/")) or "?"
+                if not is_sub and ts:
+                    s = sessions.setdefault(sid, [acct, ts, ts, 0])
+                    s[1] = min(s[1], ts); s[2] = max(s[2], ts)
+                periods = [P["all"]] + ([P["window"]] if ts and ts >= since else [])
+                # token usage (dedupe by message id; split messages repeat usage)
+                mid = msg.get("id")
+                if mid and (f, mid) not in seen_msg:
+                    seen_msg.add((f, mid))
+                    w, out, _ = tok_weight(msg.get("usage"))
+                    if w:
+                        actual = msg.get("model") or "?"
+                        for p in periods:
+                            if is_sub:
+                                file_tok[f][0 if p is P["all"] else 1] += w
+                                if meta:
+                                    t, mdl = meta[0], meta[1]
+                                elif o.get("agentId"):
+                                    t, mdl = "(no-meta)", "?"
+                                else:
+                                    t, mdl = "(no-meta)", "?"
+                                p.tok_sub[(acct, t, mdl)] += w
+                                p.tok_sub_out[(acct, t, mdl)] += out
+                                p.tok_model[("sub", actual)] += w
+                            else:
+                                p.tok_main[acct] += w
+                                p.tok_model[("main", actual)] += w
+                content = msg.get("content")
+                if not isinstance(content, list):
+                    continue
+                for b in content:
+                    if not isinstance(b, dict) or b.get("type") != "tool_use":
+                        continue
+                    tid = b.get("id")
+                    if tid in seen_tool:
+                        continue
+                    seen_tool.add(tid)
+                    name = b.get("name") or ""
+                    inp = b.get("input") if isinstance(b.get("input"), dict) else {}
+                    if name in ("Agent", "Task"):
+                        t = inp.get("subagent_type") or "(default)"
+                        mdl = inp.get("model") or "inherit"
+                        prompt = inp.get("prompt") if isinstance(inp.get("prompt"), str) else ""
+                        desc = inp.get("description") if isinstance(inp.get("description"), str) else ""
+                        tool_info[tid] = (t, mdl)
+                        if not is_sub and sid in sessions:
+                            sessions[sid][3] += 1
+                        th = src = None
+                        if t in GP_TYPES:
+                            th, src = theme_of(desc, prompt[:400])
+                            tid_theme[tid] = th
+                        for p in periods:
+                            p.agent[(acct, t, mdl)] += 1
+                            p.agent_plen[(t, mdl)].append(len(prompt))
+                            p.agent_proj[(t, mdl, proj)] += 1
+                            p.agent_per_sess[sid] += 1
+                            if th:
+                                p.gp_theme[th] += 1
+                                p.gp_theme_model[(th, mdl)] += 1
+                                p.gp_theme_chars[th] += len(prompt)
+                                p.gp_chars += len(prompt)
+                                p.gp_theme_src[(th, src)] += 1
+                                p.gp_theme_ex[th][redact(desc.strip())[:60]] += 1
+                                if th == "other/unclassified":
+                                    p.gp_other_lbl[norm_label(desc)] += 1
+                    elif name.startswith("mcp__"):
+                        parts = name.split("__")
+                        srv = parts[1] if len(parts) > 1 else name
+                        fam = next((k for k in MCP_FAMILIES if k in srv.lower()), srv)
+                        for p in periods:
+                            p.mcp_fam[(acct, fam, "sub" if is_sub else "main")] += 1
+                            p.mcp_fam_sess[(acct, fam)].add(sid)
+                            p.mcp[(acct, srv)] += 1
+                            p.mcp_sess[(acct, srv)].add(sid)
+                    elif name == "Skill":
+                        sk = str(inp.get("skill") or "?")
+                        ns = sk.split(":", 1)[0] if ":" in sk else "(local)"
+                        for p in periods:
+                            p.skill[sk] += 1
+                            p.skill_ns[ns] += 1
+                            p.skill_sess[ns].add(sid)
+                    elif name == "ToolSearch":
+                        q = str(inp.get("query") or "").lower()
+                        for kw in ("notion", "vercel", "slack", "linear", "datadog", "sanity",
+                                   "playwright", "chrome", "figma", "gmail", "drive", "calendar"):
+                            if kw in q:
+                                for p in periods:
+                                    p.toolsearch[kw] += 1
+
+    # attribute subagent-transcript tokens to the GP theme of the spawning Agent call
+    for f, (wa, ww) in file_tok.items():
+        th = tid_theme.get(file_tid.get(f))
+        if th:
+            P["all"].gp_theme_tok[th] += wa
+            P["window"].gp_theme_tok[th] += ww
+
+    out = {"roots": roots, "since": since.date().isoformat(), "files": len(files), "lines": nlines,
+           "malformed": bad, "periods": {}}
+    for key, p in P.items():
+        sess = sessions if key == "all" else {k: v for k, v in sessions.items() if v[2] >= since}
+        agent_rows = collections.Counter()
+        for (acct, t, m), n in p.agent.items():
+            agent_rows[(t, m)] += n
+        rows = []
+        for (t, m), n in agent_rows.most_common():
+            pl = p.agent_plen[(t, m)]
+            projs = collections.Counter({pr: c for (tt, mm, pr), c in p.agent_proj.items() if (tt, mm) == (t, m)})
+            rows.append({"type": t, "model": m, "n": n, "prompt_med": int(statistics.median(pl)) if pl else 0,
+                         "prompt_sum": sum(pl), "projects": projs.most_common(10)})
+        sub_tok_by_type = collections.Counter()
+        for (acct, t, m), w in p.tok_sub.items():
+            sub_tok_by_type[(t, m)] += w
+        out["periods"][key] = {
+            "agent_calls": sum(p.agent.values()),
+            "agent_by_type_model": rows,
+            "agent_by_acct": [[a_, t, m, n] for (a_, t, m), n in sorted(p.agent.items(), key=lambda x: -x[1])],
+            "gp_total": sum(p.gp_theme.values()), "gp_chars": p.gp_chars,
+            "gp_themes": [{"theme": th, "n": n, "chars": p.gp_theme_chars[th],
+                           "char_share": round(100 * p.gp_theme_chars[th] / p.gp_chars, 1) if p.gp_chars else 0,
+                           "tok_w": int(p.gp_theme_tok[th]),
+                           "from_prompt": p.gp_theme_src[(th, "prompt")],
+                           "by_model": {m: c for (t2, m), c in p.gp_theme_model.items() if t2 == th},
+                           "examples": [d for d, _ in p.gp_theme_ex[th].most_common(3)]}
+                          for th, n in p.gp_theme.most_common()],
+            "gp_other_labels": p.gp_other_lbl.most_common(a.top),
+            "mcp": [[a_, s, n, len(p.mcp_sess[(a_, s)])] for (a_, s), n in p.mcp.most_common()],
+            "toolsearch_kw": p.toolsearch.most_common(),
+            "mcp_family": [[a_, fam, p.mcp_fam[(a_, fam, "main")], p.mcp_fam[(a_, fam, "sub")],
+                            len(p.mcp_fam_sess[(a_, fam)])]
+                           for (a_, fam) in sorted(p.mcp_fam_sess, key=lambda k: -len(p.mcp_fam_sess[k]))],
+            "skills": p.skill.most_common(a.top),
+            "skill_ns": [[ns, n, len(p.skill_sess[ns])] for ns, n in p.skill_ns.most_common()],
+            "tokens_main_by_acct": {k: int(v) for k, v in p.tok_main.items()},
+            "tokens_sub_by_type_model": [[t, m, int(w)] for (t, m), w in sub_tok_by_type.most_common()],
+            "tokens_sub_by_acct_type": [[a_, t, m, int(w), int(p.tok_sub_out[(a_, t, m)])]
+                                        for (a_, t, m), w in p.tok_sub.most_common()],
+            "tokens_by_actual_model": [[s, m, int(w)] for (s, m), w in p.tok_model.most_common()],
+            "sessions": {
+                "n": len(sess),
+                "by_acct": dict(collections.Counter(v[0] for v in sess.values())),
+                "over_8h": sum(1 for v in sess.values() if (v[2] - v[1]).total_seconds() > 8 * 3600),
+                "over_24h": sum(1 for v in sess.values() if (v[2] - v[1]).total_seconds() > 24 * 3600),
+                "gt50_agent_calls": sum(1 for s in sess if p.agent_per_sess.get(s, 0) > 50),
+                "with_any_agent": sum(1 for s in sess if p.agent_per_sess.get(s, 0) > 0),
+            },
+        }
+        out["periods"][key]["headline"] = headline(p)
+    return out
+
+
+def pct(part, whole):
+    return round(100 * part / whole, 1) if whole else 0.0
+
+
+def headline(p):
+    """The round-over-round metrics: how much subagent work still lands on general-purpose."""
+    calls = sum(p.agent.values())
+    gp_calls = sum(n for (_, t, _), n in p.agent.items() if t in GP_TYPES)
+    by_type = collections.Counter()
+    for (_, t, _), w in p.tok_sub.items():
+        by_type[t] += w
+    sub = sum(by_type.values())
+    gp = sum(w for t, w in by_type.items() if t in GP_TYPES)
+    by_server = collections.Counter()
+    for (_, srv), n in p.mcp.items():
+        by_server[srv] += n
+    return {"agent_calls": calls, "gp_calls": gp_calls, "gp_call_share_pct": pct(gp_calls, calls),
+            "sub_tokens": int(sub), "gp_sub_tokens": int(gp), "gp_token_share_pct": pct(gp, sub),
+            "sub_tokens_by_type": {t: int(w) for t, w in by_type.most_common()},
+            "mcp_calls_by_server": dict(by_server.most_common())}
+
+
+SCALARS = ("agent_calls", "gp_calls", "gp_call_share_pct", "sub_tokens", "gp_sub_tokens", "gp_token_share_pct")
+BREAKDOWNS = ("sub_tokens_by_type", "mcp_calls_by_server")
+
+
+def _delta(b, c):
+    if b is None or c is None:
+        return None
+    d = c - b
+    return round(d, 1) if isinstance(d, float) else d
+
+
+def compare(base, cur):
+    """{period: {scalar: {base, current, delta}, breakdown: {key: {base, current, delta}}}}.
+    A key missing on one side has None there (reported as new / gone)."""
+    res = {}
+    for key in ("window", "all"):
+        bh = ((base.get("periods") or {}).get(key) or {})
+        ch = ((cur.get("periods") or {}).get(key) or {})
+        if not bh or not ch:
+            continue
+        bs, cs = bh.get("sessions") or {}, ch.get("sessions") or {}
+        bh, ch = bh.get("headline") or {}, ch.get("headline") or {}
+        r = {}
+        for m in SCALARS:
+            r[m] = {"base": bh.get(m), "current": ch.get(m), "delta": _delta(bh.get(m), ch.get(m))}
+        for m in ("over_8h", "over_24h"):
+            r["sessions_" + m] = {"base": bs.get(m), "current": cs.get(m), "delta": _delta(bs.get(m), cs.get(m))}
+        for m in BREAKDOWNS:
+            bd, cd = bh.get(m) or {}, ch.get(m) or {}
+            keys = sorted(set(bd) | set(cd), key=lambda k: -max(bd.get(k, 0), cd.get(k, 0)))
+            r[m] = {k: {"base": bd.get(k), "current": cd.get(k), "delta": _delta(bd.get(k), cd.get(k))}
+                    for k in keys}
+        res[key] = r
+    return res
+
+
+def _cell(v):
+    return fmt(v) if isinstance(v, int) and abs(v) >= 1000 else str(v)
+
+
+def _line(label, row):
+    b, c, d = row["base"], row["current"], row["delta"]
+    if b is None and c is None:
+        return None
+    if b is None:
+        return f"  {label:<34} new -> {_cell(c)}"
+    if c is None:
+        return f"  {label:<34} {_cell(b)} -> gone"
+    sd = (f"{d:+.1f}" if isinstance(d, float) else (f"+{_cell(d)}" if d >= 0 else f"-{_cell(-d)}"))
+    return f"  {label:<34} {_cell(b)} -> {_cell(c)} ({sd})"
+
+
+def print_compare(cmp, base, cur):
+    print(f"base since={base.get('since')} files={base.get('files')}  vs  current since={cur.get('since')} files={cur.get('files')}")
+    if not cmp:
+        print("no comparable periods (inputs lack 'periods' — were both made with --json?)")
+    for key, r in cmp.items():
+        print(f"\n######## {key.upper()} ########")
+        for m in SCALARS + ("sessions_over_8h", "sessions_over_24h"):
+            ln = _line(m, r[m])
+            if ln:
+                print(ln)
+        for m in BREAKDOWNS:
+            print(f"-- {m}")
+            for k, row in r[m].items():
+                ln = _line(k, row)
+                if ln:
+                    print(ln)
+
+
+def fmt(n):
+    n = float(n)
+    for u, d in (("G", 1e9), ("M", 1e6), ("k", 1e3)):
+        if abs(n) >= d:
+            return f"{n/d:.1f}{u}"
+    return f"{int(n)}"
+
+
+def print_report(out, top):
+    print(f"files={out['files']} lines={fmt(out['lines'])} malformed={out['malformed']} window_since={out['since']}")
+    for key, p in out["periods"].items():
+        print(f"\n######## {key.upper()} ########")
+        s = p["sessions"]
+        print(f"sessions={s['n']} {s['by_acct']} >8h={s['over_8h']} >24h={s['over_24h']} "
+              f"with_agent={s['with_any_agent']} >50_agent_calls={s['gt50_agent_calls']}")
+        tm = sum(p["tokens_main_by_acct"].values()); ts_ = sum(w for _, _, w in p["tokens_sub_by_type_model"])
+        print(f"cost-proxy tokens: main={fmt(tm)} subagents={fmt(ts_)} ({100*ts_/max(tm+ts_,1):.0f}% sub)")
+        print(f"\n-- Agent calls: {p['agent_calls']} (type | model | n | prompt med | prompt sum)")
+        for r in p["agent_by_type_model"][:top]:
+            print(f"{r['type']} | {r['model']} | {r['n']} | {r['prompt_med']} | {fmt(r['prompt_sum'])}")
+        print("\n-- subagent cost-proxy tokens by type|model")
+        for t, m, w in p["tokens_sub_by_type_model"][:top]:
+            print(f"{t} | {m} | {fmt(w)} ({100*w/max(ts_,1):.0f}%)")
+        print(f"\n-- GP themes (n={p['gp_total']}, chars={fmt(p['gp_chars'])})")
+        for t in p["gp_themes"]:
+            print(f"{t['theme']} | {t['n']} | {t['by_model']} | {t['char_share']}% | tok {fmt(t['tok_w'])} | fp {t['from_prompt']} | {t['examples']}")
+        print("other labels:", p["gp_other_labels"])
+        print("\n-- MCP (acct|server|calls|sessions)")
+        for r in p["mcp"]:
+            print(" | ".join(map(str, r)))
+        print("toolsearch kw:", p["toolsearch_kw"])
+        print("-- MCP family (acct|family|main calls|subagent calls|sessions)")
+        for r in p["mcp_family"]:
+            print(" | ".join(map(str, r)))
+        print("\n-- skill ns:", p["skill_ns"])
+        print("skills:", p["skills"])
+        print("\n-- agent by acct:", p["agent_by_acct"][:top])
+        print("tokens by actual model:", [(s_, m, fmt(w)) for s_, m, w in p["tokens_by_actual_model"][:12]])
+
+
+if __name__ == "__main__":
+    main()
