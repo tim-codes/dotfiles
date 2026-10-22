@@ -90,7 +90,7 @@
 # via the CONTEXTS mapping below, so the two contexts cannot skew.
 #
 # Usage:
-#   claude-sync            apply settings + CLAUDE.md + MCP servers + skills
+#   claude-sync            apply settings + CLAUDE.md + MCP servers + skills + agents
 #                          to every context
 #   claude-sync --diff     show what has drifted, change nothing
 #
@@ -102,6 +102,7 @@ SRC_SETTINGS_SHARED="$REPO_DIR/files/claude/settings.shared.json"
 SRC_CLAUDE_MD_SHARED="$REPO_DIR/files/claude/CLAUDE.md.shared"
 SRC_SKILLS="$REPO_DIR/files/claude/skills"
 SRC_MCP_SHARED="$REPO_DIR/files/claude/mcp.shared.json"
+SRC_AGENTS="$REPO_DIR/files/claude/agents"
 
 # context name : fragment account. The fragment account picks which
 # settings.<account>.json / CLAUDE.md.<account> the context is built from —
@@ -153,6 +154,83 @@ is_shared() {
 # whole-dir symlink and is gitignored.
 is_cc_managed() {
     [ "$1" = "synced" ]
+}
+
+# Subagent definitions (files/claude/agents/<name>.md) reach the contexts by
+# the same two shapes as skills: personal gets a whole-directory symlink,
+# every other context a curated real directory of per-file symlinks drawn
+# from this allow list. Same allow-list-not-deny-list reasoning: a new agent
+# stays personal-only until promoted here. Names, not filenames (no .md).
+# Check the plugin path for a name collision before promoting one.
+shared_agents() {
+    cat <<'LIST'
+implementer
+reviewer
+git-pr-ops
+investigator
+sanity-cms
+notion-ops
+LIST
+}
+
+is_shared_agent() {
+    shared_agents | grep -qx "$1"
+}
+
+# Read-only report of what sync_agents would do to a context, for --diff.
+agents_status_lines() {
+    local name="$1" ctx="$2" dir="$2/agents"
+    local entry base f n prune=() adopt=() personal_only=()
+
+    for f in "$SRC_AGENTS"/*.md; do
+        [ -e "$f" ] || continue
+        n="$(basename "$f" .md)"
+        is_shared_agent "$n" || personal_only+=("$n")
+    done
+
+    if [ "$name" = "personal" ]; then
+        if [ -L "$dir" ] && [ "$(readlink "$dir")" = "$SRC_AGENTS" ]; then
+            echo "  agents: already linked"
+        else
+            echo "  agents: would link -> ${SRC_AGENTS/#$HOME/~}"
+        fi
+        return
+    fi
+
+    for f in "$SRC_AGENTS"/*.md; do
+        [ -e "$f" ] || continue
+        n="$(basename "$f" .md)"
+        is_shared_agent "$n" || continue
+        if [ ! -L "$dir/$n.md" ] && [ ! -e "$dir/$n.md" ]; then
+            echo "  agents/$n.md: missing (would be linked)"
+        elif [ -L "$dir/$n.md" ] && [ "$(readlink "$dir/$n.md")" = "$f" ]; then
+            echo "  agents/$n.md: current"
+        elif [ -L "$dir/$n.md" ]; then
+            echo "  agents/$n.md: wrong target (would be relinked)"
+        else
+            echo "  agents/$n.md: real file (would be adopted if new to the repo)"
+        fi
+    done
+    if [ -d "$dir" ] && [ ! -L "$dir" ]; then
+        for entry in "$dir"/*; do
+            [ -e "$entry" ] || [ -L "$entry" ] || continue
+            base="$(basename "$entry")"
+            n="${base%.md}"
+            if [ -L "$entry" ]; then
+                if ! is_shared_agent "$n" || [ ! -e "$entry" ]; then
+                    prune+=("$base")
+                fi
+            elif [ -f "$entry" ] && [ ! -e "$SRC_AGENTS/$base" ]; then
+                adopt+=("$base")
+            fi
+        done
+    fi
+    [ "${#prune[@]}" -gt 0 ] && echo "  agents: would prune: $(IFS=,; echo "${prune[*]}" | sed 's/,/, /g')"
+    [ "${#adopt[@]}" -gt 0 ] && echo "  agents: unmanaged, would adopt: $(IFS=,; echo "${adopt[*]}" | sed 's/,/, /g')"
+    if [ "${#personal_only[@]}" -gt 0 ]; then
+        echo "  agents: personal-only, not linked: $(IFS=,; echo "${personal_only[*]}" | sed 's/,/, /g')"
+    fi
+    return 0
 }
 
 # Concatenate CLAUDE.md.shared with the optional CLAUDE.md.<account>
@@ -239,6 +317,9 @@ if [ "$diff_only" = 1 ]; then
             build_mcp "$account" "$MCP_TMP"
             mcp_status_lines "$ctx/.claude.json"
         fi
+
+        info "${ctx/#$HOME/~}/agents vs repo (files/claude/agents, shared_agents() for curated contexts)"
+        agents_status_lines "$name" "$ctx"
     done
     exit 0
 fi
@@ -461,6 +542,105 @@ sync_skills() {
     fi
 }
 
+# ---- agents: whole-dir symlink for personal (mirrors sync_skills_wholedir) ----
+sync_agents_wholedir() {
+    local ctx="$1"
+
+    if [ -L "$ctx/agents" ]; then
+        if [ "$(readlink "$ctx/agents")" = "$SRC_AGENTS" ]; then
+            echo "  agents: already linked"
+            return
+        fi
+        rm "$ctx/agents"
+    elif [ -d "$ctx/agents" ]; then
+        # Real dir: anything in it that is not a symlink is unmanaged work —
+        # move it into the repo rather than delete.
+        local entry base
+        for entry in "$ctx/agents"/*; do
+            [ -e "$entry" ] || [ -L "$entry" ] || continue
+            base="$(basename "$entry")"
+            if [ -L "$entry" ]; then
+                rm "$entry"
+            elif [ -e "$SRC_AGENTS/$base" ]; then
+                warn "agents/$base exists in both repo and context — left at $entry"
+            else
+                mv "$entry" "$SRC_AGENTS/$base"
+                echo "  agents/$base: adopted into the repo (was unmanaged)"
+            fi
+        done
+        rmdir "$ctx/agents" 2>/dev/null || {
+            warn "${ctx/#$HOME/~}/agents not empty — left as is, resolve by hand"
+            return
+        }
+    fi
+    ln -s "$SRC_AGENTS" "$ctx/agents"
+    echo "  agents: linked -> ${SRC_AGENTS/#$HOME/~}"
+}
+
+# ---- agents: curated real directory of per-file symlinks for every context
+# except personal. Links ONLY the shared_agents() allow-list; prunes broken,
+# non-shared or wrong-target links; adopts unmanaged real files into the repo
+# (mirrors sync_skills_curated, with <name>.md files instead of directories).
+sync_agents_curated() {
+    local account="$1" ctx="$2"
+    local dir="$ctx/agents"
+
+    if [ -L "$dir" ]; then
+        rm "$dir"
+        mkdir "$dir"
+        echo "  agents: replaced whole-dir symlink with a curated directory"
+    elif [ ! -d "$dir" ]; then
+        mkdir "$dir"
+    fi
+
+    local entry base n target
+    for entry in "$dir"/*; do
+        [ -e "$entry" ] || [ -L "$entry" ] || continue
+        base="$(basename "$entry")"
+        n="${base%.md}"
+        if [ -L "$entry" ]; then
+            target="$(readlink "$entry")"
+            if ! is_shared_agent "$n" || [ ! -e "$entry" ] || [ "$target" != "$SRC_AGENTS/$n.md" ]; then
+                rm "$entry"
+            fi
+        elif [ -f "$entry" ]; then
+            if [ -e "$SRC_AGENTS/$base" ]; then
+                warn "agents/$base exists in both repo and context — left at $entry"
+            else
+                mv "$entry" "$SRC_AGENTS/$base"
+                echo "  agents/$base: adopted into the repo (was unmanaged)"
+            fi
+        fi
+    done
+
+    local linked=0 personal_only=0 f
+    for f in "$SRC_AGENTS"/*.md; do
+        [ -e "$f" ] || continue
+        n="$(basename "$f" .md)"
+        if ! is_shared_agent "$n"; then
+            personal_only=$((personal_only + 1))
+            continue
+        fi
+        if [ ! -e "$dir/$n.md" ] && [ ! -L "$dir/$n.md" ]; then
+            ln -s "$f" "$dir/$n.md"
+        fi
+        echo "  agents/$n.md: linked (shared)"
+        linked=$((linked + 1))
+    done
+    echo "  agents: $linked shared linked, $personal_only personal-only left out"
+}
+
+sync_agents() {
+    local name="$1" account="$2" ctx="$3"
+
+    [ -d "$SRC_AGENTS" ] || return 0
+    if [ "$name" = "personal" ]; then
+        sync_agents_wholedir "$ctx"
+    else
+        sync_agents_curated "$account" "$ctx"
+    fi
+}
+
 # ---- overlay: symlink exxo-personal's durable state into ~/.claude-exxo ----
 # Idempotent and self-healing like the curated skills dir: correct links are
 # left alone, wrong-target links are repointed, and a REAL file/dir in the
@@ -512,6 +692,7 @@ for mapping in "${CONTEXTS[@]}"; do
     sync_claude_md "$account" "$ctx"
     sync_mcp_servers "$account" "$ctx"
     sync_skills "$name" "$account" "$ctx"
+    sync_agents "$name" "$account" "$ctx"
     if [ "$name" = "exxo-personal" ]; then
         sync_overlay "$ctx" "$HOME/.claude-exxo"
     fi
