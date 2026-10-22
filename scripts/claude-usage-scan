@@ -12,6 +12,9 @@ Default roots: ~/.claude-personal/projects ~/.claude-exxo/projects ~/.claude-exx
 --compare diffs the per-period headline metrics (general-purpose share of subagent
 tokens and calls, subagent tokens by agent type, MCP calls by server, long sessions)
 of BASE against CUR, or against a fresh scan when --current is omitted.
+--aggregate-only drops every free-text field (task descriptions, project names,
+roots, per-skill names) and masks UUID-named MCP servers: use it for any output
+that gets committed, since the dotfiles repo is public.
 Baseline: docs/superpowers/specs/2026-10-23-usage-baseline.json in the dotfiles repo.
 """
 import argparse, collections, datetime as dt, glob, json, os, re, statistics, sys
@@ -58,6 +61,7 @@ THEMES_C = [(n, re.compile(p)) for n, p in THEMES]
 MCP_FAMILIES = ("notion", "vercel", "linear", "slack", "figma", "sanity", "chrome", "playwright",
                 "microsoft", "datadog", "workos", "gmail", "calendar", "drive")
 GP_TYPES = {"general-purpose", "(default)"}
+UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
 
 
 def redact(s):
@@ -139,6 +143,8 @@ def main():
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--compare", metavar="BASE.json", help="diff headline metrics against a saved --json run")
     ap.add_argument("--current", metavar="CUR.json", help="with --compare: compare against this saved run instead of scanning")
+    ap.add_argument("--aggregate-only", action="store_true",
+                    help="omit free-text labels/project names/roots and mask UUID server names (for committed output)")
     a = ap.parse_args()
     if a.current and not a.compare:
         ap.error("--current needs --compare")
@@ -296,6 +302,8 @@ def scan(a):
                     elif name.startswith("mcp__"):
                         parts = name.split("__")
                         srv = parts[1] if len(parts) > 1 else name
+                        if a.aggregate_only:
+                            srv = UUID_RE.sub("<uuid>", srv)
                         fam = next((k for k in MCP_FAMILIES if k in srv.lower()), srv)
                         for p in periods:
                             p.mcp_fam[(acct, fam, "sub" if is_sub else "main")] += 1
@@ -375,7 +383,22 @@ def scan(a):
             },
         }
         out["periods"][key]["headline"] = headline(p)
+    if a.aggregate_only:
+        strip_free_text(out)
     return out
+
+
+def strip_free_text(out):
+    """Keep only counts and fixed taxonomy names: nothing a transcript author typed."""
+    out.pop("roots", None)
+    out["aggregate_only"] = True
+    for p in out["periods"].values():
+        for r in p["agent_by_type_model"]:
+            r.pop("projects", None)
+        for t in p["gp_themes"]:
+            t.pop("examples", None)
+        p.pop("gp_other_labels", None)
+        p.pop("skills", None)
 
 
 def pct(part, whole):
@@ -495,8 +518,8 @@ def print_report(out, top):
             print(f"{t} | {m} | {fmt(w)} ({100*w/max(ts_,1):.0f}%)")
         print(f"\n-- GP themes (n={p['gp_total']}, chars={fmt(p['gp_chars'])})")
         for t in p["gp_themes"]:
-            print(f"{t['theme']} | {t['n']} | {t['by_model']} | {t['char_share']}% | tok {fmt(t['tok_w'])} | fp {t['from_prompt']} | {t['examples']}")
-        print("other labels:", p["gp_other_labels"])
+            print(f"{t['theme']} | {t['n']} | {t['by_model']} | {t['char_share']}% | tok {fmt(t['tok_w'])} | fp {t['from_prompt']} | {t.get('examples', '')}")
+        print("other labels:", p.get("gp_other_labels", "(omitted)"))
         print("\n-- MCP (acct|server|calls|sessions)")
         for r in p["mcp"]:
             print(" | ".join(map(str, r)))
@@ -505,7 +528,7 @@ def print_report(out, top):
         for r in p["mcp_family"]:
             print(" | ".join(map(str, r)))
         print("\n-- skill ns:", p["skill_ns"])
-        print("skills:", p["skills"])
+        print("skills:", p.get("skills", "(omitted)"))
         print("\n-- agent by acct:", p["agent_by_acct"][:top])
         print("tokens by actual model:", [(s_, m, fmt(w)) for s_, m, w in p["tokens_by_actual_model"][:12]])
 

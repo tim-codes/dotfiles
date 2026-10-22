@@ -115,6 +115,12 @@ file. The 30-day re-run is a backlog item with a date.
 
 ## 5. Backlog (later rounds)
 
+- **2026-11-22: 30-day re-measure.** `scripts/claude-usage-scan
+  --aggregate-only --compare docs/superpowers/specs/2026-10-23-usage-baseline.json`;
+  goal 1 is `gp_token_share_pct` < 25 in the window period (baseline:
+  92.1% window, 91.9% all-time by the scanner's cost proxy). The baseline
+  is recorded `--aggregate-only` — no task descriptions, project names or
+  UUID server names — because this repo is public.
 Further splits by evidence: `m365-ops`, `browser-tester`, `infra-pulumi`,
 `docs-research`, `linear-ops`. Figma plugin lazy-load helper. A
 `session-janitor` note in the squad orchestrator design covers the

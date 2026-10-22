@@ -93,6 +93,22 @@ class ScanTests(unittest.TestCase):
         out = run("--compare", base, "--current", cur)
         self.assertRegex(out, r"implementer\s+new\s+->\s+50")
 
+    def test_aggregate_only_strips_free_text(self):
+        root = write_fixture(os.path.join(self.d, "p"), [("t1", "general-purpose", "acme client rollout", 100)])
+        uuid = "0123abcd-0755-4a0e-a3c9-78463d1f7e93"
+        with open(os.path.join(root, "slug", "s1.jsonl"), "a") as f:
+            f.write(json.dumps({"type": "assistant", "sessionId": "s1", "timestamp": TS, "cwd": "/x/acmeproj",
+                                "message": {"id": "m9", "content": [
+                                    {"type": "tool_use", "id": "u1", "name": f"mcp__{uuid}__search", "input": {}}]}},
+                               separators=(",", ":")) + "\n")
+        raw = run("--root", root, "--json", "--aggregate-only")
+        for leak in ("acme client rollout", "acmeproj", uuid, root):
+            self.assertNotIn(leak, raw)
+        out = json.loads(raw)
+        self.assertTrue(out["aggregate_only"])
+        self.assertEqual(out["periods"]["window"]["headline"]["mcp_calls_by_server"], {"<uuid>": 1})
+        self.assertEqual(out["periods"]["window"]["headline"]["gp_calls"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
