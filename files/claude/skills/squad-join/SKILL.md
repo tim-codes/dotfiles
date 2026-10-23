@@ -125,11 +125,11 @@ now, push if a draft PR exists) — they are not a pause by themselves.
 | directive | data | what you do |
 |---|---|---|
 | `pause` | `{reason, resets_at?}` | the pause procedure below |
-| `resume` | `{}` | the resume procedure below |
 | `priority` | `{priority}` | note it; at 4 or 5 defer optional work (polish, extra refactors, nice-to-have tests) |
 | `heavy_slot` | `{decision: grant\|deny\|revoke, retry_after_s?}` | grant: start the heavy job. deny: wait `retry_after_s`, then request again (a deny with `retry_after_s` may mean a protected app is running; do non-heavy work meanwhile). revoke: stop the heavy job now (interrupt the command), then `release` |
 | `cleanup` | `{reason, top?}` | the orchestrator saw you idle with busy or large leftover processes (`top`: `{pid, cmd, cpu_pct, rss_mb}`). Run the self-cleanup rule (§7) now: `TaskStop` completed subagents, end background shells you started, kill your own leftovers (dev servers, browsers, builds; check each `top` pid is yours before killing, never another session's), then `squad set --name <name> --detail "cleanup done: <what was stopped>"` |
 | `preflight` | `{ttl_hours?}` | warm and refresh every credential path this stream's work will need, so nothing prompts later while Tim is away; the procedure is below |
+| `resume` / `msg` | `{}` / `{kind:"operator_done", id?}` | `resume` as below; a `msg` saying an `operator_task` of yours is done: continue the work it blocked (§6 Operator tasks) |
 | `review` | `{findings}` | design-conformity findings on your ADR/plan or PR: address each blocking finding (or reply to the orchestrator with a justification), then re-send `design ready` / `pr_ready`; advisory ones are optional |
 | `infra` | `{action, pr, authority}` | infra role only; a client ignores it |
 | `relaunch` | reserved | not implemented; reply that it is unsupported |
@@ -172,7 +172,11 @@ now, while Tim is at the machine.
    `pulumi whoami`, `az account show`.
 3. **Connectors**: if the brief needs a claude.ai connector (Notion, Linear,
    Slack, ...), make one cheap read call so any OAuth happens now.
-4. **Reply**, and record it:
+4. **Foreseeable human steps.** Enumerate every one this brief implies
+   (service accounts, consents, admin-panel changes, DNS, approvals) and
+   raise each now as an `operator_task` with `"blocking":"later"` and the
+   build step that unblocks it in `after` (§6); do not wait for them.
+5. **Reply**, and record it:
 
    ```
    squad send role:orchestrator "preflight ok" --from <name> \
@@ -221,6 +225,21 @@ as the text's first word and a `kind` field in `data`.
 
   For exxo-infra this starts the review → merge → deploy flow; the
   orchestrator still gets Tim's yes first.
+- **Operator tasks** (a step only Tim can do). **Never** trigger an auth
+  prompt, Touch ID, browser login or admin-panel step yourself while Tim may
+  be away: raise it and carry on with other work in the stream.
+
+  ```
+  squad send role:orchestrator "operator task: <title>" --from <name> \
+    --data '{"kind":"operator_task","title":"<title>","stream":"<name>","blocking":"now|later","after":"<build step that unblocks it, if later>","instructions":"<exact steps / command / URL>","url":"<url>","est_minutes":<n>}'
+  ```
+
+  `now` = you cannot proceed without it; `later` = needed after `after`.
+  Use `squad set --status blocked --detail` only if nothing else in the
+  stream can proceed. When `after` is reached, tell the orchestrator the item
+  is `ready` (`"operator task ready: <title>"`, `"kind":"operator_task"`,
+  `"status":"ready"`). On `resume`, or a `msg` saying the task is done,
+  continue. Ask the orchestrator, not Tim, so one list reaches him.
 - **Blocked**: `squad set --name <name> --status blocked --detail "<what on>"`
   and `squad send role:orchestrator "blocked: <what on>" --from <name>
   --data '{"kind":"blocked","detail":"<what on>"}'`. Asking Tim directly is

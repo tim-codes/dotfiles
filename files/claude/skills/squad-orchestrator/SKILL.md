@@ -169,6 +169,31 @@ unresolved `preflight blocked` item for Tim to fix; do not work around it,
 and do not retry a blocked member until he says it is resolved. Re-send to
 that member alone afterwards.
 
+## 2c. Operator task queue
+
+The squad exists to cut human-in-the-loop (HITL) interruptions: members never
+prompt Tim, they send `operator_task` (fields in `squad-join` §6). Keep the
+queue in the `operator` gauge, republished on every change:
+```
+squad publish operator --kind gauge '{"items":[{"id","title","stream","blocking":"now|later","after","instructions","url","est_minutes","status":"open|ready|done|dropped","raised_at","presented_at","resolved_at"}]}'
+```
+- **Raise**: on `operator_task`, add an item (`id` = short slug, status
+  `open`, `raised_at` now). `ready` = unblocked by its `after` build step;
+  the member reports that (`"status":"ready"`), then mark it `ready`.
+- **Order**: blocking-now, then stream priority, then `est_minutes`.
+- **Present ONE consolidated list** (id, title, stream, exact instructions,
+  url, est. minutes), never per-member pings: when a blocking-now item
+  appears, when Tim asks, and in the §2b pre-AFK health summary. Set
+  `presented_at` on first showing.
+- **Resolve**: Tim says "done <id>": set `done` and `resolved_at`, then
+  `resume` the owner (or `msg` it that the task is done). "drop <id>" sets
+  `dropped`; tell the owner.
+- **Debug mode**: log each item's raised, presented and resolved timestamps
+  and wait minutes (raised to resolved) to the worklog and
+  `orchestrator-decisions.md` as they happen. The morning report gets an
+  "Interruptions" section: count, total wait, per-stream, and the avoidable
+  ones (preemptable in preflight, or raised by a member directly).
+
 ## 3. The plan gauge
 
 The plan lives in the broker so it survives you being closed and reopened:
@@ -331,7 +356,7 @@ member) and `cleanup` (§2a) and `preflight` (§2b).
 
 A message turn's JSON is `{"from":…,"text":…,"data":{…}}`; client →
 orchestrator messages carry `data.kind`: `pr_ready`, `heavy_slot` (`action`
-request|release), `blocked`, `done`, `infra_ready`, `infra_result`, `preflight`, plus
+request|release), `blocked`, `done`, `infra_ready`, `infra_result`, `preflight`, `operator_task` (§2c), plus
 your own timers (`sweep_due`, `heavy_slot_expired`). On `blocked`, tell Tim
 if it needs him; on `done`, drop the stream from the plan. Watcher events
 are information. Never send a `now`-priority turn for something that can
