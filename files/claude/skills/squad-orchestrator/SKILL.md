@@ -36,6 +36,7 @@ down: see `squad-join` §8.
    # and once:
    squad subscribe orchestrator host --min-change 15 --debounce-s 300
    squad subscribe orchestrator host.pressure
+   squad subscribe orchestrator host.protected
    squad subscribe orchestrator host.member_idle_with_descendants
    squad subscribe orchestrator msg.role.orchestrator
    squad subscribe orchestrator msg.all
@@ -170,6 +171,14 @@ as released. On `release`: drop the grant, grant the next in `queue`.
 - A member above 60% of the host (`host` gauge `members[].cpu_pct`) for 2
   minutes without a grant is told (plain `squad send`, no directive) to
   request a slot or stop the heavy job.
+
+**Protected apps.** The `host` gauge carries `protected:[{name, running,
+cpu_pct, rss_mb}]` and the broker publishes `host.protected {name, running}`
+on start/stop. While any protected app is running: hold `heavy_slots` at 0
+(deny requests with `retry_after_s: 600`), treat `host.pressure` `warn` as
+`critical` (revoke/stop heavy work), and tell Tim once. On `running: false`
+for the last one, restore the plan's `heavy_slots` and tell waiting members
+to retry.
 
 ## 5. Infra: review, merge, deploy
 

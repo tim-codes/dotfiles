@@ -124,7 +124,7 @@ now, push if a draft PR exists) — they are not a pause by themselves.
 | `pause` | `{reason, resets_at?}` | the pause procedure below |
 | `resume` | `{}` | the resume procedure below |
 | `priority` | `{priority}` | note it; at 4 or 5 defer optional work (polish, extra refactors, nice-to-have tests) |
-| `heavy_slot` | `{decision: grant\|deny\|revoke, retry_after_s?}` | grant: start the heavy job. deny: wait `retry_after_s`, then request again. revoke: stop the heavy job now (interrupt the command), then `release` |
+| `heavy_slot` | `{decision: grant\|deny\|revoke, retry_after_s?}` | grant: start the heavy job. deny: wait `retry_after_s`, then request again (a deny with `retry_after_s` may mean a protected app is running; do non-heavy work meanwhile). revoke: stop the heavy job now (interrupt the command), then `release` |
 | `cleanup` | `{reason, top?}` | the orchestrator saw you idle with busy or large leftover processes (`top`: `{pid, cmd, cpu_pct, rss_mb}`). Run the self-cleanup rule (§7) now: `TaskStop` completed subagents, end background shells you started, kill your own leftovers (dev servers, browsers, builds; check each `top` pid is yours before killing, never another session's), then `squad set --name <name> --detail "cleanup done: <what was stopped>"` |
 | `infra` | `{action, pr, authority}` | infra role only; a client ignores it |
 | `relaunch` | reserved | not implemented; reply that it is unsupported |
