@@ -64,6 +64,18 @@ deploy (a deploy runs to completion; then pause), `squad set --name infra
 --status paused --detail "…"`, wait; `resume` → `squad set --name infra
 --status working`. `priority` and `heavy_slot` do not apply.
 
+`preflight` `{ttl_hours?}` → warm only what exxo-infra needs, then reply
+within 10 minutes: the exxo secret cache at the requested TTL (default 12h,
+`EXXO_SECRET_CACHE_TTL_SECONDS=43200` through `agent/run --` / the
+exxo-common `run-with-secrets` skill; Touch ID if the cache is cold, so tell
+Tim first), `pulumi whoami`, `gcloud auth print-access-token >/dev/null`
+and `gh auth status`. Never print a secret value. Then `squad send
+role:orchestrator "preflight ok" --from infra --data
+'{"kind":"preflight","ok":true}'` and `squad set --name infra --detail
+"preflight ok"`, or `"preflight blocked: <what and why>"` (`"ok":false`)
+and `squad set --name infra --detail "preflight blocked: <what>"`. Do not
+work around a blocker.
+
 ## 3. The `infra` directive: review → merge → deploy
 
 `squad set --name infra --status working --detail "PR #<n>: reviewing"`.
