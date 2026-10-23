@@ -65,6 +65,12 @@ baseline. This closes a gap where both contexts had independently
 hand-duplicated copies of the same global instructions with no sync
 mechanism at all (found and fixed 2026-08-18).
 
+`scripts/claude-sync` takes exactly two forms: no argument (apply) and `--diff`
+(report drift, change nothing). `-h`/`--help` prints the usage and exits 0; any
+other argument prints the usage to stderr and exits 2 *without syncing* (before
+this, an unrecognised flag such as `--help` fell through to a real sync).
+`tests/claude-sync-args.sh` covers it.
+
 MCP servers are the same shared+fragment family, but they are the one piece of
 repo-managed config that is not a `settings.json` key at all: Claude Code keeps
 user-scope servers in `<context>/.claude.json`, alongside login state and
