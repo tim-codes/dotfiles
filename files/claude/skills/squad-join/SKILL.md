@@ -69,6 +69,10 @@ command."** That line is what later turns rely on after compaction.
 No orchestrator live is fine: register anyway and carry on. An orchestrator
 that starts later reads the roster.
 
+`name-taken: <name>` means another live session holds that name: pick a
+different `--name`, or, if you are resuming your own earlier session (same
+project, the old one gone), run `squad deregister <name>` first.
+
 ## 3. Default subscriptions
 
 ```
@@ -213,3 +217,6 @@ as the text's first word and a `kind` field in `data`.
   each turn for approval, invisibly to the broker. Re-running `squad
   register` with the same name is safe and keeps subscriptions.
 - **Name refused** (`invalid-member-name`): pick a lowercase slug.
+- **A `<squad-message>` with `priority now` arrives mid-turn**: an urgent
+  orchestrator directive or critical host pressure. Act on it before
+  continuing.

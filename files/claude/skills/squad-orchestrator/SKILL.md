@@ -90,6 +90,13 @@ mid-deploy) except at level 100.
    record; the client's `squad set --status paused --detail …` shows it too.
 4. Tell Tim one line: who was paused, why, and the reset time.
 
+**Delivery priority:** only the registered orchestrator's `squad send
+--priority now` interrupts a busy member (others are downgraded to `next`);
+`host.pressure` critical events are always delivered at `now`. Reserve `now`
+for `pause` at level 100 / ETA < 5 min and `heavy_slot revoke` on critical
+pressure. A broker restart drops held (coalesced) turns and logs the count per
+member: after a `kickstart`, re-send any pending `pause`/`resume`.
+
 **Level 100** going up: pause every member of `A`, including the top
 priority and the infra member if it is not mid-deploy; tell Tim.
 
