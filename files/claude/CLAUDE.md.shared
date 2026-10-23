@@ -209,6 +209,20 @@ consumes the secret in a single in-recipe pipeline (fixed secret, fixed
 consumer, nothing printed), so the session invokes it without ever seeing
 the value.
 
+## Repo-level Claude config follows the estate conventions
+
+A repo's `.claude/settings.json`, `settings.local.json`, `agent/Justfile`
+and CLAUDE.md follow the `claude-repo-config` skill — read it before
+changing any of them, or when the SessionStart "Claude config drift"
+warning fires. Three hard rules:
+
+- No `just:*`, `git:*` or interpreter grants (`node`, `python`, `npx`,
+  `pnpm`, `bash`, `curl`, `gh` …) in any repo settings file; grant named
+  recipes instead. Read-only basics and the deny floor are global.
+- Blanket-trusted files are read-only by construction; mutating recipes
+  live in a separate, untrusted `Justfile.ops`.
+- A repo CLAUDE.md restates nothing global — one pointer line at most.
+
 ## Don't code fast-moving tooling from memory
 
 For anything that plausibly moved since training — a framework's current
@@ -271,7 +285,9 @@ forensics, smoke follow-ups), `sanity-cms` (Sanity schema/content/Studio)
 and `notion-ops` (every Notion read or write — no other agent loads Notion
 tools) each carry their own procedure and pinned model. `general-purpose`
 is the fallback for work none of them fits, and its roster line must say
-why none did.
+why none did. A project-defined agent in the repo's `.claude/agents/` takes
+precedence over these for the work it names (e.g. parentedit's `ui` over
+`implementer` for UI work), matching Claude Code's own subagent precedence.
 
 Model choice:
 

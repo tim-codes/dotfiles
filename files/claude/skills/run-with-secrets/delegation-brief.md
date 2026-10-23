@@ -9,10 +9,12 @@ subagent has none of the orchestrator's loaded context.
 Environment access rules (mandatory — violating them prompt-storms the
 operator with Touch ID / SSH approvals):
 
-1. Run ansible from the relevant `~/dev/homelab/projects/<host>/` directory
-   or via `just` recipes — never from the repo root. Each project's
-   `ansible.cfg` carries `ControlPersist=4h` SSH multiplexing; the root has
-   none, so root-run ansible reconnects (and re-prompts) on every call.
+1. Run ansible via `just` recipes or from the relevant
+   `~/dev/homelab/projects/<host>/` directory. Both the root and each
+   project's `ansible.cfg` set `ControlPersist=4h` SSH multiplexing, but only
+   the project dir carries the host's own overrides (zima forces password
+   auth there), so a root-run ad-hoc command against a project host can
+   connect the wrong way.
 2. Route `op` through the caching shim:
    `PATH=$HOME/dev/homelab/tools/op-shim:$PATH op ...` or a Just recipe —
    never bare `op` more than once. Run `just secret-cache-up` (idempotent)

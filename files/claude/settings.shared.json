@@ -172,6 +172,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/dev/dotfiles/scripts/claude-config-audit\" --repo \"$CLAUDE_PROJECT_DIR\" --quiet --hook # claude-config-audit",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Stop": [
@@ -317,7 +327,40 @@
   "crossSessionInbound": "accept",
   "dialogExpiry": "10m",
   "permissions": {
-    "defaultMode": "auto"
+    "defaultMode": "auto",
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(git worktree list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run list:*)",
+      "Bash(just --list:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "mcp__ide__getDiagnostics"
+    ],
+    "deny": [
+      "Bash(op read*)",
+      "Bash(* op read*)",
+      "Bash(*--reveal*)",
+      "Bash(*--show-secrets*)",
+      "Bash(pulumi env open*)",
+      "Bash(* pulumi env open*)",
+      "Bash(esc env open*)",
+      "Bash(* esc env open*)",
+      "Bash(gcloud secrets versions access*)",
+      "Bash(* gcloud secrets versions access*)",
+      "Read(**/.claude.json)",
+      "Read(**/.credentials.json)"
+    ]
   },
   "worktree": {
     "baseRef": "fresh"

@@ -10,5 +10,16 @@
         "url": "git@github.com:Exxo-Labs/skills.git"
       }
     }
+  },
+  "permissions": {
+    "allow": [
+      "Bash(gcloud * list:*)",
+      "Bash(gcloud * describe:*)",
+      "Bash(pulumi preview:*)",
+      "Bash(pulumi whoami:*)",
+      "Bash(pulumi stack ls:*)",
+      "Bash(pulumi stack output:*)",
+      "Bash(agent-tooling:*)"
+    ]
   }
 }

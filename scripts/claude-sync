@@ -7,7 +7,8 @@
 #
 # 1. settings.json is built by deep-merging files/claude/settings.shared.json
 #    with a per-account files/claude/settings.<account>.json fragment
-#    (jq -s '.[0] * .[1]', account fragment wins) and the result is COPIED
+#    (jq, account fragment wins, permission rule arrays concatenated — see
+#    SETTINGS_MERGE) and the result is COPIED
 #    into the context, never symlinked. Symlinking made the live user
 #    settings file *be* the repo file, and Claude Code writes through it
 #    constantly — plugin toggles, dialog acks, key reordering — so the repo
@@ -116,6 +117,22 @@ CONTEXTS=("personal:personal" "exxo:exxo" "exxo-personal:exxo")
 OVERLAY_DIRS=(projects plugins file-history plans tasks todos paste-cache)
 OVERLAY_FILES=(history.jsonl)
 
+# Deep merge, account fragment wins — EXCEPT the permissions rule arrays.
+# jq's `*` replaces arrays wholesale, so an account fragment carrying
+# permissions.allow (settings.exxo.json's read-only cloud grants) would
+# silently drop the shared read-only allow set from that context. allow, deny
+# and ask are concatenated instead (shared first, duplicates dropped, order
+# kept), which is also how Claude Code itself merges them across scopes.
+SETTINGS_MERGE='
+  .[0] as $s | .[1] as $a
+  | ($s * $a)
+  | reduce ("allow", "deny", "ask") as $k (.;
+      ((($s.permissions // {})[$k] // []) + ((($a.permissions // {})[$k]) // [])) as $v
+      | if ($v | length) > 0
+        then .permissions[$k] = ($v | reduce .[] as $x ([]; if any(.[]; . == $x) then . else . + [$x] end))
+        else . end)
+'
+
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33mwarn:\033[0m %s\n' "$*"; }
 
@@ -139,6 +156,7 @@ shared_skills() {
 claude-workstation-setup
 worktree-closedown
 dotfiles-repo
+claude-repo-config
 LIST
 }
 
@@ -301,7 +319,7 @@ if [ "$diff_only" = 1 ]; then
             continue
         fi
         info "${ctx/#$HOME/~} vs repo (settings.shared.json + settings.$account.json)"
-        jq -s '.[0] * .[1]' "$SRC_SETTINGS_SHARED" "$fragment" > "$MERGE_TMP"
+        jq -s "$SETTINGS_MERGE" "$SRC_SETTINGS_SHARED" "$fragment" > "$MERGE_TMP"
         if diff -u "$ctx/settings.json" "$MERGE_TMP" 2>/dev/null; then
             echo "  identical"
         fi
@@ -333,7 +351,7 @@ sync_settings() {
         warn "  settings.$account.json missing — skipping settings for this context"
         return
     fi
-    jq -s '.[0] * .[1]' "$SRC_SETTINGS_SHARED" "$fragment" > "$MERGE_TMP"
+    jq -s "$SETTINGS_MERGE" "$SRC_SETTINGS_SHARED" "$fragment" > "$MERGE_TMP"
 
     # A symlink here is the old homelab arrangement; replace it with a real file.
     if [ -L "$ctx/settings.json" ]; then
