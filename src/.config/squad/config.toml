@@ -26,6 +26,12 @@ projection_horizon_minutes = 60
 cpu_warn = 80
 cpu_critical = 95
 
+# Apps whose interactive performance the orchestrator protects: while one is
+# running, pressure thresholds drop to the protected_* values and heavy work pauses.
+protected = ["Astris"]
+protected_cpu_warn = 60
+protected_cpu_critical = 80
+
 # Expected watchers: `squad status` reports one that has gone silent.
 [[watchers]]
 name = "quota"
