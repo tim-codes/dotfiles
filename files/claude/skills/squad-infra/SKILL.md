@@ -119,6 +119,9 @@ deploy (a deploy runs to completion; then pause), `squad set --name infra
 
 The orchestrator relays the result to Tim and the originating client.
 
+Self-cleanup: after each directive, and before pausing or ending, `TaskStop`
+finished subagents (the reviewer) and end any background shells you started. A `cleanup` directive means the same: do it now.
+
 ## 4. Ending
 
 When Tim ends the infra session: `squad set --name infra --status done`,

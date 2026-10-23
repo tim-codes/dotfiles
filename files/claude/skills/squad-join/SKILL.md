@@ -125,6 +125,7 @@ now, push if a draft PR exists) — they are not a pause by themselves.
 | `resume` | `{}` | the resume procedure below |
 | `priority` | `{priority}` | note it; at 4 or 5 defer optional work (polish, extra refactors, nice-to-have tests) |
 | `heavy_slot` | `{decision: grant\|deny\|revoke, retry_after_s?}` | grant: start the heavy job. deny: wait `retry_after_s`, then request again. revoke: stop the heavy job now (interrupt the command), then `release` |
+| `cleanup` | `{reason, top?}` | the orchestrator saw you idle with busy or large leftover processes (`top`: `{pid, cmd, cpu_pct, rss_mb}`). Run the self-cleanup rule (§7) now: `TaskStop` completed subagents, end background shells you started, kill your own leftovers (dev servers, browsers, builds; check each `top` pid is yours before killing, never another session's), then `squad set --name <name> --detail "cleanup done: <what was stopped>"` |
 | `infra` | `{action, pr, authority}` | infra role only; a client ignores it |
 | `relaunch` | reserved | not implemented; reply that it is unsupported |
 
@@ -190,6 +191,11 @@ as the text's first word and a `kind` field in `data`.
   milestone (plan task done, PR opened, tests green) and when you change
   direction. `--status blocked` when blocked. One line of detail; it is what
   the orchestrator and a resumed you read.
+- **Self-cleanup, standing rule.** At every milestone and before `squad set
+  --status paused|done`: stop completed background agents (`TaskStop`), end
+  background shells you started, and kill dev servers and browsers you
+  launched for testing. Leftovers keep burning CPU and memory after the turn
+  ends, and the orchestrator will send a `cleanup` directive for them.
 - Checkpoint discipline is unchanged: commit every logical step, push at
   checkpoints and pauses (draft PR), never leave work only on disk.
 - **Delegation is unchanged.** Joining the squad adds coordination between
@@ -216,6 +222,10 @@ as the text's first word and a `kind` field in `data`.
   `crossSessionInbound: "accept"`; without it a bypass-mode session holds
   each turn for approval, invisibly to the broker. Re-running `squad
   register` with the same name is safe and keeps subscriptions.
+- **`session-not-found` on register**: the pid or config dir did not resolve
+  to a Claude session. Run the command from inside the Claude session (not a
+  subshell with a different env), or pass `--pid` / `--config-dir`
+  explicitly.
 - **Name refused** (`invalid-member-name`): pick a lowercase slug.
 - **A `<squad-message>` with `priority now` arrives mid-turn**: an urgent
   orchestrator directive or critical host pressure. Act on it before
