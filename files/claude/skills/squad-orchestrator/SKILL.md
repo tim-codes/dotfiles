@@ -37,6 +37,7 @@ down: see `squad-join` §8.
    squad subscribe orchestrator host --min-change 15 --debounce-s 300
    squad subscribe orchestrator host.pressure
    squad subscribe orchestrator host.protected
+   squad subscribe orchestrator host.runaway
    squad subscribe orchestrator host.member_idle_with_descendants
    squad subscribe orchestrator msg.role.orchestrator
    squad subscribe orchestrator msg.all
@@ -179,6 +180,11 @@ on start/stop. While any protected app is running: hold `heavy_slots` at 0
 `critical` (revoke/stop heavy work), and tell Tim once. On `running: false`
 for the last one, restore the plan's `heavy_slots` and tell waiting members
 to retry.
+
+**Runaway processes.** On each `host.runaway` event (a process outside any
+member's tree that stayed hot or bloated), warn Tim in chat with pid,
+command, cpu/rss and duration, and suggest terminating it. Never kill it
+yourself. If the same pid repeats, mention it at most once per 30 minutes.
 
 ## 5. Infra: review, merge, deploy
 
