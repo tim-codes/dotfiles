@@ -13,13 +13,31 @@
   },
   "permissions": {
     "allow": [
-      "Bash(gcloud * list:*)",
-      "Bash(gcloud * describe:*)",
+      "Bash(gcloud projects list:*)",
+      "Bash(gcloud config list:*)",
+      "Bash(gcloud config get-value:*)",
+      "Bash(gcloud auth list:*)",
+      "Bash(gcloud run services list:*)",
+      "Bash(gcloud run services describe:*)",
+      "Bash(gcloud run revisions list:*)",
+      "Bash(gcloud compute instances list:*)",
+      "Bash(gcloud compute instances describe:*)",
+      "Bash(gcloud sql instances list:*)",
+      "Bash(gcloud sql instances describe:*)",
+      "Bash(gcloud secrets list:*)",
+      "Bash(gcloud iam service-accounts list:*)",
+      "Bash(gcloud logging read:*)",
+      "Bash(gcloud storage ls:*)",
+      "Bash(gsutil ls:*)",
       "Bash(pulumi preview:*)",
       "Bash(pulumi whoami:*)",
       "Bash(pulumi stack ls:*)",
       "Bash(pulumi stack output:*)",
       "Bash(agent-tooling:*)"
+    ],
+    "deny": [
+      "Bash(gcloud compute ssh*)",
+      "Bash(* gcloud compute ssh*)"
     ]
   }
 }

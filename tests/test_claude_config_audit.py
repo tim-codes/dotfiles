@@ -118,6 +118,28 @@ class ClassifierTests(unittest.TestCase):
             os.unlink(f.name)
         self.assertEqual(names, ["backend-deploy", "foo", "semrush-prod-july-urls"])
 
+    def _splicing(self, text):
+        with tempfile.NamedTemporaryFile("w", suffix="Justfile", delete=False) as f:
+            f.write(text)
+        try:
+            return cca.splicing_recipes(f.name)
+        finally:
+            os.unlink(f.name)
+
+    def test_splicing_recipes(self):
+        self.assertEqual(self._splicing('show path:\n    cat {{ path }}\n'), ["show"])
+        self.assertEqual(self._splicing('run +args:\n    @tool {{args}}\n'), ["run"])
+        self.assertEqual(self._splicing('lg env="dev" n="5":\n    echo "{{ n }}"\n    echo ok\n'), ["lg"])
+        # positional arguments referenced as "$1" are the safe form
+        self.assertEqual(self._splicing('set positional-arguments\nshow path:\n    cat -- "$1"\n'), [])
+        # recipe functions are not parameters
+        self.assertEqual(self._splicing('where:\n    ls {{ justfile_directory() }}\n'), [])
+        # a function-call argument that merely shares a prefix with the param is fine
+        self.assertEqual(self._splicing('show path:\n    echo {{ justfile_directory() }} "$1"\n'), [])
+        # comments don't count; $-prefixed params are env vars, not spliced
+        self.assertEqual(self._splicing('show path:\n    # {{ path }}\n    echo hi\n'), [])
+        self.assertEqual(self._splicing('show $path:\n    echo "$path"\n'), [])
+
 
 class CliTests(unittest.TestCase):
     def setUp(self):
@@ -183,6 +205,24 @@ class CliTests(unittest.TestCase):
         code, doc = self.fx.audit(repo)
         self.assertEqual(code, 1)
         self.assertIn("justfile-blanket", checks(doc, "error"))
+
+    def test_justfile_param_splice(self):
+        bad = "show path:\n    cat {{ path }}\n"
+        good = 'set positional-arguments\nshow path:\n    cat -- "$1"\nwhere:\n    ls {{ justfile_directory() }}\n'
+        trust = {".claude/settings.json": {"permissions": {"allow": ["Bash(just --justfile=agent/Justfile:*)"]}}}
+        repo = self.fx.repo("r", {"agent/Justfile": bad})
+        _, doc = self.fx.audit(repo)
+        self.assertNotIn("justfile-param-splice", checks(doc, "error"))  # not trusted: no finding
+        self.fx.write(repo, trust)
+        code, doc = self.fx.audit(repo)
+        self.assertEqual(code, 1)
+        self.assertIn("justfile-param-splice", checks(doc, "error"))
+        msg = [f["message"] for r in doc["repos"] for f in r["findings"] if f["check"] == "justfile-param-splice"][0]
+        self.assertIn("agent/Justfile:show", msg)
+        self.fx.write(repo, {"agent/Justfile": good})
+        code, doc = self.fx.audit(repo)
+        self.assertNotIn("justfile-param-splice", checks(doc))
+        self.assertEqual(code, 0)
 
     def test_deny_floor_partial_restatement(self):
         repo = self.fx.repo("r", {".claude/settings.json": {"permissions": {"deny": ["Bash(op read:*)"]}}})
