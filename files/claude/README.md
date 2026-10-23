@@ -108,7 +108,8 @@ whole-directory symlink to `files/claude/skills`. `~/.claude-exxo/skills` is
 a real directory of per-skill symlinks maintained by `claude-sync`, built
 from an allow list: a `shared_skills()` list in `scripts/claude-sync` names
 the repo skills that are cross-account — currently `claude-workstation-setup`,
-`worktree-closedown`, `dotfiles-repo` and `claude-repo-config` — and only those are linked into exxo;
+`worktree-closedown`, `dotfiles-repo`, `claude-repo-config` and the squad skills (`squad-infra`,
+`squad-join`, `squad-orchestrator`, `squad-debug-review`) — and only those are linked into exxo;
 every other repo skill is personal-only by default. The allow-list replaced an
 earlier exclusion list after `run-with-secrets` — homelab guidance (op-shim,
 Ansible, zima/ragnar) — turned up alongside the `exxo-common` plugin's own

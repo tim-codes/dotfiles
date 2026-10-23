@@ -181,6 +181,9 @@ worktree-closedown
 dotfiles-repo
 claude-repo-config
 squad-infra
+squad-join
+squad-orchestrator
+squad-debug-review
 LIST
 }
 
