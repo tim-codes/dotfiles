@@ -88,22 +88,34 @@ path (both from `git worktree list`), `CTX` = the session's config dir
 
 6. **Remove the worktree.** With worktrunk, `wt remove <branch>` handles
    submodules itself (verified on wt 0.79). Without it, run
-   `git -C <P> worktree remove <W>` from the primary checkout. If that fails
-   with `working trees containing submodules cannot be moved or removed`,
-   and step 5 was clean, clear the submodules first and retry:
-   `git -C <W> submodule deinit --all --force`, then
-   `rm -rf "$(git -C <W> rev-parse --absolute-git-dir)/modules"`, then the
-   same `worktree remove` without `--force`. The `modules` dir under the
-   worktree's own git dir (`<P>/.git/worktrees/<name>/modules`) holds the
-   submodule clones, and git refuses while it exists. `deinit` alone isn't
-   enough (verified on git 2.50). Prefer this to `--force`, which would also
-   discard any uncommitted state in the worktree itself; use `--force` only
-   for genuinely disposable state, and say so. Delete the branch only if its
-   PR is merged: `git -C <P> branch -d <branch>`. A squash-merged branch
-   needs `-D`, after confirming the PR is merged. Never `rm -rf` a worktree
-   directly: git keeps metadata in `<P>/.git/worktrees/` that
-   `git worktree remove` cleans up (`git worktree prune` repairs the
-   aftermath of a raw delete).
+   `git -C <P> worktree remove <W>` from the primary checkout. Prefer that to
+   `--force`, which also discards uncommitted state in the worktree itself;
+   use `--force` only for genuinely disposable state, and say so. Delete the
+   branch only if its PR is merged: `git -C <P> branch -d <branch>`. A
+   squash-merged branch needs `-D`, after confirming the PR is merged.
+   Otherwise never `rm -rf` a worktree directly: git keeps metadata in
+   `<P>/.git/worktrees/` that `git worktree remove` cleans up. The one
+   exception is the submodule case below.
+
+   **Submodule case (repos with a `.gitmodules`).** `git worktree remove`
+   refuses with `working trees containing submodules cannot be moved or
+   removed`. This is the step that has been leaving dangling worktrees in the
+   exxo repos (the vendored `.claude/vendor/skills` submodule): the refusal
+   gets read as a blocker and the worktree is abandoned. It is not one. The
+   correct closedown is:
+
+   1. Confirm the worktree is clean: `git -C <W> status --porcelain` prints
+      nothing, and step 5's submodule check found no unsaved work.
+   2. Confirm the branch is merged (PR merged, or `git -C <P> branch --merged`
+      lists it; a squash-merged branch needs the PR check).
+   3. Relocate transcripts per steps 1-4 above.
+   4. `rm -rf <W> && git -C <P> worktree prune`
+
+   `prune` drops the now-dangling `<P>/.git/worktrees/<name>` metadata,
+   including the submodule clones under its `modules/` dir, so nothing is
+   left behind. Then delete the merged branch as above. If any precondition
+   fails (dirty status, unmerged branch), stop and report rather than
+   deleting.
 
 7. **Report** what was preserved (session uuids, target slug) and what was
    removed, so the closedown is auditable from the conversation.
