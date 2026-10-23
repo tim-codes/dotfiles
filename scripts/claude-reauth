@@ -1,0 +1,429 @@
+#!/bin/bash
+# One-step re-auth for this workstation: check every credential an unattended
+# Claude run leans on, then walk Tim through the interactive logins that are
+# missing, one at a time. Use it after a reboot, before going AFK, or when a
+# squad `preflight blocked` comes back. The /reauth skill drives it.
+#
+#   claude-reauth [--check] [--context personal|exxo|exxo-personal|all] [--ttl-hours N]
+#
+# --check reports only and changes nothing. The default reports, then runs each
+# missing login in turn (browser / Touch ID — the operator answers them), starts
+# OrbStack and the secret caches if they are down, re-checks, and prints the
+# summary. Exit 0 when nothing needs auth, 1 when something still does, 2 on a
+# usage error.
+#
+# Hygiene: no tool's raw output is ever printed. Each check captures it, keeps
+# only the account name/email the tool itself shows on status, and sends token
+# output (print-access-token, `claude mcp list` targets, ids) to /dev/null.
+#
+# Scope by --context: Docker, 1Password and gh are machine-wide and always
+# checked; the exxo secret cache, gcloud (+ADC, which the Pulumi GCP provider
+# uses), pulumi (+ESC) and az belong to exxo/exxo-personal; the homelab secret
+# cache to personal; MCP servers are checked per context against
+# files/claude/reauth-needed.toml.
+#
+# Status strings these checks parse, as observed 2026-10-23 (CLI versions:
+# Claude Code 2.1.309, op 2.41.0). Failure strings marked (expected) come from
+# the tools' documented behaviour, not from a live failure.
+#   docker info      down: "Cannot connect to the Docker daemon at
+#                    unix:///Users/tim/.orbstack/run/docker.sock. Is the docker
+#                    daemon running?" (expected), rc!=0
+#   op whoami        idle/not signed in: "[ERROR] <ts> account is not signed in",
+#                    rc 1 — does not prompt. With desktop-app integration that is
+#                    the normal state once the 10-minute CLI session lapses; the
+#                    next `op` call prompts Touch ID. `op account list
+#                    --format=json` lists configured accounts without prompting.
+#   gcloud           `gcloud auth list --filter=status:ACTIVE
+#                    --format='value(account)'` prints the active email, empty
+#                    when none ("No credentialed accounts." on stderr, expected);
+#                    `print-access-token` fails with "Reauthentication failed"
+#                    (expected); ADC missing: "Your default credentials were not
+#                    found" (expected).
+#   gh auth status   ok: "  ✓ Logged in to github.com account <login> (keyring)"
+#                    and a "  - Token: gho_****" line we never print; none: "You
+#                    are not logged into any GitHub hosts." rc 1 (expected).
+#   pulumi whoami    ok: the user name on one line; logged out: "error:
+#                    PULUMI_ACCESS_TOKEN must be set for login during
+#                    non-interactive CLI sessions" (expected). ESC: `pulumi env ls`.
+#   az account show  `--query user.name -o tsv` prints the user; logged out:
+#                    "Please run 'az login' to setup account." rc 1 (expected).
+#   claude mcp list  "Checking MCP server health…", a blank line, then one
+#                    "<name>: <url-or-command> - <status>" per server. Status is
+#                    "✔ Connected", "! Needs authentication", "✘ Failed to
+#                    connect — <reason>", "Not configured" or "⏸ Pending
+#                    approval". The middle field can carry URLs and commands, so
+#                    only <name> and <status> are kept. `claude mcp get <name>`
+#                    prints "  Status: <status>".
+#   claude mcp login <name>  exists (HTTP, SSE, or claude.ai connector): it
+#                    opens the browser OAuth flow from the CLI, so MCP auth does
+#                    not need the TUI; `/mcp` in a session is the fallback.
+#
+# The secret caches have no warm command (agent-tooling's surface is `cache
+# status|purge`, `auth`): a value's TTL is set when `agent-run` / the homelab op
+# shim writes it, from EXXO_SECRET_CACHE_TTL_SECONDS / HOMELAB_1P_CACHE_TTL_SECONDS
+# in that invocation's env. So this script makes sure the containers are up and
+# prints the env to start the unattended run with (--ttl-hours, default 12).
+set -uo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+NEEDED_FILE="$REPO_DIR/files/claude/reauth-needed.toml"
+HOMELAB_JUSTFILE="$HOME/dev/homelab/justfile"
+# claude mcp list resolves project-scoped servers by cwd; ~/claude is where the
+# wrappers start sessions, and falls back to $HOME.
+MCP_CWD="$HOME/claude"; [ -d "$MCP_CWD" ] || MCP_CWD="$HOME"
+
+usage() {
+    cat <<'EOF'
+Usage: claude-reauth [--check] [--context personal|exxo|exxo-personal|all] [--ttl-hours N]
+
+  --check        report only; run no login and start nothing
+  --context C    limit context-specific checks (default: all)
+  --ttl-hours N  secret-cache TTL to start the unattended run with (default: 12)
+
+Without --check: report, then run each missing interactive login one at a
+time, start OrbStack / the secret caches if down, re-check, summarise.
+Exit 0 all ok, 1 something still needs auth, 2 usage error.
+EOF
+}
+
+MODE=run; CTX_ARG=all; TTL_HOURS=12
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --check) MODE=check ;;
+        --context) [ $# -ge 2 ] || { usage >&2; exit 2; }; CTX_ARG="$2"; shift ;;
+        --context=*) CTX_ARG="${1#--context=}" ;;
+        --ttl-hours) [ $# -ge 2 ] || { usage >&2; exit 2; }; TTL_HOURS="$2"; shift ;;
+        --ttl-hours=*) TTL_HOURS="${1#--ttl-hours=}" ;;
+        -h|--help) usage; exit 0 ;;
+        *) usage >&2; exit 2 ;;
+    esac
+    shift
+done
+case "$CTX_ARG" in
+    all) CONTEXTS="personal exxo exxo-personal" ;;
+    personal|exxo|exxo-personal) CONTEXTS="$CTX_ARG" ;;
+    *) usage >&2; exit 2 ;;
+esac
+case "$TTL_HOURS" in ''|*[!0-9]*|0) usage >&2; exit 2 ;; esac
+TTL_SECONDS=$((TTL_HOURS * 3600))
+
+want_personal=0; want_exxo=0
+for c in $CONTEXTS; do
+    case "$c" in personal) want_personal=1 ;; *) want_exxo=1 ;; esac
+done
+
+have() { command -v "$1" >/dev/null 2>&1; }
+ctx_dir() { printf '%s/.claude-%s' "$HOME" "$1"; }
+launcher() { case "$1" in personal) echo claude ;; *) echo "claude-$1" ;; esac; }
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+# --- rows ----------------------------------------------------------------------
+# Parallel arrays (bash 3.2: no associative arrays). A check sets S (ok |
+# needs-auth | failed | skipped), N (one-line hint), FIX (the command shown to
+# the operator, empty when there is no CLI fix), TTY (1 = the fix needs a
+# terminal) and REFRESH (1 = ok, but run mode should still run the fix).
+R_ITEM=(); R_CHECK=(); R_CTX=(); R_SRV=(); R_S=(); R_N=(); R_FIX=(); R_TTY=(); R_REF=()
+add_row() { R_ITEM+=("$1"); R_CHECK+=("$2"); R_CTX+=("${3:-}"); R_SRV+=("${4:-}")
+            R_S+=(""); R_N+=(""); R_FIX+=(""); R_TTY+=(0); R_REF+=(0); }
+run_check() {
+    local i="$1"
+    S=failed; N=""; FIX=""; TTY=0; REFRESH=0
+    "check_${R_CHECK[$i]}" "${R_CTX[$i]}" "${R_SRV[$i]}"
+    R_S[$i]="$S"; R_N[$i]="$N"; R_FIX[$i]="$FIX"; R_TTY[$i]="$TTY"; R_REF[$i]="$REFRESH"
+}
+
+# --- Docker / OrbStack ----------------------------------------------------------
+docker_up() { have docker && docker info >/dev/null 2>&1; }
+check_docker() {
+    if ! have docker; then S=failed; N="docker CLI not installed (OrbStack)"; return; fi
+    if docker_up; then S=ok; N="daemon running"; return; fi
+    S=needs-auth; N="daemon unreachable — OrbStack down"; FIX="orb start"
+}
+fix_docker() {
+    orb start >/dev/null 2>&1
+    local n=0
+    while [ $n -lt 45 ]; do docker_up && return 0; sleep 2; n=$((n + 1)); done
+    return 1
+}
+
+# --- secret caches (see the exxo-common run-with-secrets skill and homelab's
+# run-with-secrets skill; never stopped here — only started) ----------------------
+container_running() { [ -n "$(docker ps -q -f "name=$1" 2>/dev/null)" ]; }
+check_exxo_cache() {
+    if ! docker_up; then S=skipped; N="Docker down — fix docker first"; return; fi
+    if ! container_running exxo-1p-cache; then
+        S=needs-auth; N="exxo-1p-cache not running"
+        FIX="docker run -d --rm --name exxo-1p-cache -p 127.0.0.1:6380:6379 redis:7-alpine redis-server --save '' --appendonly no"
+        return
+    fi
+    # Captured, not piped into grep -q: under pipefail an early grep exit
+    # SIGPIPEs the producer and fails the pipeline.
+    local status
+    if have agent-tooling; then
+        status="$(agent-tooling cache status 2>/dev/null)"
+        case "$status" in
+            *": reachable"*) ;;
+            *) S=failed; N="container up but agent-tooling reports it unreachable"; return ;;
+        esac
+    fi
+    S=ok; N="up on 127.0.0.1:6380; TTL is per run: EXXO_SECRET_CACHE_TTL_SECONDS=$TTL_SECONDS"
+}
+fix_exxo_cache() {
+    # The reference invocation from the exxo-common cache contract (idempotent).
+    container_running exxo-1p-cache || docker run -d --rm --name exxo-1p-cache \
+        -p 127.0.0.1:6380:6379 redis:7-alpine redis-server --save '' --appendonly no >/dev/null 2>&1
+}
+check_homelab_cache() {
+    if [ ! -f "$HOMELAB_JUSTFILE" ]; then S=skipped; N="no ~/dev/homelab checkout"; return; fi
+    if ! docker_up; then S=skipped; N="Docker down — fix docker first"; return; fi
+    if container_running homelab-1p-cache; then
+        S=ok; N="up on 127.0.0.1:6381; TTL is per run: HOMELAB_1P_CACHE_TTL_SECONDS=$TTL_SECONDS"; return
+    fi
+    if ! have just; then S=failed; N="homelab-1p-cache down and just not installed"; return; fi
+    S=needs-auth; N="homelab-1p-cache not running"; FIX="just --justfile ~/dev/homelab/justfile secret-cache-up"
+}
+fix_homelab_cache() { just --justfile "$HOMELAB_JUSTFILE" secret-cache-up >/dev/null 2>&1; }
+
+# --- 1Password CLI ---------------------------------------------------------------
+check_op() {
+    if ! have op; then S=failed; N="op not installed"; return; fi
+    local email
+    if email="$(op whoami --format=json 2>/dev/null | jq -r '.email // empty' 2>/dev/null)" && [ -n "$email" ]; then
+        S=ok; N="signed in as $email"; return
+    fi
+    email="$(op account list --format=json 2>/dev/null | jq -r '.[0].email // empty' 2>/dev/null)"
+    if [ -n "$email" ]; then
+        # Idle CLI session is normal with app integration; in run mode one
+        # Touch ID now also unlocks the desktop app after a reboot.
+        S=ok; N="$email configured, CLI session idle — next op call prompts Touch ID"
+        FIX="op signin"; REFRESH=1; return
+    fi
+    S=needs-auth; N="no 1Password account configured for the CLI"; FIX="op signin"; TTY=1
+}
+fix_op() { op signin >/dev/null; }
+
+# --- gh -----------------------------------------------------------------------------
+check_gh() {
+    if ! have gh; then S=failed; N="gh not installed"; return; fi
+    local out login
+    if out="$(gh auth status --hostname github.com 2>&1)"; then
+        login="$(printf '%s\n' "$out" | sed -n 's/.*Logged in to github\.com account \([^ ]*\).*/\1/p' | head -n 1)"
+        S=ok; N="github.com as ${login:-?}"; return
+    fi
+    S=needs-auth; N="not logged in to github.com"
+    FIX="gh auth login --hostname github.com --git-protocol ssh --web"; TTY=1
+}
+fix_gh() { gh auth login --hostname github.com --git-protocol ssh --web; }
+
+# --- gcloud (+ application-default credentials) --------------------------------------
+gcloud_account() { gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1; }
+check_gcloud() {
+    if ! have gcloud; then S=skipped; N="gcloud not installed"; return; fi
+    local acct; acct="$(gcloud_account)"
+    if [ -z "$acct" ]; then S=needs-auth; N="no active account"; FIX="gcloud auth login"; return; fi
+    if gcloud auth print-access-token >/dev/null 2>&1; then S=ok; N="$acct"; return; fi
+    S=needs-auth; N="$acct: token refresh failed (reauth required)"; FIX="gcloud auth login $acct"
+}
+fix_gcloud() {
+    local acct; acct="$(gcloud_account)"
+    if [ -n "$acct" ]; then gcloud auth login "$acct"; else gcloud auth login; fi
+}
+check_gcloud_adc() {
+    if ! have gcloud; then S=skipped; N="gcloud not installed"; return; fi
+    if gcloud auth application-default print-access-token >/dev/null 2>&1; then
+        S=ok; N="application-default credentials valid"; return
+    fi
+    S=needs-auth; N="no valid ADC (Pulumi's GCP provider uses it)"; FIX="gcloud auth application-default login"
+}
+fix_gcloud_adc() { gcloud auth application-default login; }
+
+# --- pulumi (+ ESC) -------------------------------------------------------------------
+check_pulumi() {
+    if ! have pulumi; then S=skipped; N="pulumi not installed"; return; fi
+    local user
+    if ! user="$(pulumi whoami 2>/dev/null | head -n 1)" || [ -z "$user" ]; then
+        S=needs-auth; N="not logged in"; FIX="pulumi login"; TTY=1; return
+    fi
+    if pulumi env ls >/dev/null 2>&1; then S=ok; N="$user; ESC reachable"; return; fi
+    S=needs-auth; N="$user, but ESC (pulumi env ls) failed"; FIX="pulumi login"; TTY=1
+}
+fix_pulumi() { pulumi login; }
+
+# --- az -------------------------------------------------------------------------------
+check_az() {
+    if ! have az; then S=skipped; N="az not installed"; return; fi
+    local user
+    if user="$(az account show --query user.name -o tsv 2>/dev/null | head -n 1)" && [ -n "$user" ]; then
+        S=ok; N="$user"; return
+    fi
+    S=needs-auth; N="not logged in"; FIX="az login"
+}
+fix_az() { az login >/dev/null; }
+
+# --- Claude Code MCP servers -------------------------------------------------------
+# reauth-needed.toml → "<table>\t<key>\t<server>" lines.
+needed_lines() {
+    [ -f "$NEEDED_FILE" ] || return 0
+    awk '
+        { sub(/^[[:space:]]+/, "") }
+        /^#/ || /^$/ { next }
+        /^\[[^]]+\]$/ { sec = substr($0, 2, length($0) - 2); gsub(/[[:space:]]/, "", sec); next }
+        !inarr && /^(servers|optional)[[:space:]]*=/ {
+            key = $0; sub(/[[:space:]]*=.*/, "", key); rest = $0; sub(/^[^=]*=/, "", rest); inarr = 1
+        }
+        inarr {
+            if (rest == "") rest = $0
+            while (match(rest, /"[^"]*"/)) { print sec "\t" key "\t" substr(rest, RSTART + 1, RLENGTH - 2); rest = substr(rest, RSTART + RLENGTH) }
+            if (index(rest, "]")) inarr = 0
+            rest = ""
+        }' "$NEEDED_FILE"
+}
+needed_for() {  # ctx key → server names, one per line ([all] first)
+    needed_lines | awk -F '\t' -v c="$1" -v k="$2" '($1 == "all" || $1 == c) && $2 == k { print $3 }'
+}
+# claude mcp list for one context, reduced to "<name>\t<status>" (never targets).
+mcp_list() {
+    local ctx="$1" f="$TMP/mcp-$1"
+    if [ ! -f "$f" ]; then
+        (cd "$MCP_CWD" && env CLAUDE_CONFIG_DIR="$(ctx_dir "$ctx")" claude mcp list 2>/dev/null) |
+            awk '{
+                n = index($0, ": "); if (n == 0) next
+                rest = $0; i = 0
+                while ((j = index(substr(rest, i + 1), " - ")) > 0) i += j
+                if (i == 0) next
+                print substr($0, 1, n - 1) "\t" substr($0, i + 3)
+            }' >"$f"
+    fi
+    cat "$f"
+}
+mcp_status_now() {  # one server, live, via claude mcp get
+    (cd "$MCP_CWD" && env CLAUDE_CONFIG_DIR="$(ctx_dir "$1")" claude mcp get "$2" 2>/dev/null) |
+        sed -n 's/^[[:space:]]*Status:[[:space:]]*//p' | head -n 1
+}
+classify_mcp() {
+    case "$1" in
+        *Connected*) S=ok; N="connected" ;;
+        *"Needs authentication"*) S=needs-auth; N="needs authentication" ;;
+        *"Pending approval"*) S=needs-auth; N="pending approval (project .mcp.json) — approve in-session" ;;
+        *) S=failed; N="not connecting (not an auth problem) — check: claude mcp get '$2'" ;;
+    esac
+}
+check_mcp_ctx() {  # a context whose directory is missing
+    S=skipped; N="$(ctx_dir "$1" | sed "s#^$HOME#~#") does not exist"
+}
+check_mcp() {
+    local ctx="$1" srv="$2" optional=0 st opts
+    opts="$(needed_for "$ctx" optional)"
+    case $'\n'"$opts"$'\n' in *$'\n'"$srv"$'\n'*) optional=1 ;; esac
+    if [ -n "${MCP_RECHECK:-}" ]; then
+        st="$(mcp_status_now "$ctx" "$srv")"
+    else
+        st="$(mcp_list "$ctx" | awk -F '\t' -v s="$srv" '$1 == s { print $2; exit }')"
+    fi
+    if [ -z "$st" ]; then
+        if [ "$optional" = 1 ]; then S=skipped; N="optional, not present in this context"
+        else S=failed; N="not configured in this context — run claude-sync, or add it"; fi
+        return
+    fi
+    classify_mcp "$st" "$srv"
+    if [ "$S" = needs-auth ] && case "$st" in *"Needs authentication"*) true ;; *) false ;; esac; then
+        FIX="claude mcp login '$srv' (in $(launcher "$ctx") context)"
+    fi
+}
+fix_mcp() { (cd "$MCP_CWD" && env CLAUDE_CONFIG_DIR="$(ctx_dir "$1")" claude mcp login "$2"); }
+
+# --- build the checklist -------------------------------------------------------
+add_row docker docker
+[ "$want_exxo" = 1 ] && add_row exxo-secret-cache exxo_cache
+[ "$want_personal" = 1 ] && add_row homelab-secret-cache homelab_cache
+add_row 1password op
+add_row gh gh
+if [ "$want_exxo" = 1 ]; then
+    add_row gcloud gcloud
+    add_row gcloud-adc gcloud_adc
+    add_row pulumi pulumi
+    add_row az az
+fi
+for ctx in $CONTEXTS; do
+    if [ ! -d "$(ctx_dir "$ctx")" ]; then add_row "mcp:$ctx" mcp_ctx "$ctx"; continue; fi
+    { needed_for "$ctx" servers; needed_for "$ctx" optional; } | awk '!seen[$0]++' >"$TMP/srv-$ctx"
+    while IFS= read -r srv; do
+        [ -n "$srv" ] && add_row "mcp:$ctx:$srv" mcp "$ctx" "$srv"
+    done <"$TMP/srv-$ctx"
+done
+
+# --- output ----------------------------------------------------------------------
+print_table() {
+    local i
+    echo "== $1 (contexts: $CONTEXTS)"
+    printf '  %-40s %-10s %s\n' ITEM STATUS HINT
+    for i in "${!R_ITEM[@]}"; do
+        local hint="${R_N[$i]}"
+        if [ "${R_S[$i]}" = needs-auth ] && [ -n "${R_FIX[$i]}" ]; then hint="$hint → ${R_FIX[$i]}"; fi
+        printf '  %-40s %-10s %s\n' "${R_ITEM[$i]}" "${R_S[$i]}" "$hint"
+    done
+}
+print_mcp_steps() {
+    local ctx i printed_head=0 printed_ctx
+    for ctx in $CONTEXTS; do
+        printed_ctx=0
+        for i in "${!R_ITEM[@]}"; do
+            [ "${R_CHECK[$i]}" = mcp ] && [ "${R_CTX[$i]}" = "$ctx" ] && [ "${R_S[$i]}" = needs-auth ] || continue
+            if [ "$printed_head" = 0 ]; then
+                echo
+                echo "== In-session MCP steps (one pass per context; or let claude-reauth run \`claude mcp login\`)"
+                printed_head=1
+            fi
+            if [ "$printed_ctx" = 0 ]; then
+                echo "  $ctx — launch \`$(launcher "$ctx")\`, then:"
+                printed_ctx=1
+            fi
+            echo "    /mcp → select \"${R_SRV[$i]}\" → Enter → approve in the browser"
+        done
+    done
+}
+print_ttl() {
+    echo
+    echo "== Unattended run: start it with the cache TTL set (${TTL_HOURS}h)"
+    [ "$want_exxo" = 1 ] && echo "  EXXO_SECRET_CACHE_TTL_SECONDS=$TTL_SECONDS     (read by agent-run per invocation)"
+    [ "$want_personal" = 1 ] && echo "  HOMELAB_1P_CACHE_TTL_SECONDS=$TTL_SECONDS      (read by homelab's op shim per invocation)"
+    return 0
+}
+
+for i in "${!R_ITEM[@]}"; do run_check "$i"; done
+
+if [ "$MODE" = run ]; then
+    print_table Report
+    echo
+    MCP_RECHECK=""
+    for i in "${!R_ITEM[@]}"; do
+        # Re-check first: an earlier fix (Docker) can change a later row (caches).
+        run_check "$i"
+        if [ "${R_S[$i]}" != needs-auth ] && [ "${R_REF[$i]}" != 1 ]; then continue; fi
+        [ -n "${R_FIX[$i]}" ] || continue
+        if [ "${R_TTY[$i]}" = 1 ] && [ ! -t 0 ]; then
+            R_N[$i]="${R_N[$i]} — needs a terminal, run it there"
+            continue
+        fi
+        echo "==> ${R_ITEM[$i]}: running \`${R_FIX[$i]}\` — answer the browser / Touch ID prompt; waiting."
+        if ! "fix_${R_CHECK[$i]}" "${R_CTX[$i]}" "${R_SRV[$i]}"; then
+            echo "    (${R_ITEM[$i]}: the login command exited non-zero)"
+        fi
+        [ "${R_CHECK[$i]}" = mcp ] && MCP_RECHECK=1
+        run_check "$i"
+        MCP_RECHECK=""
+    done
+    echo
+fi
+
+print_table Summary
+print_mcp_steps
+print_ttl
+
+rc=0
+for i in "${!R_ITEM[@]}"; do
+    case "${R_S[$i]}" in needs-auth|failed) rc=1 ;; esac
+done
+exit "$rc"
