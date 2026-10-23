@@ -184,7 +184,7 @@ carried no MCP servers at all while `~/.claude-exxo` had four.
    REAL directory of per-skill symlinks curated by claude-sync against an
    allow list: only repo skills named in `shared_skills()` in
    `scripts/claude-sync` get linked in (currently `claude-workstation-setup`,
-   `worktree-closedown`, `dotfiles-repo`, `claude-repo-config`). Every other repo skill is
+   `worktree-closedown`, `dotfiles-repo`, `claude-repo-config`, `squad-infra`). Every other repo skill is
    personal-only by default and must be explicitly promoted — add its name to
    `shared_skills()` to make it cross-account.
    Authoring asymmetry (verified against claude-sync): author new skills in
