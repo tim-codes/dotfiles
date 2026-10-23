@@ -11,12 +11,30 @@ have joined it. It pushes changes into a member's conversation as
 `<squad-message>` turns, so you never poll. Joining changes nothing about
 how you do your own work; it adds coordination between sessions.
 
+**Never halt to ask Tim in chat; register, then route questions through the orchestrator's operator queue.**
+
 Every `squad` command below is spelled as the CLI accepts it. Environment
 variables do not persist between Bash tool calls, so **always pass
 `--name <name>` to `squad set` and `--from <name>` to `squad send`**; never
 rely on `$SQUAD_MEMBER`.
 
 ## 1. Get out of the primary checkout
+
+**Register first, always.** Before this step, run §2 (with `--cwd "$PWD"`)
+and §3 so there is a channel to raise problems on; every start-up check below
+runs after. After moving into the worktree, re-run the same `squad register`
+with the worktree `--cwd` (safe, keeps subscriptions).
+
+**Safe drift is auto-fixed, never asked about**, one log line each: a
+submodule whose checkout differs from its pin (`+` in `git submodule status`)
+with empty `git -C <path> status --porcelain` → `git submodule update --init
+<path>`; untracked `.claude-cache/`, `node_modules/`, `.next/`, `dist/` →
+ignore; stale local `main` → `git fetch origin main:main` (only if main is not
+checked out) or `git pull --ff-only`. **Anything else dirty or ambiguous**
+(modified tracked files, unmerged commits, a conflicting branch): do not stop
+and ask Tim; `squad set --name <name> --status blocked --detail "<what>"`,
+then raise an `operator_task` with `"blocking":"now"` (§6) giving the exact
+options and your recommendation, and continue the steps that don't depend on it.
 
 If cwd is inside a git repo, check whether it is the primary checkout:
 
@@ -69,8 +87,8 @@ command."** That line is what later turns rely on after compaction.
 No orchestrator live is fine: register anyway and carry on. An orchestrator
 that starts later reads the roster.
 
-If `squad register` exits 2 (broker unreachable), run `squad doctor --fix`
-once and retry; if the broker is still unreachable, tell Tim and stop.
+If `squad register` fails (exit 2, broker unreachable), run `squad doctor
+--fix` once and retry; only if it still fails, tell Tim.
 
 `name-taken: <name>` means another live session holds that name: pick a
 different `--name`, or, if you are resuming your own earlier session (same

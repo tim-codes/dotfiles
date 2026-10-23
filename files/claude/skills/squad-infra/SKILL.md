@@ -10,6 +10,8 @@ orchestrator's say-so. You act **only** on an `infra` directive that carries
 Tim's authority; everything else that arrives is information. You never
 edit code: you review, merge and deploy what a workstream produced.
 
+**Never halt to ask Tim in chat; register, then route questions through the orchestrator's operator queue.**
+
 Env vars do not persist between Bash calls: pass `--from infra` explicitly.
 Every command here is spelled as the `squad` CLI accepts it. Exit 2 from a
 `squad` command means the broker is unreachable: tell Tim (`launchctl print
@@ -18,32 +20,41 @@ Messages not arriving: `squad status --pretty` and `squad roster --pretty`.
 
 ## 1. Start-up
 
-1. **Right checkout.** `git remote get-url origin` must contain
-   `exxo-infra` (expected `git@github.com:Exxo-Labs/exxo-infra.git`, normally
-   `~/dev/exxo/exxo-infra`). Anything else: tell Tim and stop. This session
-   runs in the **exxo** context (`claude-exxo`).
-2. **Deploy from main.** This is the one squad role that works in the
-   primary checkout, because it deploys `main` and edits nothing: `git
-   branch --show-current` is `main` and `git status --porcelain` is empty,
-   else tell Tim and stop. Then `git pull --ff-only`.
-3. **Singleton check.** `squad roster | jq -r '.[] | select(.live and
-   .req.role=="infra") | .req.name'`. Any output: an infra agent is already
-   live; tell Tim its name and stop. (Re-registering a live name silently
-   replaces it, so this check comes first.)
-4. **Register and subscribe:**
+1. **Register first, always** (the first action after loading this skill;
+   every other check comes after, so there is a channel to raise problems on):
+   singleton guard `squad roster | jq -r '.[] | select(.live and
+   .req.role=="infra") | .req.name'` (any output: an infra agent is live,
+   re-registering would replace it; skip registering, raise it per step 4
+   and end the turn), then
    ```
    squad register --name infra --role infra --priority 1 \
      --session-id "$CLAUDE_CODE_SESSION_ID" --notes "exxo-infra review/merge/deploy"
    squad subscribe infra msg.infra
    squad subscribe infra msg.role.infra
    ```
-   On `infra-exists: …`, print the name it gives and stop.
-   If `squad register` exits 2 (broker unreachable), run `squad doctor --fix`
-   once and retry; if still unreachable, tell Tim and stop.
+   On `infra-exists: …` do the same. If `register` fails (exit 2, broker
+   unreachable), run `squad doctor --fix` once and retry; only then tell Tim.
+2. **Right checkout.** `git remote get-url origin` must contain `exxo-infra`
+   (expected `git@github.com:Exxo-Labs/exxo-infra.git`, normally
+   `~/dev/exxo/exxo-infra`); this session runs in the **exxo** context.
+3. **Deploy from main.** The one squad role that works in the primary
+   checkout (it deploys `main`, edits nothing): `git branch --show-current`
+   is `main`. Auto-fix safe drift, log one line each, never ask: submodule
+   `+` in `git submodule status` with empty `git -C <path> status --porcelain`
+   → `git submodule update --init <path>`; untracked build artefacts/caches
+   (`.claude-cache/`, `node_modules/`, `.next/`, `dist/`) → ignore; stale
+   `main` → `git pull --ff-only`.
+4. **Anything else dirty or ambiguous** (wrong repo, modified tracked files,
+   unmerged commits, a conflicting branch): do NOT stop and ask Tim in chat.
+   `squad set --name infra --status blocked --detail "<what>"`, then `squad
+   send role:orchestrator "operator task: <what>" --from infra --data
+   '{"kind":"operator_task","blocking":"now","title":"<what>","instructions":"<exact options + your recommendation>"}'`;
+   continue start-up steps that don't depend on it and take no `infra`
+   directive until it clears.
 5. **Tell the orchestrator** (it may be holding requests):
    `squad send role:orchestrator "infra_ready" --from infra --data
    '{"kind":"infra_ready"}'`. No orchestrator live is fine.
-6. Tell Tim you are registered as `infra` and waiting, then end the turn.
+6. Tell Tim (one line) you are registered as `infra` and waiting, then end the turn.
    Directives arrive as turns; do not poll.
 
 ## 2. Accepting a directive
