@@ -112,6 +112,35 @@ curated contexts `claude-sync` skips it (`is_cc_managed()`) rather than
 adopting it, which would have moved exxo account state into the repo. Account
 skills are managed on claude.ai, never vendored here.
 
+Subagent definitions take the same two shapes. `agents/<name>.md` holds the
+dedicated agents (frontmatter `name`, `description`, `model`; the body is the
+procedure, including the environment mechanics a fresh subagent context does
+not inherit). `~/.claude-personal/agents` is a whole-directory symlink to
+`files/claude/agents`; the curated contexts get a real `agents/` directory of
+per-file symlinks for the names in `shared_agents()` in `scripts/claude-sync`
+— currently all six round-one agents (`implementer`, `reviewer`,
+`git-pr-ops`, `investigator`, `sanity-cms`, `notion-ops`), because 92% of the
+subagent spend they target is in exxo. A real file dropped into a curated
+`agents/` dir is adopted into the repo as personal-only, same as skills.
+Rationale and the measurement baseline:
+`docs/superpowers/specs/2026-10-23-subagent-plugin-hygiene-design.md`;
+re-measure with `scripts/claude-usage-scan --compare
+docs/superpowers/specs/2026-10-23-usage-baseline.json`.
+
+Plugins that are off by default: `notion@claude-plugins-official` and
+`vercel@claude-plugins-official` are set to `false` in `settings.shared.json`
+(not deleted — the merged settings file is copied over the live one, and an
+absent key leaves an installed marketplace plugin at its default, on). To use
+one for a session, enable it with `/plugin`; the next `claude-sync` turns it
+back off. That is the lazy-load pattern. Notion work in exxo goes through the
+`claude_ai_Notion` account connector (and the `notion-ops` agent); the legacy
+hand-added `notion` server is retired per context with `claude mcp remove -s
+user notion`. `linear@claude-plugins-official` stays on: the parentedit
+repo's `linear-tpe` skill calls the plugin's `mcp__plugin_linear_linear__*`
+tools by name. Figma is not a Claude Code plugin here — it arrives inside the
+claude.ai account-synced `design` plugin (`plugins/synced/`), which these
+fragments do not manage.
+
 Contexts are created by `scripts/claude-contexts`; the `claude`,
 `claude-personal`, `claude-exxo` and `claude-exxo-personal` shell wrappers
 select them via `CLAUDE_CONFIG_DIR` (see `src/.config/fish/common.fish`,

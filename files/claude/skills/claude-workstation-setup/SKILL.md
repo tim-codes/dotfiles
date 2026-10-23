@@ -207,6 +207,42 @@ claude-sync's curated path skips it (`is_cc_managed()`) instead of adopting it
 into the repo. Never vendor, commit or hand-edit it — account skills are
 managed on claude.ai.
 
+## Subagent definitions: same two shapes as skills
+
+Dedicated subagents live in `files/claude/agents/<name>.md` (frontmatter
+`name`, `description`, `model`; body = the procedure, which restates the
+environment mechanics a subagent doesn't inherit). Personal gets
+`~/.claude-personal/agents` as a whole-directory symlink to that dir; exxo and
+exxo-personal get a real `agents/` directory of per-file symlinks for the
+names in `shared_agents()` in `scripts/claude-sync` (currently `implementer`,
+`reviewer`, `git-pr-ops`, `investigator`, `sanity-cms`, `notion-ops` — all of
+them). Same allow-list and adoption rules as skills: a new agent is
+personal-only until named there, and a real file created in a curated
+`agents/` dir is adopted into the repo on the next sync. Verified 2026-10-23
+that Claude Code follows both a symlinked `agents/` dir and symlinked agent
+files. `claude-sync --diff` reports each agent's link state.
+
+The delegation policy in `CLAUDE.md.shared` routes to these first, with
+`general-purpose` as the stated-reason fallback. Progress is measured with
+`scripts/claude-usage-scan` against
+`docs/superpowers/specs/2026-10-23-usage-baseline.json` (goal: general-purpose
+under 25% of subagent tokens by 2026-11-22).
+
+## Plugins kept off by default (lazy load)
+
+`notion@claude-plugins-official` and `vercel@claude-plugins-official` are
+`false` in `settings.shared.json`: their skills were unused, their listing cost
+every turn. Enable one for a session with `/plugin` when a task needs it; the
+next `claude-sync` turns it back off. Explicit `false`, not a deleted key — the
+merged settings file replaces the live one, and an absent key leaves an
+installed marketplace plugin on. Notion in exxo goes through the
+`claude_ai_Notion` account connector via the `notion-ops` agent; the legacy
+hand-added `notion` server is retired with `claude mcp remove -s user notion`
+under each CLAUDE_CONFIG_DIR. `linear@claude-plugins-official` stays on because
+parentedit's `linear-tpe` skill names `mcp__plugin_linear_linear__*` tools.
+Figma reaches a context only inside the claude.ai account-synced `design`
+plugin (`<context>/plugins/synced/`), which the fragments don't manage.
+
 ## What is deliberately NOT shared or synced
 
 - **Permission approvals** — per repository, in `.claude/settings.local.json`

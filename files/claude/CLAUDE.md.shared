@@ -263,14 +263,29 @@ conflict resolution where each step depends on judging the previous one,
 and final synthesis. Independent delegable units launch as parallel
 subagents in one message, not sequentially.
 
-Model choice — the orchestrator's call, per task; neither tier needs a
-stated reason:
+Route to a dedicated agent first. `implementer` (plan-lane and ad-hoc
+implementation), `reviewer` (code/spec review, re-review waves),
+`git-pr-ops` (branch/worktree surveys, PR create/update, merge-state and CI
+checks, worktree closedown), `investigator` (debugging, CI/build log
+forensics, smoke follow-ups), `sanity-cms` (Sanity schema/content/Studio)
+and `notion-ops` (every Notion read or write — no other agent loads Notion
+tools) each carry their own procedure and pinned model. `general-purpose`
+is the fallback for work none of them fits, and its roster line must say
+why none did.
 
-- `sonnet` and `opus` are both ordinary choices. Match the model to the
-  task: how complex or multi-step the brief is, how design-sensitive the
-  edit, how much precise instruction-following matters.
+Model choice:
+
+- Dedicated agents: omit `model` — the definition pins it (sonnet in round
+  one). Pass `opus` only with a one-line reason on the roster line (e.g. a
+  design-sensitive implementation lane); `haiku` is fine for pure
+  `git-pr-ops` surveys.
+- `general-purpose`: `sonnet` and `opus` are both ordinary choices. Match
+  the model to the task: how complex or multi-step the brief is, how
+  design-sensitive the edit, how much precise instruction-following
+  matters.
 - `fable` — rare; only when the subtask needs frontier judgment end-to-end,
-  and say why. (Omitting `model` inherits the orchestrator's Opus.)
+  and say why. (Omitting `model` on `general-purpose` inherits the
+  orchestrator's Opus.)
 
 On every launch, announce a numbered roster — **task** (agent type) —
 **model**, with a one-line brief per agent — so delegation and model
@@ -288,13 +303,20 @@ uncached secret reads, unmultiplexed connections).
 Self-audit: on noticing more than ~5 tool calls have just run inline on
 work a subagent could have done, say so in the next message and delegate
 the remainder — the correction is part of the expected behaviour, not an
-embarrassment.
+embarrassment. Likewise a `general-purpose` launch for an implement,
+review, git/PR, investigate, Sanity or Notion-shaped task is a miss: say so
+next turn and route the rest to the dedicated agent.
 
 **Why:** the orchestrator's context and judgment are the scarce resource,
 and under a busy main loop "good judgment" reliably drifts toward doing
 everything inline — mechanical triggers (call-count, output-size), free
 per-task model choice, and a self-audit clause are what convert the
-preference into behaviour. `CLAUDE_CODE_SUBAGENT_MODEL`
+preference into behaviour. Dedicated agents exist because a transcript scan
+(2026-10-23) put 85% of Agent calls on `general-purpose`, and Opus
+`general-purpose` alone at 51% of all tokens, for work that mostly follows a
+known procedure a cheaper model can run when the procedure is written down;
+`scripts/claude-usage-scan` in dotfiles measures progress against that
+baseline. `CLAUDE_CODE_SUBAGENT_MODEL`
 is deliberately NOT set — it takes priority over the per-invocation model
 parameter, which would defeat exactly this per-task selection.
 

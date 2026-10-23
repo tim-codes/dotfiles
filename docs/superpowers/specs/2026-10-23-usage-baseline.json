@@ -1,0 +1,3083 @@
+{
+ "since": "2026-09-22",
+ "files": 1412,
+ "lines": 447823,
+ "malformed": 0,
+ "periods": {
+  "all": {
+   "agent_calls": 1157,
+   "agent_by_type_model": [
+    {
+     "type": "general-purpose",
+     "model": "opus",
+     "n": 449,
+     "prompt_med": 4708,
+     "prompt_sum": 2298945
+    },
+    {
+     "type": "general-purpose",
+     "model": "sonnet",
+     "n": 400,
+     "prompt_med": 2844,
+     "prompt_sum": 1226222
+    },
+    {
+     "type": "Explore",
+     "model": "sonnet",
+     "n": 58,
+     "prompt_med": 2159,
+     "prompt_sum": 131604
+    },
+    {
+     "type": "(default)",
+     "model": "opus",
+     "n": 53,
+     "prompt_med": 5109,
+     "prompt_sum": 292145
+    },
+    {
+     "type": "(default)",
+     "model": "sonnet",
+     "n": 36,
+     "prompt_med": 3179,
+     "prompt_sum": 118451
+    },
+    {
+     "type": "ui",
+     "model": "opus",
+     "n": 21,
+     "prompt_med": 5139,
+     "prompt_sum": 121148
+    },
+    {
+     "type": "Explore",
+     "model": "opus",
+     "n": 20,
+     "prompt_med": 2592,
+     "prompt_sum": 54691
+    },
+    {
+     "type": "general-purpose",
+     "model": "inherit",
+     "n": 17,
+     "prompt_med": 2311,
+     "prompt_sum": 68049
+    },
+    {
+     "type": "fork",
+     "model": "inherit",
+     "n": 14,
+     "prompt_med": 1652,
+     "prompt_sum": 25939
+    },
+    {
+     "type": "(default)",
+     "model": "inherit",
+     "n": 13,
+     "prompt_med": 3112,
+     "prompt_sum": 48503
+    },
+    {
+     "type": "feature-dev:code-reviewer",
+     "model": "opus",
+     "n": 12,
+     "prompt_med": 2535,
+     "prompt_sum": 30332
+    },
+    {
+     "type": "claude",
+     "model": "sonnet",
+     "n": 10,
+     "prompt_med": 3211,
+     "prompt_sum": 32509
+    },
+    {
+     "type": "claude",
+     "model": "opus",
+     "n": 8,
+     "prompt_med": 6250,
+     "prompt_sum": 55640
+    },
+    {
+     "type": "general-purpose",
+     "model": "fable",
+     "n": 7,
+     "prompt_med": 8611,
+     "prompt_sum": 59270
+    },
+    {
+     "type": "feature-dev:code-reviewer",
+     "model": "sonnet",
+     "n": 6,
+     "prompt_med": 2645,
+     "prompt_sum": 15432
+    },
+    {
+     "type": "Explore",
+     "model": "inherit",
+     "n": 6,
+     "prompt_med": 1010,
+     "prompt_sum": 8821
+    },
+    {
+     "type": "general-purpose",
+     "model": "haiku",
+     "n": 5,
+     "prompt_med": 1206,
+     "prompt_sum": 6937
+    },
+    {
+     "type": "ui",
+     "model": "sonnet",
+     "n": 5,
+     "prompt_med": 2107,
+     "prompt_sum": 11987
+    },
+    {
+     "type": "web-fetch",
+     "model": "inherit",
+     "n": 4,
+     "prompt_med": 1560,
+     "prompt_sum": 5939
+    },
+    {
+     "type": "claude-code-guide",
+     "model": "inherit",
+     "n": 3,
+     "prompt_med": 917,
+     "prompt_sum": 3626
+    },
+    {
+     "type": "Plan",
+     "model": "opus",
+     "n": 2,
+     "prompt_med": 3825,
+     "prompt_sum": 7650
+    },
+    {
+     "type": "web-fetch",
+     "model": "sonnet",
+     "n": 2,
+     "prompt_med": 1111,
+     "prompt_sum": 2222
+    },
+    {
+     "type": "feature-dev:code-explorer",
+     "model": "opus",
+     "n": 1,
+     "prompt_med": 2829,
+     "prompt_sum": 2829
+    },
+    {
+     "type": "feature-dev:code-architect",
+     "model": "opus",
+     "n": 1,
+     "prompt_med": 4530,
+     "prompt_sum": 4530
+    },
+    {
+     "type": "vercel:deployment-expert",
+     "model": "sonnet",
+     "n": 1,
+     "prompt_med": 3549,
+     "prompt_sum": 3549
+    },
+    {
+     "type": "squarespace",
+     "model": "opus",
+     "n": 1,
+     "prompt_med": 6830,
+     "prompt_sum": 6830
+    },
+    {
+     "type": "claude-code-guide",
+     "model": "sonnet",
+     "n": 1,
+     "prompt_med": 649,
+     "prompt_sum": 649
+    },
+    {
+     "type": "Explore",
+     "model": "haiku",
+     "n": 1,
+     "prompt_med": 224,
+     "prompt_sum": 224
+    }
+   ],
+   "agent_by_acct": [
+    [
+     "exxo",
+     "general-purpose",
+     "opus",
+     402
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "sonnet",
+     359
+    ],
+    [
+     "exxo",
+     "(default)",
+     "opus",
+     53
+    ],
+    [
+     "exxo",
+     "Explore",
+     "sonnet",
+     51
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "opus",
+     47
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "sonnet",
+     41
+    ],
+    [
+     "exxo",
+     "(default)",
+     "sonnet",
+     36
+    ],
+    [
+     "exxo",
+     "ui",
+     "opus",
+     21
+    ],
+    [
+     "exxo",
+     "Explore",
+     "opus",
+     20
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "inherit",
+     17
+    ],
+    [
+     "exxo",
+     "fork",
+     "inherit",
+     14
+    ],
+    [
+     "exxo",
+     "(default)",
+     "inherit",
+     13
+    ],
+    [
+     "exxo",
+     "feature-dev:code-reviewer",
+     "opus",
+     12
+    ],
+    [
+     "exxo",
+     "claude",
+     "sonnet",
+     10
+    ],
+    [
+     "exxo",
+     "claude",
+     "opus",
+     8
+    ],
+    [
+     "personal",
+     "Explore",
+     "sonnet",
+     7
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "fable",
+     6
+    ],
+    [
+     "exxo",
+     "feature-dev:code-reviewer",
+     "sonnet",
+     6
+    ],
+    [
+     "exxo",
+     "ui",
+     "sonnet",
+     5
+    ],
+    [
+     "exxo",
+     "web-fetch",
+     "inherit",
+     4
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "haiku",
+     4
+    ],
+    [
+     "personal",
+     "Explore",
+     "inherit",
+     3
+    ],
+    [
+     "exxo",
+     "Explore",
+     "inherit",
+     3
+    ],
+    [
+     "exxo",
+     "web-fetch",
+     "sonnet",
+     2
+    ],
+    [
+     "personal",
+     "claude-code-guide",
+     "inherit",
+     2
+    ],
+    [
+     "exxo",
+     "feature-dev:code-explorer",
+     "opus",
+     1
+    ],
+    [
+     "exxo",
+     "claude-code-guide",
+     "inherit",
+     1
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "haiku",
+     1
+    ],
+    [
+     "exxo",
+     "feature-dev:code-architect",
+     "opus",
+     1
+    ],
+    [
+     "exxo",
+     "Plan",
+     "opus",
+     1
+    ],
+    [
+     "exxo",
+     "vercel:deployment-expert",
+     "sonnet",
+     1
+    ],
+    [
+     "exxo",
+     "squarespace",
+     "opus",
+     1
+    ],
+    [
+     "personal",
+     "claude-code-guide",
+     "sonnet",
+     1
+    ],
+    [
+     "personal",
+     "Plan",
+     "opus",
+     1
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "fable",
+     1
+    ],
+    [
+     "exxo",
+     "Explore",
+     "haiku",
+     1
+    ]
+   ],
+   "gp_total": 980,
+   "gp_chars": 4118522,
+   "gp_themes": [
+    {
+     "theme": "review/audit",
+     "n": 208,
+     "chars": 751759,
+     "char_share": 18.3,
+     "tok_w": 126185935,
+     "from_prompt": 39,
+     "by_model": {
+      "sonnet": 96,
+      "opus": 99,
+      "inherit": 11,
+      "fable": 2
+     }
+    },
+    {
+     "theme": "implement (plan lane/task)",
+     "n": 148,
+     "chars": 737534,
+     "char_share": 17.9,
+     "tok_w": 384329635,
+     "from_prompt": 6,
+     "by_model": {
+      "sonnet": 55,
+      "opus": 84,
+      "fable": 4,
+      "haiku": 5
+     }
+    },
+    {
+     "theme": "git/pr ops",
+     "n": 90,
+     "chars": 412444,
+     "char_share": 10.0,
+     "tok_w": 143451310,
+     "from_prompt": 37,
+     "by_model": {
+      "sonnet": 35,
+      "opus": 55
+     }
+    },
+    {
+     "theme": "investigate/debug",
+     "n": 66,
+     "chars": 299859,
+     "char_share": 7.3,
+     "tok_w": 103305970,
+     "from_prompt": 11,
+     "by_model": {
+      "opus": 48,
+      "sonnet": 18
+     }
+    },
+    {
+     "theme": "write code/implement",
+     "n": 55,
+     "chars": 273923,
+     "char_share": 6.7,
+     "tok_w": 73492990,
+     "from_prompt": 2,
+     "by_model": {
+      "opus": 38,
+      "sonnet": 17
+     }
+    },
+    {
+     "theme": "infra/pulumi/cloud",
+     "n": 52,
+     "chars": 247552,
+     "char_share": 6.0,
+     "tok_w": 34931207,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 20,
+      "opus": 32
+     }
+    },
+    {
+     "theme": "docs/web research",
+     "n": 49,
+     "chars": 165159,
+     "char_share": 4.0,
+     "tok_w": 32512548,
+     "from_prompt": 14,
+     "by_model": {
+      "sonnet": 22,
+      "opus": 15,
+      "inherit": 12
+     }
+    },
+    {
+     "theme": "sanity/cms",
+     "n": 42,
+     "chars": 193567,
+     "char_share": 4.7,
+     "tok_w": 92222321,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 14,
+      "opus": 27,
+      "fable": 1
+     }
+    },
+    {
+     "theme": "linear",
+     "n": 34,
+     "chars": 99113,
+     "char_share": 2.4,
+     "tok_w": 11261397,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 33,
+      "opus": 1
+     }
+    },
+    {
+     "theme": "m365/office docs",
+     "n": 32,
+     "chars": 118215,
+     "char_share": 2.9,
+     "tok_w": 26431385,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 17,
+      "opus": 13,
+      "inherit": 2
+     }
+    },
+    {
+     "theme": "search/locate/explore",
+     "n": 32,
+     "chars": 109682,
+     "char_share": 2.7,
+     "tok_w": 35244539,
+     "from_prompt": 3,
+     "by_model": {
+      "sonnet": 20,
+      "opus": 12
+     }
+    },
+    {
+     "theme": "notion",
+     "n": 31,
+     "chars": 101845,
+     "char_share": 2.5,
+     "tok_w": 9904695,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 27,
+      "inherit": 2,
+      "opus": 2
+     }
+    },
+    {
+     "theme": "ci/test/log forensics",
+     "n": 31,
+     "chars": 139331,
+     "char_share": 3.4,
+     "tok_w": 65064193,
+     "from_prompt": 6,
+     "by_model": {
+      "opus": 15,
+      "sonnet": 15,
+      "inherit": 1
+     }
+    },
+    {
+     "theme": "data/analysis/report",
+     "n": 23,
+     "chars": 83702,
+     "char_share": 2.0,
+     "tok_w": 13118736,
+     "from_prompt": 1,
+     "by_model": {
+      "sonnet": 9,
+      "opus": 12,
+      "inherit": 2
+     }
+    },
+    {
+     "theme": "homelab/ssh/hosts",
+     "n": 21,
+     "chars": 91956,
+     "char_share": 2.2,
+     "tok_w": 20176833,
+     "from_prompt": 0,
+     "by_model": {
+      "opus": 15,
+      "sonnet": 6
+     }
+    },
+    {
+     "theme": "browser/ui testing",
+     "n": 18,
+     "chars": 73492,
+     "char_share": 1.8,
+     "tok_w": 32043423,
+     "from_prompt": 2,
+     "by_model": {
+      "opus": 12,
+      "sonnet": 6
+     }
+    },
+    {
+     "theme": "secrets/1password",
+     "n": 16,
+     "chars": 86565,
+     "char_share": 2.1,
+     "tok_w": 27413041,
+     "from_prompt": 0,
+     "by_model": {
+      "opus": 9,
+      "sonnet": 7
+     }
+    },
+    {
+     "theme": "datadog/observability",
+     "n": 11,
+     "chars": 53335,
+     "char_share": 1.3,
+     "tok_w": 8106452,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 6,
+      "opus": 5
+     }
+    },
+    {
+     "theme": "plan/design",
+     "n": 8,
+     "chars": 40286,
+     "char_share": 1.0,
+     "tok_w": 8638451,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 4,
+      "opus": 4
+     }
+    },
+    {
+     "theme": "slack",
+     "n": 6,
+     "chars": 12801,
+     "char_share": 0.3,
+     "tok_w": 1210338,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 6
+     }
+    },
+    {
+     "theme": "vercel",
+     "n": 4,
+     "chars": 12937,
+     "char_share": 0.3,
+     "tok_w": 1088270,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 2,
+      "opus": 2
+     }
+    },
+    {
+     "theme": "other/unclassified",
+     "n": 3,
+     "chars": 13465,
+     "char_share": 0.3,
+     "tok_w": 3018285,
+     "from_prompt": 0,
+     "by_model": {
+      "opus": 2,
+      "sonnet": 1
+     }
+    }
+   ],
+   "mcp": [
+    [
+     "exxo",
+     "claude-in-chrome",
+     2521,
+     22
+    ],
+    [
+     "exxo",
+     "plugin_linear_linear",
+     1464,
+     28
+    ],
+    [
+     "exxo",
+     "claude_ai_Linear",
+     1038,
+     17
+    ],
+    [
+     "exxo",
+     "Sanity",
+     500,
+     24
+    ],
+    [
+     "exxo",
+     "claude_ai_Microsoft_365",
+     436,
+     22
+    ],
+    [
+     "exxo",
+     "playwright",
+     381,
+     13
+    ],
+    [
+     "exxo",
+     "plugin_Notion_notion",
+     295,
+     15
+    ],
+    [
+     "exxo",
+     "claude_ai_Notion",
+     286,
+     12
+    ],
+    [
+     "exxo",
+     "plugin_design_figma",
+     278,
+     1
+    ],
+    [
+     "exxo",
+     "claude_ai_Slack",
+     199,
+     11
+    ],
+    [
+     "exxo",
+     "vercel",
+     103,
+     14
+    ],
+    [
+     "exxo",
+     "notion",
+     64,
+     4
+    ],
+    [
+     "exxo",
+     "workos",
+     43,
+     4
+    ],
+    [
+     "exxo",
+     "claude_ai_Figma",
+     28,
+     3
+    ],
+    [
+     "exxo",
+     "claude_ai_Claude_Docs",
+     28,
+     1
+    ],
+    [
+     "exxo",
+     "plugin_product-management_figma",
+     27,
+     2
+    ],
+    [
+     "exxo",
+     "ccd_session",
+     22,
+     1
+    ],
+    [
+     "personal",
+     "terminal",
+     19,
+     1
+    ],
+    [
+     "exxo",
+     "claude_ai_Datadog",
+     13,
+     3
+    ],
+    [
+     "exxo",
+     "mantine",
+     12,
+     2
+    ],
+    [
+     "exxo",
+     "<uuid>",
+     9,
+     1
+    ],
+    [
+     "exxo",
+     "plugin_design_slack",
+     8,
+     1
+    ],
+    [
+     "personal",
+     "ccd_session",
+     4,
+     2
+    ],
+    [
+     "personal",
+     "Sanity",
+     3,
+     1
+    ],
+    [
+     "exxo",
+     "claude_ai_Gmail",
+     1,
+     1
+    ]
+   ],
+   "toolsearch_kw": [
+    [
+     "linear",
+     247
+    ],
+    [
+     "sanity",
+     92
+    ],
+    [
+     "notion",
+     85
+    ],
+    [
+     "chrome",
+     65
+    ],
+    [
+     "vercel",
+     40
+    ],
+    [
+     "slack",
+     28
+    ],
+    [
+     "playwright",
+     25
+    ],
+    [
+     "figma",
+     21
+    ],
+    [
+     "datadog",
+     5
+    ],
+    [
+     "calendar",
+     2
+    ],
+    [
+     "gmail",
+     1
+    ]
+   ],
+   "mcp_family": [
+    [
+     "exxo",
+     "linear",
+     768,
+     1734,
+     38
+    ],
+    [
+     "exxo",
+     "sanity",
+     84,
+     416,
+     24
+    ],
+    [
+     "exxo",
+     "notion",
+     118,
+     527,
+     24
+    ],
+    [
+     "exxo",
+     "chrome",
+     1564,
+     957,
+     22
+    ],
+    [
+     "exxo",
+     "microsoft",
+     96,
+     340,
+     22
+    ],
+    [
+     "exxo",
+     "vercel",
+     27,
+     76,
+     14
+    ],
+    [
+     "exxo",
+     "playwright",
+     17,
+     364,
+     13
+    ],
+    [
+     "exxo",
+     "slack",
+     162,
+     45,
+     11
+    ],
+    [
+     "exxo",
+     "workos",
+     42,
+     1,
+     4
+    ],
+    [
+     "exxo",
+     "figma",
+     15,
+     318,
+     3
+    ],
+    [
+     "exxo",
+     "datadog",
+     0,
+     13,
+     3
+    ],
+    [
+     "personal",
+     "ccd_session",
+     3,
+     1,
+     2
+    ],
+    [
+     "exxo",
+     "mantine",
+     0,
+     12,
+     2
+    ],
+    [
+     "exxo",
+     "ccd_session",
+     5,
+     17,
+     1
+    ],
+    [
+     "exxo",
+     "gmail",
+     1,
+     0,
+     1
+    ],
+    [
+     "exxo",
+     "claude_ai_Claude_Docs",
+     28,
+     0,
+     1
+    ],
+    [
+     "personal",
+     "sanity",
+     3,
+     0,
+     1
+    ],
+    [
+     "personal",
+     "terminal",
+     19,
+     0,
+     1
+    ],
+    [
+     "exxo",
+     "<uuid>",
+     0,
+     9,
+     1
+    ]
+   ],
+   "skill_ns": [
+    [
+     "(local)",
+     261,
+     50
+    ],
+    [
+     "exxo-common",
+     123,
+     38
+    ],
+    [
+     "superpowers",
+     51,
+     18
+    ],
+    [
+     "anthropic-skills",
+     10,
+     7
+    ],
+    [
+     "frontend-design",
+     5,
+     2
+    ],
+    [
+     "vercel",
+     1,
+     1
+    ],
+    [
+     "worktrunk",
+     1,
+     1
+    ]
+   ],
+   "tokens_main_by_acct": {
+    "exxo": 568078072,
+    "personal": 51959413
+   },
+   "tokens_sub_by_type_model": [
+    [
+     "general-purpose",
+     "opus",
+     1009263669
+    ],
+    [
+     "general-purpose",
+     "sonnet",
+     185028002
+    ],
+    [
+     "ui",
+     "opus",
+     58411179
+    ],
+    [
+     "general-purpose",
+     "fable",
+     37659734
+    ],
+    [
+     "general-purpose",
+     "inherit",
+     20156538
+    ],
+    [
+     "Explore",
+     "sonnet",
+     13994870
+    ],
+    [
+     "claude",
+     "opus",
+     8623720
+    ],
+    [
+     "Explore",
+     "opus",
+     6557118
+    ],
+    [
+     "feature-dev:code-reviewer",
+     "opus",
+     3772709
+    ],
+    [
+     "fork",
+     "inherit",
+     3572759
+    ],
+    [
+     "ui",
+     "sonnet",
+     2911894
+    ],
+    [
+     "claude",
+     "sonnet",
+     1947232
+    ],
+    [
+     "workflow-subagent",
+     "opus",
+     1817750
+    ],
+    [
+     "squarespace",
+     "opus",
+     1762281
+    ],
+    [
+     "workflow-subagent",
+     "sonnet",
+     1631598
+    ],
+    [
+     "Explore",
+     "inherit",
+     1416580
+    ],
+    [
+     "feature-dev:code-architect",
+     "opus",
+     1318232
+    ],
+    [
+     "general-purpose",
+     "haiku",
+     1044018
+    ],
+    [
+     "Plan",
+     "opus",
+     612048
+    ],
+    [
+     "claude-code-guide",
+     "inherit",
+     576742
+    ],
+    [
+     "feature-dev:code-reviewer",
+     "sonnet",
+     419570
+    ],
+    [
+     "web-fetch",
+     "inherit",
+     408831
+    ],
+    [
+     "feature-dev:code-explorer",
+     "opus",
+     356510
+    ],
+    [
+     "web-fetch",
+     "sonnet",
+     246808
+    ],
+    [
+     "workflow-subagent",
+     "haiku",
+     229581
+    ],
+    [
+     "vercel:deployment-expert",
+     "sonnet",
+     180054
+    ],
+    [
+     "claude-code-guide",
+     "sonnet",
+     139830
+    ],
+    [
+     "Explore",
+     "haiku",
+     31041
+    ]
+   ],
+   "tokens_sub_by_acct_type": [
+    [
+     "exxo",
+     "general-purpose",
+     "opus",
+     958588014,
+     3609331
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "sonnet",
+     176249101,
+     521973
+    ],
+    [
+     "exxo",
+     "ui",
+     "opus",
+     58411179,
+     349483
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "opus",
+     50675654,
+     173003
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "fable",
+     37212574,
+     14245
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "inherit",
+     20156538,
+     118918
+    ],
+    [
+     "exxo",
+     "Explore",
+     "sonnet",
+     13128274,
+     37023
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "sonnet",
+     8778901,
+     53195
+    ],
+    [
+     "exxo",
+     "claude",
+     "opus",
+     8623720,
+     18595
+    ],
+    [
+     "exxo",
+     "Explore",
+     "opus",
+     6147689,
+     12340
+    ],
+    [
+     "exxo",
+     "feature-dev:code-reviewer",
+     "opus",
+     3772709,
+     33581
+    ],
+    [
+     "exxo",
+     "fork",
+     "inherit",
+     3572759,
+     54590
+    ],
+    [
+     "exxo",
+     "ui",
+     "sonnet",
+     2911894,
+     4401
+    ],
+    [
+     "exxo",
+     "claude",
+     "sonnet",
+     1947232,
+     3507
+    ],
+    [
+     "exxo",
+     "workflow-subagent",
+     "opus",
+     1817750,
+     2757
+    ],
+    [
+     "exxo",
+     "squarespace",
+     "opus",
+     1762281,
+     1082
+    ],
+    [
+     "exxo",
+     "workflow-subagent",
+     "sonnet",
+     1631598,
+     7475
+    ],
+    [
+     "exxo",
+     "feature-dev:code-architect",
+     "opus",
+     1318232,
+     1271
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "haiku",
+     878657,
+     746
+    ],
+    [
+     "personal",
+     "Explore",
+     "sonnet",
+     866596,
+     769
+    ],
+    [
+     "personal",
+     "Explore",
+     "inherit",
+     722048,
+     29023
+    ],
+    [
+     "exxo",
+     "Explore",
+     "inherit",
+     694532,
+     768
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "fable",
+     447159,
+     720
+    ],
+    [
+     "exxo",
+     "feature-dev:code-reviewer",
+     "sonnet",
+     419570,
+     344
+    ],
+    [
+     "personal",
+     "Explore",
+     "opus",
+     409428,
+     287
+    ],
+    [
+     "exxo",
+     "web-fetch",
+     "inherit",
+     408831,
+     811
+    ],
+    [
+     "personal",
+     "claude-code-guide",
+     "inherit",
+     399609,
+     7743
+    ],
+    [
+     "exxo",
+     "Plan",
+     "opus",
+     369325,
+     263
+    ],
+    [
+     "exxo",
+     "feature-dev:code-explorer",
+     "opus",
+     356510,
+     305
+    ],
+    [
+     "exxo",
+     "web-fetch",
+     "sonnet",
+     246808,
+     97
+    ],
+    [
+     "personal",
+     "Plan",
+     "opus",
+     242723,
+     899
+    ],
+    [
+     "exxo",
+     "workflow-subagent",
+     "haiku",
+     229581,
+     47
+    ],
+    [
+     "exxo",
+     "vercel:deployment-expert",
+     "sonnet",
+     180054,
+     56
+    ],
+    [
+     "exxo",
+     "claude-code-guide",
+     "inherit",
+     177133,
+     753
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "haiku",
+     165360,
+     76
+    ],
+    [
+     "personal",
+     "claude-code-guide",
+     "sonnet",
+     139830,
+     527
+    ],
+    [
+     "exxo",
+     "Explore",
+     "haiku",
+     31041,
+     5
+    ]
+   ],
+   "tokens_by_actual_model": [
+    [
+     "sub",
+     "claude-opus-5-5",
+     1033245565
+    ],
+    [
+     "main",
+     "claude-fable-5-1",
+     317649791
+    ],
+    [
+     "main",
+     "claude-opus-5-5",
+     270689081
+    ],
+    [
+     "sub",
+     "claude-sonnet-5-5",
+     130257963
+    ],
+    [
+     "sub",
+     "claude-sonnet-5",
+     96157333
+    ],
+    [
+     "sub",
+     "claude-opus-5",
+     61176114
+    ],
+    [
+     "sub",
+     "claude-fable-5-1",
+     38316593
+    ],
+    [
+     "main",
+     "claude-sonnet-5",
+     15285558
+    ],
+    [
+     "main",
+     "claude-fable-5",
+     10696754
+    ],
+    [
+     "main",
+     "claude-opus-4-8",
+     5509630
+    ],
+    [
+     "sub",
+     "claude-opus-4-8",
+     2095322
+    ],
+    [
+     "sub",
+     "claude-haiku-4-5-20251001",
+     1857638
+    ],
+    [
+     "sub",
+     "claude-haiku-5-5",
+     984378
+    ],
+    [
+     "main",
+     "claude-haiku-5-5",
+     206669
+    ]
+   ],
+   "sessions": {
+    "n": 110,
+    "by_acct": {
+     "exxo": 69,
+     "personal": 41
+    },
+    "over_8h": 28,
+    "over_24h": 19,
+    "gt50_agent_calls": 6,
+    "with_any_agent": 67
+   },
+   "headline": {
+    "agent_calls": 1157,
+    "gp_calls": 980,
+    "gp_call_share_pct": 84.7,
+    "sub_tokens": 1364090910,
+    "gp_sub_tokens": 1253151963,
+    "gp_token_share_pct": 91.9,
+    "sub_tokens_by_type": {
+     "general-purpose": 1253151963,
+     "ui": 61323074,
+     "Explore": 21999610,
+     "claude": 10570953,
+     "feature-dev:code-reviewer": 4192280,
+     "workflow-subagent": 3678930,
+     "fork": 3572759,
+     "squarespace": 1762281,
+     "feature-dev:code-architect": 1318232,
+     "claude-code-guide": 716573,
+     "web-fetch": 655639,
+     "Plan": 612048,
+     "feature-dev:code-explorer": 356510,
+     "vercel:deployment-expert": 180054
+    },
+    "mcp_calls_by_server": {
+     "claude-in-chrome": 2521,
+     "plugin_linear_linear": 1464,
+     "claude_ai_Linear": 1038,
+     "Sanity": 503,
+     "claude_ai_Microsoft_365": 436,
+     "playwright": 381,
+     "plugin_Notion_notion": 295,
+     "claude_ai_Notion": 286,
+     "plugin_design_figma": 278,
+     "claude_ai_Slack": 199,
+     "vercel": 103,
+     "notion": 64,
+     "workos": 43,
+     "claude_ai_Figma": 28,
+     "claude_ai_Claude_Docs": 28,
+     "plugin_product-management_figma": 27,
+     "ccd_session": 26,
+     "terminal": 19,
+     "claude_ai_Datadog": 13,
+     "mantine": 12,
+     "<uuid>": 9,
+     "plugin_design_slack": 8,
+     "claude_ai_Gmail": 1
+    }
+   }
+  },
+  "window": {
+   "agent_calls": 1012,
+   "agent_by_type_model": [
+    {
+     "type": "general-purpose",
+     "model": "opus",
+     "n": 404,
+     "prompt_med": 4761,
+     "prompt_sum": 2077346
+    },
+    {
+     "type": "general-purpose",
+     "model": "sonnet",
+     "n": 355,
+     "prompt_med": 2743,
+     "prompt_sum": 1034880
+    },
+    {
+     "type": "(default)",
+     "model": "opus",
+     "n": 53,
+     "prompt_med": 5109,
+     "prompt_sum": 292145
+    },
+    {
+     "type": "Explore",
+     "model": "sonnet",
+     "n": 49,
+     "prompt_med": 2214,
+     "prompt_sum": 109666
+    },
+    {
+     "type": "(default)",
+     "model": "sonnet",
+     "n": 36,
+     "prompt_med": 3179,
+     "prompt_sum": 118451
+    },
+    {
+     "type": "ui",
+     "model": "opus",
+     "n": 19,
+     "prompt_med": 5276,
+     "prompt_sum": 112232
+    },
+    {
+     "type": "Explore",
+     "model": "opus",
+     "n": 15,
+     "prompt_med": 2707,
+     "prompt_sum": 40033
+    },
+    {
+     "type": "fork",
+     "model": "inherit",
+     "n": 14,
+     "prompt_med": 1652,
+     "prompt_sum": 25939
+    },
+    {
+     "type": "claude",
+     "model": "sonnet",
+     "n": 10,
+     "prompt_med": 3211,
+     "prompt_sum": 32509
+    },
+    {
+     "type": "feature-dev:code-reviewer",
+     "model": "opus",
+     "n": 9,
+     "prompt_med": 2581,
+     "prompt_sum": 23086
+    },
+    {
+     "type": "claude",
+     "model": "opus",
+     "n": 8,
+     "prompt_med": 6250,
+     "prompt_sum": 55640
+    },
+    {
+     "type": "general-purpose",
+     "model": "fable",
+     "n": 7,
+     "prompt_med": 8611,
+     "prompt_sum": 59270
+    },
+    {
+     "type": "feature-dev:code-reviewer",
+     "model": "sonnet",
+     "n": 6,
+     "prompt_med": 2645,
+     "prompt_sum": 15432
+    },
+    {
+     "type": "general-purpose",
+     "model": "haiku",
+     "n": 5,
+     "prompt_med": 1206,
+     "prompt_sum": 6937
+    },
+    {
+     "type": "web-fetch",
+     "model": "inherit",
+     "n": 4,
+     "prompt_med": 1560,
+     "prompt_sum": 5939
+    },
+    {
+     "type": "ui",
+     "model": "sonnet",
+     "n": 3,
+     "prompt_med": 2107,
+     "prompt_sum": 7390
+    },
+    {
+     "type": "Explore",
+     "model": "inherit",
+     "n": 3,
+     "prompt_med": 1492,
+     "prompt_sum": 6525
+    },
+    {
+     "type": "Plan",
+     "model": "opus",
+     "n": 2,
+     "prompt_med": 3825,
+     "prompt_sum": 7650
+    },
+    {
+     "type": "web-fetch",
+     "model": "sonnet",
+     "n": 2,
+     "prompt_med": 1111,
+     "prompt_sum": 2222
+    },
+    {
+     "type": "claude-code-guide",
+     "model": "inherit",
+     "n": 2,
+     "prompt_med": 1354,
+     "prompt_sum": 2709
+    },
+    {
+     "type": "feature-dev:code-architect",
+     "model": "opus",
+     "n": 1,
+     "prompt_med": 4530,
+     "prompt_sum": 4530
+    },
+    {
+     "type": "general-purpose",
+     "model": "inherit",
+     "n": 1,
+     "prompt_med": 1583,
+     "prompt_sum": 1583
+    },
+    {
+     "type": "vercel:deployment-expert",
+     "model": "sonnet",
+     "n": 1,
+     "prompt_med": 3549,
+     "prompt_sum": 3549
+    },
+    {
+     "type": "squarespace",
+     "model": "opus",
+     "n": 1,
+     "prompt_med": 6830,
+     "prompt_sum": 6830
+    },
+    {
+     "type": "claude-code-guide",
+     "model": "sonnet",
+     "n": 1,
+     "prompt_med": 649,
+     "prompt_sum": 649
+    },
+    {
+     "type": "Explore",
+     "model": "haiku",
+     "n": 1,
+     "prompt_med": 224,
+     "prompt_sum": 224
+    }
+   ],
+   "agent_by_acct": [
+    [
+     "exxo",
+     "general-purpose",
+     "opus",
+     357
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "sonnet",
+     314
+    ],
+    [
+     "exxo",
+     "(default)",
+     "opus",
+     53
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "opus",
+     47
+    ],
+    [
+     "exxo",
+     "Explore",
+     "sonnet",
+     42
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "sonnet",
+     41
+    ],
+    [
+     "exxo",
+     "(default)",
+     "sonnet",
+     36
+    ],
+    [
+     "exxo",
+     "ui",
+     "opus",
+     19
+    ],
+    [
+     "exxo",
+     "Explore",
+     "opus",
+     15
+    ],
+    [
+     "exxo",
+     "fork",
+     "inherit",
+     14
+    ],
+    [
+     "exxo",
+     "claude",
+     "sonnet",
+     10
+    ],
+    [
+     "exxo",
+     "feature-dev:code-reviewer",
+     "opus",
+     9
+    ],
+    [
+     "exxo",
+     "claude",
+     "opus",
+     8
+    ],
+    [
+     "personal",
+     "Explore",
+     "sonnet",
+     7
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "fable",
+     6
+    ],
+    [
+     "exxo",
+     "feature-dev:code-reviewer",
+     "sonnet",
+     6
+    ],
+    [
+     "exxo",
+     "web-fetch",
+     "inherit",
+     4
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "haiku",
+     4
+    ],
+    [
+     "exxo",
+     "ui",
+     "sonnet",
+     3
+    ],
+    [
+     "exxo",
+     "Explore",
+     "inherit",
+     3
+    ],
+    [
+     "exxo",
+     "web-fetch",
+     "sonnet",
+     2
+    ],
+    [
+     "personal",
+     "claude-code-guide",
+     "inherit",
+     2
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "haiku",
+     1
+    ],
+    [
+     "exxo",
+     "feature-dev:code-architect",
+     "opus",
+     1
+    ],
+    [
+     "exxo",
+     "Plan",
+     "opus",
+     1
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "inherit",
+     1
+    ],
+    [
+     "exxo",
+     "vercel:deployment-expert",
+     "sonnet",
+     1
+    ],
+    [
+     "exxo",
+     "squarespace",
+     "opus",
+     1
+    ],
+    [
+     "personal",
+     "claude-code-guide",
+     "sonnet",
+     1
+    ],
+    [
+     "personal",
+     "Plan",
+     "opus",
+     1
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "fable",
+     1
+    ],
+    [
+     "exxo",
+     "Explore",
+     "haiku",
+     1
+    ]
+   ],
+   "gp_total": 861,
+   "gp_chars": 3590612,
+   "gp_themes": [
+    {
+     "theme": "review/audit",
+     "n": 173,
+     "chars": 546030,
+     "char_share": 15.2,
+     "tok_w": 83200979,
+     "from_prompt": 20,
+     "by_model": {
+      "opus": 84,
+      "sonnet": 87,
+      "fable": 2
+     }
+    },
+    {
+     "theme": "implement (plan lane/task)",
+     "n": 135,
+     "chars": 673247,
+     "char_share": 18.8,
+     "tok_w": 369958745,
+     "from_prompt": 6,
+     "by_model": {
+      "opus": 81,
+      "sonnet": 45,
+      "fable": 4,
+      "haiku": 5
+     }
+    },
+    {
+     "theme": "git/pr ops",
+     "n": 85,
+     "chars": 392918,
+     "char_share": 10.9,
+     "tok_w": 140500461,
+     "from_prompt": 34,
+     "by_model": {
+      "sonnet": 34,
+      "opus": 51
+     }
+    },
+    {
+     "theme": "investigate/debug",
+     "n": 58,
+     "chars": 265127,
+     "char_share": 7.4,
+     "tok_w": 94421967,
+     "from_prompt": 10,
+     "by_model": {
+      "opus": 41,
+      "sonnet": 17
+     }
+    },
+    {
+     "theme": "write code/implement",
+     "n": 52,
+     "chars": 249669,
+     "char_share": 7.0,
+     "tok_w": 70255697,
+     "from_prompt": 2,
+     "by_model": {
+      "opus": 36,
+      "sonnet": 16
+     }
+    },
+    {
+     "theme": "infra/pulumi/cloud",
+     "n": 48,
+     "chars": 232477,
+     "char_share": 6.5,
+     "tok_w": 33520513,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 18,
+      "opus": 30
+     }
+    },
+    {
+     "theme": "sanity/cms",
+     "n": 40,
+     "chars": 189560,
+     "char_share": 5.3,
+     "tok_w": 91876737,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 12,
+      "opus": 27,
+      "fable": 1
+     }
+    },
+    {
+     "theme": "docs/web research",
+     "n": 34,
+     "chars": 124089,
+     "char_share": 3.5,
+     "tok_w": 28516886,
+     "from_prompt": 14,
+     "by_model": {
+      "sonnet": 20,
+      "opus": 14
+     }
+    },
+    {
+     "theme": "linear",
+     "n": 30,
+     "chars": 84795,
+     "char_share": 2.4,
+     "tok_w": 10157136,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 29,
+      "opus": 1
+     }
+    },
+    {
+     "theme": "search/locate/explore",
+     "n": 29,
+     "chars": 99271,
+     "char_share": 2.8,
+     "tok_w": 34335544,
+     "from_prompt": 3,
+     "by_model": {
+      "sonnet": 18,
+      "opus": 11
+     }
+    },
+    {
+     "theme": "notion",
+     "n": 27,
+     "chars": 92163,
+     "char_share": 2.6,
+     "tok_w": 8828808,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 25,
+      "opus": 2
+     }
+    },
+    {
+     "theme": "ci/test/log forensics",
+     "n": 25,
+     "chars": 120640,
+     "char_share": 3.4,
+     "tok_w": 61771958,
+     "from_prompt": 3,
+     "by_model": {
+      "opus": 12,
+      "sonnet": 13
+     }
+    },
+    {
+     "theme": "m365/office docs",
+     "n": 24,
+     "chars": 89479,
+     "char_share": 2.5,
+     "tok_w": 21633941,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 15,
+      "opus": 9
+     }
+    },
+    {
+     "theme": "data/analysis/report",
+     "n": 21,
+     "chars": 80436,
+     "char_share": 2.2,
+     "tok_w": 12668919,
+     "from_prompt": 1,
+     "by_model": {
+      "sonnet": 8,
+      "opus": 12,
+      "inherit": 1
+     }
+    },
+    {
+     "theme": "homelab/ssh/hosts",
+     "n": 21,
+     "chars": 91956,
+     "char_share": 2.6,
+     "tok_w": 20176833,
+     "from_prompt": 0,
+     "by_model": {
+      "opus": 15,
+      "sonnet": 6
+     }
+    },
+    {
+     "theme": "browser/ui testing",
+     "n": 18,
+     "chars": 73492,
+     "char_share": 2.0,
+     "tok_w": 32043423,
+     "from_prompt": 2,
+     "by_model": {
+      "opus": 12,
+      "sonnet": 6
+     }
+    },
+    {
+     "theme": "secrets/1password",
+     "n": 14,
+     "chars": 74549,
+     "char_share": 2.1,
+     "tok_w": 26763557,
+     "from_prompt": 0,
+     "by_model": {
+      "opus": 7,
+      "sonnet": 7
+     }
+    },
+    {
+     "theme": "datadog/observability",
+     "n": 10,
+     "chars": 50387,
+     "char_share": 1.4,
+     "tok_w": 7960506,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 5,
+      "opus": 5
+     }
+    },
+    {
+     "theme": "plan/design",
+     "n": 7,
+     "chars": 30892,
+     "char_share": 0.9,
+     "tok_w": 8244806,
+     "from_prompt": 0,
+     "by_model": {
+      "opus": 4,
+      "sonnet": 3
+     }
+    },
+    {
+     "theme": "slack",
+     "n": 4,
+     "chars": 6899,
+     "char_share": 0.2,
+     "tok_w": 763592,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 4
+     }
+    },
+    {
+     "theme": "vercel",
+     "n": 3,
+     "chars": 9071,
+     "char_share": 0.3,
+     "tok_w": 877539,
+     "from_prompt": 0,
+     "by_model": {
+      "sonnet": 2,
+      "opus": 1
+     }
+    },
+    {
+     "theme": "other/unclassified",
+     "n": 3,
+     "chars": 13465,
+     "char_share": 0.4,
+     "tok_w": 3018285,
+     "from_prompt": 0,
+     "by_model": {
+      "opus": 2,
+      "sonnet": 1
+     }
+    }
+   ],
+   "mcp": [
+    [
+     "exxo",
+     "claude-in-chrome",
+     1574,
+     18
+    ],
+    [
+     "exxo",
+     "plugin_linear_linear",
+     1340,
+     23
+    ],
+    [
+     "exxo",
+     "claude_ai_Linear",
+     995,
+     16
+    ],
+    [
+     "exxo",
+     "Sanity",
+     493,
+     21
+    ],
+    [
+     "exxo",
+     "claude_ai_Microsoft_365",
+     352,
+     15
+    ],
+    [
+     "exxo",
+     "claude_ai_Notion",
+     286,
+     12
+    ],
+    [
+     "exxo",
+     "playwright",
+     280,
+     10
+    ],
+    [
+     "exxo",
+     "plugin_design_figma",
+     278,
+     1
+    ],
+    [
+     "exxo",
+     "plugin_Notion_notion",
+     253,
+     13
+    ],
+    [
+     "exxo",
+     "claude_ai_Slack",
+     184,
+     9
+    ],
+    [
+     "exxo",
+     "vercel",
+     103,
+     14
+    ],
+    [
+     "exxo",
+     "notion",
+     39,
+     3
+    ],
+    [
+     "exxo",
+     "workos",
+     30,
+     3
+    ],
+    [
+     "exxo",
+     "claude_ai_Figma",
+     28,
+     3
+    ],
+    [
+     "exxo",
+     "claude_ai_Claude_Docs",
+     28,
+     1
+    ],
+    [
+     "exxo",
+     "plugin_product-management_figma",
+     27,
+     2
+    ],
+    [
+     "personal",
+     "terminal",
+     19,
+     1
+    ],
+    [
+     "exxo",
+     "claude_ai_Datadog",
+     13,
+     3
+    ],
+    [
+     "exxo",
+     "mantine",
+     12,
+     2
+    ],
+    [
+     "exxo",
+     "plugin_design_slack",
+     8,
+     1
+    ],
+    [
+     "personal",
+     "Sanity",
+     3,
+     1
+    ],
+    [
+     "exxo",
+     "claude_ai_Gmail",
+     1,
+     1
+    ]
+   ],
+   "toolsearch_kw": [
+    [
+     "linear",
+     232
+    ],
+    [
+     "sanity",
+     87
+    ],
+    [
+     "notion",
+     75
+    ],
+    [
+     "chrome",
+     53
+    ],
+    [
+     "vercel",
+     40
+    ],
+    [
+     "slack",
+     23
+    ],
+    [
+     "figma",
+     21
+    ],
+    [
+     "playwright",
+     20
+    ],
+    [
+     "datadog",
+     5
+    ],
+    [
+     "calendar",
+     2
+    ],
+    [
+     "gmail",
+     1
+    ]
+   ],
+   "mcp_family": [
+    [
+     "exxo",
+     "linear",
+     733,
+     1602,
+     32
+    ],
+    [
+     "exxo",
+     "sanity",
+     80,
+     413,
+     21
+    ],
+    [
+     "exxo",
+     "notion",
+     116,
+     462,
+     21
+    ],
+    [
+     "exxo",
+     "chrome",
+     617,
+     957,
+     18
+    ],
+    [
+     "exxo",
+     "microsoft",
+     69,
+     283,
+     15
+    ],
+    [
+     "exxo",
+     "vercel",
+     27,
+     76,
+     14
+    ],
+    [
+     "exxo",
+     "playwright",
+     17,
+     263,
+     10
+    ],
+    [
+     "exxo",
+     "slack",
+     159,
+     33,
+     9
+    ],
+    [
+     "exxo",
+     "workos",
+     29,
+     1,
+     3
+    ],
+    [
+     "exxo",
+     "figma",
+     15,
+     318,
+     3
+    ],
+    [
+     "exxo",
+     "datadog",
+     0,
+     13,
+     3
+    ],
+    [
+     "exxo",
+     "mantine",
+     0,
+     12,
+     2
+    ],
+    [
+     "exxo",
+     "gmail",
+     1,
+     0,
+     1
+    ],
+    [
+     "exxo",
+     "claude_ai_Claude_Docs",
+     28,
+     0,
+     1
+    ],
+    [
+     "personal",
+     "sanity",
+     3,
+     0,
+     1
+    ],
+    [
+     "personal",
+     "terminal",
+     19,
+     0,
+     1
+    ]
+   ],
+   "skill_ns": [
+    [
+     "(local)",
+     188,
+     41
+    ],
+    [
+     "exxo-common",
+     109,
+     29
+    ],
+    [
+     "superpowers",
+     36,
+     15
+    ],
+    [
+     "anthropic-skills",
+     6,
+     5
+    ],
+    [
+     "frontend-design",
+     5,
+     2
+    ],
+    [
+     "vercel",
+     1,
+     1
+    ],
+    [
+     "worktrunk",
+     1,
+     1
+    ]
+   ],
+   "tokens_main_by_acct": {
+    "exxo": 467943109,
+    "personal": 45022914
+   },
+   "tokens_sub_by_type_model": [
+    [
+     "general-purpose",
+     "opus",
+     954013716
+    ],
+    [
+     "general-purpose",
+     "sonnet",
+     168413672
+    ],
+    [
+     "ui",
+     "opus",
+     55198871
+    ],
+    [
+     "general-purpose",
+     "fable",
+     37659734
+    ],
+    [
+     "Explore",
+     "sonnet",
+     10065130
+    ],
+    [
+     "claude",
+     "opus",
+     8623720
+    ],
+    [
+     "Explore",
+     "opus",
+     5738726
+    ],
+    [
+     "fork",
+     "inherit",
+     3037226
+    ],
+    [
+     "feature-dev:code-reviewer",
+     "opus",
+     2924982
+    ],
+    [
+     "ui",
+     "sonnet",
+     2659439
+    ],
+    [
+     "claude",
+     "sonnet",
+     1947232
+    ],
+    [
+     "squarespace",
+     "opus",
+     1762281
+    ],
+    [
+     "workflow-subagent",
+     "sonnet",
+     1631598
+    ],
+    [
+     "feature-dev:code-architect",
+     "opus",
+     1318232
+    ],
+    [
+     "workflow-subagent",
+     "opus",
+     1126525
+    ],
+    [
+     "general-purpose",
+     "haiku",
+     1044018
+    ],
+    [
+     "Explore",
+     "inherit",
+     694532
+    ],
+    [
+     "Plan",
+     "opus",
+     612048
+    ],
+    [
+     "feature-dev:code-reviewer",
+     "sonnet",
+     419570
+    ],
+    [
+     "web-fetch",
+     "inherit",
+     408831
+    ],
+    [
+     "claude-code-guide",
+     "inherit",
+     399609
+    ],
+    [
+     "general-purpose",
+     "inherit",
+     365700
+    ],
+    [
+     "web-fetch",
+     "sonnet",
+     246808
+    ],
+    [
+     "workflow-subagent",
+     "haiku",
+     180824
+    ],
+    [
+     "vercel:deployment-expert",
+     "sonnet",
+     180054
+    ],
+    [
+     "claude-code-guide",
+     "sonnet",
+     139830
+    ],
+    [
+     "Explore",
+     "haiku",
+     31041
+    ]
+   ],
+   "tokens_sub_by_acct_type": [
+    [
+     "exxo",
+     "general-purpose",
+     "opus",
+     903338061,
+     3516697
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "sonnet",
+     159634770,
+     498801
+    ],
+    [
+     "exxo",
+     "ui",
+     "opus",
+     55198871,
+     344655
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "opus",
+     50675654,
+     173003
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "fable",
+     37212574,
+     14245
+    ],
+    [
+     "exxo",
+     "Explore",
+     "sonnet",
+     9198534,
+     33631
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "sonnet",
+     8778901,
+     53195
+    ],
+    [
+     "exxo",
+     "claude",
+     "opus",
+     8623720,
+     18595
+    ],
+    [
+     "exxo",
+     "Explore",
+     "opus",
+     5329297,
+     11420
+    ],
+    [
+     "exxo",
+     "fork",
+     "inherit",
+     3037226,
+     54488
+    ],
+    [
+     "exxo",
+     "feature-dev:code-reviewer",
+     "opus",
+     2924982,
+     33172
+    ],
+    [
+     "exxo",
+     "ui",
+     "sonnet",
+     2659439,
+     4116
+    ],
+    [
+     "exxo",
+     "claude",
+     "sonnet",
+     1947232,
+     3507
+    ],
+    [
+     "exxo",
+     "squarespace",
+     "opus",
+     1762281,
+     1082
+    ],
+    [
+     "exxo",
+     "workflow-subagent",
+     "sonnet",
+     1631598,
+     7475
+    ],
+    [
+     "exxo",
+     "feature-dev:code-architect",
+     "opus",
+     1318232,
+     1271
+    ],
+    [
+     "exxo",
+     "workflow-subagent",
+     "opus",
+     1126525,
+     2381
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "haiku",
+     878657,
+     746
+    ],
+    [
+     "personal",
+     "Explore",
+     "sonnet",
+     866596,
+     769
+    ],
+    [
+     "exxo",
+     "Explore",
+     "inherit",
+     694532,
+     768
+    ],
+    [
+     "personal",
+     "general-purpose",
+     "fable",
+     447159,
+     720
+    ],
+    [
+     "exxo",
+     "feature-dev:code-reviewer",
+     "sonnet",
+     419570,
+     344
+    ],
+    [
+     "personal",
+     "Explore",
+     "opus",
+     409428,
+     287
+    ],
+    [
+     "exxo",
+     "web-fetch",
+     "inherit",
+     408831,
+     811
+    ],
+    [
+     "personal",
+     "claude-code-guide",
+     "inherit",
+     399609,
+     7743
+    ],
+    [
+     "exxo",
+     "Plan",
+     "opus",
+     369325,
+     263
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "inherit",
+     365700,
+     480
+    ],
+    [
+     "exxo",
+     "web-fetch",
+     "sonnet",
+     246808,
+     97
+    ],
+    [
+     "personal",
+     "Plan",
+     "opus",
+     242723,
+     899
+    ],
+    [
+     "exxo",
+     "workflow-subagent",
+     "haiku",
+     180824,
+     41
+    ],
+    [
+     "exxo",
+     "vercel:deployment-expert",
+     "sonnet",
+     180054,
+     56
+    ],
+    [
+     "exxo",
+     "general-purpose",
+     "haiku",
+     165360,
+     76
+    ],
+    [
+     "personal",
+     "claude-code-guide",
+     "sonnet",
+     139830,
+     527
+    ],
+    [
+     "exxo",
+     "Explore",
+     "haiku",
+     31041,
+     5
+    ]
+   ],
+   "tokens_by_actual_model": [
+    [
+     "sub",
+     "claude-opus-5-5",
+     1033245565
+    ],
+    [
+     "main",
+     "claude-opus-5-5",
+     270689081
+    ],
+    [
+     "main",
+     "claude-fable-5-1",
+     242070272
+    ],
+    [
+     "sub",
+     "claude-sonnet-5-5",
+     130257963
+    ],
+    [
+     "sub",
+     "claude-sonnet-5",
+     57786618
+    ],
+    [
+     "sub",
+     "claude-fable-5-1",
+     37659734
+    ],
+    [
+     "sub",
+     "claude-haiku-5-5",
+     984378
+    ],
+    [
+     "sub",
+     "claude-haiku-4-5-20251001",
+     909698
+    ],
+    [
+     "main",
+     "claude-haiku-5-5",
+     206669
+    ]
+   ],
+   "sessions": {
+    "n": 84,
+    "by_acct": {
+     "exxo": 54,
+     "personal": 30
+    },
+    "over_8h": 17,
+    "over_24h": 9,
+    "gt50_agent_calls": 6,
+    "with_any_agent": 52
+   },
+   "headline": {
+    "agent_calls": 1012,
+    "gp_calls": 861,
+    "gp_call_share_pct": 85.1,
+    "sub_tokens": 1260843959,
+    "gp_sub_tokens": 1161496842,
+    "gp_token_share_pct": 92.1,
+    "sub_tokens_by_type": {
+     "general-purpose": 1161496842,
+     "ui": 57858310,
+     "Explore": 16529429,
+     "claude": 10570953,
+     "feature-dev:code-reviewer": 3344553,
+     "fork": 3037226,
+     "workflow-subagent": 2938947,
+     "squarespace": 1762281,
+     "feature-dev:code-architect": 1318232,
+     "web-fetch": 655639,
+     "Plan": 612048,
+     "claude-code-guide": 539439,
+     "vercel:deployment-expert": 180054
+    },
+    "mcp_calls_by_server": {
+     "claude-in-chrome": 1574,
+     "plugin_linear_linear": 1340,
+     "claude_ai_Linear": 995,
+     "Sanity": 496,
+     "claude_ai_Microsoft_365": 352,
+     "claude_ai_Notion": 286,
+     "playwright": 280,
+     "plugin_design_figma": 278,
+     "plugin_Notion_notion": 253,
+     "claude_ai_Slack": 184,
+     "vercel": 103,
+     "notion": 39,
+     "workos": 30,
+     "claude_ai_Figma": 28,
+     "claude_ai_Claude_Docs": 28,
+     "plugin_product-management_figma": 27,
+     "terminal": 19,
+     "claude_ai_Datadog": 13,
+     "mantine": 12,
+     "plugin_design_slack": 8,
+     "claude_ai_Gmail": 1
+    }
+   }
+  }
+ },
+ "aggregate_only": true
+}
