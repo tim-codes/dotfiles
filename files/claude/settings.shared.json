@@ -412,6 +412,9 @@
       "serverName": "plugin:engineering:notion"
     },
     {
+      "serverName": "plugin:engineering:datadog"
+    },
+    {
       "serverName": "plugin:enterprise-search:guru"
     },
     {
