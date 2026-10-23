@@ -38,6 +38,8 @@ Messages not arriving: `squad status --pretty` and `squad roster --pretty`.
    squad subscribe infra msg.role.infra
    ```
    On `infra-exists: …`, print the name it gives and stop.
+   If `squad register` exits 2 (broker unreachable), run `squad doctor --fix`
+   once and retry; if still unreachable, tell Tim and stop.
 5. **Tell the orchestrator** (it may be holding requests):
    `squad send role:orchestrator "infra_ready" --from infra --data
    '{"kind":"infra_ready"}'`. No orchestrator live is fine.

@@ -20,6 +20,19 @@ down: see `squad-join` §8.
 
 ## 1. Start-up
 
+0. **System prerequisites.** Before touching the broker:
+   - `squad doctor --fix` (checks config, state/runtime dirs, broker
+     reachability, watchers seen, the launchd jobs
+     `dev.tim.squad-broker|watch-quota|watch-host`, binary-vs-running version
+     and the cc-socks dir; `--fix` bootstraps/kickstarts missing or dead jobs
+     and re-checks). Exit 0 all ok, 1 any fail. If it still exits 1, show Tim
+     the output and stop.
+   - Exxo-side prereqs the member streams depend on. `docker info` failing:
+     run `orb start` (no need to ask) and wait until `docker info` succeeds.
+     Then make sure the shared secret-cache container is up as the exxo-common
+     `run-with-secrets` skill prescribes (it is available: this session runs
+     in an exxo context); start it per that skill if not.
+   - Report doctor, Docker and secret-cache state in the §1.7 health summary.
 1. **Singleton check.** `squad roster | jq -r '.[] | select(.live and
    .req.role=="orchestrator") | .req.name'`. Any output: one is already
    live; tell Tim its name and stop (re-registering a live name silently
