@@ -32,6 +32,8 @@ down: see `squad-join` §8.
      Then make sure the shared secret-cache container is up as the exxo-common
      `run-with-secrets` skill prescribes (it is available: this session runs
      in an exxo context); start it per that skill if not.
+     Then `~/dev/dotfiles/scripts/claude-reauth --check`; if anything needs
+     auth, tell Tim to run `/reauth` (or the script) before going AFK.
    - Report doctor, Docker and secret-cache state in the §1.7 health summary.
 1. **Singleton check.** `squad roster | jq -r '.[] | select(.live and
    .req.role=="orchestrator") | .req.name'`. Any output: one is already

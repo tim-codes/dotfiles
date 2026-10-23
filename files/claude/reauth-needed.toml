@@ -1,0 +1,42 @@
+# MCP servers scripts/claude-reauth expects to be connected, per context.
+#
+# Names are EXACTLY as `claude mcp list` prints them under that context's
+# CLAUDE_CONFIG_DIR: user-scope servers by their own name (`Sanity`,
+# `datadog`), claude.ai account connectors as `claude.ai <Name>`, plugin
+# servers as `plugin:<plugin>:<server>`. The same names work for
+# `claude mcp get` / `claude mcp login`.
+#
+#   servers  — required: absent or not connected counts against the exit code
+#   optional — checked only if the context lists it; absent → skipped
+#
+# [all] applies to every context. Tables are personal, exxo, exxo-personal.
+# Kept to the subset the parser in claude-reauth reads: [table] headers,
+# `servers`/`optional` string arrays (single- or multi-line), # comments.
+
+[all]
+servers = ["playwright"]
+
+[personal]
+servers = ["Sanity", "mantine"]
+
+# Datadog is the user-scope `datadog` server from mcp.exxo.json (EU site,
+# mcp.datadoghq.eu/v1/mcp), not the engineering plugin's US-site
+# `plugin:engineering:datadog`, whose OAuth starts on the wrong site.
+# `claude.ai Datadog` is the account connector — present only where the
+# account has it enabled.
+[exxo]
+servers = [
+  "datadog",
+  "workos",
+  "claude.ai Microsoft 365",
+  "claude.ai Notion",
+  "claude.ai Slack",
+  "claude.ai Figma",
+]
+optional = ["claude.ai Datadog"]
+
+# Same exxo fragments, personal subscription: the claude.ai connectors follow
+# the logged-in ACCOUNT, so the Exxo-org ones are not reachable here.
+[exxo-personal]
+servers = ["datadog", "workos"]
+optional = ["claude.ai Datadog"]
