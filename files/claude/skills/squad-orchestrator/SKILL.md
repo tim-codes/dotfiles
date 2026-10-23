@@ -13,6 +13,8 @@ Client behaviour under each directive is defined in the `squad-join` skill;
 read it once so you know what your directives make them do. `--debug`
 (argument): see §9; without it nothing in §9 applies.
 
+**Never halt to ask Tim in chat; register, then route questions through the orchestrator's operator queue.**
+
 Env vars do not persist between Bash calls: pass `--name orchestrator` and
 `--from orchestrator` explicitly. Every command here is spelled as the
 `squad` CLI accepts it. Exit 2 from any `squad` command means the broker is
@@ -20,13 +22,24 @@ down: see `squad-join` §8.
 
 ## 1. Start-up
 
-0. **System prerequisites.** Before touching the broker:
+**Register first, always.** The first action is the singleton check (step 1,
+a read-only roster lookup; re-registering a live name replaces it) then step 2
+`squad register` and step 3 subscriptions. If `register` fails (exit 2), run
+`squad doctor --fix` once and retry; only then tell Tim. Everything else
+(step 0 prerequisites, the repo drift rule below) runs after registration.
+Safe drift (submodule `+` with a clean interior → `git submodule update
+--init <path>`; build-artefact/cache untracked files ignored; stale `main` →
+`git pull --ff-only`) is fixed without asking. Anything else dirty or
+ambiguous: `squad set --name orchestrator --status blocked --detail "<what>"`
+and add it to your own §2c queue with options and a recommendation.
+
+0. **System prerequisites (after registration).** Before further broker work:
    - `squad doctor --fix` (checks config, state/runtime dirs, broker
      reachability, watchers seen, the launchd jobs
      `dev.tim.squad-broker|relay|watch-quota|watch-host`, binary-vs-running
      version and the cc-socks dir; `--fix` bootstraps/kickstarts missing or dead jobs
      and re-checks). Exit 0 all ok, 1 any fail. If it still exits 1, show Tim
-     the output and stop.
+     the output.
    - Exxo-side prereqs the member streams depend on. `docker info` failing:
      run `orb start` (no need to ask) and wait until `docker info` succeeds.
      Then make sure the shared secret-cache container is up as the exxo-common
@@ -37,7 +50,7 @@ down: see `squad-join` §8.
    - Report doctor, Docker and secret-cache state in the §1.7 health summary.
 1. **Singleton check.** `squad roster | jq -r '.[] | select(.live and
    .req.role=="orchestrator") | .req.name'`. Any output: one is already
-   live; tell Tim its name and stop (re-registering a live name silently
+   live; tell Tim its name and end (re-registering a live name silently
    replaces it, so this comes first).
 2. **Register.** `squad register --name orchestrator --role orchestrator
    --priority 1 --session-id "$CLAUDE_CODE_SESSION_ID" --notes "squad
