@@ -54,6 +54,15 @@ for ctx in exxo exxo-personal; do
     check "$ctx: gcloud compute ssh is denied" has "$ctx" deny 'Bash(gcloud compute ssh*)'
     check "$ctx: nested gcloud compute ssh is denied" has "$ctx" deny 'Bash(* gcloud compute ssh*)'
 done
+# deniedMcpServers lives only in the shared fragment, so the plain deep-merge
+# must carry the whole array into every context (it silences the unauthenticated
+# claude.ai-synced plugin servers).
+shared_denied="$(jq '.deniedMcpServers | length' "$C/settings.shared.json")"
+for ctx in personal exxo exxo-personal; do
+    check "$ctx keeps all $shared_denied deniedMcpServers entries" \
+        test "$(jq '.deniedMcpServers | length' "$FAKE/.claude-$ctx/settings.json")" -eq "$shared_denied"
+done
+check "deniedMcpServers is non-empty" test "$shared_denied" -gt 0
 check "personal never gets the Exxo cloud grants" \
     test "$(jq '[.permissions.allow[] | select(test("agent-tooling|gcloud|pulumi"))] | length' "$FAKE/.claude-personal/settings.json")" -eq 0
 check "personal never gets the Exxo gcloud ssh deny" \

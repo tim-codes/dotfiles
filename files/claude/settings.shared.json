@@ -364,5 +364,118 @@
   },
   "worktree": {
     "baseRef": "fresh"
-  }
+  },
+  "deniedMcpServers": [
+    {
+      "serverName": "plugin:data:hex"
+    },
+    {
+      "serverName": "plugin:data:amplitude"
+    },
+    {
+      "serverName": "plugin:data:amplitude-eu"
+    },
+    {
+      "serverName": "plugin:data:definite"
+    },
+    {
+      "serverName": "plugin:data:snowflake"
+    },
+    {
+      "serverName": "plugin:data:databricks"
+    },
+    {
+      "serverName": "plugin:design:intercom"
+    },
+    {
+      "serverName": "plugin:design:atlassian"
+    },
+    {
+      "serverName": "plugin:design:notion"
+    },
+    {
+      "serverName": "plugin:design:gmail"
+    },
+    {
+      "serverName": "plugin:design:google calendar"
+    },
+    {
+      "serverName": "plugin:design:slack"
+    },
+    {
+      "serverName": "plugin:engineering:slack"
+    },
+    {
+      "serverName": "plugin:engineering:atlassian"
+    },
+    {
+      "serverName": "plugin:engineering:notion"
+    },
+    {
+      "serverName": "plugin:enterprise-search:guru"
+    },
+    {
+      "serverName": "plugin:product-management:monday"
+    },
+    {
+      "serverName": "plugin:product-management:clickup"
+    },
+    {
+      "serverName": "plugin:product-management:amplitude"
+    },
+    {
+      "serverName": "plugin:product-management:amplitude-eu"
+    },
+    {
+      "serverName": "plugin:product-management:pendo"
+    },
+    {
+      "serverName": "plugin:product-management:fireflies"
+    },
+    {
+      "serverName": "plugin:product-management:similarweb"
+    },
+    {
+      "serverName": "plugin:product-management:figma"
+    },
+    {
+      "serverName": "plugin:productivity:monday"
+    },
+    {
+      "serverName": "plugin:productivity:clickup"
+    },
+    {
+      "serverName": "plugin:productivity:slack"
+    },
+    {
+      "serverName": "plugin:productivity:notion"
+    },
+    {
+      "serverName": "plugin:data:atlassian"
+    },
+    {
+      "serverName": "plugin:productivity:atlassian"
+    },
+    {
+      "serverName": "plugin:product-management:slack"
+    },
+    {
+      "serverName": "plugin:product-management:atlassian"
+    },
+    {
+      "serverName": "plugin:product-management:notion"
+    },
+    {
+      "serverName": "plugin:product-management:intercom"
+    },
+    {
+      "serverName": "plugin:enterprise-search:slack"
+    },
+    {
+      "serverName": "plugin:enterprise-search:notion"
+    },
+    {
+      "serverName": "plugin:enterprise-search:atlassian"
+    }
+  ]
 }
