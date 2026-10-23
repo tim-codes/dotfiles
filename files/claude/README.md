@@ -269,6 +269,15 @@ stubs.
   plugin's `plugin:engineering:datadog` hard-codes the US site and its OAuth
   starts there. The plugin server is meant to be denied (`deniedMcpServers`
   in the settings fragments), so only the EU one is ever authed.
+- `mcp.exxo.json` also adds the user-scope `boards` server
+  (`https://boards.exxo.tools/mcp`), the Exxo shared-whiteboard service's MCP
+  endpoint, so a context's Claude Code can read and edit boards as the
+  signed-in developer. It is Exxo-only because boards is an Exxo internal
+  service, and OAuth-only (AuthKit; invitation-only Exxo WorkOS org), so the
+  fragment holds no credential. After the next `claude-sync`, authenticate
+  once per context: `/mcp` → `boards` → Authenticate (or `claude mcp login
+  boards`); Claude Code then keeps and refreshes the token. The
+  `whiteboard-illustrations` skill publishes through it.
 - The secret caches have no warm command; a cached value's TTL is fixed when
   `agent-run` (or homelab's op shim) writes it. So the script only makes sure
   the containers are up and prints the `EXXO_SECRET_CACHE_TTL_SECONDS` /
