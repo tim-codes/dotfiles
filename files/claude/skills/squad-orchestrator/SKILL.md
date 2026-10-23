@@ -23,8 +23,8 @@ down: see `squad-join` §8.
 0. **System prerequisites.** Before touching the broker:
    - `squad doctor --fix` (checks config, state/runtime dirs, broker
      reachability, watchers seen, the launchd jobs
-     `dev.tim.squad-broker|watch-quota|watch-host`, binary-vs-running version
-     and the cc-socks dir; `--fix` bootstraps/kickstarts missing or dead jobs
+     `dev.tim.squad-broker|relay|watch-quota|watch-host`, binary-vs-running
+     version and the cc-socks dir; `--fix` bootstraps/kickstarts missing or dead jobs
      and re-checks). Exit 0 all ok, 1 any fail. If it still exits 1, show Tim
      the output and stop.
    - Exxo-side prereqs the member streams depend on. `docker info` failing:
