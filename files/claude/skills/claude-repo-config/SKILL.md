@@ -21,7 +21,10 @@ through `claude-sync` (see the `claude-workstation-setup` skill).
 **Global read-only allow set.** `git status/diff/log/branch/show/worktree
 list`, `gh pr view/list/checks/diff`, `gh run view/list`, `just --list`,
 `WebSearch`, `WebFetch` for github.com and raw.githubusercontent.com, and
-`mcp__ide__getDiagnostics`. Exxo adds an enumerated set of read-only `gcloud` commands
+`mcp__ide__getDiagnostics`. The local `squad` broker CLI (same-uid Unix-socket IPC to the
+broker, no network or credentials) is granted subcommand by subcommand: `squad
+send/set/publish/subscribe/unsubscribe/register/deregister/status/roster/get/
+history/doctor/debug`. Exxo adds an enumerated set of read-only `gcloud` commands
 (`projects list`, `config list`, `run services list/describe`, `compute
 instances list/describe`, `logging read`, `storage ls`, ...) plus `gsutil ls`,
 `pulumi preview/whoami/stack ls/stack output`, and `agent-tooling:*`, and
