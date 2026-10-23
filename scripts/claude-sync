@@ -94,9 +94,32 @@
 #   claude-sync            apply settings + CLAUDE.md + MCP servers + skills + agents
 #                          to every context
 #   claude-sync --diff     show what has drifted, change nothing
+#   claude-sync -h|--help  print this usage and exit 0
+#
+# Any other argument prints the usage to stderr and exits 2 without syncing.
 #
 # Safe to re-run.
 set -euo pipefail
+
+usage() {
+    cat <<'USAGE'
+Usage: claude-sync [--diff | -h | --help]
+  (no argument)  apply settings + CLAUDE.md + MCP servers + skills + agents
+                 to every context
+  --diff         show what has drifted, change nothing
+  -h, --help     print this usage and exit
+USAGE
+}
+
+# Parse before anything else runs: an unrecognised argument must never fall
+# through to a real sync.
+diff_only=0
+case "$#:${1:-}" in
+    0:)         ;;
+    1:--diff)   diff_only=1 ;;
+    1:-h|1:--help) usage; exit 0 ;;
+    *)          echo "claude-sync: unknown argument: $*" >&2; usage >&2; exit 2 ;;
+esac
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_SETTINGS_SHARED="$REPO_DIR/files/claude/settings.shared.json"
@@ -303,9 +326,6 @@ mcp_status_lines() {
         | .[]
     ' 2>/dev/null || echo "  (unreadable .claude.json — skipped)"
 }
-
-diff_only=0
-[ "${1:-}" = "--diff" ] && diff_only=1
 
 if [ "$diff_only" = 1 ]; then
     for mapping in "${CONTEXTS[@]}"; do

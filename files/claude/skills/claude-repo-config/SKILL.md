@@ -142,6 +142,12 @@ relocate any session transcripts per the `worktree-closedown` skill, then
 `wt remove <branch>` does the equivalent itself. Full procedure, including
 the submodule unsaved-work check: the `worktree-closedown` skill.
 
+In a repo with `submodule.recurse=true` (parentedit), `wt switch --create` can
+leave the worktree's submodule gitdir partial: `.git/modules/<submodule path>/`
+under the worktree's gitdir holds only `config`, so reset/checkout fails with
+"not a git repository". Delete that partial `modules/<submodule path>`
+directory and run `git submodule update --init` in the worktree.
+
 ## CLAUDE.md: at most 300 lines, no restated globals
 
 A repo CLAUDE.md is loaded on every turn, on top of roughly 430 lines of global instructions.

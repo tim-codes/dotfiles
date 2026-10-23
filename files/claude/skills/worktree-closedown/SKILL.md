@@ -117,6 +117,12 @@ path (both from `git worktree list`), `CTX` = the session's config dir
    fails (dirty status, unmerged branch), stop and report rather than
    deleting.
 
+   **Partial submodule gitdir.** In a repo with `submodule.recurse=true`
+   (parentedit), `wt switch --create` can produce a worktree whose gitdir's
+   `modules/<submodule path>/` holds only `config`; reset/checkout then fails
+   with "not a git repository", and the step 5 check reads nothing real. Delete
+   that partial directory and run `git submodule update --init` in `<W>`.
+
 7. **Report** what was preserved (session uuids, target slug) and what was
    removed, so the closedown is auditable from the conversation.
 
