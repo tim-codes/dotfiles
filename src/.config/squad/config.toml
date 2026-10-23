@@ -1,0 +1,33 @@
+# squad (~/dev/squad): accounts the quota watcher tracks and the broker maps
+# sessions onto. Everything else is the built-in default; see the repo's
+# config.example.toml for the knobs.
+
+[broker]
+grace_minutes = 10
+
+# Personal and exxo-personal are the same account; listing both dirs lets the
+# watcher dedupe their caches. The first dir is the one whose keychain token
+# the API tier reads.
+[[accounts]]
+name = "personal"
+email = "timoconnell1024@gmail.com"
+config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
+
+[[accounts]]
+name = "exxo"
+email = "tim@exxo.io"
+config_dirs = ["~/.claude-exxo"]
+
+[quota]
+levels = [50, 75, 90, 95, 100]
+projection_horizon_minutes = 60
+
+[host]
+cpu_warn = 80
+cpu_critical = 95
+
+# Expected watchers: `squad status` reports one that has gone silent.
+[[watchers]]
+name = "quota"
+[[watchers]]
+name = "host"

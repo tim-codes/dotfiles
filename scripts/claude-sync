@@ -180,6 +180,7 @@ claude-workstation-setup
 worktree-closedown
 dotfiles-repo
 claude-repo-config
+squad-infra
 LIST
 }
 

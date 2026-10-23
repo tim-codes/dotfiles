@@ -13,6 +13,10 @@ cargoGitDeps=(
   # it rewrites the theme.toml indirection, not the stow-managed
   # alacritty.toml); move to crates.io `althemer` once a release > 0.3.0 ships
   ssh://git@github.com/xdagiz/althemer
+  # squad: local broker + quota/host watchers coordinating Claude Code sessions
+  # (the launchd agents in src/Library/LaunchAgents run ~/.cargo/bin/squad);
+  # remote created by the squad build PR
+  ssh://git@github.com/tim-codes/squad
 )
 
 # Keep the toolchain itself current first: nothing else updates rustup's
