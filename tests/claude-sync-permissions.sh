@@ -31,11 +31,13 @@ sync >"$T/apply.log" 2>&1 || { bad "apply exited non-zero"; cat "$T/apply.log"; 
 
 shared_allow="$(jq '.permissions.allow | length' "$C/settings.shared.json")"
 shared_deny="$(jq '.permissions.deny | length' "$C/settings.shared.json")"
+exxo_deny="$(jq '(.permissions.deny // []) | length' "$C/settings.exxo.json")"
 for ctx in personal exxo exxo-personal; do
+    want_deny="$shared_deny"; [ "$ctx" = personal ] || want_deny=$((shared_deny + exxo_deny))
     check "$ctx keeps the whole shared allow set" \
         test "$(jq '[.permissions.allow[]] | length' "$FAKE/.claude-$ctx/settings.json")" -ge "$shared_allow"
     check "$ctx keeps the whole deny floor" \
-        test "$(jq '.permissions.deny | length' "$FAKE/.claude-$ctx/settings.json")" -eq "$shared_deny"
+        test "$(jq '.permissions.deny | length' "$FAKE/.claude-$ctx/settings.json")" -eq "$want_deny"
     check "$ctx keeps defaultMode" \
         test "$(jq -r '.permissions.defaultMode' "$FAKE/.claude-$ctx/settings.json")" = auto
     check "$ctx has git status grant" has "$ctx" allow 'Bash(git status:*)'
@@ -45,8 +47,17 @@ for ctx in exxo exxo-personal; do
     check "$ctx: duplicate rule appears once" \
         test "$(jq '[.permissions.allow[] | select(. == "WebSearch")] | length' "$FAKE/.claude-$ctx/settings.json")" -eq 1
 done
+for ctx in exxo exxo-personal; do
+    check "$ctx: gcloud grants are enumerated read-only commands" has "$ctx" allow 'Bash(gcloud compute instances list:*)'
+    check "$ctx: no middle-wildcard gcloud grants" \
+        test "$(jq '[.permissions.allow[] | select(test("^Bash\\(gcloud \\*"))] | length' "$FAKE/.claude-$ctx/settings.json")" -eq 0
+    check "$ctx: gcloud compute ssh is denied" has "$ctx" deny 'Bash(gcloud compute ssh*)'
+    check "$ctx: nested gcloud compute ssh is denied" has "$ctx" deny 'Bash(* gcloud compute ssh*)'
+done
 check "personal never gets the Exxo cloud grants" \
     test "$(jq '[.permissions.allow[] | select(test("agent-tooling|gcloud|pulumi"))] | length' "$FAKE/.claude-personal/settings.json")" -eq 0
+check "personal never gets the Exxo gcloud ssh deny" \
+    test "$(jq '[.permissions.deny[] | select(test("gcloud compute ssh"))] | length' "$FAKE/.claude-personal/settings.json")" -eq 0
 check "personal never gets the exxo marketplace" \
     test "$(jq '.extraKnownMarketplaces | has("exxo-skills")' "$FAKE/.claude-personal/settings.json")" = false
 
