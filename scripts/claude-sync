@@ -156,6 +156,7 @@ shared_skills() {
 claude-workstation-setup
 worktree-closedown
 dotfiles-repo
+claude-repo-config
 LIST
 }
 
