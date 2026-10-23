@@ -36,6 +36,8 @@ Checks (level, id):
   warn  claude-md-contradiction  CLAUDE.md contradicts a global rule
   warn  skill-links           duplicate / aliased / broken / doubly-delivered skill links
   error justfile-blanket      agent/Justfile is blanket-trusted but has mutating-looking recipes
+  error justfile-param-splice agent/Justfile is blanket-trusted and a recipe splices a parameter
+                              ({{ param }}) into its shell body (reports file:recipe)
   warn  skills-submodule      shared-skills submodule pin >3 commits behind origin/main
                               (info when 1-3; local ref only, never fetched)
 Exit status: 1 if any error-level finding (0 under --hook), else 0.
@@ -334,6 +336,7 @@ class Audit:
         self.check_claude_md()
         self.check_skills()
         self.check_justfile()
+        self.check_justfile_splice()
         self.check_submodule()
         return self.findings
 
@@ -510,6 +513,17 @@ class Audit:
                      "blanket-trusted but recipe(s) look mutating: " + ", ".join(bad[:6])
                      + (" …" if len(bad) > 6 else "") + " — move them to a non-trusted Justfile.ops")
 
+    def check_justfile_splice(self):
+        path = os.path.join(self.repo, "agent", "Justfile")
+        if not os.path.isfile(path) or not self.blanket_trusted():
+            return
+        bad = splicing_recipes(path)
+        if bad:
+            shown = ", ".join(f"agent/Justfile:{n}" for n in bad[:6]) + (" …" if len(bad) > 6 else "")
+            self.add("error", "justfile-param-splice", path,
+                     "blanket-trusted but recipe(s) splice parameters into shell: " + shown
+                     + " — use `set positional-arguments` and \"$1\", never {{ param }} in a shell line")
+
     def check_submodule(self):
         try:
             with open(os.path.join(self.repo, ".gitmodules")) as f:
@@ -542,7 +556,8 @@ READ_VERB_RE = re.compile(r"(^|-)(get|list|show|count|counts|check|status|ls|vie
 ENV_WRITE_RE = re.compile(r"(>>?|\bpath\s*=|\bopen\()\s*[\"']?(\.\./)?\.env\b")
 
 
-def mutating_recipes(path):
+def parse_recipes(path):
+    """Return [(name, head_line, [body lines])] for a Justfile ([] when unreadable)."""
     try:
         with open(path, errors="replace") as f:
             lines = f.read().splitlines()
@@ -554,21 +569,66 @@ def mutating_recipes(path):
             continue
         if line[0] in " \t":
             if cur:
-                cur[1].append(line)
+                cur[2].append(line)
             continue
         if re.match(r"^(set|alias|import|mod|export)\b|^[A-Za-z_][\w-]*\s*:=|^\[", line):
             cur = None
             continue
         m = RECIPE_HEAD_RE.match(line)
-        cur = (m.group(1), []) if m else None
+        cur = (m.group(1), line, []) if m else None
         if cur:
             recipes.append(cur)
+    return recipes
+
+
+def mutating_recipes(path):
     out = []
-    for name, body in recipes:
+    for name, _head, body in parse_recipes(path):
         if MUTATING_NAME_RE.search(name) and not READ_VERB_RE.search(name):
             out.append((name, "name"))
         elif any(ENV_WRITE_RE.search(b) for b in body):
             out.append((name, "writes .env"))
+    return out
+
+
+PARAM_EXPR_RE = re.compile(r"\{\{(?!\{)(.*?)\}\}")
+
+
+def recipe_params(head):
+    """Parameter names declared in a recipe head line; $-prefixed (exported env) ones are excluded."""
+    sig = re.split(r":(?!=)", head, maxsplit=1)[0].lstrip("@")
+    names = []
+    for tok in sig.split()[1:]:
+        tok = tok.split("=", 1)[0]
+        if tok.startswith("$"):
+            continue
+        tok = tok.lstrip("*+")
+        if tok.startswith("$"):
+            continue
+        if re.fullmatch(r"[A-Za-z_][\w-]*", tok):
+            names.append(tok)
+    return names
+
+
+def splicing_recipes(path):
+    """Recipes that interpolate one of their own parameters via {{ param }} in a body line.
+
+    Interpolation happens before the shell parses the line, so a parameter value
+    is shell code. `set positional-arguments` + "$1" passes it as data instead.
+    Functions such as justfile_directory() are not parameters and are ignored.
+    """
+    out = []
+    for name, head, body in parse_recipes(path):
+        params = recipe_params(head)
+        if not params:
+            continue
+        for line in body:
+            if line.lstrip().startswith("#"):
+                continue
+            if any(re.search(r"(?<![\w-])%s(?![\w(-])" % re.escape(p), expr)
+                   for expr in PARAM_EXPR_RE.findall(line) for p in params):
+                out.append(name)
+                break
     return out
 
 
