@@ -212,6 +212,7 @@ shared_agents() {
     cat <<'LIST'
 implementer
 reviewer
+conformity-reviewer
 git-pr-ops
 investigator
 sanity-cms
