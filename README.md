@@ -93,5 +93,6 @@ Host *
 * when running the init script, it is most reliable to open zsh in native terminal (not alacritty or another emulator), then run eg `./dev/dotfiles/scripts/init`
 * storing GPG keys in 1password as a reference, but they are not integrated, the local GPG key is used for signing
 * maybe this tool will help with the bash->fish PATH loading: https://github.com/edc/bass
+* before an unattended Claude run or after a reboot, `scripts/claude-reauth` (`--check` to report only) re-checks Docker, the secret caches, op/gcloud/gh/pulumi/az and each context's MCP servers, and runs the missing logins one at a time — see `files/claude/README.md`
 * todo: the fisher install step is not idempotent and is super flaky between different shells
 

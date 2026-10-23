@@ -245,6 +245,36 @@ Two caveats from the [docs](https://code.claude.com/docs/en/model-config):
   accept `ultracode`, and `max` is session-only unless set through
   `CLAUDE_CODE_EFFORT_LEVEL`.
 
+## Re-auth before an unattended run: `scripts/claude-reauth`
+
+One script checks every credential an unattended run leans on and, without
+`--check`, walks through the missing interactive logins one at a time:
+OrbStack/Docker (started if down), the `exxo-1p-cache` and `homelab-1p-cache`
+containers (started, never stopped), the 1Password CLI, gcloud + ADC, gh,
+pulumi + ESC, az, and each context's MCP servers. It prints an
+ok / needs-auth / failed / skipped table and exits 1 while anything still
+needs auth; no tool's raw output reaches the terminal. The `reauth` skill
+(shared to every context, `/reauth`) drives it, and the squad orchestrator
+runs `--check` in its step 0. `tests/claude-reauth.sh` covers it with PATH
+stubs.
+
+- Which MCP servers count, per context, is `reauth-needed.toml` (names exactly
+  as `claude mcp list` prints them). MCP OAuth does not need the TUI: `claude
+  mcp login <name>` runs the browser flow from the CLI (HTTP/SSE servers and
+  claude.ai connectors); `/mcp` in a session stays the fallback, and the
+  script prints those steps grouped by context.
+- Datadog is EU: `mcp.exxo.json` adds a user-scope `datadog` server at
+  `https://mcp.datadoghq.eu/v1/mcp` (Datadog's current endpoint;
+  `/api/unstable/mcp-server/mcp` is deprecated), because the engineering
+  plugin's `plugin:engineering:datadog` hard-codes the US site and its OAuth
+  starts there. The plugin server is meant to be denied (`deniedMcpServers`
+  in the settings fragments), so only the EU one is ever authed.
+- The secret caches have no warm command; a cached value's TTL is fixed when
+  `agent-run` (or homelab's op shim) writes it. So the script only makes sure
+  the containers are up and prints the `EXXO_SECRET_CACHE_TTL_SECONDS` /
+  `HOMELAB_1P_CACHE_TTL_SECONDS` the run should start with (`--ttl-hours`,
+  default 12).
+
 ## What is NOT in this file
 
 Permission approvals ("yes, don't ask again") are **per repository**, not
