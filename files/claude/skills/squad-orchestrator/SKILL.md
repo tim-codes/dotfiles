@@ -311,11 +311,23 @@ doing" digests from the roster and `squad history`). Announce the numbered
 roster on every launch. Briefs restate what a fresh context lacks: absolute
 paths, `gh -R`, `run-with-secrets` for anything credentialed.
 
+## 7a. Design conformity
+
+- On a member's `design ready` message (ADR/plan) and at every `pr_ready`,
+  dispatch `conformity-reviewer` (sonnet) with the ADR path or the PR
+  (`gh -R <repo>`); announce it on the numbered roster.
+- Blocking findings go back to the member as a `review` directive, data
+  `{findings:[…]}` (dimension, established pattern, proposed, smallest
+  change). Advisory ones are passed along, never held on.
+- Hold the merge (for exxo-infra, §5's ask to Tim too) until each blocking
+  finding is addressed or Tim rules on it.
+- Log the outcome in the worklog: verdict, findings sent, resolution.
+
 ## 8. Messages you receive
 
 Directives you send, defined client-side in `squad-join` §5: `pause`,
-`resume`, `priority`, `heavy_slot`, `infra` (to the infra member) and
-`cleanup` (§2a) and `preflight` (§2b).
+`resume`, `priority`, `heavy_slot`, `review` (§7a), `infra` (to the infra
+member) and `cleanup` (§2a) and `preflight` (§2b).
 
 A message turn's JSON is `{"from":…,"text":…,"data":{…}}`; client →
 orchestrator messages carry `data.kind`: `pr_ready`, `heavy_slot` (`action`

@@ -279,8 +279,9 @@ subagents in one message, not sequentially.
 
 Route to a dedicated agent first. `implementer` (plan-lane and ad-hoc
 implementation), `reviewer` (code/spec review, re-review waves),
-`git-pr-ops` (branch/worktree surveys, PR create/update, merge-state and CI
-checks, worktree closedown), `investigator` (debugging, CI/build log
+`conformity-reviewer` (stack/pattern conformity of a design or PR against
+the estate's conventions), `git-pr-ops` (branch/worktree surveys, PR
+create/update, merge-state and CI checks, worktree closedown), `investigator` (debugging, CI/build log
 forensics, smoke follow-ups), `sanity-cms` (Sanity schema/content/Studio)
 and `notion-ops` (every Notion read or write — no other agent loads Notion
 tools) each carry their own procedure and pinned model. `general-purpose`
