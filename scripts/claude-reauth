@@ -329,7 +329,7 @@ check_mcp() {
     fi
     classify_mcp "$st" "$srv"
     if [ "$S" = needs-auth ] && case "$st" in *"Needs authentication"*) true ;; *) false ;; esac; then
-        FIX="claude mcp login '$srv' (in $(launcher "$ctx") context)"
+        FIX="env CLAUDE_CONFIG_DIR=~/.claude-$ctx claude mcp login '$srv'"
     fi
 }
 fix_mcp() { (cd "$MCP_CWD" && env CLAUDE_CONFIG_DIR="$(ctx_dir "$1")" claude mcp login "$2"); }
