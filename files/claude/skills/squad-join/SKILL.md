@@ -69,6 +69,9 @@ command."** That line is what later turns rely on after compaction.
 No orchestrator live is fine: register anyway and carry on. An orchestrator
 that starts later reads the roster.
 
+If `squad register` exits 2 (broker unreachable), run `squad doctor --fix`
+once and retry; if the broker is still unreachable, tell Tim and stop.
+
 `name-taken: <name>` means another live session holds that name: pick a
 different `--name`, or, if you are resuming your own earlier session (same
 project, the old one gone), run `squad deregister <name>` first.
