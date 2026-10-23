@@ -25,3 +25,5 @@ src/.config/tmux/theme-scratch.conf
 # Claude Code per-account cache of claude.ai account skills, written through
 # the ~/.claude-personal/skills whole-dir symlink (see scripts/claude-sync).
 files/claude/skills/synced/
+__pycache__/
+*.pyc
