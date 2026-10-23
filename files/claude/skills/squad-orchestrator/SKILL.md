@@ -134,6 +134,26 @@ for the same member after that, tell Tim. If the member is `gone` (not
 and the `top` commands and pids. Never kill another session's processes
 yourself: the owner, or Tim, does.
 
+## 2b. Preflight before Tim goes AFK
+
+Send `preflight` once every expected member (and `infra`, if it is to be
+used) has joined, or whenever Tim asks. It makes each member warm the
+credentials its work needs while Tim can still answer a Touch ID prompt.
+
+```
+squad send all "preflight" --from orchestrator \
+  --data '{"directive":"preflight","ttl_hours":12}'
+```
+
+Omit `ttl_hours` for the 12h default. Members reply within 10 minutes with
+`data.kind` `preflight` (`ok` true|false, `detail` on failure); a member
+that has not replied by then is `no reply`. Collect the replies and include
+them in the health summary you give Tim before he goes AFK: one line per
+member (`ok`, `blocked: <what and why>` or `no reply`). List every
+unresolved `preflight blocked` item for Tim to fix; do not work around it,
+and do not retry a blocked member until he says it is resolved. Re-send to
+that member alone afterwards.
+
 ## 3. The plan gauge
 
 The plan lives in the broker so it survives you being closed and reopened:
@@ -280,11 +300,11 @@ paths, `gh -R`, `run-with-secrets` for anything credentialed.
 
 Directives you send, defined client-side in `squad-join` §5: `pause`,
 `resume`, `priority`, `heavy_slot`, `infra` (to the infra member) and
-`cleanup` (§2a).
+`cleanup` (§2a) and `preflight` (§2b).
 
 A message turn's JSON is `{"from":…,"text":…,"data":{…}}`; client →
 orchestrator messages carry `data.kind`: `pr_ready`, `heavy_slot` (`action`
-request|release), `blocked`, `done`, `infra_ready`, `infra_result`, plus
+request|release), `blocked`, `done`, `infra_ready`, `infra_result`, `preflight`, plus
 your own timers (`sweep_due`, `heavy_slot_expired`). On `blocked`, tell Tim
 if it needs him; on `done`, drop the stream from the plan. Watcher events
 are information. Never send a `now`-priority turn for something that can

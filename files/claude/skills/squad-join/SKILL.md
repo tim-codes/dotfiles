@@ -1,6 +1,6 @@
 ---
 name: squad-join
-description: Join this Claude Code session to the local squad (the `squad` broker) as a client workstream — move into a worktree, register, subscribe to quota/host/message topics, and follow the orchestrator's directives (pause, resume, priority, heavy_slot). Use when Tim says "/squad-join", "join the squad" or "register with the squad", and whenever a `<squad-message>` turn arrives and you need to know what it means or how to respond. Arguments `[--name N] [--priority 1-5] [--needs a,b] [--branch B]`.
+description: Join this Claude Code session to the local squad (the `squad` broker) as a client workstream — move into a worktree, register, subscribe to quota/host/message topics, and follow the orchestrator's directives (pause, resume, priority, heavy_slot, preflight). Use when Tim says "/squad-join", "join the squad" or "register with the squad", and whenever a `<squad-message>` turn arrives and you need to know what it means or how to respond. Arguments `[--name N] [--priority 1-5] [--needs a,b] [--branch B]`.
 ---
 
 # Squad: joining as a client workstream
@@ -126,6 +126,7 @@ now, push if a draft PR exists) — they are not a pause by themselves.
 | `priority` | `{priority}` | note it; at 4 or 5 defer optional work (polish, extra refactors, nice-to-have tests) |
 | `heavy_slot` | `{decision: grant\|deny\|revoke, retry_after_s?}` | grant: start the heavy job. deny: wait `retry_after_s`, then request again (a deny with `retry_after_s` may mean a protected app is running; do non-heavy work meanwhile). revoke: stop the heavy job now (interrupt the command), then `release` |
 | `cleanup` | `{reason, top?}` | the orchestrator saw you idle with busy or large leftover processes (`top`: `{pid, cmd, cpu_pct, rss_mb}`). Run the self-cleanup rule (§7) now: `TaskStop` completed subagents, end background shells you started, kill your own leftovers (dev servers, browsers, builds; check each `top` pid is yours before killing, never another session's), then `squad set --name <name> --detail "cleanup done: <what was stopped>"` |
+| `preflight` | `{ttl_hours?}` | warm and refresh every credential path this stream's work will need, so nothing prompts later while Tim is away; the procedure is below |
 | `infra` | `{action, pr, authority}` | infra role only; a client ignores it |
 | `relaunch` | reserved | not implemented; reply that it is unsupported |
 
@@ -144,6 +145,44 @@ now, push if a draft PR exists) — they are not a pause by themselves.
 **Resume**: run `squad roster` and re-read your own `detail`; pick up from
 the next step it names; `squad set --name <name> --status working
 --detail "<resumed: …>"`.
+
+## 5a. Preflight
+
+On a `preflight` directive, warm every credential path this stream's work
+will need, then reply within 10 minutes. Never print a secret value, and do
+not `op read` or reveal anything: the point is to take the approval prompts
+now, while Tim is at the machine.
+
+1. **Exxo secret cache**, at the requested TTL (`ttl_hours`, default 12, so
+   `EXXO_SECRET_CACHE_TTL_SECONDS=43200`). Run a cheap credential-resolving
+   command through the wrapper with that variable set: `agent-run` /
+   the exxo-common `run-with-secrets` skill (`agent/run -- <cmd>`;
+   `agent-tooling cache status` to check). A personal-context stream uses the
+   homelab `run-with-secrets` equivalent instead (`just secret-cache-up`,
+   then a `just` recipe). If the cache is cold, `op` signs in through Touch
+   ID: tell Tim what will appear before triggering it, then wait for the
+   approval rather than retrying.
+2. **Only the CLIs this repo actually uses** (check its `CLAUDE.md` and
+   `Justfile`), each with output discarded or limited to identity:
+   `gcloud auth print-access-token >/dev/null`, `gh auth status`,
+   `pulumi whoami`, `az account show`.
+3. **Connectors**: if the brief needs a claude.ai connector (Notion, Linear,
+   Slack, ...), make one cheap read call so any OAuth happens now.
+4. **Reply**, and record it:
+
+   ```
+   squad send role:orchestrator "preflight ok" --from <name> \
+     --data '{"kind":"preflight","ok":true}'
+   squad set --name <name> --detail "preflight ok (cache <ttl>h)"
+   ```
+
+   On failure, say what and why, and do not work around it:
+
+   ```
+   squad send role:orchestrator "preflight blocked: <what and why>" --from <name> \
+     --data '{"kind":"preflight","ok":false,"detail":"<what and why>"}'
+   squad set --name <name> --detail "preflight blocked: <what>"
+   ```
 
 ## 6. Talking to the orchestrator
 
