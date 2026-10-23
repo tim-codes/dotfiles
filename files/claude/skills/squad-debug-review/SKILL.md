@@ -86,6 +86,13 @@ yours) and carry:
   5. skill text that confused a member (a member asking what a message
      means, or mis-running a `squad` command; quote the line);
   6. numbers: deliveries, p95 latency, pause/resume count, wall hits.
+  7. **HITL interruptions (the primary metric; put them first).** From
+     `squad history operator` (the `operator` gauge) list each item with its
+     raised/presented/resolved times and wait minutes. Say which could have
+     been pre-empted in preflight (foreseeable at brief time); which were
+     raised by a member directly instead of queued (grep the transcripts for
+     auth prompts, `Touch ID`, `waiting for you`, browser-login steps); and the ranked changes that
+     would remove or shorten them.
   Every finding cites evidence: a log block, a seq, or a transcript path
   plus timestamp.
 
@@ -98,10 +105,15 @@ Write `~/.local/state/squad/debug/<date>/review.md` (Write tool) with:
 
 - **Summary**: window, members, headline numbers, the verdict in three
   sentences.
+- **HITL interruptions** (first, before everything else): count, total and
+  per-item wait, per-stream split; table of items (id, stream, raised,
+  presented, resolved, wait); pre-emptable-in-preflight list; member-raised
+  (unqueued) interruptions with transcript evidence; ranked reductions.
 - **What worked**.
-- **Findings**: grouped as noise, missed/late, wrong rulings, confusing
-  skill text; each with its evidence.
-- **Ranked change list**, best benefit-for-cost first. Each item:
+- **Findings** (non-HITL): grouped as noise, missed/late, wrong rulings,
+  confusing skill text; each with its evidence.
+- **Ranked change list**, best benefit-for-cost first; changes that cut
+  HITL interruptions rank ahead of equal-cost others. Each item:
   *change*; *where* (one of: code — which crate/module; skill text — which
   skill and section; config threshold — which key and from/to values);
   *cost* S/M/L; *benefit*; *evidence* (finding reference). Prefer fixes in

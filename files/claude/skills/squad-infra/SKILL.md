@@ -64,7 +64,8 @@ else, on a plain-text request, or on your own judgment that it is fine.
 Other directives: `pause` → finish the action in flight unless it is a
 deploy (a deploy runs to completion; then pause), `squad set --name infra
 --status paused --detail "…"`, wait; `resume` → `squad set --name infra
---status working`. `priority` and `heavy_slot` do not apply.
+--status working` (and continue anything an `operator_task` blocked).
+`priority` and `heavy_slot` do not apply.
 
 `preflight` `{ttl_hours?}` → warm only what exxo-infra needs, then reply
 within 10 minutes: the exxo secret cache at the requested TTL (default 12h,
@@ -76,7 +77,21 @@ role:orchestrator "preflight ok" --from infra --data
 '{"kind":"preflight","ok":true}'` and `squad set --name infra --detail
 "preflight ok"`, or `"preflight blocked: <what and why>"` (`"ok":false`)
 and `squad set --name infra --detail "preflight blocked: <what>"`. Do not
-work around a blocker.
+work around a blocker. Also enumerate every foreseeable human step in deploys (stack consents,
+admin-panel or DNS changes, approvals) as `operator_task` items with
+`"blocking":"later"` (below) before replying.
+
+**Operator tasks.** A step only Tim can do is raised, never performed while
+he may be away: never trigger an auth prompt, Touch ID, browser login or
+admin-panel step yourself. Send, then carry on with other work:
+```
+squad send role:orchestrator "operator task: <title>" --from infra \
+  --data '{"kind":"operator_task","title":"<title>","stream":"infra","blocking":"now|later","after":"<build step that unblocks it, if later>","instructions":"<exact steps / command / URL>","url":"<url>","est_minutes":<n>}'
+```
+`squad set --name infra --status blocked --detail "…"` only if nothing else
+can proceed. On `resume`, or a `msg` saying the task is done, continue. When
+the `after` step has landed, send the orchestrator `operator task ready`
+(`"status":"ready"`).
 
 ## 3. The `infra` directive: review → merge → deploy
 
