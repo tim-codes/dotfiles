@@ -56,8 +56,8 @@ never try to make its auth unattended.
 ## Delegating: these rules do NOT travel to subagents on their own
 
 This skill loads only into the context that invoked it. A subagent starts
-fresh and will happily run bare `op`, ansible from the repo root (no project
-`ansible.cfg` → no ControlPersist multiplexing), or a raw-ssh retry loop —
+fresh and will happily run bare `op`, ansible from the wrong directory
+(missing a project `ansible.cfg`'s host overrides), or a raw-ssh retry loop —
 each of which turns into a Touch ID / SSH-approval prompt storm on the
 operator's Mac (observed 2026-08-22).
 
