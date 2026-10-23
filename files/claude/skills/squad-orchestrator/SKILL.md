@@ -36,6 +36,7 @@ down: see `squad-join` §8.
    # and once:
    squad subscribe orchestrator host --min-change 15 --debounce-s 300
    squad subscribe orchestrator host.pressure
+   squad subscribe orchestrator host.member_idle_with_descendants
    squad subscribe orchestrator msg.role.orchestrator
    squad subscribe orchestrator msg.all
    ```
@@ -110,6 +111,26 @@ for m in <top> <next> …; do squad send "$m" "resume" --from orchestrator \
 ```
 Remove them from `paused`, publish the plan, tell Tim one line. Members
 Tim paused himself (no plan entry) are his to resume.
+
+## 2a. Idle members with leftover processes
+
+`host.member_idle_with_descendants` fires when a member's Claude session
+has been idle >=10 min but its process tree still holds busy or large
+descendants. Payload: `{member, idle_minutes, descendants, cpu_pct, rss_mb,
+top:[{pid, cmd, cpu_pct, rss_mb}]}`. Skip a member that is `paused` or
+mid-`heavy_slot` grant (the load is expected); otherwise send it a cleanup
+directive:
+```
+squad send <member> "cleanup: idle <n>m with <d> descendants (<cpu>% cpu, <rss> MB)" --from orchestrator \
+  --data '{"directive":"cleanup","reason":"idle with descendants","top":[<the event top list>]}'
+```
+It stops its finished background shells and agents, kills its own leftovers
+(dev servers, browsers, builds) and confirms with `squad set --detail
+"cleanup done: …"`. Expect that within a few minutes; if the event repeats
+for the same member after that, tell Tim. If the member is `gone` (not
+`live` in `squad roster`), report to Tim instead, with the member, idle time
+and the `top` commands and pids. Never kill another session's processes
+yourself: the owner, or Tim, does.
 
 ## 3. The plan gauge
 
@@ -207,13 +228,28 @@ old and no sweep is running, sweep. Delegate it to a **janitor subagent**
   tree, live session inside, open draft PR, or any ambiguity.
 - **Also report**: Claude sessions idle for more than 8h with no squad
   registration, and squad members gone longer than the grace period.
+- **Dangling subagents**: for each context (`~/.claude-*`), scan
+  `<CONFIG_DIR>/projects/*/<session>/subagents/agent-*.meta.json`. The
+  sibling `agent-<id>.jsonl` is that agent's transcript; the meta has no
+  timestamps. Heuristic for "started, no completion": the transcript's first
+  line is older than 2h, **and** its mtime is stale or its last assistant
+  record has no `stop_reason: end_turn`, **and** the parent
+  `<session>.jsonl` shows no result or `<task-notification>` for the meta's
+  `toolUseId` / agent id after the launch acknowledgement. Skip sessions
+  whose `sessions/<pid>.json` shows `busy` (the agent may be live). List
+  each hit (context, project, session, agent id, `description`, age) in the
+  report; report-only, never act on them.
+- **Stale members**: list roster members whose last `squad set` is older
+  than 2h while the CC status (`jq -r .status
+  <req.config_dir>/sessions/<req.pid>.json`) is `idle`. Report-only; the
+  usual cause is a stream that finished or stalled without updating.
 - **Debug retention**: remove date-named capture dirs under
   `~/.local/state/squad/debug/` older than 14 days (`find … -mindepth 1
   -maxdepth 1 -type d -mtime +14`; never `debug.on`). List each removed dir
   in the sweep report; never silently.
 
 Give Tim one message: removed items with evidence, then the report pile
-grouped by reason. His answers ("remove the parentedit ones") go back to
+grouped by reason (dangling subagents and stale members included). His answers ("remove the parentedit ones") go back to
 the same subagent via `SendMessage`.
 
 ## 7. Your own subagents
@@ -226,6 +262,10 @@ roster on every launch. Briefs restate what a fresh context lacks: absolute
 paths, `gh -R`, `run-with-secrets` for anything credentialed.
 
 ## 8. Messages you receive
+
+Directives you send, defined client-side in `squad-join` §5: `pause`,
+`resume`, `priority`, `heavy_slot`, `infra` (to the infra member) and
+`cleanup` (§2a).
 
 A message turn's JSON is `{"from":…,"text":…,"data":{…}}`; client →
 orchestrator messages carry `data.kind`: `pr_ready`, `heavy_slot` (`action`
@@ -247,7 +287,7 @@ At start-up, before §1 step 4, only when started with `--debug`:
    use `$CLAUDE_CODE_SESSION_ID`, and say so). Publish the gauge with that
    `session_id` and `"debug":true` so the review finds your transcript.
 3. After **every** directive you send (pause, resume, priority, heavy_slot,
-   infra), in the same turn, append to today's decision log:
+   infra, cleanup), in the same turn, append to today's decision log:
    ```
    d=~/.local/state/squad/debug/$(date +%F); mkdir -p "$d"; cat >> "$d/orchestrator-decisions.md" <<'EOF'
    ## <ISO ts> <directive> → <member>
