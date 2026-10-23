@@ -117,10 +117,20 @@ Splitting a recipe out:
 1. Move the recipe into `agent/Justfile.ops`. Add a header comment saying the
    file is not blanket-trusted.
 2. Call it as `just --justfile=agent/Justfile.ops <recipe>` and accept the
-   prompt each time. Grant nothing for that file.
+   prompt each time. Grant nothing for that file. The blanket rule
+   `Bash(just --justfile=agent/Justfile:*)` means `just --justfile=agent/Justfile *`
+   (`:*` is a trailing wildcard preceded by a space, per the permissions docs),
+   so `just --justfile=agent/Justfile.ops ...` does not match it. As belt and
+   braces, repos also add `ask` rules for `Justfile.ops` in both spellings
+   (`--justfile=agent/Justfile.ops` and `--justfile agent/Justfile.ops`), so a
+   future loosening of the blanket cannot silently trust the ops file.
 3. Update the repo CLAUDE.md pointer that names the recipe.
 
 ## Worktrees: submodules and closedown
+
+Run `git fetch origin main` in the primary before `wt switch --create`: it
+branches from local `main`, which can be stale, and a branch cut from a stale
+`main` produces a PR that conflicts with, or silently reverts, newer work.
 
 In the Exxo repos every worktree carries the vendored `.claude/vendor/skills`
 submodule, so `git worktree remove` refuses with `working trees containing
