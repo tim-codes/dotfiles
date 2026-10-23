@@ -10,8 +10,16 @@ to that file, so the repo was perpetually dirty.
 - `settings.shared.json` — the baseline applied to every context.
 - `settings.personal.json` — the personal-context fragment, currently `{}`.
 - `settings.exxo.json` — Exxo-only: enables the `exxo-common@exxo-skills`
-  plugin and registers the `exxo-skills` marketplace under
-  `extraKnownMarketplaces`.
+  plugin, registers the `exxo-skills` marketplace under
+  `extraKnownMarketplaces`, and adds the Exxo read-only cloud grants.
+
+Permissions are the one place the merge is not "account wins": `allow`,
+`deny` and `ask` are concatenated across the fragments (`SETTINGS_MERGE` in
+`claude-sync`), since jq's `*` would let the exxo array replace the shared
+one. `settings.shared.json` holds the global read-only allow set and the
+deny floor; repos carry only repo-specific grants (the `claude-repo-config`
+skill, checked by `scripts/claude-config-audit`, which also runs as a
+SessionStart hook in every session).
 
 The split exists because the Exxo context must receive the Exxo skills
 marketplace/plugin while `~/.claude-personal` must never get it (homelab #76,
@@ -94,7 +102,7 @@ whole-directory symlink to `files/claude/skills`. `~/.claude-exxo/skills` is
 a real directory of per-skill symlinks maintained by `claude-sync`, built
 from an allow list: a `shared_skills()` list in `scripts/claude-sync` names
 the repo skills that are cross-account — currently `claude-workstation-setup`,
-`worktree-closedown` and `dotfiles-repo` — and only those are linked into exxo;
+`worktree-closedown`, `dotfiles-repo` and `claude-repo-config` — and only those are linked into exxo;
 every other repo skill is personal-only by default. The allow-list replaced an
 earlier exclusion list after `run-with-secrets` — homelab guidance (op-shim,
 Ansible, zima/ragnar) — turned up alongside the `exxo-common` plugin's own
@@ -235,9 +243,27 @@ Two caveats from the [docs](https://code.claude.com/docs/en/model-config):
 Permission approvals ("yes, don't ask again") are **per repository**, not
 per account: Claude Code writes them to `.claude/settings.local.json` at the
 git repository root. Outside a repository it writes them in the directory the
-session started from. Nothing here touches them.
+session started from. claude-sync never touches them; `claude-config-audit
+--fix-local` prunes them on request (dangerous, already-covered and junk
+entries, with a `.bak`).
 
 ## Deferred follow-ups
+
+- The deny floor makes any Bash command whose text contains `--reveal`,
+  `--show-secrets` or ` op read` unrunnable — including a `grep` for those
+  strings. Accepted trade-off (Grep/Write tools still work); revisit if it
+  bites a recurring task, with a narrower floor entry rather than an allow
+  (noted 2026-10-23).
+- `claude-config-audit`'s mutating-recipe and research-domain checks are
+  name/pattern heuristics (`deploy|revoke|destroy|reset|restore|env-set|-prod`,
+  writes to `.env`; >10 non-docs WebFetch domains). A recipe that mutates
+  under an innocuous name (h2gc-portal's `e2e-auth-state`) is not caught —
+  extend the patterns when one turns up rather than trusting a clean run
+  as proof (noted 2026-10-23).
+- The audit's skill-link duplicate check knows the exxo-mantine plugin's
+  `mantine-*` names by prefix, not by reading the plugin snapshot; another
+  plugin that ships a skill also linked in a repo would go unflagged
+  (noted 2026-10-23).
 
 - `~/.claude-exxo-personal` still has no MCP servers of its own beyond what
   `claude-sync` manages. `~/.claude-exxo` carries three remaining hand-added

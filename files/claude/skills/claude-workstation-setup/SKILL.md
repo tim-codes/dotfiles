@@ -1,6 +1,6 @@
 ---
 name: claude-workstation-setup
-description: Full disclosure of how Claude Code is set up on Tim's workstations — per-account contexts, shell wrappers, settings/CLAUDE.md fragment merge, repo-managed MCP servers, the two skill-delivery paths (including vendored upstream skills), and where approvals/memory live. Use when asked how the Claude setup/context segregation works, when changing any part of it (claude-sync, settings/CLAUDE.md/MCP fragments, skills, plugins), or when a session behaves as if it's in the wrong account, or when adding/updating a global (cross-session) instruction.
+description: Full disclosure of how Claude Code is set up on Tim's workstations — per-account contexts, shell wrappers, settings/CLAUDE.md fragment merge (incl. the global permission allow set and deny floor), the repo-config audit hook, repo-managed MCP servers, the two skill-delivery paths (including vendored upstream skills), and where approvals/memory live. Use when asked how the Claude setup/context segregation works, when changing any part of it (claude-sync, settings/CLAUDE.md/MCP fragments, skills, plugins), or when a session behaves as if it's in the wrong account, or when adding/updating a global (cross-session) instruction.
 ---
 
 # How Claude Code is set up on these workstations
@@ -67,6 +67,49 @@ Consequence: never hand-edit `~/.claude-*/settings.json` for anything meant
 to last — it reverts on the next sync. Put it in the right fragment instead.
 Account-specific keys (the exxo-skills marketplace, its plugin) live only in
 `settings.exxo.json`; `~/.claude-personal` must never receive Exxo config.
+
+One exception to "account fragment wins": the permission rule arrays
+(`permissions.allow`/`deny`/`ask`) are CONCATENATED across the two fragments
+(shared first, duplicates dropped — `SETTINGS_MERGE` in claude-sync), because
+jq's `*` replaces arrays and the exxo grants would otherwise wipe the shared
+set. That is where the global permissions live (added 2026-10-23):
+`settings.shared.json` carries the read-only allow set (git/gh read
+subcommands, `just --list`, `WebSearch`, GitHub `WebFetch`,
+`mcp__ide__getDiagnostics`) and the **deny floor** (`op read`, `--reveal`,
+`--show-secrets`, `pulumi`/`esc env open`, `gcloud secrets versions access`,
+each also as `* <cmd>` so a later segment matches; `Read` of `.claude.json`
+and `.credentials.json`); `settings.exxo.json` adds the Exxo read-only cloud
+grants (`gcloud * list/describe`, `pulumi preview/whoami/stack ls/stack
+output`, `agent-tooling:*`). Deny is evaluated before allow across every
+scope, so no repo file can loosen the floor. Repos keep only repo-specific
+grants — the conventions are the `claude-repo-config` skill.
+`tests/claude-sync-permissions.sh` checks the merge.
+
+## Repo config: conventions skill, audit script, SessionStart hook
+
+Three artefacts keep every repo's own Claude config in line with the global
+layer (added 2026-10-23, after a survey found `just:*`/`git:*` local grants,
+a blanket-trusted `agent/Justfile` with prod-mutating recipes, and 16 repos
+restating global CLAUDE.md blocks):
+
+- `files/claude/skills/claude-repo-config/` — the conventions (global vs
+  committed vs local settings, deny floor, `agent/Justfile` read-only
+  invariant and `Justfile.ops`, CLAUDE.md ≤300 lines with no restated
+  globals) and the fix procedures. Shared to every context.
+- `scripts/claude-config-audit` — stdlib Python check over one repo
+  (`--repo`, default cwd) or the estate (`--estate`, roots default `~/dev`,
+  skipping worktrees, `picnic` and repos idle >30 days unless `--all`);
+  `--json`, `--explain`, `--fix-local` (writes `settings.local.json.bak`).
+  It reads the allow set, floor and global headings from the fragments here,
+  so it cannot disagree with what claude-sync deploys. Tests:
+  `tests/test_claude_config_audit.py`.
+- A `SessionStart` hook in `settings.shared.json` (matcher
+  `startup|resume`, marker `# claude-config-audit`) runs it with `--quiet
+  --hook` against `$CLAUDE_PROJECT_DIR`: silent when clean or not a git repo,
+  otherwise a one-line `systemMessage` plus the findings as context. It
+  always exits 0 and runs in ~0.1s. The hook references the script by its
+  primary-checkout path (`$HOME/dev/dotfiles/scripts/…`), like the other
+  dotfiles hooks, so it tracks `main`.
 
 ## Global instructions (CLAUDE.md): shared baseline + optional per-account fragment
 
@@ -141,7 +184,7 @@ carried no MCP servers at all while `~/.claude-exxo` had four.
    REAL directory of per-skill symlinks curated by claude-sync against an
    allow list: only repo skills named in `shared_skills()` in
    `scripts/claude-sync` get linked in (currently `claude-workstation-setup`,
-   `worktree-closedown`, `dotfiles-repo`). Every other repo skill is
+   `worktree-closedown`, `dotfiles-repo`, `claude-repo-config`). Every other repo skill is
    personal-only by default and must be explicitly promoted — add its name to
    `shared_skills()` to make it cross-account.
    Authoring asymmetry (verified against claude-sync): author new skills in
@@ -246,7 +289,8 @@ plugin (`<context>/plugins/synced/`), which the fragments don't manage.
 ## What is deliberately NOT shared or synced
 
 - **Permission approvals** — per repository, in `.claude/settings.local.json`
-  at the repo root, untouched by claude-sync.
+  at the repo root, untouched by claude-sync. (The audit's `--fix-local`
+  prunes them on request; nothing does so automatically.)
 - **Auto-memory** — per context, under `<context>/projects/<cwd-slug>/memory/`.
   Kept segregated on purpose (work/personal leakage); durable architecture
   facts belong here in this skill instead.
