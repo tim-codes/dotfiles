@@ -1,0 +1,779 @@
+#!/usr/bin/env -S python3 -I
+"""Audit a repo's (or the estate's) Claude Code config against the estate conventions.
+
+The conventions themselves live in the claude-repo-config skill
+(files/claude/skills/claude-repo-config/SKILL.md); this script is the check.
+Stdlib only, runs isolated (python3 -I), never fetches, never prints a
+settings value it hasn't redacted.
+
+Usage:
+  claude-config-audit [--repo PATH]            audit one repo (default: cwd)
+  claude-config-audit --estate [--root DIR ...] [--all]
+                                               audit every primary checkout under the roots
+  options: --json   machine-readable output
+           --quiet  print only warn/error findings, nothing at all when clean
+           --hook   SessionStart-hook output (JSON systemMessage + additionalContext,
+                    always exit 0, silent when clean or not a git repo)
+           --explain  list each local entry --fix-local would remove, and why (dry run)
+           --fix-local  strip .claude/settings.local.json per the conventions
+                    (backup written next to it as settings.local.json.bak)
+
+Estate mode walks the roots (default ~/dev) for primary checkouts (a .git
+DIRECTORY — linked worktrees have a .git file and are skipped), skips any path
+containing "picnic", and skips repos with no commit in the last 30 days unless
+--all is given.
+
+Checks (level, id):
+  error committed-dangerous   committed settings grant just:*/git:*/interpreters/
+                              mutating pulumi/secret-revealing commands
+  error local-dangerous       settings.local.json holds a grant from the dangerous list
+  warn  local-oversize        settings.local.json has more than 25 allow entries
+  warn  local-strippable      local entries already covered globally / junk / dead
+                              (info when fewer than 5)
+  warn  deny-floor            the repo restates the global deny floor, but only partially
+  warn  claude-md-size        CLAUDE.md (+ @imports) over 300 lines
+  warn  claude-md-restated    CLAUDE.md restates a global instruction block
+  warn  claude-md-contradiction  CLAUDE.md contradicts a global rule
+  warn  skill-links           duplicate / aliased / broken / doubly-delivered skill links
+  error justfile-blanket      agent/Justfile is blanket-trusted but has mutating-looking recipes
+  warn  skills-submodule      shared-skills submodule pin >3 commits behind origin/main
+                              (info when 1-3; local ref only, never fetched)
+Exit status: 1 if any error-level finding (0 under --hook), else 0.
+"""
+import argparse, datetime as dt, json, os, re, subprocess, sys, time
+
+SCRIPT_REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+FRAGMENTS = os.path.join(SCRIPT_REPO, "files", "claude")
+DEFAULT_ROOTS = ["~/dev"]
+SKIP_PATH_PARTS = ("picnic",)
+PRUNE_DIRS = {"node_modules", "target", "dist", "build", ".venv", "venv", ".next", ".turbo"}
+IDLE_DAYS = 30
+CLAUDE_MD_MAX = 300
+LOCAL_MAX = 25
+RESEARCH_DOMAIN_BULK = 10
+LOCAL_STRIP_WARN = 5  # fewer strippable local entries than this is info, not a warning
+SUBMODULE_WARN_BEHIND = 3
+SKILLS_SUBMODULE = ".claude/vendor/skills"
+SKILLS_CLONES = ["~/dev/exxo/skills"]  # extra places an up-to-date origin/main may live
+
+# --- permission rules ---------------------------------------------------------
+
+RULE_RE = re.compile(r"^([\w-]+)(?:\((.*)\))?$", re.S)
+SECRET_RE = re.compile(
+    r"(sk-[A-Za-z0-9_\-]{8,}|gh[pousr]_[A-Za-z0-9]{8,}|xox[abpr]-[A-Za-z0-9\-]{8,}|"
+    r"AKIA[0-9A-Z]{12,}|eyJ[A-Za-z0-9_\-]{10,}|[A-Za-z0-9+_\-]{32,}|[0-9a-f]{24,})")
+
+# A grant of the whole command family: `Bash(<cmd>:*)` / `Bash(<cmd> *)`.
+BARE_DANGEROUS = {
+    "just": "every just recipe", "git": "every git subcommand",
+    "node": "arbitrary code", "python": "arbitrary code", "python3": "arbitrary code",
+    "npx": "arbitrary packages", "pnpm": "arbitrary scripts", "bun": "arbitrary code",
+    "deno": "arbitrary code", "uv": "arbitrary code", "uvx": "arbitrary packages",
+    "bash": "arbitrary code", "sh": "arbitrary code", "zsh": "arbitrary code",
+    "eval": "arbitrary code", "exec": "arbitrary code", "source": "arbitrary code",
+    "sudo": "privilege escalation", "xargs": "arbitrary commands", "env": "arbitrary commands",
+    "curl": "arbitrary network writes", "wget": "arbitrary downloads",
+    "gh": "every gh call incl. merges and API writes", "rm": "deletion",
+    "ssh": "remote state changes", "scp": "remote writes", "rsync": "bulk writes",
+    "docker": "every docker call", "kubectl": "cluster writes", "gcloud": "every gcloud call",
+    "pulumi": "infra mutation", "esc": "secret reads", "op": "secret reads",
+}
+# Command heads that are dangerous however they are narrowed (and any grant
+# broad enough to include them).
+HEAD_DANGEROUS = [
+    ("pulumi up", "infra mutation"), ("pulumi refresh", "infra mutation"),
+    ("pulumi import", "infra mutation"), ("pulumi destroy", "infra mutation"),
+    ("pulumi env open", "secret reveal"), ("pulumi esc", "secret reveal"),
+    ("esc env open", "secret reveal"), ("esc env get", "secret reveal"),
+    ("gcloud secrets versions access", "secret reveal"),
+    ("op read", "secret reveal"),
+    ("git reset", "destructive git"), ("git rebase", "destructive git"),
+    ("docker rm", "destructive docker"), ("docker run", "arbitrary containers"),
+    ("ssh", "remote state changes"), ("ansible", "ad-hoc lab state changes"),
+    ("ansible-playbook", "lab state changes"), ("vercel env", "writes secrets to disk"),
+]
+HEAD_DANGEROUS = [(h.split(), why) for h, why in HEAD_DANGEROUS]
+INLINE_SECRET_RE = re.compile(
+    r"\$\(\s*(op|gcloud secrets|pulumi|esc)\b|--reveal|--show-secrets|"
+    r"\b[A-Z][A-Z0-9_]*(PWD|PASSWORD|TOKEN|SECRET|API_KEY)=")
+SHELL_KEYWORDS = {"for", "do", "done", "then", "fi", "if", "else", "elif", "while",
+                  "until", "case", "esac", "{", "}", "(", ")", "&&", "||", ";"}
+DEAD_PREFIXES = ("mcp__plugin_Notion_notion__", "mcp__plugin_vercel_")
+DOCS_DOMAIN_RE = re.compile(
+    r"(^|\.)(docs?|developers?|api|learn|support)\.|\.dev$|github|npmjs|pypi|mantine|"
+    r"pulumi|datadoghq|cloud\.google|anthropic|claude\.com|vercel|sanity|nextjs|"
+    r"python\.org|mozilla\.org|readthedocs")
+FLOOR_LIKE_RE = re.compile(r"op read|--reveal|--show-secrets|env open|secrets versions access|\.claude\.json|\.credentials\.json")
+BLANKET_RE = re.compile(r"^Bash\(\s*just\s+(--justfile[= ]|-f\s*)\S*agent/Justfile\b.*\*\)$")
+
+
+def parse_rule(rule):
+    """(tool, arg) or (None, None) when unparseable."""
+    m = RULE_RE.match(rule.strip()) if isinstance(rule, str) else None
+    return (m.group(1), m.group(2)) if m else (None, None)
+
+
+def canon(pattern):
+    """Bash pattern -> (tokens, wildcard). `x:*`, `x *`, `x*` all count as prefix grants."""
+    p = pattern.strip()
+    wild = False
+    for suf in (":*", " *", "*"):
+        if p.endswith(suf):
+            p, wild = p[: -len(suf)], True
+            break
+    toks = p.split()
+    while toks and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", toks[0]):
+        toks.pop(0)  # leading env assignments don't change the command
+    return toks, wild
+
+
+def tok_prefix(a, b):
+    """a is a token-prefix of b; `*` tokens match anything."""
+    return len(a) <= len(b) and all(x == y or "*" in x or "*" in y for x, y in zip(a, b))
+
+
+def dangerous_reason(rule):
+    tool, arg = parse_rule(rule)
+    if tool != "Bash":
+        return None
+    if arg is None or arg.strip() in ("", "*"):
+        return "unrestricted Bash"
+    if INLINE_SECRET_RE.search(arg):
+        return "secret-revealing / inline-secret command"
+    toks, wild = canon(arg)
+    if not toks:
+        return "unrestricted Bash" if wild else None
+    if wild and len(toks) == 1 and toks[0] in BARE_DANGEROUS:
+        return f"grants {BARE_DANGEROUS[toks[0]]}"
+    for head, why in HEAD_DANGEROUS:
+        if tok_prefix(head, toks) or (wild and tok_prefix(toks, head)):
+            return why
+    return None
+
+
+def junk_reason(rule):
+    tool, arg = parse_rule(rule)
+    if tool is None:
+        return "unparseable rule"
+    if any(rule.startswith(p) for p in DEAD_PREFIXES):
+        return "dead grant (plugin disabled globally)"
+    if tool == "Bash" and arg is not None:
+        if "\n" in arg or "<<" in arg or "EOF" in arg or len(arg) > 200:
+            return "multi-line / heredoc approval"
+        toks, _ = canon(arg)
+        if toks and toks[0] in SHELL_KEYWORDS:
+            return "shell fragment"
+        if re.search(r"(^|[\s=])(/Users/|/home/|~/)", arg):
+            return "one-off absolute path"
+    if tool == "Read" and arg and re.match(r"^//?(Users|home)/", arg) and not re.match(r"^//?(Users|home)/[^/]+/dev/", arg):
+        return "one-off absolute path"  # sibling-repo reads under ~/dev are kept
+    return None
+
+
+def research_domain(rule):
+    tool, arg = parse_rule(rule)
+    return tool == "WebFetch" and bool(arg) and arg.startswith("domain:") and not DOCS_DOMAIN_RE.search(arg[7:])
+
+
+def covered(rule, allows):
+    """rule is already granted by one of allows (exact, or a broader prefix grant)."""
+    if rule in allows:
+        return True
+    tool, arg = parse_rule(rule)
+    if tool != "Bash" or arg is None:
+        return False
+    r_toks, r_wild = canon(arg)
+    for a in allows:
+        at, aa = parse_rule(a)
+        if at != "Bash" or aa is None:
+            continue
+        a_toks, a_wild = canon(aa)
+        if not a_toks:
+            continue
+        if a_wild and tok_prefix(a_toks, r_toks):
+            return True
+        if not a_wild and not r_wild and a_toks == r_toks:
+            return True
+    return False
+
+
+def redact(s, n=90):
+    s = SECRET_RE.sub("<redacted>", s.replace("\n", " "))
+    return s if len(s) <= n else s[: n - 1] + "…"
+
+
+# --- helpers ------------------------------------------------------------------
+
+def git(repo, *args, timeout=5):
+    try:
+        r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True,
+                           timeout=timeout, env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def load_json(path):
+    try:
+        with open(path) as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        return {"__unreadable__": True}
+
+
+def perms(doc, key):
+    p = (doc or {}).get("permissions") or {}
+    v = p.get(key) or []
+    return [x for x in v if isinstance(x, str)]
+
+
+def context_of(repo):
+    """'exxo' or 'personal' — which account's global fragments apply."""
+    cfg = os.environ.get("CLAUDE_CONFIG_DIR", "")
+    base = os.path.basename(cfg.rstrip("/"))
+    if base.startswith(".claude-exxo"):
+        return "exxo"
+    if base.startswith(".claude-personal"):
+        return "personal"
+    if "/dev/exxo/" in repo + "/" or os.path.isdir(os.path.join(repo, SKILLS_SUBMODULE)):
+        return "exxo"
+    return "personal"
+
+
+def user_config_dir(ctx):
+    cfg = os.environ.get("CLAUDE_CONFIG_DIR")
+    return cfg or os.path.expanduser(f"~/.claude-{ctx}")
+
+
+_GLOBAL = {}
+
+
+def global_settings(ctx):
+    if ctx not in _GLOBAL:
+        shared = load_json(os.path.join(FRAGMENTS, "settings.shared.json")) or {}
+        frag = load_json(os.path.join(FRAGMENTS, f"settings.{ctx}.json")) or {}
+        _GLOBAL[ctx] = {"allow": perms(shared, "allow") + perms(frag, "allow"),
+                        "floor": perms(shared, "deny")}
+    return _GLOBAL[ctx]
+
+
+_HEADINGS = None
+
+
+def global_headings():
+    global _HEADINGS
+    if _HEADINGS is None:
+        _HEADINGS = {}
+        for name in ("CLAUDE.md.shared", "CLAUDE.md.exxo", "CLAUDE.md.personal"):
+            try:
+                with open(os.path.join(FRAGMENTS, name)) as f:
+                    for line in f:
+                        m = re.match(r"^##\s+(.+?)\s*$", line)
+                        if m:
+                            _HEADINGS[norm_heading(m.group(1))] = m.group(1)
+            except OSError:
+                pass
+    return _HEADINGS
+
+
+def norm_heading(s):
+    return re.sub(r"[^a-z0-9]+", " ", s.lower()).strip()
+
+
+# First lines of the global blocks repo files are known to paraphrase (survey 2026-10-23).
+RESTATED_PHRASES = [
+    (r"\*\*Any command that needs credentials MUST run through `agent/run", "Exxo credentials go through agent/run"),
+    (r"^#+\s*Secrets management boundary", "Secrets are referenced, never written"),
+    (r"`agent/` is the credential(-loading)? entry point \*\*only\*\*", "Exxo credentials go through agent/run"),
+    (r"^Cache and auth administration is the package's CLI", "Exxo credentials go through agent/run"),
+    (r"secret as a plain value, even temporarily", "Secrets are referenced, never written"),
+    (r"`agent/Justfile` is covered by a single blanket permission", "Blanket-trusted files"),
+]
+CONTRADICTIONS = [
+    (r"exactly ONE commit per turn", "contradicts 'Commit often' (logical commits as you go)"),
+]
+
+
+# --- checks -------------------------------------------------------------------
+
+class Audit:
+    def __init__(self, repo, hook=False):
+        self.repo = repo
+        self.hook = hook
+        self.ctx = context_of(repo)
+        self.findings = []
+        self.committed = load_json(os.path.join(repo, ".claude", "settings.json"))
+        self.local_files = self._local_files()
+        self.plans = {}
+
+    def add(self, level, check, path, msg):
+        rel = os.path.relpath(path, self.repo) if path and os.path.isabs(path) else (path or ".")
+        self.findings.append({"level": level, "check": check, "file": rel, "message": msg})
+
+    def _local_files(self):
+        out = []
+        cands = [os.path.join(self.repo, ".claude", "settings.local.json")]
+        for sub in ("projects", "apps", "packages"):
+            d = os.path.join(self.repo, sub)
+            if os.path.isdir(d):
+                for e in sorted(os.listdir(d)):
+                    cands.append(os.path.join(d, e, ".claude", "settings.local.json"))
+        for c in cands:
+            if os.path.isfile(c):
+                out.append(c)
+        return out
+
+    def run(self):
+        self.check_committed()
+        for f in self.local_files:
+            self.check_local(f)
+        self.check_deny_floor()
+        self.check_claude_md()
+        self.check_skills()
+        self.check_justfile()
+        self.check_submodule()
+        return self.findings
+
+    def check_committed(self):
+        doc = self.committed
+        path = os.path.join(self.repo, ".claude", "settings.json")
+        if doc is None:
+            return
+        if doc.get("__unreadable__"):
+            self.add("error", "committed-dangerous", path, "not valid JSON")
+            return
+        bad = [(r, dangerous_reason(r)) for r in perms(doc, "allow")]
+        bad = [(r, why) for r, why in bad if why]
+        if bad:
+            self.add("error", "committed-dangerous", path,
+                     f"{len(bad)} over-broad grant(s): " + "; ".join(f"{redact(r, 60)} ({why})" for r, why in bad[:5]))
+
+    def strip_plan(self, doc):
+        """Per-entry verdicts for a local file: (kept, removed[(rule, category, why)])."""
+        committed_allow = perms(self.committed, "allow")
+        allows_above = global_settings(self.ctx)["allow"] + committed_allow
+        kept, removed = [], []
+        allow = perms(doc, "allow")
+        # A handful of non-docs WebFetch domains is benign local state; a long
+        # list of them is a research session's residue (survey: ~70 in two repos).
+        bulk_research = sum(map(research_domain, allow)) > RESEARCH_DOMAIN_BULK
+        for r in allow:
+            why = dangerous_reason(r)
+            if why:
+                removed.append((r, "dangerous", why)); continue
+            why = junk_reason(r) or ("one-off research domain" if bulk_research and research_domain(r) else None)
+            if why:
+                removed.append((r, "dead" if why.startswith("dead") else "junk", why)); continue
+            if covered(r, allows_above):
+                removed.append((r, "covered", "already granted globally or in committed settings")); continue
+            if r in kept:
+                removed.append((r, "covered", "duplicate entry")); continue
+            kept.append(r)
+        return kept, removed
+
+    def check_local(self, path):
+        doc = load_json(path)
+        if not doc:
+            return
+        if doc.get("__unreadable__"):
+            self.add("error", "local-dangerous", path, "not valid JSON")
+            return
+        allow = perms(doc, "allow")
+        kept, removed = self.strip_plan(doc)
+        self.plans[os.path.relpath(path, self.repo)] = removed
+        dang = [(r, why) for r, cat, why in removed if cat == "dangerous"]
+        if dang:
+            self.add("error", "local-dangerous", path,
+                     f"{len(dang)} dangerous grant(s): " + "; ".join(f"{redact(r, 50)} ({why})" for r, why in dang[:5])
+                     + (" …" if len(dang) > 5 else "") + " — run claude-config-audit --fix-local")
+        if len(allow) > LOCAL_MAX:
+            self.add("warn", "local-oversize", path, f"{len(allow)} allow entries (> {LOCAL_MAX})")
+        other = [cat for _, cat, _ in removed if cat != "dangerous"]
+        if other:
+            counts = {c: other.count(c) for c in ("covered", "junk", "dead") if other.count(c)}
+            self.add("warn" if len(other) >= LOCAL_STRIP_WARN else "info", "local-strippable", path,
+                     f"{len(other)} redundant/junk entr{'y' if len(other) == 1 else 'ies'} ("
+                     + ", ".join(f"{k} {v}" for k, v in counts.items()) + ") — run --fix-local")
+
+    def check_deny_floor(self):
+        """A repo that carries its own copy of the floor (Exxo repos do, for colleagues'
+        machines without these dotfiles) must carry all of it, in the wildcard form.
+        A deny list of purely repo-specific entries is fine: the global floor applies."""
+        deny = perms(self.committed, "deny")
+        if not any(FLOOR_LIKE_RE.search(d) for d in deny):
+            return
+        floor = global_settings(self.ctx)["floor"]
+        missing = [f for f in floor if f not in deny]
+        if missing:
+            self.add("warn", "deny-floor", os.path.join(self.repo, ".claude", "settings.json"),
+                     f"repo restates the deny floor partially — lacks {len(missing)} of {len(floor)}: "
+                     + ", ".join(missing[:3]) + (" …" if len(missing) > 3 else "")
+                     + " (carry the whole floor, or drop the restated entries)")
+
+    def check_claude_md(self):
+        heads = global_headings()
+        for rel in ("CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md"):
+            path = os.path.join(self.repo, rel)
+            try:
+                with open(path, errors="replace") as f:
+                    lines = f.read().splitlines()
+            except OSError:
+                continue
+            imported = 0
+            for line in lines:
+                m = re.match(r"^@(\S+)", line.strip())
+                if m:
+                    ip = os.path.expanduser(m.group(1))
+                    ip = ip if os.path.isabs(ip) else os.path.join(os.path.dirname(path), ip)
+                    try:
+                        with open(ip, errors="replace") as f:
+                            imported += sum(1 for _ in f)
+                    except OSError:
+                        pass
+            total = len(lines) + imported
+            if total > CLAUDE_MD_MAX:
+                extra = f" ({len(lines)} + {imported} imported)" if imported else ""
+                self.add("warn", "claude-md-size", path,
+                         f"{total} lines{extra} > {CLAUDE_MD_MAX} — move reference material to docs/ or a skill")
+            hits = []
+            for i, line in enumerate(lines, 1):
+                m = re.match(r"^#{1,4}\s+(.+?)\s*$", line)
+                if m and norm_heading(m.group(1)) in heads:
+                    hits.append((i, heads[norm_heading(m.group(1))]))
+                    continue
+                for pat, block in RESTATED_PHRASES:
+                    if re.search(pat, line):
+                        hits.append((i, block))
+                        break
+            if hits:
+                blocks = sorted({b for _, b in hits})
+                self.add("warn", "claude-md-restated", path,
+                         f"restates global block(s) {', '.join(repr(b) for b in blocks[:4])} at line(s) "
+                         + ", ".join(str(i) for i, _ in hits[:6]) + " — replace with a one-line pointer")
+            for i, line in enumerate(lines, 1):
+                for pat, why in CONTRADICTIONS:
+                    if re.search(pat, line, re.I):
+                        self.add("warn", "claude-md-contradiction", path, f"line {i} {why}")
+
+    def check_skills(self):
+        d = os.path.join(self.repo, ".claude", "skills")
+        if not os.path.isdir(d):
+            return
+        user_skills = os.path.join(user_config_dir(self.ctx), "skills")
+        try:
+            user_names = set(os.listdir(user_skills))
+        except OSError:
+            user_names = set()
+        mantine_plugin = self.ctx == "exxo" and self._plugin_enabled("exxo-mantine@")
+        by_target, notes = {}, []
+        for name in sorted(os.listdir(d)):
+            p = os.path.join(d, name)
+            if os.path.islink(p):
+                if not os.path.exists(p):
+                    notes.append(f"{name}: broken link"); continue
+                tgt = os.path.realpath(p)
+                by_target.setdefault(tgt, []).append(name)
+                if os.path.basename(tgt) != name:
+                    notes.append(f"{name}: aliases upstream '{os.path.basename(tgt)}'")
+            if name in user_names:
+                notes.append(f"{name}: also a user-level skill")
+            elif mantine_plugin and name.startswith("mantine-"):
+                notes.append(f"{name}: also delivered by the exxo-mantine plugin")
+        for tgt, names in by_target.items():
+            if len(names) > 1:
+                notes.append(f"{' + '.join(names)}: same skill linked twice")
+        if notes:
+            self.add("warn", "skill-links", d, "; ".join(notes[:6]) + (" …" if len(notes) > 6 else ""))
+
+    def _plugin_enabled(self, prefix):
+        doc = load_json(os.path.join(user_config_dir(self.ctx), "settings.json")) or {}
+        ep = doc.get("enabledPlugins") or {}
+        if not ep:  # fall back to the repo fragments
+            for name in ("settings.shared.json", f"settings.{self.ctx}.json"):
+                ep.update((load_json(os.path.join(FRAGMENTS, name)) or {}).get("enabledPlugins") or {})
+        return any(k.startswith(prefix) and v for k, v in ep.items())
+
+    def blanket_trusted(self):
+        docs = [self.committed] + [load_json(f) for f in self.local_files]
+        return any(BLANKET_RE.match(r.strip()) for doc in docs for r in perms(doc, "allow"))
+
+    def check_justfile(self):
+        path = os.path.join(self.repo, "agent", "Justfile")
+        if not os.path.isfile(path) or not self.blanket_trusted():
+            return
+        bad = [f"{n} ({why})" for n, why in mutating_recipes(path)]
+        if bad:
+            self.add("error", "justfile-blanket", path,
+                     "blanket-trusted but recipe(s) look mutating: " + ", ".join(bad[:6])
+                     + (" …" if len(bad) > 6 else "") + " — move them to a non-trusted Justfile.ops")
+
+    def check_submodule(self):
+        try:
+            with open(os.path.join(self.repo, ".gitmodules")) as f:
+                gm = f.read()
+        except OSError:
+            return
+        paths = re.findall(r"^\s*path\s*=\s*(\S+)", gm, re.M)
+        if SKILLS_SUBMODULE not in paths:
+            return
+        line = git(self.repo, "ls-tree", "HEAD", SKILLS_SUBMODULE)
+        if not line or " commit " not in line:
+            return
+        pinned = line.split()[2]
+        best = None
+        for cand in [os.path.join(self.repo, SKILLS_SUBMODULE)] + [os.path.expanduser(c) for c in SKILLS_CLONES]:
+            if not os.path.exists(os.path.join(cand, ".git")):
+                continue
+            n = git(cand, "rev-list", "--count", f"{pinned}..origin/main")
+            if n is not None and n.isdigit():
+                best = max(best or 0, int(n))
+        if best:
+            level = "warn" if best > SUBMODULE_WARN_BEHIND else "info"
+            self.add(level, "skills-submodule", SKILLS_SUBMODULE,
+                     f"pin is {best} commit(s) behind origin/main (local ref, not fetched) — just skills-update")
+
+
+RECIPE_HEAD_RE = re.compile(r"^@?(_?[A-Za-z0-9][A-Za-z0-9_-]*)\b[^\n]*:(?!=)")
+MUTATING_NAME_RE = re.compile(r"deploy|revoke|destroy|reset|restore|env-set|-prod\b")
+READ_VERB_RE = re.compile(r"(^|-)(get|list|show|count|counts|check|status|ls|view)(-|$)")
+ENV_WRITE_RE = re.compile(r"(>>?|\bpath\s*=|\bopen\()\s*[\"']?(\.\./)?\.env\b")
+
+
+def mutating_recipes(path):
+    try:
+        with open(path, errors="replace") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return []
+    recipes, cur = [], None
+    for line in lines:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line[0] in " \t":
+            if cur:
+                cur[1].append(line)
+            continue
+        if re.match(r"^(set|alias|import|mod|export)\b|^[A-Za-z_][\w-]*\s*:=|^\[", line):
+            cur = None
+            continue
+        m = RECIPE_HEAD_RE.match(line)
+        cur = (m.group(1), []) if m else None
+        if cur:
+            recipes.append(cur)
+    out = []
+    for name, body in recipes:
+        if MUTATING_NAME_RE.search(name) and not READ_VERB_RE.search(name):
+            out.append((name, "name"))
+        elif any(ENV_WRITE_RE.search(b) for b in body):
+            out.append((name, "writes .env"))
+    return out
+
+
+# --- fix-local ----------------------------------------------------------------
+
+def fix_local(audit):
+    reports = []
+    for path in audit.local_files:
+        doc = load_json(path)
+        if not doc or doc.get("__unreadable__"):
+            continue
+        kept, removed = audit.strip_plan(doc)
+        if not removed:
+            continue
+        new = dict(doc)
+        p = dict(new.get("permissions") or {})
+        if kept:
+            p["allow"] = kept
+        else:
+            p.pop("allow", None)
+        if p:
+            new["permissions"] = p
+        else:
+            new.pop("permissions", None)
+        bak = path + ".bak"
+        if os.path.exists(bak):
+            bak = path + ".bak-" + time.strftime("%Y%m%d-%H%M%S")
+        with open(path) as src, open(bak, "w") as dst:
+            dst.write(src.read())
+        tmp = path + ".claude-config-audit-tmp"
+        with open(tmp, "w") as f:
+            json.dump(new, f, indent=2)
+            f.write("\n")
+        with open(tmp) as f:
+            json.load(f)  # validate before swapping in
+        os.replace(tmp, path)
+        cats = {}
+        for _, c, _ in removed:
+            cats[c] = cats.get(c, 0) + 1
+        reports.append({"file": os.path.relpath(path, audit.repo), "backup": os.path.basename(bak),
+                        "removed": len(removed), "kept": len(kept), "by_category": cats})
+    return reports
+
+
+# --- discovery / output -------------------------------------------------------
+
+def find_repos(roots, max_depth=4):
+    seen, out = set(), []
+    for root in roots:
+        root = os.path.expanduser(root)
+        stack = [(root, 0)]
+        while stack:
+            d, depth = stack.pop()
+            if any(s in d for s in SKIP_PATH_PARTS):
+                continue
+            real = os.path.realpath(d)
+            if real in seen:
+                continue
+            seen.add(real)
+            if os.path.isdir(os.path.join(d, ".git")):
+                out.append(d)
+                continue
+            if os.path.exists(os.path.join(d, ".git")) or depth >= max_depth:
+                continue  # linked worktree (.git file) or too deep
+            try:
+                subs = sorted(os.listdir(d), reverse=True)
+            except OSError:
+                continue
+            for s in subs:
+                p = os.path.join(d, s)
+                if s.startswith(".") or s in PRUNE_DIRS or os.path.islink(p) or not os.path.isdir(p):
+                    continue
+                stack.append((p, depth + 1))
+    return sorted(out)
+
+
+def idle_days(repo):
+    ts = git(repo, "log", "-1", "--format=%ct")
+    if not ts or not ts.isdigit():
+        return None
+    return (time.time() - int(ts)) / 86400
+
+
+def tilde(p):
+    h = os.path.expanduser("~")
+    return "~" + p[len(h):] if p == h or p.startswith(h + "/") else p
+
+
+LEVEL_ORDER = {"error": 0, "warn": 1, "info": 2}
+
+
+def render_text(results, quiet, estate):
+    out = []
+    for r in results:
+        fs = [f for f in r["findings"] if not quiet or f["level"] != "info"]
+        if not fs and (quiet or not estate):
+            continue
+        if estate:
+            out.append(f"== {tilde(r['repo'])}" + ("" if fs else ": clean"))
+        for f in sorted(fs, key=lambda f: LEVEL_ORDER[f["level"]]):
+            out.append(f"{'  ' if estate else ''}{f['level']:5} {f['check']} {f['file']}: {f['message']}")
+        for f, rm in r.get("strip_plan", {}).items():
+            for x in rm:
+                out.append(f"{'  ' if estate else ''}  would remove {f}: {x['rule']}  [{x['category']}: {x['why']}]")
+        for fx in r.get("fixed", []):
+            out.append(f"{'  ' if estate else ''}fixed {fx['file']}: removed {fx['removed']} "
+                       f"({', '.join(f'{k} {v}' for k, v in fx['by_category'].items())}), kept {fx['kept']}, "
+                       f"backup {fx['backup']}")
+    return out
+
+
+def hook_payload(result):
+    fs = [f for f in result["findings"] if f["level"] in ("error", "warn")]
+    if not fs:
+        return None
+    fs.sort(key=lambda f: LEVEL_ORDER[f["level"]])
+    ne = sum(f["level"] == "error" for f in fs)
+    nw = len(fs) - ne
+    name = os.path.basename(result["repo"])
+    summary = (f"Claude config drift in {name}: {ne} error(s), {nw} warning(s) — "
+               f"{fs[0]['check']}: {redact(fs[0]['message'], 100)}. "
+               f"Run `claude-config-audit` here; conventions: claude-repo-config skill.")
+    ctx_lines = ["claude-config-audit found Claude Code config drift in this repo. The conventions and the "
+                 "fix procedure are in the claude-repo-config skill; mention this to the operator, and fix it "
+                 "only if they ask or the task touches repo config."]
+    ctx_lines += [f"- {f['level']} {f['check']} {f['file']}: {f['message']}" for f in fs]
+    return {"systemMessage": summary,
+            "hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "\n".join(ctx_lines)}}
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    g = ap.add_mutually_exclusive_group()
+    g.add_argument("--repo", help="repo to audit (default: cwd)")
+    g.add_argument("--estate", action="store_true", help="audit every primary checkout under the roots")
+    ap.add_argument("--root", action="append", help="estate root (repeatable; replaces the default ~/dev)")
+    ap.add_argument("--all", action="store_true", help="estate: include repos idle > 30 days")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--hook", action="store_true")
+    ap.add_argument("--fix-local", action="store_true")
+    ap.add_argument("--explain", action="store_true",
+                    help="list each local entry --fix-local would remove, and why (a dry run)")
+    a = ap.parse_args(argv)
+
+    skipped = []
+    if a.estate:
+        repos = []
+        for r in find_repos(a.root or DEFAULT_ROOTS):
+            idle = None if a.all else idle_days(r)
+            if idle is not None and idle > IDLE_DAYS:
+                skipped.append({"repo": r, "reason": f"idle {int(idle)} days"})
+            else:
+                repos.append(r)
+    else:
+        start = a.repo or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+        top = git(start, "rev-parse", "--show-toplevel") if os.path.isdir(start) else None
+        if not top:
+            if not (a.quiet or a.hook or a.json):
+                print(f"not a git repo: {start} — nothing to audit")
+            elif a.json:
+                print(json.dumps({"repos": [], "skipped": [{"repo": start, "reason": "not a git repo"}]}))
+            return 0
+        if any(s in top for s in SKIP_PATH_PARTS):
+            return 0
+        repos = [top]
+
+    results = []
+    for r in repos:
+        au = Audit(r, hook=a.hook)
+        fixed = fix_local(au) if a.fix_local else []
+        if fixed:
+            au = Audit(r)
+        results.append({"repo": r, "context": au.ctx, "findings": au.run(), "fixed": fixed})
+        if a.explain:
+            results[-1]["strip_plan"] = {f: [{"rule": redact(x, 120), "category": c, "why": w} for x, c, w in rm]
+                                         for f, rm in au.plans.items()}
+
+    errors = sum(f["level"] == "error" for r in results for f in r["findings"])
+    warns = sum(f["level"] == "warn" for r in results for f in r["findings"])
+    if a.hook:
+        payload = hook_payload(results[0]) if results else None
+        if payload:
+            print(json.dumps(payload))
+        return 0
+    if a.json:
+        print(json.dumps({"repos": results, "skipped": skipped,
+                          "summary": {"repos": len(results), "errors": errors, "warnings": warns}}, indent=1))
+    else:
+        lines = render_text(results, a.quiet, a.estate)
+        if a.estate and skipped and not a.quiet:
+            lines.append(f"skipped {len(skipped)} idle repo(s) (> {IDLE_DAYS} days; --all includes them): "
+                         + ", ".join(os.path.basename(s["repo"]) for s in skipped))
+        if not a.quiet or errors or warns:
+            if not a.quiet:
+                lines.append(f"{len(results)} repo(s): {errors} error(s), {warns} warning(s)")
+        if lines:
+            print("\n".join(lines))
+    return 1 if errors else 0
+
+
+if __name__ == "__main__":
+    if "--hook" in sys.argv:
+        try:
+            sys.exit(main())
+        except Exception:
+            sys.exit(0)  # a broken audit must never get in the way of a session
+    sys.exit(main())
