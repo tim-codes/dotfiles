@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# squad-tunnel — host the squad dashboard (127.0.0.1:7780) through a persistent
+# Microsoft dev tunnel so Tim can open it from his phone.
+#
+#   squad-tunnel host     ensure the tunnel, publish its URL, then run
+#                         `devtunnel host` in the foreground (the launchd mode)
+#   squad-tunnel ensure   create/reconcile the tunnel and cache its URL
+#   squad-tunnel url      print the cached URL
+#
+# Conventions copied from the exxo-common dev-tunnels skill: id
+# exxo-<account>-<repo>, --expiration 30d, one labelled tunnel, http port with
+# per-port `tenant` access (signed-in Exxo Entra users; never anonymous).
+# Port URLs only exist while hosted, so the URL is cached under
+# ~/.config/squad/tunnel.json and republished as the `dashboard` gauge.
+#
+# No secrets: devtunnel keeps its own login in the system keychain. When that
+# login has expired, `host` logs a clear line and exits 78 (EX_CONFIG) so the
+# launchd ThrottleInterval, not a hot loop, paces the retries. Fix with
+# `devtunnel user login -d` (or /reauth), then launchd recovers by itself.
+#
+# SQUAD_TUNNEL_DRY_RUN=1 prints the mutating commands instead of running them.
+set -euo pipefail
+
+ID=${SQUAD_TUNNEL_ID:-exxo-tfo-squad}
+PORT=${SQUAD_TUNNEL_PORT:-7780}
+CACHE=${SQUAD_TUNNEL_CACHE:-$HOME/.config/squad/tunnel.json}
+DRY=${SQUAD_TUNNEL_DRY_RUN:-0}
+
+log() { printf '%s squad-tunnel: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >&2; }
+die() { log "$1"; exit "${2:-1}"; }
+
+run() {
+  if [[ $DRY == 1 ]]; then
+    printf '(dry run) %s\n' "$*"
+  else
+    "$@" >/dev/null
+  fi
+}
+
+need() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1" 127; }
+
+logged_in() { devtunnel user show 2>&1 | grep -q '^Logged in as'; }
+
+require_login() {
+  [[ $DRY == 1 ]] && return 0
+  logged_in || die "devtunnel is not logged in (token expired?): run 'devtunnel user login -d' or /reauth; not retrying hot" 78
+}
+
+show_json() { devtunnel show "$ID" --json 2>/dev/null; }
+
+port_url() { # show-json -> https URL of $PORT, or empty while not hosted
+  jq -r --argjson p "$PORT" '(.tunnel // .) | (.ports // [])[]
+    | select(.portNumber == $p and .portUri) | .portUri | sub("/+$"; "")' <<<"$1" 2>/dev/null | head -n1
+}
+
+has_port() { # show-json
+  jq -e --argjson p "$PORT" '(.tunnel // .) | (.ports // []) | any(.portNumber == $p)' <<<"$1" >/dev/null 2>&1
+}
+
+has_tenant_access() {
+  devtunnel access list "$ID" -p "$PORT" --json 2>/dev/null |
+    jq -e '(.accessControlEntries // .) | if type == "array" then . else [] end
+      | any(.type == "Organizations" and (.isDeny | not))' >/dev/null 2>&1
+}
+
+ensure() {
+  need devtunnel
+  need jq
+  require_login
+  local show=""
+  [[ $DRY == 1 ]] || show=$(show_json || true)
+  if [[ -z $show ]]; then
+    log "creating tunnel $ID"
+    run devtunnel create "$ID" --labels exxo --labels squad --labels dashboard \
+      --description "squad dashboard (127.0.0.1:$PORT)" --expiration 30d --json
+    show=""
+    # A new tunnel gets new hostnames; any cached URL is stale.
+    [[ $DRY == 1 ]] || rm -f "$CACHE"
+  else
+    # Hosting does not extend expiry, so re-arm the 30d window on every start.
+    run devtunnel update "$ID" --expiration 30d --json ||
+      log "could not refresh expiration on $ID (continuing)"
+  fi
+  if [[ -z $show ]] || ! has_port "$show"; then
+    run devtunnel port create "$ID" -p "$PORT" --protocol http --json
+  fi
+  if [[ $DRY == 1 ]] || ! has_tenant_access; then
+    run devtunnel access create "$ID" -p "$PORT" --tenant --json
+  fi
+}
+
+# Write the cache and publish the gauge. Publish failure (broker down) is
+# logged, never fatal.
+record_url() { # url
+  local url=$1 now
+  now=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+  mkdir -p "$(dirname "$CACHE")"
+  jq -n --arg id "$ID" --arg u "$url" --arg t "$now" \
+    '{id: $id, tunnel_url: $u, updated_at: $t}' >"$CACHE.tmp" && mv "$CACHE.tmp" "$CACHE"
+  local data
+  data=$(jq -cn --arg u "$url" --arg id "$ID" '{tunnel_url: $u, tunnel_id: $id}')
+  if command -v squad >/dev/null 2>&1; then
+    squad publish --kind gauge dashboard "$data" >/dev/null 2>&1 ||
+      log "squad publish dashboard failed (broker down?); URL is still cached in $CACHE"
+  else
+    log "squad not on PATH; skipped gauge publish"
+  fi
+  log "dashboard URL $url"
+}
+
+# Poll for the port URL (it appears once `devtunnel host` connects).
+watch_url() {
+  local show url
+  for _ in $(seq 1 60); do
+    show=$(show_json || true)
+    url=$([[ -n $show ]] && port_url "$show" || true)
+    if [[ -n $url ]]; then
+      record_url "$url"
+      return 0
+    fi
+    sleep 1
+  done
+  log "no port URL after 60s of hosting; run 'squad-tunnel ensure' once the host is up"
+}
+
+cmd_url() {
+  [[ -s $CACHE ]] || die "no cached URL at $CACHE; run 'squad-tunnel ensure' or start the launchd agent" 1
+  jq -r '.tunnel_url' "$CACHE"
+}
+
+cmd_ensure() {
+  ensure
+  if [[ $DRY == 1 ]]; then
+    printf '(dry run) would resolve the %s URL, write %s and publish gauge dashboard\n' "$PORT" "$CACHE"
+    return 0
+  fi
+  local show url
+  show=$(show_json) || die "tunnel $ID not visible after create"
+  url=$(port_url "$show")
+  if [[ -z $url ]]; then
+    if [[ -s $CACHE ]]; then
+      url=$(jq -r '.tunnel_url' "$CACHE")
+    else
+      die "URL unknown: the tunnel has never been hosted. Start the agent (launchctl kickstart gui/\$(id -u)/dev.tim.squad-tunnel) and re-run." 1
+    fi
+  fi
+  record_url "$url"
+  printf '%s\n' "$url"
+}
+
+cmd_host() {
+  ensure
+  if [[ $DRY == 1 ]]; then
+    printf '(dry run) exec devtunnel host %s\n' "$ID"
+    return 0
+  fi
+  # Republish the cached URL straight away, then refresh from the live tunnel
+  # once the host connects.
+  [[ -s $CACHE ]] && record_url "$(jq -r '.tunnel_url' "$CACHE")" || true
+  watch_url &
+  exec devtunnel host "$ID"
+}
+
+case ${1:-host} in
+  host) cmd_host ;;
+  ensure) cmd_ensure ;;
+  url) cmd_url ;;
+  *) die "usage: squad-tunnel [host|ensure|url]" 64 ;;
+esac

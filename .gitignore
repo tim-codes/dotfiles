@@ -11,6 +11,7 @@ src/bin/*
 !src/bin/ghostty-fit
 !src/bin/worktree-relocate-transcripts
 !src/bin/worktree-copy-local-env
+!src/bin/squad-tunnel
 .claude
 src/.config/alacritty/local.toml
 src/.config/alacritty/theme.toml
