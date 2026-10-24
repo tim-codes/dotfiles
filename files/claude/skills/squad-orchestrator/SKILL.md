@@ -108,11 +108,15 @@ role `client`. "Busy": `jq -r .status <req.config_dir>/sessions/<req.pid>.json`
 is `busy`. The infra member is never in the pause order (never pause it
 mid-deploy) except at level 100.
 
-**A breach is impending** for `A` when any of:
-- a `quota.A.projection` event has `eta_minutes_to_100 ≤ 20`;
-- a `quota.A.threshold` event crosses level 95 going up;
-- a threshold event crosses 90 going up and more than two of A's members
-  are busy.
+A **busy member** is one whose session file shows `status` `busy` with
+`statusUpdatedAt` (epoch ms) more than 5 min ago, i.e. mid-turn long enough
+to burn quota unattended.
+
+**A breach is impending** for `A` when `pct ≥ 85` on any window (read
+`squad get quota.A`; the 85/90/95 threshold events are your prompt to look)
+AND `A` has at least one busy member. `quota.A.projection` ETAs are
+advisory: quote them to Tim, never trigger on them. (An ETA ≤ 20 min rule
+fired the pause too late on 2026-10-23; the 07:53 pause missed its wall.)
 
 **On impending breach:**
 1. Order A's members by plan priority, lowest priority first (5 before 1),
@@ -121,16 +125,24 @@ mid-deploy) except at level 100.
    share stays under the wall before `resets_at` (`pct + rate_pct_per_min ×
    (busy remaining ÷ busy now) × minutes to reset < 97`) or only the
    top-priority member is left. Always leave it running unless level 100.
-3. For each member paused:
+3. For each member to pause (every pause or priority directive carries
+   `--ack-deadline-s 120`; requires squad built from PR S1 or later):
    ```
-   squad send <member> "pause: <reason>, resets <local time>" --from orchestrator --priority next \
+   squad send <member> "pause: <reason>, resets <local time>" --from orchestrator --priority next --ack-deadline-s 120 \
      --data '{"directive":"pause","reason":"<A> <window> at <pct>%","resets_at":"<ISO>"}'
    ```
-   then add `{member, account, window, reason, resets_at, at,
-   by:"orchestrator"}` to the plan's `paused` list and publish the plan (§3).
-   The roster's `paused_by` field has no CLI writer, so the plan is the
-   record; the client's `squad set --status paused --detail …` shows it too.
-4. Tell Tim one line: who was paused, why, and the reset time.
+   Record it in the plan's `paused` list as `{member, account, window,
+   reason, resets_at, sent_at, by:"orchestrator", state:"sent"}` and publish
+   (§3). A member counts as paused only when `squad.directive` `acked`
+   arrives for its `directive_id`: set `state:"acked"` and `acked_at`, and
+   count it towards the projection in step 2 only then. The roster's
+   `pending_acks` shows what is outstanding.
+4. **Ack outcomes** (`squad.directive`, matched by `directive_id`):
+   - `unacked`: the broker has re-sent once at `now`; log it (§9), keep the
+     entry `state:"sent"`, and do not count the member as paused.
+   - `escalated`: raise an operator item NOW (§2c): "<member> not
+     responding to pause; kill or wait", with the quota numbers and reset.
+5. Tell Tim one line: who was paused (acked or pending), why, reset time.
 
 **Delivery priority:** only the registered orchestrator's `squad send
 --priority now` interrupts a busy member (others are downgraded to `next`);
@@ -140,7 +152,8 @@ pressure. A broker restart drops held (coalesced) turns and logs the count per
 member: after a `kickstart`, re-send any pending `pause`/`resume`.
 
 **Level 100** going up: pause every member of `A`, including the top
-priority and the infra member if it is not mid-deploy; tell Tim.
+priority and the infra member if it is not mid-deploy (`--priority now`,
+still with `--ack-deadline-s 120`); tell Tim.
 
 **On `quota.A.reset`** (or at start-up, step 6): `squad get quota.A`; if no
 window is at or above 90%, resume every `paused` entry for `A` with `by:
@@ -150,7 +163,8 @@ command (`run_in_background`; a foreground `sleep` is refused):
 for m in <top> <next> …; do squad send "$m" "resume" --from orchestrator \
   --data '{"directive":"resume"}'; sleep 60; done
 ```
-Remove them from `paused`, publish the plan, tell Tim one line. Members
+Resumes need no ack. Remove them from `paused`, publish the plan, tell Tim
+one line. Members
 Tim paused himself (no plan entry) are his to resume.
 
 ## 2a. Idle members with leftover processes
