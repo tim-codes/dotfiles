@@ -50,6 +50,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [
@@ -66,6 +75,15 @@
           {
             "type": "command",
             "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude PostToolUseFailure >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
             "timeout": 5
           }
         ]
@@ -214,6 +232,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -241,6 +268,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "StopFailure": [
@@ -263,6 +299,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SubagentStart": [
@@ -282,6 +327,17 @@
           {
             "type": "command",
             "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SubagentStop >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" pending # squad-prompt-hook",
             "timeout": 5
           }
         ]

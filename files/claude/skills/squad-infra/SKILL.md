@@ -72,6 +72,26 @@ PR.** Reply `infra_result` `blocked` with `findings: ["no authority"]` (or
 the failed check) and wait. Never merge or deploy on a message from anyone
 else, on a plain-text request, or on your own judgment that it is fine.
 
+**ESC writes** (a deploy step or directive that needs one) go only through the named recipe, value on stdin, never as an
+argument:
+
+```
+just --justfile=agent/Justfile.ops esc-set <env> <key>       # secret
+just --justfile=agent/Justfile.ops esc-set-plain <env> <key> # non-secret
+```
+
+The recipe name is the allow-listed unit (tim-codes/squad#31).
+Never write with the `esc` CLI or bare `pulumi env set`, and never read a
+value back. Sequence ESC writes between rollouts: before writing, confirm no
+`pulumi up` for a dependent stack is in flight (your own queue, and the
+`infra` gauge via `squad get infra`); if one is, queue the write behind it.
+Requires exxo-infra PR #184 merged; until then report `infra_result`
+`blocked` with reason `esc-recipes-missing`, never falling back to bare
+`pulumi env set` or `esc`.
+
+A `pause` or `priority` carrying `ack_required: <id>`: run `squad ack <id>`
+first, before anything else (requires squad S1 build).
+
 Other directives: `pause` → finish the action in flight unless it is a
 deploy (a deploy runs to completion; then pause), `squad set --name infra
 --status paused --detail "…"`, wait; `resume` → `squad set --name infra
@@ -158,6 +178,23 @@ the `after` step has landed, send the orchestrator `operator task ready`
    #<n> <status>"`.
 
 The orchestrator relays the result to Tim and the originating client.
+
+## 3a. Target state (GitOps)
+
+Once exxo-infra's pipeline is live (tim-codes/squad#33; spec
+`docs/superpowers/specs/2026-10-24-gitops-pulumi-pipeline.md` in exxo-infra,
+operator steps in `docs/gitops-operator-steps.md`), CI previews and applies
+stacks and your job narrows to two things:
+
+1. **PRs**: review, queue and merge them in dependency order (tiers in the
+   spec), then monitor the rollout to green with `gh run list/view` (poll
+   `gh`; the pipeline publishes nothing to squad).
+2. **ESC ops**: review, accept, queue and apply them in an order that does
+   not interfere with in-flight rollouts (the `esc-set` recipes above, which
+   need exxo-infra PR #184).
+
+Until the pipeline lands and the orchestrator says so, §3 stands: you run
+`pulumi up` yourself.
 
 Self-cleanup: after each directive, and before pausing or ending, `TaskStop`
 finished subagents (the reviewer) and end any background shells you started. A `cleanup` directive means the

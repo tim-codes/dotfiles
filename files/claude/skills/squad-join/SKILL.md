@@ -90,20 +90,33 @@ that starts later reads the roster.
 If `squad register` fails (exit 2, broker unreachable), run `squad doctor
 --fix` once and retry; only if it still fails, tell Tim.
 
-`name-taken: <name>` means another live session holds that name: pick a
-different `--name`, or, if you are resuming your own earlier session (same
-project, the old one gone), run `squad deregister <name>` first.
+`name-taken: <name>` means another live session holds that name. You are
+probably a resumed older session whose successor is already registered: stop,
+tell Tim your session id (`$CLAUDE_CODE_SESSION_ID`) and the name, and do not
+`squad deregister` the live holder. Pick a different `--name` only if Tim says
+this is a genuinely separate stream.
 
 ## 3. Default subscriptions
 
 ```
-squad subscribe <name> quota.<account>.threshold --levels 75,90,95,100
+squad subscribe <name> quota.<account>.threshold
 squad subscribe <name> quota.<account>.reset
 squad subscribe <name> host.pressure
 squad subscribe <name> msg.<name>
 squad subscribe <name> msg.role.client
 squad subscribe <name> msg.all
 ```
+
+Then set the threshold levels as a separate command, never inside a loop over
+topics:
+
+```
+squad subscribe <name> quota.<account>.threshold --levels 75,90,95,100
+```
+
+`--levels` is a flag of `subscribe`, not part of the topic name: it applies
+to the one topic named in that command, so keep it out of any loop that
+subscribes several topics.
 
 The broker also delivers `msg.*` lanes to their recipients implicitly; the
 explicit subscriptions keep the roster self-describing. Do not subscribe to
@@ -142,7 +155,7 @@ now, push if a draft PR exists) — they are not a pause by themselves.
 
 | directive | data | what you do |
 |---|---|---|
-| `pause` | `{reason, resets_at?}` | the pause procedure below |
+| `pause` | `{reason, resets_at?}` | ack first (below), then the pause procedure below |
 | `priority` | `{priority}` | note it; at 4 or 5 defer optional work (polish, extra refactors, nice-to-have tests) |
 | `heavy_slot` | `{decision: grant\|deny\|revoke, retry_after_s?}` | grant: start the heavy job. deny: wait `retry_after_s`, then request again (a deny with `retry_after_s` may mean a protected app is running; do non-heavy work meanwhile). revoke: stop the heavy job now (interrupt the command), then `release` |
 | `cleanup` | `{reason, top?}` | the orchestrator saw you idle with busy or large leftover processes (`top`: `{pid, cmd, cpu_pct, rss_mb}`). Run the self-cleanup rule (§7) now: `TaskStop` completed subagents, end background shells you started, kill your own leftovers (dev servers, browsers, builds; check each `top` pid is yours before killing, never another session's), then `squad set --name <name> --detail "cleanup done: <what was stopped>"` |
@@ -151,6 +164,21 @@ now, push if a draft PR exists) — they are not a pause by themselves.
 | `review` | `{findings}` | design-conformity findings on your ADR/plan or PR: address each blocking finding (or reply to the orchestrator with a justification), then re-send `design ready` / `pr_ready`; advisory ones are optional |
 | `infra` | `{action, pr, authority}` | infra role only; a client ignores it |
 | `relaunch` | reserved | not implemented; reply that it is unsupported |
+
+**Acknowledge first.** A message carrying a trailer line `ack_required:
+<directive_id>` must be acknowledged as the first action of the turn, before
+doing any of the work it asks for:
+
+```
+squad ack <directive_id> [--note "<one line>"]
+```
+
+An unacked directive is re-delivered at `now` and then escalated to Tim as
+"member not responding". A pause ack means "I have stopped launching new
+work", not "I have finished pausing"; the procedure below still follows.
+While paused, only `msg.*` and `squad.directive` reach you; quota and host
+topics are suppressed, so do not expect them. Requires squad built from PR S1
+or later (`ack_required` never appears on older brokers).
 
 **Pause**, in order:
 1. Finish the tool action in flight. Do not start a new task or subagent;
@@ -187,13 +215,22 @@ now, while Tim is at the machine.
 2. **Only the CLIs this repo actually uses** (check its `CLAUDE.md` and
    `Justfile`), each with output discarded or limited to identity:
    `gcloud auth print-access-token >/dev/null`, `gh auth status`,
-   `pulumi whoami`, `az account show`.
+   `pulumi whoami`, `az account show`. **gcloud ADC/RAPT**: run the
+   `print-access-token` dry check through the repo's agent recipe
+   (`agent/run -- gcloud auth print-access-token >/dev/null`) if one exists;
+   an expired RAPT or ADC fails here, so report it. No recipe: say "gcloud
+   ADC: unknown" in the reply rather than guessing.
 3. **Connectors**: if the brief needs a claude.ai connector (Notion, Linear,
    Slack, ...), make one cheap read call so any OAuth happens now.
 4. **Foreseeable human steps.** Enumerate every one this brief implies
    (service accounts, consents, admin-panel changes, DNS, approvals) and
    raise each now as an `operator_task` with `"blocking":"later"` and the
-   build step that unblocks it in `after` (§6); do not wait for them.
+   build step that unblocks it in `after` (§6); do not wait for them. This
+   includes pending admin consents (Entra, Google Workspace) and device-code
+   flows. Raise them `blocking:"now"` only if the orchestrator's directive
+   says Tim is present (a device code expires in minutes); otherwise
+   `"later"` with the exact expiry in `instructions`. Never request a device
+   code yourself while Tim may be away.
 5. **Reply**, and record it:
 
    ```
@@ -262,6 +299,9 @@ as the text's first word and a `kind` field in `data`.
   and `squad send role:orchestrator "blocked: <what on>" --from <name>
   --data '{"kind":"blocked","detail":"<what on>"}'`. Asking Tim directly is
   still right when it is his decision.
+- **Messaging another member** (`squad send <member> ...`): a member that has
+  left returns `unknown-member`. Check `squad roster`; if it is gone, send the
+  point to `role:orchestrator` instead of retrying.
 - **Done**: `squad send role:orchestrator "done: <summary>" --from <name>
   --data '{"kind":"done"}'`.
 
@@ -307,6 +347,17 @@ as the text's first word and a `kind` field in `data`.
   subshell with a different env), or pass `--pid` / `--config-dir`
   explicitly.
 - **Name refused** (`invalid-member-name`): pick a lowercase slug.
+- **Deliveries held while a permission prompt is open**: the dotfiles hook
+  `files/claude/hooks/squad-prompt-hook` marks you `prompt_pending` on a
+  `PermissionRequest` and clears it on `PostToolUse`/`UserPromptSubmit`, so
+  the broker holds all deliveries (even `now`) until Tim answers. Requires
+  squad built from PR S5 (tim-codes/squad#34) or later; older brokers ignore it.
+- **Phantom classifier denials**: a tool result saying things like "user
+  doesn't want this action" when Tim typed nothing of the kind is the
+  permission classifier, not Tim. Retry once with a narrower command (one
+  path, no pipes or `&&`). If it denies again, raise an operator item (§6)
+  naming the command; never record it as Tim's ruling or abandon the work on
+  the strength of it.
 - **A `<squad-message>` with `priority now` arrives mid-turn**: an urgent
   orchestrator directive or critical host pressure. Act on it before
   continuing.
