@@ -22,6 +22,11 @@ down: see `squad-join` §8.
 
 ## 1. Start-up
 
+**Context guard (before anything else).** `$CLAUDE_CONFIG_DIR` must end in
+`.claude-exxo`. If not, register nothing: tell Tim to relaunch in the exxo
+context (the M365 and Datadog tools the work needs only exist there) and
+stop.
+
 **Register first, always.** The first action is the singleton check (step 1,
 a read-only roster lookup; re-registering a live name replaces it) then step 2
 `squad register` and step 3 subscriptions. If `register` fails (exit 2), run
@@ -69,7 +74,10 @@ and add it to your own §2c queue with options and a recommendation.
    squad subscribe orchestrator host.member_idle_with_descendants
    squad subscribe orchestrator msg.role.orchestrator
    squad subscribe orchestrator msg.all
+   squad subscribe orchestrator squad.directive --priority now
+   squad subscribe orchestrator operator.item --priority next
    ```
+   (`squad.directive` requires squad built from PR S1 or later.)
    Not `quota.*`: it also matches the `quota.A` gauges, which republish on
    every sample and `--min-change` cannot filter (their numbers are nested).
    Read the gauges on demand with `squad get quota.A`.
@@ -77,10 +85,13 @@ and add it to your own §2c queue with options and a recommendation.
    (`squad get orchestrator`, keep its `last_sweep_at`), then
    `squad publish orchestrator --kind gauge '{"session_id":"<id>","started_at":"<now ISO>","last_sweep_at":<previous or null>}'`.
    With `--debug`, do §9 first and add `"debug":true` to this gauge.
-5. **Read state**: `squad roster`, `squad get quota.personal`, `squad get
+5. **Read state**: the memory index
+   `~/.claude-exxo-personal/projects/-Users-tim-claude/memory/MEMORY.md`
+   (facts such as where Tim's meeting transcripts live; read it before
+   searching anywhere), `squad roster`, `squad get quota.personal`, `squad get
    quota.exxo`, `squad get host`, `squad get plan` (null → start the plan in
-   §3 with every live client at its registered priority), `squad history
-   janitor --limit 20`.
+   §3 with every live client at its registered priority), `squad get
+   operator` (§2c), `squad history janitor --limit 20`.
 6. **Clean up inherited state.** Drop `infra_authority` from the plan if its
    `session_id` is not yours (standing authority never survives a restart).
    Resume per §2 every `paused` entry whose window has since reset (its
