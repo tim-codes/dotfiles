@@ -78,6 +78,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -220,6 +229,15 @@
           {
             "type": "command",
             "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude Stop >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
             "timeout": 5
           }
         ]
