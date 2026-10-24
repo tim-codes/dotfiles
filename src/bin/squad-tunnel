@@ -11,7 +11,8 @@
 # exxo-<account>-<repo>, --expiration 30d, one labelled tunnel, http port with
 # per-port `tenant` access (signed-in Exxo Entra users; never anonymous).
 # Port URLs only exist while hosted, so the URL is cached under
-# ~/.config/squad/tunnel.json and republished as the `dashboard` gauge.
+# ~/.config/squad/tunnel.json (stowed from src/.config/squad/, gitignored:
+# per-machine state) and republished as the `dashboard` gauge.
 #
 # No secrets: devtunnel keeps its own login in the system keychain. When that
 # login has expired, `host` logs a clear line and exits 78 (EX_CONFIG) so the

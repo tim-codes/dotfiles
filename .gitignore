@@ -28,3 +28,4 @@ src/.config/tmux/theme-scratch.conf
 files/claude/skills/synced/
 __pycache__/
 *.pyc
+src/.config/squad/tunnel.json
