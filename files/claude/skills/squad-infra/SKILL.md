@@ -85,6 +85,12 @@ Never write with the `esc` CLI or bare `pulumi env set`, and never read a
 value back. Sequence ESC writes between rollouts: before writing, confirm no
 `pulumi up` for a dependent stack is in flight (your own queue, and the
 `infra` gauge via `squad get infra`); if one is, queue the write behind it.
+Requires exxo-infra PR #184 merged; until then report `infra_result`
+`blocked` with reason `esc-recipes-missing`, never falling back to bare
+`pulumi env set` or `esc`.
+
+A `pause` or `priority` carrying `ack_required: <id>`: run `squad ack <id>`
+first, before anything else (requires squad S1 build).
 
 Other directives: `pause` → finish the action in flight unless it is a
 deploy (a deploy runs to completion; then pause), `squad set --name infra
@@ -184,7 +190,8 @@ stacks and your job narrows to two things:
    spec), then monitor the rollout to green with `gh run list/view` (poll
    `gh`; the pipeline publishes nothing to squad).
 2. **ESC ops**: review, accept, queue and apply them in an order that does
-   not interfere with in-flight rollouts (the `esc-set` recipes above).
+   not interfere with in-flight rollouts (the `esc-set` recipes above, which
+   need exxo-infra PR #184).
 
 Until the pipeline lands and the orchestrator says so, §3 stands: you run
 `pulumi up` yourself.

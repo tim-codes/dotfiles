@@ -3,7 +3,8 @@
 #
 # Usage (settings.shared.json hooks): squad-prompt-hook pending|cleared
 #   pending  <- PermissionRequest (a permission dialog is about to be shown)
-#   cleared  <- PostToolUse, UserPromptSubmit (the prompt was answered)
+#   cleared  <- PostToolUse, PostToolUseFailure, PermissionDenied, Stop,
+#               UserPromptSubmit (the prompt was answered, denied or abandoned)
 #
 # Reads the hook JSON on stdin for session_id, then runs
 #   squad prompt <state> --session <session_id>

@@ -299,6 +299,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SubagentStart": [
