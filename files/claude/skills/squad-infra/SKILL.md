@@ -80,10 +80,10 @@ else, on a plain-text request, or on your own judgment that it is fine.
 argument:
 
 ```
-just --justfile=agent/Justfile.ops esc-set-1p <env> <key> op://vault/item/field  # preferred
-just --justfile=agent/Justfile.ops esc-set-gen <env> <key> [bytes]                # preferred
-just --justfile=agent/Justfile.ops esc-set <env> <key>       # secret, stdin
-just --justfile=agent/Justfile.ops esc-set-plain <env> <key> # non-secret, stdin
+just --justfile=agent/ops.Justfile esc-set-1p <env> <key> op://vault/item/field  # preferred
+just --justfile=agent/ops.Justfile esc-set-gen <env> <key> [bytes]                # preferred
+just --justfile=agent/ops.Justfile esc-set <env> <key>       # secret, stdin
+just --justfile=agent/ops.Justfile esc-set-plain <env> <key> # non-secret, stdin
 ```
 
 `esc-set-1p` (value read from a 1Password reference) and `esc-set-gen`
@@ -163,7 +163,7 @@ the `after` step has landed, send the orchestrator `operator task ready`
    and let Tim name the stacks. No stacks at all (docs, CI only): merge and
    report `deployed` with `stacks: []`.
 4. **Merge** (requires exxo-infra PR #184 merged): from this primary
-   checkout run `just --justfile=agent/Justfile.ops pr-merge <n>`, then `git
+   checkout run `just --justfile=agent/ops.Justfile pr-merge <n>`, then `git
    pull --ff-only`. It merges only if the PR's review decision is APPROVED,
    or `SQUAD_MERGE_AUTHORITY` equals today's date (`YYYY-MM-DD`, set by Tim at
    launch); it also needs green checks and pins the head commit. A refusal is

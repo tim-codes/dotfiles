@@ -337,6 +337,7 @@ class Audit:
         self.check_skills()
         self.check_justfile()
         self.check_justfile_splice()
+        self.check_legacy_ops_name()
         self.check_submodule()
         return self.findings
 
@@ -511,7 +512,13 @@ class Audit:
         if bad:
             self.add("error", "justfile-blanket", path,
                      "blanket-trusted but recipe(s) look mutating: " + ", ".join(bad[:6])
-                     + (" …" if len(bad) > 6 else "") + " — move them to a non-trusted Justfile.ops")
+                     + (" …" if len(bad) > 6 else "") + " — move them to a non-trusted ops.Justfile")
+
+    def check_legacy_ops_name(self):
+        path = os.path.join(self.repo, "agent", "Justfile.ops")
+        if os.path.isfile(path):
+            self.add("warn", "ops-justfile-name", path,
+                     "renamed 2026-10-24: rename agent/Justfile.ops to agent/ops.Justfile")
 
     def check_justfile_splice(self):
         path = os.path.join(self.repo, "agent", "Justfile")

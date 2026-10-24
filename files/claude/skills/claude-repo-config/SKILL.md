@@ -1,6 +1,6 @@
 ---
 name: claude-repo-config
-description: The estate conventions for a repo's own Claude Code config — what belongs in the global fragments vs a repo's committed .claude/settings.json vs its gitignored settings.local.json, the global deny floor, the agent/Justfile read-only invariant (mutating recipes go in Justfile.ops), CLAUDE.md limits, and the claude-config-audit command with its --fix-local procedure. Use when a SessionStart "Claude config drift" warning appears, when adding or changing permissions, hooks, skills or CLAUDE.md in any repo, when bringing a new or drifted repo into line, or when a permission prompt tempts you to add a broad grant.
+description: The estate conventions for a repo's own Claude Code config — what belongs in the global fragments vs a repo's committed .claude/settings.json vs its gitignored settings.local.json, the global deny floor, the agent/Justfile read-only invariant (mutating recipes go in ops.Justfile), CLAUDE.md limits, and the claude-config-audit command with its --fix-local procedure. Use when a SessionStart "Claude config drift" warning appears, when adding or changing permissions, hooks, skills or CLAUDE.md in any repo, when bringing a new or drifted repo into line, or when a permission prompt tempts you to add a broad grant.
 ---
 
 # Repo-level Claude config: the estate conventions
@@ -96,12 +96,12 @@ When a recurring task needs a secret, don't ask for the deny to be lifted. Add
 a secret-piping recipe that fetches and consumes the secret in one in-recipe
 pipeline and prints nothing.
 
-## agent/Justfile is read-only by construction; mutations go in Justfile.ops
+## agent/Justfile is read-only by construction; mutations go in ops.Justfile
 
 The blanket grant trusts the file, not today's entries, so every future recipe
 inherits it. Recipes in `agent/Justfile` must be read-only lookups and
 secret-piping reads. Anything that deploys, revokes, destroys, resets,
-restores, writes `.env`, or touches prod state goes in `agent/Justfile.ops`,
+restores, writes `.env`, or touches prod state goes in `agent/ops.Justfile`,
 or in the main `Justfile` as a named recipe. That file is never blanket-trusted,
 so each run is approved per use. A dated one-off (`*-july-urls`) belongs in
 neither: run it ad hoc.
@@ -117,17 +117,21 @@ are not parameters and are fine. The audit's `justfile-param-splice` check
 one of its own parameters while the file is blanket-trusted.
 
 Splitting a recipe out:
-1. Move the recipe into `agent/Justfile.ops`. Add a header comment saying the
+1. Move the recipe into `agent/ops.Justfile`. Add a header comment saying the
    file is not blanket-trusted.
-2. Call it as `just --justfile=agent/Justfile.ops <recipe>` and accept the
+2. Call it as `just --justfile=agent/ops.Justfile <recipe>` and accept the
    prompt each time. Grant nothing for that file. The blanket rule
    `Bash(just --justfile=agent/Justfile:*)` means `just --justfile=agent/Justfile *`
    (`:*` is a trailing wildcard preceded by a space, per the permissions docs),
-   so `just --justfile=agent/Justfile.ops ...` does not match it. As belt and
-   braces, repos also add `ask` rules for `Justfile.ops` in both spellings
-   (`--justfile=agent/Justfile.ops` and `--justfile agent/Justfile.ops`), so a
+   so `just --justfile=agent/ops.Justfile ...` does not match it. As belt and
+   braces, repos also add `ask` rules for `ops.Justfile` in both spellings
+   (`--justfile=agent/ops.Justfile` and `--justfile agent/ops.Justfile`), so a
    future loosening of the blanket cannot silently trust the ops file.
 3. Update the repo CLAUDE.md pointer that names the recipe.
+
+The file was renamed from `Justfile.ops` to `ops.Justfile` on 2026-10-24; any repo still carrying `agent/Justfile.ops` should rename it (the audit warns, check `ops-justfile-name`).
+
+Approved exception (2026-10-24, first instance Exxo-Labs/exxo-infra PR #184): committed settings may carry a named allow grant for a specific `ops.Justfile` recipe that is a single in-recipe fetch-and-consume pipeline. Blanket `ops.Justfile` grants remain forbidden.
 
 ## Worktrees: submodules and closedown
 
@@ -206,7 +210,7 @@ the primary checkout):
 2. **Committed settings:** delete what the global set covers. Replace
    `just:*` with named recipe grants. Normalise spellings. Keep hooks intact.
    Validate with `jq .`.
-3. **agent/Justfile:** move mutating recipes to `Justfile.ops`. Drop the
+3. **agent/Justfile:** move mutating recipes to `ops.Justfile`. Drop the
    blanket grant if the file can't be made read-only.
 4. **Local file:** follow the `--fix-local` procedure above.
 5. **CLAUDE.md:** replace restated globals with pointers, and relocate
