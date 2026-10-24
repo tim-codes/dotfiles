@@ -166,11 +166,12 @@ now, push if a draft PR exists) — they are not a pause by themselves.
 | `relaunch` | reserved | not implemented; reply that it is unsupported |
 
 **Acknowledge first.** A message carrying a trailer line `ack_required:
-<directive_id>` must be acknowledged as the first action of the turn, before
-doing any of the work it asks for:
+<seq> topic=<topic>` must be acknowledged as the first action of the turn,
+before doing any of the work it asks for. Paste the whole trailer value, so
+the broker never has to guess between topics that share a seq:
 
 ```
-squad ack <directive_id> [--note "<one line>"]
+squad ack "<seq> topic=<topic>" [--note "<one line>"]
 ```
 
 An unacked directive is re-delivered at `now` and then escalated to Tim as
