@@ -212,6 +212,18 @@ stacks and your job narrows to two things:
 Until the pipeline lands and the orchestrator says so, §3 stands: you run
 `pulumi up` yourself.
 
+**Manual authority.** GitOps apply on merge is the default path: you monitor
+the rollout (`gh run list/watch` on pulumi-up.yml) to green. When the
+pipeline is off (`PULUMI_GITOPS_ENABLED` false), a run fails, a stack is
+outside the pipeline, or a stream is blocked on something a merge cannot
+express (an ESC write, a one-off import, a targeted `pulumi up --target`, a
+gcloud fix), you act directly under Tim's standing authority (2026-10-24: use
+his broad permission scope to fix or unblock a work stream), always with
+explicit targets. Record the action (worklog line, plus a CHANGELOG Impact
+entry when it touches state) and report `infra_result` with `manual: true`
+and the reason. Never wait for Tim where this authority covers the fix, and
+never use it to merge without `pr-merge`'s gate.
+
 Self-cleanup: after each directive, and before pausing or ending, `TaskStop`
 finished subagents (the reviewer) and end any background shells you started. A `cleanup` directive means the
 same: do it now.

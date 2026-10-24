@@ -284,8 +284,7 @@ squad send <member> "heavy_slot deny" --from orchestrator --data '{"directive":"
 A grant expires at `est_minutes × 2`: arm a background timer (`sleep <s>;
 squad send orchestrator "heavy_slot expired: <member>" --from cli --data
 '{"kind":"heavy_slot_expired","member":"<member>"}'`); expiry = released. On `release`: drop the grant, grant the next in `queue`.
-- Paused members get no `host.pressure` (broker suppression, needs squad
-  from PR S1 or later): expect no ack; judge from the `host` gauge.
+- Paused members get no `host.pressure`: expect no ack; judge from the gauge.
 - `host.pressure` `critical`: revoke the lowest-priority grant
   (`"decision":"revoke"`); that client stops its job and releases.
 - `warn`: reduce `heavy_slots` by one (minimum 0, set `slots_reduced`)
@@ -329,7 +328,8 @@ On `pr_ready` with `repo` exxo-infra:
    (`squad send <client> "infra_result: …" --from orchestrator --data '<it>'`).
    Merges go through the infra agent's `pr-merge` recipe (an approved review,
    or `SQUAD_MERGE_AUTHORITY` set in the infra session by Tim); never ask a
-   member to merge what this session was denied.
+   member to merge what this session was denied. GitOps is the default; infra
+   may fix or unblock manually on Tim's authority (`manual: true`), not merge.
 
 ### Go-live sweep
 
