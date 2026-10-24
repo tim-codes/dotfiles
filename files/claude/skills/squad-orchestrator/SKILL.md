@@ -27,31 +27,25 @@ down: see `squad-join` §8.
 context (the M365 and Datadog tools the work needs only exist there) and
 stop.
 
-**Register first, always.** The first action is the singleton check (step 1,
-a read-only roster lookup; re-registering a live name replaces it) then step 2
-`squad register` and step 3 subscriptions. If `register` fails (exit 2), run
-`squad doctor --fix` once and retry; only then tell Tim. Everything else
-(step 0 prerequisites, the repo drift rule below) runs after registration.
-Safe drift (submodule `+` with a clean interior → `git submodule update
---init <path>`; build-artefact/cache untracked files ignored; stale `main` →
-`git pull --ff-only`) is fixed without asking. Anything else dirty or
-ambiguous: `squad set --name orchestrator --status blocked --detail "<what>"`
-and add it to your own §2c queue with options and a recommendation.
+**Register first, always:** singleton check (step 1), `squad register`
+(step 2), subscriptions (step 3). If `register` fails (exit 2), run `squad
+doctor --fix` once and retry; only then tell Tim. Step 0 and the repo drift
+rule run after registration. Safe drift (submodule `+` with a clean interior
+→ `git submodule update --init <path>`; cache untracked files ignored; stale
+`main` → `git pull --ff-only`) is fixed without asking. Anything else dirty
+or ambiguous: `squad set --name orchestrator --status blocked --detail
+"<what>"` and add it to your §2c queue with options and a recommendation.
 
 0. **System prerequisites (after registration).** Before further broker work:
-   - `squad doctor --fix` (checks config, state/runtime dirs, broker
-     reachability, watchers seen, the launchd jobs
-     `dev.tim.squad-broker|relay|watch-quota|watch-host`, binary-vs-running
-     version and the cc-socks dir; `--fix` bootstraps/kickstarts missing or dead jobs
-     and re-checks). Exit 0 all ok, 1 any fail. If it still exits 1, show Tim
-     the output.
-   - Exxo-side prereqs the member streams depend on. `docker info` failing:
-     run `orb start` (no need to ask) and wait until `docker info` succeeds.
-     Then make sure the shared secret-cache container is up as the exxo-common
-     `run-with-secrets` skill prescribes (it is available: this session runs
-     in an exxo context); start it per that skill if not.
-     Then `~/dev/dotfiles/scripts/claude-reauth --check`; if anything needs
-     auth, tell Tim to run `/reauth` (or the script) before going AFK.
+   - `squad doctor --fix` (config, state dirs, broker, watchers, the launchd
+     jobs `dev.tim.squad-broker|relay|watch-quota|watch-host`, binary-vs-
+     running version, cc-socks dir; `--fix` bootstraps/kickstarts dead jobs
+     and re-checks). Exit 0 all ok, 1 any fail; if still 1, show Tim.
+   - Exxo-side prereqs. `docker info` failing: `orb start` (no need to ask),
+     wait until it succeeds. Then ensure the shared secret-cache container is
+     up as the exxo-common `run-with-secrets` skill prescribes. Then
+     `~/dev/dotfiles/scripts/claude-reauth --check`; if anything needs auth,
+     tell Tim to run `/reauth` before going AFK.
    - Report doctor, Docker and secret-cache state in the §1.7 health summary.
 1. **Singleton check.** `squad roster | jq -r '.[] | select(.live and
    .req.role=="orchestrator") | .req.name'`. Any output: one is already
@@ -96,24 +90,23 @@ and add it to your own §2c queue with options and a recommendation.
    `session_id` is not yours (standing authority never survives a restart).
    Resume per §2 every `paused` entry whose window has since reset (its
    `resets_at` is past, or the quota gauge shows the window below 90%).
-7. **Announce** to Tim, in at most ~12 lines: live members (name, account,
-   status, priority, repo); each account's 5h / week / model windows with
-   reset times; host pressure; heavy slots in use; anything paused and why;
-   unresolved items from the last sweep. Then start the janitor sweep (§6).
+7. **Announce** to Tim in at most ~12 lines: live members (name, account,
+   status, priority, repo); each account's windows with reset times; host
+   pressure; heavy slots; anything paused and why; open sweep items. Then
+   start the janitor sweep (§6).
 
 ## 2. Quota reactivity
 
 Account `A`'s members: `squad roster`, `.req.account == "A"`, `.live`,
-role `client`. "Busy": `jq -r .status <req.config_dir>/sessions/<req.pid>.json`
-is `busy`. The infra member is never in the pause order (never pause it
+role `client`. The infra member is never in the pause order (never pause it
 mid-deploy) except at level 100.
 
-A **busy member** is one whose session file shows `status` `busy` with
-`statusUpdatedAt` (epoch ms) more than 5 min ago, i.e. mid-turn long enough
-to burn quota unattended.
+A **busy member** has `jq .status <req.config_dir>/sessions/<req.pid>.json`
+`busy` with `statusUpdatedAt` (epoch ms) over 5 min old: mid-turn long
+enough to burn quota unattended. Others are idle and cost nothing.
 
 **A breach is impending** for `A` when `pct ≥ 85` on any window (read
-`squad get quota.A`; the 85/90/95 threshold events are your prompt to look)
+`squad get quota.A`; threshold events are your prompt to look)
 AND `A` has at least one busy member. `quota.A.projection` ETAs are
 advisory: quote them to Tim, never trigger on them.
 
@@ -146,9 +139,9 @@ advisory: quote them to Tim, never trigger on them.
 **Delivery priority:** only the registered orchestrator's `squad send
 --priority now` interrupts a busy member (others are downgraded to `next`);
 `host.pressure` critical events are always delivered at `now`. Reserve `now`
-for `pause` at level 100 / ETA < 5 min and `heavy_slot revoke` on critical
-pressure. A broker restart drops held (coalesced) turns and logs the count per
-member: after a `kickstart`, re-send any pending `pause`/`resume`.
+for `pause` at level 100 and `heavy_slot revoke` on critical pressure. A
+broker restart drops held (coalesced) turns: after a `kickstart`, re-send any
+pending `pause`/`resume`.
 
 **Level 100** going up: pause every member of `A`, including the top
 priority and the infra member if it is not mid-deploy (`--priority now`,
@@ -162,8 +155,7 @@ command (`run_in_background`; a foreground `sleep` is refused):
 for m in <top> <next> …; do squad send "$m" "resume" --from orchestrator \
   --data '{"directive":"resume"}'; sleep 60; done
 ```
-Resumes need no ack. Remove them from `paused`, publish the plan, tell Tim
-one line. Members
+Resumes need no ack. Remove them from `paused`, publish the plan, tell Tim. Members
 Tim paused himself (no plan entry) are his to resume.
 
 ## 2a. Idle members with leftover processes
@@ -178,29 +170,26 @@ directive:
 squad send <member> "cleanup: idle <n>m with <d> descendants (<cpu>% cpu, <rss> MB)" --from orchestrator \
   --data '{"directive":"cleanup","reason":"idle with descendants","top":[<the event top list>]}'
 ```
-It stops its finished background shells and agents, kills its own leftovers
-(dev servers, browsers, builds) and confirms with `squad set --detail
-"cleanup done: …"`. Expect that within a few minutes; if the event repeats
-for the same member after that, tell Tim. If the member is `gone` (not
-`live` in `squad roster`), report to Tim instead, with the member, idle time
-and the `top` commands and pids. Never kill another session's processes
-yourself: the owner, or Tim, does.
+It stops its finished background work and kills its own leftovers, then
+confirms with `squad set --detail "cleanup done: …"`. If the event repeats
+for the same member afterwards, tell Tim. If the member is `gone` (not
+`live`), report to Tim instead (member, idle time, `top` commands and pids).
+Never kill another session's processes yourself.
 
 ## 2b. Preflight before Tim goes AFK
 
-Send `preflight` once every expected member (and `infra`, if it is to be
-used) has joined, or whenever Tim asks. It makes each member warm the
-credentials its work needs while Tim can still answer a Touch ID prompt.
+Send `preflight` once every expected member (and `infra`, if used) has
+joined, or whenever Tim asks: each member warms its credentials while Tim
+can still answer a Touch ID prompt.
 
 ```
 squad send all "preflight" --from orchestrator \
   --data '{"directive":"preflight","ttl_hours":12}'
 ```
 
-Omit `ttl_hours` for the 12h default. Before or alongside it, run these
-checks yourself (a subagent per §7) and add each failure to the health
-summary and §2c as `blocking:now` while Tim is present, else `later` with
-the exact expiry:
+Omit `ttl_hours` for the 12h default. Alongside it, have a subagent (§7) run
+these checks; each failure goes in the health summary and §2c as
+`blocking:now` while Tim is present, else `later` with the exact expiry:
 - **gcloud RAPT/ADC**: `agent/run -- gcloud auth print-access-token
   >/dev/null` (where the repo has `agent/run`); failure means reauth.
 - **Admin consents and device-code flows** the briefs depend on (Entra,
@@ -236,34 +225,31 @@ curl -sS 'http://127.0.0.1:7780/api/operator/items?status=open,ready'    # list
 A 422 returns `{error, field}`: fix that field and retry. The server sets
 `presented_at` and `resolved_at` itself; never send them. Subscribing to
 `operator.item` (§1) tells you when Tim or a member changes one.
-- **Raise** on `operator_task`: `status:"open"`, `id` a short slug. When the
-  member reports it unblocked (`"status":"ready"`), PATCH to `ready` the
-  moment the precondition clears, never batched or held for a round-up.
-- **`blocking:"now"`** is anything that blocks a member's next step. `later`
-  is only for work no stream is waiting on. Misfiling a blocker as `later`
-  cost Tim 80 minutes on 2026-10-23.
+- **Raise** on `operator_task`: `status:"open"`, `id` a short slug. PATCH to
+  `ready` the moment the precondition clears, never batched.
+- **`blocking:"now"`** is anything that blocks a member's next step; `later`
+  only for work no stream waits on (a misfiled blocker cost Tim 80 minutes).
 - **Every item carries `commands[]`** he can copy in this view, in the
-  repo's CLI convention (`pulumi env set`, never `esc`), or a `url`. Never
-  "see the other pane". Refresh the text whenever the facts change.
+  repo's CLI convention (`pulumi env set`, never `esc`), or a `url`; never
+  "see the other pane". Refresh the text when the facts change.
 - **Draft links** (`draft_url`, `url`) are checked by the server; a 422 on
   them means fix the draft, not the item. Never present an approval item
   whose draft you have not seen resolve.
-- **Present, nudge, order**: blocking-now first, then stream priority, then
+- **Order and nudge**: blocking-now, then stream priority, then
   `est_minutes`. Show one consolidated list when a blocking-now item
-  appears, when Tim asks and in the §2b summary. While Tim is present give
+  appears, when Tim asks and in the §2b summary. While he is present give
   one chat line about ready items every 30 min, and once when he returns
-  from AFK. Chase him: it is your job, not his.
-- **Resolve** one item at a time, when its outcome is known. Never close or
-  drop items in a batch (a 09:31 batch close lost the true wait times). Tim's
-  Done / Drop / Back to agent buttons PATCH the server directly; on the
-  `operator.item` event `done`, `resume` the owner or `msg` it; on `dropped`
-  or "back to agent" (`with: agent:<m>`), tell the owner. His chat "done
-  <id>" is a PATCH from you with `actor:"orchestrator"`.
-- **Debug mode**: log each item's raised, presented and resolved timestamps
-  and wait minutes to the worklog and `orchestrator-decisions.md`. The
-  morning report gets an "Interruptions" section: count, total wait,
-  per-stream, and the avoidable ones (preemptable in preflight, or raised by
-  a member directly).
+  from AFK. Chasing him is your job, not his.
+- **Resolve** one item at a time, when its outcome is known; never close
+  or drop in a batch (it loses the true wait times). Tim's Done / Drop /
+  Back to agent buttons PATCH the server directly: on `operator.item`
+  `done`, `resume` or `msg` the owner; on `dropped` or `with: agent:<m>`,
+  tell the owner. His chat "done <id>" is your PATCH with
+  `actor:"orchestrator"`.
+- **Debug mode**: log each item's raised, presented and resolved times and
+  wait minutes to the worklog and `orchestrator-decisions.md`; the morning
+  report's "Interruptions" section counts them (total wait, per-stream,
+  avoidable ones).
 
 ## 3. The plan gauge
 
@@ -294,28 +280,28 @@ squad send <member> "heavy_slot deny" --from orchestrator --data '{"directive":"
 ```
 A grant expires at `est_minutes × 2`: arm a background timer (`sleep <s>;
 squad send orchestrator "heavy_slot expired: <member>" --from cli --data
-'{"kind":"heavy_slot_expired","member":"<member>"}'`); on expiry treat it
-as released. On `release`: drop the grant, grant the next in `queue`.
+'{"kind":"heavy_slot_expired","member":"<member>"}'`); expiry = released. On `release`: drop the grant, grant the next in `queue`.
+- Paused members do not receive `host.pressure` (broker suppression,
+  requires squad built from PR S1 or later): expect no ack from them on
+  pressure; judge it from the `host` gauge.
 - `host.pressure` `critical`: revoke the lowest-priority grant
   (`"decision":"revoke"`); that client stops its job and releases.
 - `warn`: reduce `heavy_slots` by one (minimum 0, set `slots_reduced`)
   until `ok` has held for 5 minutes, then restore it.
-- A member above 60% of the host (`host` gauge `members[].cpu_pct`) for 2
-  minutes without a grant is told (plain `squad send`, no directive) to
-  request a slot or stop the heavy job.
+- A member above 60% of the host (`members[].cpu_pct`) for 2 minutes
+  without a grant is told (plain `squad send`) to request a slot or stop.
 
 **Protected apps.** The `host` gauge carries `protected:[{name, running,
-cpu_pct, rss_mb}]` and the broker publishes `host.protected {name, running}`
-on start/stop. While any protected app is running: hold `heavy_slots` at 0
-(deny requests with `retry_after_s: 600`), treat `host.pressure` `warn` as
-`critical` (revoke/stop heavy work), and tell Tim once. On `running: false`
-for the last one, restore the plan's `heavy_slots` and tell waiting members
-to retry.
+cpu_pct, rss_mb}]`; the broker publishes `host.protected {name, running}`.
+While any is running: hold `heavy_slots` at 0 (deny with `retry_after_s:
+600`), treat `host.pressure` `warn` as `critical`, and tell Tim once. When
+the last stops, restore the plan's `heavy_slots` and tell waiting members to
+retry.
 
-**Runaway processes.** On each `host.runaway` event (a process outside any
-member's tree that stayed hot or bloated), warn Tim in chat with pid,
-command, cpu/rss and duration, and suggest terminating it. Never kill it
-yourself. If the same pid repeats, mention it at most once per 30 minutes.
+**Runaway processes.** On `host.runaway` (a process outside any member's
+tree that stayed hot or bloated), warn Tim in chat with pid, command,
+cpu/rss and duration and suggest terminating it; never kill it yourself.
+Repeats of the same pid: at most once per 30 minutes.
 
 ## 5. Infra: review, merge, deploy
 
@@ -324,10 +310,10 @@ On `pr_ready` with `repo` exxo-infra:
    checks are green (`gh pr view <n> -R Exxo-Labs/exxo-infra --json
    state,isDraft,mergeable,statusCheckRollup`). Not green → tell the
    originating client and Tim; stop.
-2. **Authority gate.** exxo-infra is a production-stage Exxo repo: merging
-   needs human review. Ask Tim in chat, naming the PR number, title and
-   summary, and proceed only on his yes **for that PR**. If Tim grants
-   standing authority ("merge infra PRs for the rest of this session"), set
+2. **Authority gate.** exxo-infra is production-stage: merging needs human
+   review. Ask Tim in chat (PR number, title, summary); proceed only on his
+   yes **for that PR**. If he grants standing authority ("merge infra PRs
+   for the rest of this session"), set
    the plan's `infra_authority` to `{"granted_by":"tim","scope":"session",
    "at":"<ISO>","session_id":"<yours>"}` and publish. It ends with this
    session; never carry it over, never infer it.
@@ -344,61 +330,66 @@ On `pr_ready` with `repo` exxo-infra:
    client (`squad send <client> "infra_result: …" --from orchestrator
    --data '<the result data>'`).
 
+### Go-live sweep
+
+After any deploy that enables telemetry (RUM, APM, logs), delegate a sweep
+(§7) that queries the sink: Datadog RUM applications list plus events from
+the last 15 minutes (Datadog MCP or the repo's `dd` recipe). Zero events
+fails the done-report. Config being present is not evidence data flows.
+
 ## 6. Janitor sweep
 
-Runs at start-up, every 4 hours, and when Tim says "sweep now". After each
-sweep, set `last_sweep_at` in the orchestrator gauge and arm the next with
-a background `sleep 14400; squad send orchestrator "sweep due" --from cli
---data '{"kind":"sweep_due"}'`. On any turn, if `last_sweep_at` is over 4h
-old and no sweep is running, sweep. Delegate it to a **janitor subagent**
-(`git-pr-ops`, sonnet) so you see only the summary; its brief carries:
+Runs at start-up, every 4 hours, and on "sweep now". After each sweep set
+`last_sweep_at` in the orchestrator gauge and arm the next with a background
+`sleep 14400; squad send orchestrator "sweep due" --from cli --data
+'{"kind":"sweep_due"}'`. On any turn, if `last_sweep_at` is over 4h old and
+no sweep is running, sweep. Delegate to a **janitor subagent** (`git-pr-ops`,
+sonnet) so you see only the summary; its brief carries:
 - **Scope**: every git repo two levels under `~/dev` (`~/dev/*`,
   `~/dev/exxo/*`, …) and every entry of each one's `git worktree list`.
-- **Clear case** — all of: the branch is merged into the default branch, or
-  its PR is merged or closed (`gh pr list -R <owner/repo> --head <branch>
-  --state all`); no squad member (`squad roster`, `.req.cwd`) and no live
-  Claude session (`~/.claude-*/sessions/*.json`, `.cwd`) is inside the
-  worktree; `git status --porcelain` is empty; the last commit is older than
-  24h; and the submodule check finds no unsaved work.
+- **Clear case**, all of: branch merged into the default branch, or its PR
+  merged or closed (`gh pr list -R <owner/repo> --head <branch> --state
+  all`); no squad member (`.req.cwd`) or live Claude session
+  (`~/.claude-*/sessions/*.json`, `.cwd`) inside the worktree; `git status
+  --porcelain` empty; last commit older than 24h; no unsaved submodule work.
 - **Action on a clear case**: load the `worktree-closedown` skill and follow
-  it — `wt remove <branch>` (its hook relocates transcripts first), or the
-  manual relocate-then-remove. **Submodules**: in a repo with `.gitmodules`
-  (the exxo repos' `.claude/vendor/skills`) `git worktree remove` refuses;
-  that is not a blocker — use the skill's submodule case (`rm -rf <W> &&
-  git -C <P> worktree prune` after its checks). Delete the local branch if
-  merged (`-D` only after confirming a squash-merged PR) and the remote
-  branch if its PR merged. Publish each removal: `squad publish janitor
+  it (`wt remove <branch>`, whose hook relocates transcripts first, or the
+  manual relocate-then-remove). Repos with `.gitmodules` make `git worktree
+  remove` refuse; use the skill's submodule case (`rm -rf <W> && git -C <P>
+  worktree prune` after its checks). Delete the local branch if merged
+  (`-D` only after confirming a squash-merged PR) and the remote branch if
+  its PR merged. Publish each removal: `squad publish janitor
   '{"removed":"<path>","branch":"…","evidence":"…"}'`. Never confirm Claude
   Code's own "clean up worktree?" prompt.
-- **Everything else is report-only**: unmerged with recent commits, dirty
-  tree, live session inside, open draft PR, or any ambiguity.
-- **Also report**: Claude sessions idle for more than 8h with no squad
-  registration, and squad members gone longer than the grace period.
-- **Dangling subagents**: for each context (`~/.claude-*`), scan
-  `<CONFIG_DIR>/projects/*/<session>/subagents/agent-*.meta.json`. The
-  sibling `agent-<id>.jsonl` is that agent's transcript; the meta has no
-  timestamps. Heuristic for "started, no completion": the transcript's first
-  line is older than 2h, **and** its mtime is stale or its last assistant
-  record has no `stop_reason: end_turn`, **and** the parent
-  `<session>.jsonl` shows no result or `<task-notification>` for the meta's
-  `toolUseId` / agent id after the launch acknowledgement. Skip sessions
-  whose `sessions/<pid>.json` shows `busy` (the agent may be live). List
-  each hit (context, project, session, agent id, `description`, age) in the
-  report; report-only, never act on them.
-- **Stale members**: list roster members whose last `squad set` is older
-  than 2h while the CC status (`jq -r .status
-  <req.config_dir>/sessions/<req.pid>.json`) is `idle`. Report-only; the
-  usual cause is a stream that finished or stalled without updating.
-- **Debug retention**: remove date-named capture dirs under
+- **Everything else is report-only** (unmerged with recent commits, dirty
+  tree, live session, open draft PR, any ambiguity), plus Claude sessions
+  idle over 8h with no squad registration and members gone past the grace
+  period.
+- **Dangling subagents**: per context (`~/.claude-*`) scan
+  `<CONFIG_DIR>/projects/*/<session>/subagents/agent-*.meta.json` (the
+  sibling `agent-<id>.jsonl` is the transcript; the meta has no timestamps).
+  "Started, no completion" = transcript first line older than 2h, **and**
+  mtime stale or last assistant record without `stop_reason: end_turn`,
+  **and** the parent `<session>.jsonl` shows no result or
+  `<task-notification>` for the `toolUseId` / agent id after the launch
+  acknowledgement. Skip sessions whose `sessions/<pid>.json` is `busy`. List
+  each hit (context, project, session, agent id, `description`, age);
+  report-only.
+- **Stale members**: roster members whose last `squad set` is older than 2h
+  while `jq -r .status <req.config_dir>/sessions/<req.pid>.json` is `idle`
+  (usually a finished or stalled stream). Report-only.
+- **Debug retention**: remove date-named dirs under
   `~/.local/state/squad/debug/` older than 14 days (`find … -mindepth 1
-  -maxdepth 1 -type d -mtime +14`; never `debug.on`). List each removed dir
-  in the sweep report; never silently.
+  -maxdepth 1 -type d -mtime +14`; never `debug.on`), listing each.
 
-Give Tim one message: removed items with evidence, then the report pile
-grouped by reason (dangling subagents and stale members included). His answers ("remove the parentedit ones") go back to
-the same subagent via `SendMessage`.
+Give Tim one message: removals with evidence, then the report pile by
+reason. His answers go back to the same subagent via `SendMessage`.
 
 ## 7. Your own subagents
+
+**Hard rule: you never perform browser flows, admin-console work, CLI
+surveys or email drafting inline.** Launch a subagent (or direct a member)
+and record only the ruling.
 
 Apply the global delegation policy unchanged, preferring the dedicated
 agents. Roster: **janitor** and **PR-check** (`git-pr-ops`, sonnet),
@@ -406,6 +397,10 @@ agents. Roster: **janitor** and **PR-check** (`git-pr-ops`, sonnet),
 doing" digests from the roster and `squad history`). Announce the numbered
 roster on every launch. Briefs restate what a fresh context lacks: absolute
 paths, `gh -R`, `run-with-secrets` for anything credentialed.
+Admin or OAuth briefs also carry: the **brand name** for any consent
+artefact ("Exxo Labs"); the **exact identity list** for any access grant
+(confirm with Tim via §2c if it came from memory); "capture a screenshot at
+each admin step" as the default.
 
 ## 7a. Design conformity
 
@@ -416,23 +411,21 @@ paths, `gh -R`, `run-with-secrets` for anything credentialed.
   `{findings:[…]}` (dimension, established pattern, proposed, smallest
   change). Advisory ones are passed along, never held on.
 - Hold the merge (for exxo-infra, §5's ask to Tim too) until each blocking
-  finding is addressed or Tim rules on it.
-- Log the outcome in the worklog: verdict, findings sent, resolution.
+  finding is addressed or Tim rules. Log verdict, findings and resolution.
 
 ## 8. Messages you receive
 
 Directives you send, defined client-side in `squad-join` §5: `pause`,
-`resume`, `priority`, `heavy_slot`, `review` (§7a), `infra` (to the infra
-member) and `cleanup` (§2a) and `preflight` (§2b).
+`resume`, `priority`, `heavy_slot`, `review` (§7a), `infra`, `cleanup` (§2a)
+and `preflight` (§2b). `pause`/`priority` carry an ack deadline (§2).
 
 A message turn's JSON is `{"from":…,"text":…,"data":{…}}`; client →
 orchestrator messages carry `data.kind`: `pr_ready`, `heavy_slot` (`action`
-request|release), `blocked`, `done`, `infra_ready`, `infra_result`, `preflight`, `operator_task` (§2c), plus
-your own timers (`sweep_due`, `heavy_slot_expired`). On `blocked`, tell Tim
+request|release), `blocked`, `done`, `infra_ready`, `infra_result`,
+`preflight`, `operator_task` (§2c), plus your own timers (`sweep_due`, `heavy_slot_expired`). On `blocked`, tell Tim
 if it needs him; on `done`, drop the stream from the plan. Watcher events
-are information. Never send a `now`-priority turn for something that can
-wait until a member is idle.
-When the session ends: `squad deregister orchestrator`.
+are information. Never send a `now` turn for what can wait until a member
+is idle. When the session ends: `squad deregister orchestrator`.
 
 ## 9. Debug mode (`--debug`)
 
@@ -445,7 +438,8 @@ At start-up, before §1 step 4, only when started with `--debug`:
    use `$CLAUDE_CODE_SESSION_ID`, and say so). Publish the gauge with that
    `session_id` and `"debug":true` so the review finds your transcript.
 3. After **every** directive you send (pause, resume, priority, heavy_slot,
-   infra, cleanup), in the same turn, append to today's decision log:
+   infra, cleanup) and every `squad.directive` `unacked` or `escalated`
+   event (member, directive_id, age_s, action taken), in the same turn, append to today's decision log:
    ```
    d=~/.local/state/squad/debug/$(date +%F); mkdir -p "$d"; cat >> "$d/orchestrator-decisions.md" <<'EOF'
    ## <ISO ts> <directive> → <member>
