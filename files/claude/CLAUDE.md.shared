@@ -220,7 +220,7 @@ warning fires. Three hard rules:
   `pnpm`, `bash`, `curl`, `gh` …) in any repo settings file; grant named
   recipes instead. Read-only basics and the deny floor are global.
 - Blanket-trusted files are read-only by construction; mutating recipes
-  live in a separate, untrusted `Justfile.ops`.
+  live in a separate, untrusted `ops.Justfile`.
 - A repo CLAUDE.md restates nothing global — one pointer line at most.
 
 ## Don't code fast-moving tooling from memory

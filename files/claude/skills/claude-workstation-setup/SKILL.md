@@ -94,7 +94,7 @@ restating global CLAUDE.md blocks):
 
 - `files/claude/skills/claude-repo-config/` — the conventions (global vs
   committed vs local settings, deny floor, `agent/Justfile` read-only
-  invariant and `Justfile.ops`, CLAUDE.md ≤300 lines with no restated
+  invariant and `ops.Justfile`, CLAUDE.md ≤300 lines with no restated
   globals) and the fix procedures. Shared to every context.
 - `scripts/claude-config-audit` — stdlib Python check over one repo
   (`--repo`, default cwd) or the estate (`--estate`, roots default `~/dev`,
