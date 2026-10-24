@@ -284,9 +284,8 @@ squad send <member> "heavy_slot deny" --from orchestrator --data '{"directive":"
 A grant expires at `est_minutes × 2`: arm a background timer (`sleep <s>;
 squad send orchestrator "heavy_slot expired: <member>" --from cli --data
 '{"kind":"heavy_slot_expired","member":"<member>"}'`); expiry = released. On `release`: drop the grant, grant the next in `queue`.
-- Paused members do not receive `host.pressure` (broker suppression,
-  requires squad built from PR S1 or later): expect no ack from them on
-  pressure; judge it from the `host` gauge.
+- Paused members get no `host.pressure` (broker suppression, needs squad
+  from PR S1 or later): expect no ack; judge from the `host` gauge.
 - `host.pressure` `critical`: revoke the lowest-priority grant
   (`"decision":"revoke"`); that client stops its job and releases.
 - `warn`: reduce `heavy_slots` by one (minimum 0, set `slots_reduced`)
@@ -298,13 +297,11 @@ squad send orchestrator "heavy_slot expired: <member>" --from cli --data
 cpu_pct, rss_mb}]`; the broker publishes `host.protected {name, running}`.
 While any is running: hold `heavy_slots` at 0 (deny with `retry_after_s:
 600`), treat `host.pressure` `warn` as `critical`, and tell Tim once. When
-the last stops, restore the plan's `heavy_slots` and tell waiting members to
-retry.
+the last stops, restore `heavy_slots` and tell waiting members to retry.
 
 **Runaway processes.** On `host.runaway` (a process outside any member's
-tree that stayed hot or bloated), warn Tim in chat with pid, command,
-cpu/rss and duration and suggest terminating it; never kill it yourself.
-Repeats of the same pid: at most once per 30 minutes.
+tree that stayed hot or bloated), warn Tim in chat (pid, command, cpu/rss,
+duration) and suggest terminating it; never kill it. Same pid: 30 min apart.
 
 ## 5. Infra: review, merge, deploy
 
@@ -319,9 +316,9 @@ On `pr_ready` with `repo` exxo-infra:
    for the rest of this session"), set the plan's `infra_authority` to
    `{"granted_by":"tim","scope":"session","at":"<ISO>","session_id":"<yours>"}`
    and publish. It ends with this session; never carry it over or infer it.
-3. **No infra member live** (`.req.role == "infra"`): tell Tim to start one
-   (`/squad-infra` in the exxo-infra checkout, exxo context); hold the
-   request in `pending_infra` until its `infra_ready` message.
+3. **No infra member live** (`.req.role == "infra"`): tell Tim to run
+   `/squad-infra` in exxo-infra (exxo context); hold the request in
+   `pending_infra` until `infra_ready`.
 4. **Send**:
    ```
    squad send role:infra "infra: review_merge_deploy #<n>" --from orchestrator \
@@ -330,6 +327,9 @@ On `pr_ready` with `repo` exxo-infra:
 5. **On `infra_result`** (`blocked`, `deployed` or `failed`): relay status,
    stacks, summary, findings and `log_path` to Tim and the originating client
    (`squad send <client> "infra_result: …" --from orchestrator --data '<it>'`).
+   Merges go through the infra agent's `pr-merge` recipe (an approved review,
+   or `SQUAD_MERGE_AUTHORITY` set in the infra session by Tim); never ask a
+   member to merge what this session was denied.
 
 ### Go-live sweep
 

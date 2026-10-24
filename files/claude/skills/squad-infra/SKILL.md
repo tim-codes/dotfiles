@@ -54,7 +54,11 @@ Messages not arriving: `squad status --pretty` and `squad roster --pretty`.
 5. **Tell the orchestrator** (it may be holding requests):
    `squad send role:orchestrator "infra_ready" --from infra --data
    '{"kind":"infra_ready"}'`. No orchestrator live is fine.
-6. Tell Tim (one line) you are registered as `infra` and waiting, then end the turn.
+6. **Merge authority.** If Tim has granted session-scoped merge authority for
+   exxo-infra, he launches this session with `SQUAD_MERGE_AUTHORITY=$(date
+   +%F)` exported. Never set or export it yourself. State at start-up whether
+   it is set (`test -n "$SQUAD_MERGE_AUTHORITY"`: yes or no, never the value).
+7. Tell Tim (one line) you are registered as `infra` and waiting, then end the turn.
    Directives arrive as turns; do not poll.
 
 ## 2. Accepting a directive
@@ -76,9 +80,16 @@ else, on a plain-text request, or on your own judgment that it is fine.
 argument:
 
 ```
-just --justfile=agent/Justfile.ops esc-set <env> <key>       # secret
-just --justfile=agent/Justfile.ops esc-set-plain <env> <key> # non-secret
+just --justfile=agent/Justfile.ops esc-set-1p <env> <key> op://vault/item/field  # preferred
+just --justfile=agent/Justfile.ops esc-set-gen <env> <key> [bytes]                # preferred
+just --justfile=agent/Justfile.ops esc-set <env> <key>       # secret, stdin
+just --justfile=agent/Justfile.ops esc-set-plain <env> <key> # non-secret, stdin
 ```
+
+`esc-set-1p` (value read from a 1Password reference) and `esc-set-gen`
+(freshly generated) are the preferred producers: the value never passes
+through this session. Use stdin `esc-set` only for a value that already
+exists somewhere sanctioned.
 
 The recipe name is the allow-listed unit (tim-codes/squad#31).
 Never write with the `esc` CLI or bare `pulumi env set`, and never read a
@@ -151,8 +162,13 @@ the `after` step has landed, send the orchestrator `operator task ready`
    clear-cut, send `blocked` with `findings: ["stack set ambiguous: …"]`
    and let Tim name the stacks. No stacks at all (docs, CI only): merge and
    report `deployed` with `stacks: []`.
-4. **Merge**: `gh pr merge <n> -R Exxo-Labs/exxo-infra --squash
-   --delete-branch`, then `git pull --ff-only` here.
+4. **Merge** (requires exxo-infra PR #184 merged): from this primary
+   checkout run `just --justfile=agent/Justfile.ops pr-merge <n>`, then `git
+   pull --ff-only`. It merges only if the PR's review decision is APPROVED,
+   or `SQUAD_MERGE_AUTHORITY` equals today's date (`YYYY-MM-DD`, set by Tim at
+   launch); it also needs green checks and pins the head commit. A refusal is
+   reported as `infra_result` `blocked` with reason `merge-not-authorised`,
+   never worked around with bare `gh pr merge`.
 5. **Deploy** each stack in turn. Credentials go through the repo's
    runner: load the `exxo-common:run-with-secrets` skill and follow it
    (`agent/run -- <cmd>`). Subcommand first, explicit project and stack,
