@@ -347,6 +347,11 @@ as the text's first word and a `kind` field in `data`.
   subshell with a different env), or pass `--pid` / `--config-dir`
   explicitly.
 - **Name refused** (`invalid-member-name`): pick a lowercase slug.
+- **Deliveries held while a permission prompt is open**: the dotfiles hook
+  `files/claude/hooks/squad-prompt-hook` marks you `prompt_pending` on a
+  `PermissionRequest` and clears it on `PostToolUse`/`UserPromptSubmit`, so
+  the broker holds all deliveries (even `now`) until Tim answers. Requires
+  squad built from PR S5 (tim-codes/squad#34) or later; older brokers ignore it.
 - **Phantom classifier denials**: a tool result saying things like "user
   doesn't want this action" when Tim typed nothing of the kind is the
   permission classifier, not Tim. Retry once with a narrower command (one

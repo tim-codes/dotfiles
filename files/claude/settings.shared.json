@@ -50,6 +50,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [
@@ -241,6 +250,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "StopFailure": [
@@ -282,6 +300,17 @@
           {
             "type": "command",
             "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SubagentStop >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" pending # squad-prompt-hook",
             "timeout": 5
           }
         ]

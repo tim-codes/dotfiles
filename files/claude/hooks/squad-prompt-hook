@@ -1,0 +1,25 @@
+#!/bin/sh
+# Tell the squad broker when this session is blocked on a permission prompt.
+#
+# Usage (settings.shared.json hooks): squad-prompt-hook pending|cleared
+#   pending  <- PermissionRequest (a permission dialog is about to be shown)
+#   cleared  <- PostToolUse, UserPromptSubmit (the prompt was answered)
+#
+# Reads the hook JSON on stdin for session_id, then runs
+#   squad prompt <state> --session <session_id>
+# which sets/clears the member's prompt_pending flag so the broker holds
+# deliveries while Tim has a prompt to answer. Requires squad built from the
+# S5 PR (tim-codes/squad#34) or later; on an older squad the call fails and
+# is ignored. Always exits 0 and prints nothing, so it can never block or
+# noise up a session. No-op when squad or jq is not installed.
+state="$1"
+case "$state" in
+  pending | cleared) ;;
+  *) exit 0 ;;
+esac
+command -v squad >/dev/null 2>&1 || exit 0
+command -v jq >/dev/null 2>&1 || exit 0
+session_id="$(jq -r '.session_id // empty' 2>/dev/null)"
+[ -n "$session_id" ] || exit 0
+squad prompt "$state" --session "$session_id" >/dev/null 2>&1 || true
+exit 0
