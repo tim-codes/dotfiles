@@ -71,13 +71,12 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    squad subscribe orchestrator squad.directive --priority now
    squad subscribe orchestrator operator.item --priority next
    ```
-   (`squad.directive` requires squad built from PR S1 or later.)
+   (`squad.directive` requires squad built from PR S1 or later;
+   `operator.item` requires the dashboard server from PR S3.)
    Not `quota.*`: it also matches the `quota.A` gauges, which republish on
-   every sample and `--min-change` cannot filter (their numbers are nested).
-   Read the gauges on demand with `squad get quota.A`.
+   every sample; read them on demand with `squad get quota.A`.
 4. **Publish the orchestrator gauge.** Read the previous one first
-   (`squad get orchestrator`, keep its `last_sweep_at`), then
-   `squad publish orchestrator --kind gauge '{"session_id":"<id>","started_at":"<now ISO>","last_sweep_at":<previous or null>}'`.
+   (`squad get orchestrator`, keep `last_sweep_at`), then `squad publish orchestrator --kind gauge '{"session_id":"<id>","started_at":"<now ISO>","last_sweep_at":<previous or null>}'`.
    With `--debug`, do §9 first and add `"debug":true` to this gauge.
 5. **Read state**: the memory index
    `~/.claude-exxo-personal/projects/-Users-tim-claude/memory/MEMORY.md`
@@ -103,20 +102,24 @@ mid-deploy) except at level 100.
 
 A **busy member** has `jq .status <req.config_dir>/sessions/<req.pid>.json`
 `busy` with `statusUpdatedAt` (epoch ms) over 5 min old: mid-turn long
-enough to burn quota unattended. Others are idle and cost nothing.
+enough to burn quota unattended.
 
 **A breach is impending** for `A` when `pct ≥ 85` on any window (read
 `squad get quota.A`; threshold events are your prompt to look)
-AND `A` has at least one busy member. `quota.A.projection` ETAs are
-advisory: quote them to Tim, never trigger on them.
+AND `A` has at least one busy member. With none busy and `pct` 85–95,
+pause nothing: idle members burn nothing. **Hard ceiling:** `pct ≥ 95`
+pauses the busiest member regardless of the busy test (level 100: below).
+Re-run the test at every janitor sweep and on any `squad.member` status
+transition to busy while `pct ≥ 85`, not only on threshold crossings.
+`quota.A.projection` ETAs are advisory: quote them, never trigger on them.
 
 **On impending breach:**
-1. Order A's members by plan priority, lowest priority first (5 before 1),
-   then busy before idle (idle ones cost nothing).
+1. Order A's members by plan priority, lowest first (5 before 1), then
+   busy before idle.
 2. Pause down that list until projected use at the remaining members'
    share stays under the wall before `resets_at` (`pct + rate_pct_per_min ×
    (busy remaining ÷ busy now) × minutes to reset < 97`) or only the
-   top-priority member is left. Always leave it running unless level 100.
+   top-priority member is left (always left running unless level 100).
 3. For each member to pause (every pause or priority directive carries
    `--ack-deadline-s 120`; requires squad built from PR S1 or later):
    ```
@@ -134,38 +137,36 @@ advisory: quote them to Tim, never trigger on them.
      entry `state:"sent"`, and do not count the member as paused.
    - `escalated`: raise an operator item NOW (§2c): "<member> not
      responding to pause; kill or wait", with the quota numbers and reset.
-5. Tell Tim one line: who was paused (acked or pending), why, reset time.
+5. Tell Tim one line: who, acked or pending, why, reset time.
 
-**Delivery priority:** only the registered orchestrator's `squad send
---priority now` interrupts a busy member (others are downgraded to `next`);
-`host.pressure` critical events are always delivered at `now`. Reserve `now`
-for `pause` at level 100 and `heavy_slot revoke` on critical pressure. A
-broker restart drops held (coalesced) turns: after a `kickstart`, re-send any
-pending `pause`/`resume`.
+**Delivery priority:** only the orchestrator's `squad send --priority now`
+interrupts a busy member (others are downgraded to `next`); critical
+`host.pressure` is always `now`. Reserve `now` for `pause` at level 100 and
+`heavy_slot revoke` on critical pressure. A broker restart drops held turns:
+after a `kickstart`, re-send any pending `pause`/`resume`.
 
-**Level 100** going up: pause every member of `A`, including the top
-priority and the infra member if it is not mid-deploy (`--priority now`,
-still with `--ack-deadline-s 120`); tell Tim.
+**Level 100** going up: pause every member of `A`, top priority and
+non-deploying infra included (`--priority now`, `--ack-deadline-s 120`);
+tell Tim.
 
-**On `quota.A.reset`** (or at start-up, step 6): `squad get quota.A`; if no
+**On `quota.A.reset`** (or start-up step 6): `squad get quota.A`; if no
 window is at or above 90%, resume every `paused` entry for `A` with `by:
-"orchestrator"`, highest priority first, 60s apart, in one background
-command (`run_in_background`; a foreground `sleep` is refused):
+"orchestrator"`, highest priority first, 60s apart, in one
+`run_in_background` command (a foreground `sleep` is refused):
 ```
 for m in <top> <next> …; do squad send "$m" "resume" --from orchestrator \
   --data '{"directive":"resume"}'; sleep 60; done
 ```
-Resumes need no ack. Remove them from `paused`, publish the plan, tell Tim. Members
-Tim paused himself (no plan entry) are his to resume.
+Resumes need no ack. Remove them from `paused`, publish the plan, tell Tim.
+Members Tim paused himself (no plan entry) are his to resume.
 
 ## 2a. Idle members with leftover processes
 
 `host.member_idle_with_descendants` fires when a member's Claude session
 has been idle >=10 min but its process tree still holds busy or large
 descendants. Payload: `{member, idle_minutes, descendants, cpu_pct, rss_mb,
-top:[{pid, cmd, cpu_pct, rss_mb}]}`. Skip a member that is `paused` or
-mid-`heavy_slot` grant (the load is expected); otherwise send it a cleanup
-directive:
+top:[{pid, cmd, cpu_pct, rss_mb}]}`. Skip a `paused` member or one
+mid-`heavy_slot` grant (load expected); otherwise send a cleanup directive:
 ```
 squad send <member> "cleanup: idle <n>m with <d> descendants (<cpu>% cpu, <rss> MB)" --from orchestrator \
   --data '{"directive":"cleanup","reason":"idle with descendants","top":[<the event top list>]}'
@@ -191,10 +192,10 @@ Omit `ttl_hours` for the 12h default. Alongside it, have a subagent (§7) run
 these checks; each failure goes in the health summary and §2c as
 `blocking:now` while Tim is present, else `later` with the exact expiry:
 - **gcloud RAPT/ADC**: `agent/run -- gcloud auth print-access-token
-  >/dev/null` (where the repo has `agent/run`); failure means reauth.
+  >/dev/null` (where the repo has `agent/run`).
 - **Admin consents and device-code flows** the briefs depend on (Entra,
-  Google, WorkOS), each listed with its expiry. Request a device code only
-  while Tim is present; one issued for later expires unseen.
+  Google, WorkOS), each with its expiry. Request device codes only while Tim
+  is present; one issued for later expires unseen.
 - **Cutover targets**: for any deploy that changes a domain, diff the ESC
   values against the target domains (apex, www, studio) before go.
  Members reply within 10 minutes with
@@ -210,9 +211,9 @@ that member alone afterwards.
 
 The squad exists to cut human-in-the-loop (HITL) interruptions: members never
 prompt Tim, they send `operator_task` (fields in `squad-join` §6). The
-dashboard server (`:7780`) owns the queue; you no longer publish an `operator`
-gauge. Preferred form: `squad operator raise|set|list` (requires the `squad
-operator` CLI, issue S4). Until that ships, use the API directly:
+dashboard server (`:7780`) owns the queue (requires the dashboard server
+from PR S3). Preferred form: `squad operator raise|set|list` (requires the
+`squad operator` CLI, S4). Until S4 ships, use the API directly (S3 needed):
 ```
 # raise / replace (caller-chosen id; the server stamps raised_at and updated_at)
 curl -sS -X PUT http://127.0.0.1:7780/api/operator/items/<id> -H 'content-type: application/json' \
@@ -222,19 +223,21 @@ curl -sS -X PATCH http://127.0.0.1:7780/api/operator/items/<id> -H 'content-type
   -d '{"status":"ready","actor":"orchestrator"}'
 curl -sS 'http://127.0.0.1:7780/api/operator/items?status=open,ready'    # list
 ```
-A 422 returns `{error, field}`: fix that field and retry. The server sets
-`presented_at` and `resolved_at` itself; never send them. Subscribing to
-`operator.item` (§1) tells you when Tim or a member changes one.
-- **Raise** on `operator_task`: `status:"open"`, `id` a short slug. PATCH to
-  `ready` the moment the precondition clears, never batched.
-- **`blocking:"now"`** is anything that blocks a member's next step; `later`
+**Until S3 is live**, publish the `operator` gauge as before: `squad publish
+operator --kind gauge '{"items":[{id,title,stream,blocking,status,raised_at,…}]}'`,
+republished on every change; the server imports it once S3 lands.
+A 422 returns `{error, field}`: fix that field. The server sets
+`presented_at`/`resolved_at`; never send them. `operator.item` (§1) reports
+changes by Tim or members.
+- **Raise** on `operator_task`: `status:"open"`, short-slug `id`; PATCH to
+  `ready` the moment the precondition clears.
+- **`blocking:"now"`** is anything blocking a member's next step; `later`
   only for work no stream waits on (a misfiled blocker cost Tim 80 minutes).
-- **Every item carries `commands[]`** he can copy in this view, in the
-  repo's CLI convention (`pulumi env set`, never `esc`), or a `url`; never
-  "see the other pane". Refresh the text when the facts change.
-- **Draft links** (`draft_url`, `url`) are checked by the server; a 422 on
-  them means fix the draft, not the item. Never present an approval item
-  whose draft you have not seen resolve.
+- **Every item carries copy-able `commands[]`** in the repo's CLI convention
+  (`pulumi env set`, never `esc`), or a `url`; never "see the other pane".
+  Refresh the text when facts change.
+- **Draft links** (`draft_url`, `url`) are server-checked; a 422 means fix
+  the draft, not the item. Never present an unresolved draft.
 - **Order and nudge**: blocking-now, then stream priority, then
   `est_minutes`. Show one consolidated list when a blocking-now item
   appears, when Tim asks and in the §2b summary. While he is present give
@@ -253,7 +256,7 @@ A 422 returns `{error, field}`: fix that field and retry. The server sets
 
 ## 3. The plan gauge
 
-The plan lives in the broker so it survives you being closed and reopened:
+The plan lives in the broker, surviving your restarts:
 ```
 {"streams":[{"member":"…","priority":1-5,"phase":"…","notes":"…"}],
  "heavy_slots":1,"slots_reduced":false,"grants":[{"member","reason","granted_at","expires_at"}],
@@ -264,10 +267,10 @@ The plan lives in the broker so it survives you being closed and reopened:
 Read with `squad get plan | jq .data`; publish the whole object with `squad
 publish plan --kind gauge '<json>'` after every change.
 
-**Priority** is 1 (highest) to 5. Tim sets it in a sentence ("make mailkit
-top priority"): update `streams`, publish, run `squad set --name <member>
+**Priority** is 1 (highest) to 5. When Tim sets it ("make mailkit top"): update `streams`, publish, run `squad set --name <member>
 --priority <p>`, and `squad send <member> "priority <p>" --from orchestrator
---data '{"directive":"priority","priority":<p>}'`. Don't micromanage tasks.
+--ack-deadline-s 120 --data '{"directive":"priority","priority":<p>}'`;
+handle `unacked`/`escalated` as in §2 step 4. Don't micromanage tasks.
 
 ## 4. Heavy slots
 
@@ -313,10 +316,9 @@ On `pr_ready` with `repo` exxo-infra:
 2. **Authority gate.** exxo-infra is production-stage: merging needs human
    review. Ask Tim in chat (PR number, title, summary); proceed only on his
    yes **for that PR**. If he grants standing authority ("merge infra PRs
-   for the rest of this session"), set
-   the plan's `infra_authority` to `{"granted_by":"tim","scope":"session",
-   "at":"<ISO>","session_id":"<yours>"}` and publish. It ends with this
-   session; never carry it over, never infer it.
+   for the rest of this session"), set the plan's `infra_authority` to
+   `{"granted_by":"tim","scope":"session","at":"<ISO>","session_id":"<yours>"}`
+   and publish. It ends with this session; never carry it over or infer it.
 3. **No infra member live** (`.req.role == "infra"`): tell Tim to start one
    (`/squad-infra` in the exxo-infra checkout, exxo context); hold the
    request in `pending_infra` until its `infra_ready` message.
@@ -326,9 +328,8 @@ On `pr_ready` with `repo` exxo-infra:
      --data '{"directive":"infra","action":"review_merge_deploy","repo":"Exxo-Labs/exxo-infra","pr":<n>,"origin":"<client>","authority":{"granted_by":"tim","scope":"pr|session","at":"<ISO>"}}'
    ```
 5. **On `infra_result`** (`blocked`, `deployed` or `failed`): relay status,
-   stacks, summary, findings and `log_path` to Tim and the originating
-   client (`squad send <client> "infra_result: …" --from orchestrator
-   --data '<the result data>'`).
+   stacks, summary, findings and `log_path` to Tim and the originating client
+   (`squad send <client> "infra_result: …" --from orchestrator --data '<it>'`).
 
 ### Go-live sweep
 
@@ -388,19 +389,18 @@ reason. His answers go back to the same subagent via `SendMessage`.
 ## 7. Your own subagents
 
 **Hard rule: you never perform browser flows, admin-console work, CLI
-surveys or email drafting inline.** Launch a subagent (or direct a member)
-and record only the ruling.
+surveys or email drafting inline.** Launch a subagent (or direct a member);
+record only the ruling.
 
-Apply the global delegation policy unchanged, preferring the dedicated
-agents. Roster: **janitor** and **PR-check** (`git-pr-ops`, sonnet),
-**summariser** (`Explore` or `general-purpose`, sonnet; "what is everyone
-doing" digests from the roster and `squad history`). Announce the numbered
-roster on every launch. Briefs restate what a fresh context lacks: absolute
-paths, `gh -R`, `run-with-secrets` for anything credentialed.
-Admin or OAuth briefs also carry: the **brand name** for any consent
-artefact ("Exxo Labs"); the **exact identity list** for any access grant
-(confirm with Tim via §2c if it came from memory); "capture a screenshot at
-each admin step" as the default.
+Apply the global delegation policy, preferring the dedicated agents. Roster:
+**janitor** and **PR-check** (`git-pr-ops`, sonnet), **summariser**
+(`Explore` or `general-purpose`, sonnet; digests from the roster and `squad
+history`). Announce the numbered roster on every launch. Briefs restate what
+a fresh context lacks: absolute paths, `gh -R`, `run-with-secrets` for
+credentials. Admin or OAuth briefs also carry: the **brand name** for any
+consent artefact ("Exxo Labs"); the **exact identity list** for any access
+grant (confirm with Tim via §2c if from memory); "capture a screenshot at
+each admin step" by default.
 
 ## 7a. Design conformity
 
@@ -425,7 +425,7 @@ request|release), `blocked`, `done`, `infra_ready`, `infra_result`,
 `preflight`, `operator_task` (§2c), plus your own timers (`sweep_due`, `heavy_slot_expired`). On `blocked`, tell Tim
 if it needs him; on `done`, drop the stream from the plan. Watcher events
 are information. Never send a `now` turn for what can wait until a member
-is idle. When the session ends: `squad deregister orchestrator`.
+is idle. At session end: `squad deregister orchestrator`.
 
 ## 9. Debug mode (`--debug`)
 
@@ -433,13 +433,14 @@ At start-up, before §1 step 4, only when started with `--debug`:
 1. `squad debug on` (`squad debug off` is Tim's call, not yours). Tell Tim
    once that capture lands in `~/.local/state/squad/debug/<date>/` and that
    `/squad-debug-review` reads it; §6 prunes dirs over 14 days.
-2. Session id: the pid is the basename of `$CLAUDE_CODE_MESSAGING_SOCKET`;
-   `jq -r .sessionId "$CLAUDE_CONFIG_DIR/sessions/<pid>.json"` (missing:
-   use `$CLAUDE_CODE_SESSION_ID`, and say so). Publish the gauge with that
+2. Session id: pid = basename of `$CLAUDE_CODE_MESSAGING_SOCKET`; `jq -r
+   .sessionId "$CLAUDE_CONFIG_DIR/sessions/<pid>.json"` (missing: use
+   `$CLAUDE_CODE_SESSION_ID`, and say so). Publish the gauge with that
    `session_id` and `"debug":true` so the review finds your transcript.
 3. After **every** directive you send (pause, resume, priority, heavy_slot,
    infra, cleanup) and every `squad.directive` `unacked` or `escalated`
-   event (member, directive_id, age_s, action taken), in the same turn, append to today's decision log:
+   event (member, directive_id, age_s, action), in the same turn append to
+   today's decision log:
    ```
    d=~/.local/state/squad/debug/$(date +%F); mkdir -p "$d"; cat >> "$d/orchestrator-decisions.md" <<'EOF'
    ## <ISO ts> <directive> → <member>
