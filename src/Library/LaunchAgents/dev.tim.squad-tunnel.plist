@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.tim.squad-tunnel</string>
+
+  <!-- Hosts the squad dashboard (127.0.0.1:7780) through the persistent
+       Microsoft dev tunnel exxo-tfo-squad (`squad-tunnel host`), so Tim can
+       open it from his phone. The script ensures the tunnel, publishes its
+       URL as the `dashboard` gauge, then execs `devtunnel host`.
+       If the devtunnel login has expired it exits 78 with a log line;
+       ThrottleInterval paces the retries until `devtunnel user login -d`
+       (or /reauth) is run. Absolute paths: launchd does no ~ expansion. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/tim/bin/squad-tunnel</string>
+    <string>host</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/Users/tim/.cargo/bin</string>
+    <key>HOME</key>
+    <string>/Users/tim</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <!-- ~/.local/state/squad must exist before bootstrap. -->
+  <key>StandardOutPath</key>
+  <string>/Users/tim/.local/state/squad/tunnel.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/tim/.local/state/squad/tunnel.log</string>
+</dict>
+</plist>

@@ -80,11 +80,11 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    With `--debug`, do §9 first and add `"debug":true` to this gauge.
 5. **Read state**: the memory index
    `~/.claude-exxo-personal/projects/-Users-tim-claude/memory/MEMORY.md`
-   (facts such as where Tim's meeting transcripts live; read it before
-   searching anywhere), `squad roster`, `squad get quota.personal`, `squad get
-   quota.exxo`, `squad get host`, `squad get plan` (null → start the plan in
-   §3 with every live client at its registered priority), `squad get
-   operator` (§2c), `squad history janitor --limit 20`.
+   (facts such as where Tim's meeting transcripts live; read it before searching
+   anywhere), `squad roster`, `squad get quota.personal`, `squad get quota.exxo`,
+   `squad get host`, `squad get plan` (null → start the plan in §3 with every live
+   client at its registered priority), `squad get operator` (§2c), `squad history janitor --limit 20`. Dashboard tunnel URL: `squad get dashboard` →
+   `tunnel_url`; include it in operator items that need Tim on his phone.
 6. **Clean up inherited state.** Drop `infra_authority` from the plan if its
    `session_id` is not yours (standing authority never survives a restart).
    Resume per §2 every `paused` entry whose window has since reset (its
