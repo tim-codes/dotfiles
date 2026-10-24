@@ -81,7 +81,7 @@ just --justfile=agent/Justfile.ops esc-set <env> <key>       # secret
 just --justfile=agent/Justfile.ops esc-set-plain <env> <key> # non-secret
 ```
 
-The recipe name is the allow-listed unit (exxo-infra#I1 / tim-codes/squad#31).
+The recipe name is the allow-listed unit (tim-codes/squad#31).
 Never write with the `esc` CLI or bare `pulumi env set`, and never read a
 value back. Sequence ESC writes between rollouts: before writing, confirm no
 `pulumi up` for a dependent stack is in flight (your own queue, and the
