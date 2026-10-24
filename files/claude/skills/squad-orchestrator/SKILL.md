@@ -115,8 +115,7 @@ to burn quota unattended.
 **A breach is impending** for `A` when `pct ≥ 85` on any window (read
 `squad get quota.A`; the 85/90/95 threshold events are your prompt to look)
 AND `A` has at least one busy member. `quota.A.projection` ETAs are
-advisory: quote them to Tim, never trigger on them. (An ETA ≤ 20 min rule
-fired the pause too late on 2026-10-23; the 07:53 pause missed its wall.)
+advisory: quote them to Tim, never trigger on them.
 
 **On impending breach:**
 1. Order A's members by plan priority, lowest priority first (5 before 1),
@@ -198,7 +197,18 @@ squad send all "preflight" --from orchestrator \
   --data '{"directive":"preflight","ttl_hours":12}'
 ```
 
-Omit `ttl_hours` for the 12h default. Members reply within 10 minutes with
+Omit `ttl_hours` for the 12h default. Before or alongside it, run these
+checks yourself (a subagent per §7) and add each failure to the health
+summary and §2c as `blocking:now` while Tim is present, else `later` with
+the exact expiry:
+- **gcloud RAPT/ADC**: `agent/run -- gcloud auth print-access-token
+  >/dev/null` (where the repo has `agent/run`); failure means reauth.
+- **Admin consents and device-code flows** the briefs depend on (Entra,
+  Google, WorkOS), each listed with its expiry. Request a device code only
+  while Tim is present; one issued for later expires unseen.
+- **Cutover targets**: for any deploy that changes a domain, diff the ESC
+  values against the target domains (apex, www, studio) before go.
+ Members reply within 10 minutes with
 `data.kind` `preflight` (`ok` true|false, `detail` on failure); a member
 that has not replied by then is `no reply`. Collect the replies and include
 them in the health summary you give Tim before he goes AFK: one line per
@@ -210,27 +220,50 @@ that member alone afterwards.
 ## 2c. Operator task queue
 
 The squad exists to cut human-in-the-loop (HITL) interruptions: members never
-prompt Tim, they send `operator_task` (fields in `squad-join` §6). Keep the
-queue in the `operator` gauge, republished on every change:
+prompt Tim, they send `operator_task` (fields in `squad-join` §6). The
+dashboard server (`:7780`) owns the queue; you no longer publish an `operator`
+gauge. Preferred form: `squad operator raise|set|list` (requires the `squad
+operator` CLI, issue S4). Until that ships, use the API directly:
 ```
-squad publish operator --kind gauge '{"items":[{"id","title","stream","blocking":"now|later","after","instructions","url","est_minutes","status":"open|ready|done|dropped","raised_at","presented_at","resolved_at"}]}'
+# raise / replace (caller-chosen id; the server stamps raised_at and updated_at)
+curl -sS -X PUT http://127.0.0.1:7780/api/operator/items/<id> -H 'content-type: application/json' \
+  -d '{"stream":"<member>","title":"…","kind":"approval|action|info","blocking":"now|later","status":"open","instructions":"…","commands":["…"],"url":null,"draft_url":null,"after":null,"est_minutes":5}'
+# change status / hand back (actor is mandatory)
+curl -sS -X PATCH http://127.0.0.1:7780/api/operator/items/<id> -H 'content-type: application/json' \
+  -d '{"status":"ready","actor":"orchestrator"}'
+curl -sS 'http://127.0.0.1:7780/api/operator/items?status=open,ready'    # list
 ```
-- **Raise**: on `operator_task`, add an item (`id` = short slug, status
-  `open`, `raised_at` now). `ready` = unblocked by its `after` build step;
-  the member reports that (`"status":"ready"`), then mark it `ready`.
-- **Order**: blocking-now, then stream priority, then `est_minutes`.
-- **Present ONE consolidated list** (id, title, stream, exact instructions,
-  url, est. minutes), never per-member pings: when a blocking-now item
-  appears, when Tim asks, and in the §2b pre-AFK health summary. Set
-  `presented_at` on first showing.
-- **Resolve**: Tim says "done <id>": set `done` and `resolved_at`, then
-  `resume` the owner (or `msg` it that the task is done). "drop <id>" sets
-  `dropped`; tell the owner.
+A 422 returns `{error, field}`: fix that field and retry. The server sets
+`presented_at` and `resolved_at` itself; never send them. Subscribing to
+`operator.item` (§1) tells you when Tim or a member changes one.
+- **Raise** on `operator_task`: `status:"open"`, `id` a short slug. When the
+  member reports it unblocked (`"status":"ready"`), PATCH to `ready` the
+  moment the precondition clears, never batched or held for a round-up.
+- **`blocking:"now"`** is anything that blocks a member's next step. `later`
+  is only for work no stream is waiting on. Misfiling a blocker as `later`
+  cost Tim 80 minutes on 2026-10-23.
+- **Every item carries `commands[]`** he can copy in this view, in the
+  repo's CLI convention (`pulumi env set`, never `esc`), or a `url`. Never
+  "see the other pane". Refresh the text whenever the facts change.
+- **Draft links** (`draft_url`, `url`) are checked by the server; a 422 on
+  them means fix the draft, not the item. Never present an approval item
+  whose draft you have not seen resolve.
+- **Present, nudge, order**: blocking-now first, then stream priority, then
+  `est_minutes`. Show one consolidated list when a blocking-now item
+  appears, when Tim asks and in the §2b summary. While Tim is present give
+  one chat line about ready items every 30 min, and once when he returns
+  from AFK. Chase him: it is your job, not his.
+- **Resolve** one item at a time, when its outcome is known. Never close or
+  drop items in a batch (a 09:31 batch close lost the true wait times). Tim's
+  Done / Drop / Back to agent buttons PATCH the server directly; on the
+  `operator.item` event `done`, `resume` the owner or `msg` it; on `dropped`
+  or "back to agent" (`with: agent:<m>`), tell the owner. His chat "done
+  <id>" is a PATCH from you with `actor:"orchestrator"`.
 - **Debug mode**: log each item's raised, presented and resolved timestamps
-  and wait minutes (raised to resolved) to the worklog and
-  `orchestrator-decisions.md` as they happen. The morning report gets an
-  "Interruptions" section: count, total wait, per-stream, and the avoidable
-  ones (preemptable in preflight, or raised by a member directly).
+  and wait minutes to the worklog and `orchestrator-decisions.md`. The
+  morning report gets an "Interruptions" section: count, total wait,
+  per-stream, and the avoidable ones (preemptable in preflight, or raised by
+  a member directly).
 
 ## 3. The plan gauge
 
