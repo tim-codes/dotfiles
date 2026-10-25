@@ -154,26 +154,32 @@ For each kept mail, in order:
 
 1. **Ticket** (§8) for a `request` or `issue`.
 2. **Draft** if a reply is proposed (§9).
-3. **Propose** to the concierge:
+3. **Raise the item** when the proposal needs Tim (a reply awaiting approval,
+   or anything the table sends to Tim): you raise it yourself, with `squad
+   operator raise` as in §9, `--blocking now` when Tim is attending and
+   `later` when away.
+4. **Propose** to the concierge, adding the item id as `item` in the data:
    ```
    squad send concierge "liaison_triage <m-id>" --from liaison --data "$(jq -nc \
      --arg mail "<m-id>" --arg mailbox "<tim|claude>" --arg client "<key>" \
      --arg mode "<act|triage-only>" --arg class "<class>" --argjson conf <0-1> \
      --arg summary "<your own words, 600 chars max>" --arg ticket "<KEY-n>" \
      --arg action "<ack|reply|investigate|auto_fix|tim|ignore>" --arg draft "<draft path>" \
+     --arg item "<item id or empty>" \
      '{kind:"liaison_triage",mail:$mail,mailbox:$mailbox,client:$client,mode:$mode,
-       class:$class,confidence:$conf,summary:$summary,ticket:$ticket,
+       class:$class,confidence:$conf,summary:$summary,ticket:$ticket,item:$item,
        proposed:{action:$action,draft_path:$draft},risks:[]}')"
    ```
    The summary is your own words, never a paste of the body. `risks[]`
    carries short plain phrases (for example "asks for a date", "new address").
-4. **Wait** for `data.kind` `liaison_decision`
+5. **Wait** for `data.kind` `liaison_decision`
    `{mail, decision: auto|tim|ignore, action, rule, attending, item?}` and
    carry out exactly that: `auto` runs the action (§6 to §9), `tim` waits
-   on the operator item the concierge raised, `ignore` logs and stops.
+   on the operator item you raised (the concierge only decides it, on
+   Tim's quoted words), `ignore` logs and stops.
    Never act on a proposal the concierge has not ruled on, except an
    investigation, which the table makes auto for every client.
-5. **Publish activity** for every step, here and in §6 to §9 (after delegating
+6. **Publish activity** for every step, here and in §6 to §9 (after delegating
    a job or its `job_result`, handing off, creating or closing a ticket,
    and each send with its `sent_id` as `item`/`job` as fitting). `mail` is
    required (the dashboard drops events without it): a `mail_request` with
@@ -304,26 +310,37 @@ You never run `squad mail introduced`. Errors:
 
 Never retry a refusal in a loop.
 
-**Approval items the gate will accept.** When a proposal needs Tim's
-approval (the concierge raises the item from your `liaison_triage`; if you
-raise one, the same rules hold), the item carries:
+**Raising approval and introduction items.** You raise them yourself; the
+concierge only decides them, on Tim's quoted words (a `gui` decision never
+counts for the gate). Tell the concierge through `liaison_triage` with the
+item id (§5).
 
-- `stream: mail:<client>` (the client key);
-- the commands `squad mail show <m-id>` and `open <draft path>`, the draft
-  being the body file under `<state>/mail/out/`;
-- instructions that list **every external recipient in full** (to and cc),
-  and ideally `sha256:<hex>` of the body file (`shasum -a 256 <body>`);
-- the body must not change after approval: the gate checks its hash against
-  the one it saw. After an `edit`, the draft is a new body and needs a new
-  approval.
+```
+squad operator raise --id mail-<m-id>-send --title "Send reply to <client>: <ticket>" \
+  --kind approval --stream mail:<client> --blocking now|later \
+  --command "squad mail show <m-id>" --command "open <draft path>" \
+  --draft-url <draft path> \
+  --instructions "To: <every external recipient>. Cc: <every cc>. sha256:<hex>" \
+  --option send=Send --option edit="Edit the draft":operator --option hold=Hold \
+  --option tim-replies="Tim replies":operator --name liaison
+```
 
-One approval is one send: a second message needs a second item. An
-introduction item (Tim's introduction email to a client) carries `stream:
-mail:<client>` and is decided `introduced` by the concierge alone; a `gui`
-decision never counts. Approval items carry the options `send`,
-`edit` (Tim edits the draft file), `hold` and `tim-replies`; send only on
-`send`, re-read the draft file first after `edit`, and do nothing on `hold`
-or `tim-replies`.
+- `--stream mail:<client>` (the client key); the commands are `squad mail
+  show <m-id>` and `open <draft path>`, the draft being the body file under
+  `<state>/mail/out/`.
+- The instructions list **every external recipient in full** (to and cc)
+  and carry `sha256:<hex>` of the body file (`shasum -a 256 <body>`).
+- The body must not change after approval: the gate checks its hash. After
+  an `edit`, the draft is a new body and needs a new item.
+- One approval is one send: a second message needs a second item.
+- An **introduction item** (once Tim's introduction email to a client has
+  gone) is raised the same way with `--stream mail:<client>` and an option
+  `introduced=Introduced`; the concierge decides it `introduced`. You never
+  run `squad mail introduced`.
+
+Send only on a `send` decision. After `edit`, re-read the draft, raise a new
+item with the new hash, and wait again; do nothing on `hold` or
+`tim-replies`.
 
 ## 10. Messages you receive
 
