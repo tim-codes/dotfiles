@@ -2,6 +2,7 @@ cwd: ~/dev/<owner>/<repo>
 context: exxo
 model: opus
 effort: high
+needs: none
 join: /squad-join --name <member> --priority 3 --needs <connectors> --branch squad/<member>
 launch: claude-kickoff ~/claude/prompts/<date>/<NN>-<member>.md
 base: main
@@ -20,16 +21,18 @@ fill it in and delete every comment. Launch with
 launcher, never a hand-built `claude` line.
 
 FRONTMATTER (key: value lines, ended by the first line that is exactly `---`;
-the body is everything after it). claude-kickoff reads the first four keys; the
+the body is everything after it). claude-kickoff reads the first four keys and `needs`; the
 rest are for the humans, the orchestrator and the herder, and are ignored by it.
 Values may run long. A comment after `context` is fine: only its first word counts.
 
   cwd           working directory: ~/dev/..., an absolute path, or the bare name of one
                 git checkout under ~/dev
-  context       exxo | exxo-personal | personal: which account context runs it
+  context       personal | exxo | exxo-personal | exxo-openrouter: which account context runs it
                 (overridable with `--account`)
   model         passed as `--model`
   effort        passed as `--effort`
+  needs         optional: m365, figma, notion (exxo only), agent-run (not exxo-openrouter),
+                datadog, boards (not exxo-openrouter); an unmet one exits 9 before launch
   join          the /squad-join line the member runs first (repeat it as the first
                 line of the body so the member sees it)
   launch        informational: how it is started; claude-kickoff is the launcher

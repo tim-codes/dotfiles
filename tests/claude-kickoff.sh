@@ -15,7 +15,7 @@ REAL_HOME="$HOME"
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 FAKE="$T/home"; BIN="$T/bin"; REC="$T/rec"
-mkdir -p "$FAKE/.claude-exxo" "$FAKE/.claude-exxo-personal" "$FAKE/.claude-personal" \
+mkdir -p "$FAKE/.claude-exxo" "$FAKE/.claude-exxo-openrouter" "$FAKE/.claude-exxo-personal" "$FAKE/.claude-personal" \
          "$FAKE/work/proj/.git" "$FAKE/work/other" "$FAKE/dev/grp/named/.git" "$FAKE/dev/one/dup/.git" \
          "$FAKE/dev/two/dup/.git" "$FAKE/dev/shallow/.git" "$FAKE/dev/x/shallow/.git" "$BIN"
 
@@ -158,6 +158,51 @@ kick "$T/shallow.md" --dry-run
 check "shallowest bare-name match wins" has "cwd: $(cd "$FAKE/dev/shallow" && pwd -P)"
 sed 's|^cwd: .*|cwd: nowhere|' "$T/fixture.md" >"$T/nowhere.md"
 expect_rc "unmatched bare cwd name" 5 "$T/nowhere.md" --dry-run
+# --- needs mapping (exit 9) ---
+withneeds() { sed "s|^model: .*|&\nneeds: $1|" "$T/fixture.md" >"$T/needs.md"; }
+for n in datadog boards; do
+    withneeds "$n"
+    for c in exxo exxo-personal personal; do expect_rc "needs $n is met in $c" 0 "$T/needs.md" --account "$c" --dry-run; done
+    expect_rc "needs $n is unmet in exxo-openrouter" 9 "$T/needs.md" --account exxo-openrouter --dry-run
+done
+for n in m365 figma notion; do
+    withneeds "$n"
+    expect_rc "needs $n is met in exxo" 0 "$T/needs.md" --account exxo --dry-run
+    for c in exxo-personal personal exxo-openrouter; do expect_rc "needs $n is unmet in $c" 9 "$T/needs.md" --account "$c" --dry-run; done
+done
+withneeds "agent-run"
+for c in exxo exxo-personal personal; do expect_rc "needs agent-run is met in $c" 0 "$T/needs.md" --account "$c" --dry-run; done
+expect_rc "needs agent-run is unmet in exxo-openrouter" 9 "$T/needs.md" --account exxo-openrouter --dry-run
+withneeds "Datadog, M365 something-else"
+expect_rc "needs is case-insensitive, comma or space separated, ignores unknown words" 9 "$T/needs.md" --account personal --dry-run
+has "'m365'" && ok "  message names the unmet need" || bad "  message does not name m365: $out"
+expect_rc "exxo-openrouter is a known context" 0 "$T/fixture.md" --account exxo-openrouter --dry-run
+has "config_dir: $FAKE/.claude-exxo-openrouter" && ok "  maps to its config dir" || bad "  wrong config dir: $out"
+
+# --- OpenRouter routing env is scrubbed outside exxo-openrouter, as the wrappers do ---
+cat >"$BIN/claude" <<'EOF'
+#!/bin/bash
+{ echo "CFG=${CLAUDE_CONFIG_DIR-unset}"; env | grep -E '^(ANTHROPIC_|CLAUDE_CODE_SUBAGENT_MODEL=)' | sed 's/=.*//' | sort | tr '\n' ' '; echo; } >"$REC"
+EOF
+for c in exxo exxo-openrouter; do
+    HOME="$FAKE" PATH="$BIN:/usr/bin:/bin" REC="$REC" ANTHROPIC_BASE_URL=x ANTHROPIC_API_KEY=x CLAUDE_CODE_SUBAGENT_MODEL=x "$KICK" "$T/fixture.md" --account "$c" >/dev/null 2>&1
+    if [ "$c" = exxo ]; then check "exxo launch drops the OpenRouter env" bash -c '! grep -q "ANTHROPIC_\|SUBAGENT" "$1"' _ "$REC"
+    else check "exxo-openrouter launch keeps its env" bash -c 'grep -q "ANTHROPIC_BASE_URL" "$1"' _ "$REC"; fi
+done
+
+# --- drift guard: the launcher's context table must match the fish wrappers ---
+FISH="$SRC_REPO/src/.config/fish/common.fish"
+want_ctx() { grep -m1 '^CONTEXTS=' "$KICK" | sed 's/^CONTEXTS="\(.*\)"$/\1/' | tr ' ' '\n' | sort; }
+fish_dirs() { grep -m1 'set -l ctx_dirs' "$FISH" | grep -o '\.claude-[a-z-]*' | sed 's/^\.claude-//' | sort; }
+fish_funcs() { grep -o '^function claude-[a-z-]* ' "$FISH" | sed 's/^function claude-//; s/ $//' | grep -v '^default$' | sort; }
+check "drift guard: CONTEXTS is non-empty" [ -n "$(want_ctx)" ]
+check "drift guard: CONTEXTS equals the ctx_dirs in __claude_ctx" [ "$(want_ctx)" = "$(fish_dirs)" ]
+check "drift guard: CONTEXTS equals the claude-<context> wrapper functions" [ "$(want_ctx)" = "$(fish_funcs)" ]
+want_env() { grep -m1 '^OPENROUTER_ENV=' "$KICK" | sed 's/^OPENROUTER_ENV="\(.*\)"$/\1/' | tr ' ' '\n' | sort; }
+fish_env() { grep -m1 'for v in ANTHROPIC_BASE_URL' "$FISH" | sed 's/^ *for v in //' | tr ' ' '\n' | sort; }
+check "drift guard: OPENROUTER_ENV is non-empty" [ -n "$(want_env)" ]
+check "drift guard: OPENROUTER_ENV equals the scrub list in __claude_ctx" [ "$(want_env)" = "$(fish_env)" ]
+
 rmdir "$FAKE/.claude-personal"
 expect_rc "missing config dir" 6 "$T/yaml.md" --dry-run
 HOME="$FAKE" PATH="/usr/bin:/bin" "$KICK" "$T/fixture.md" --dry-run >/dev/null 2>&1; rc=$?
