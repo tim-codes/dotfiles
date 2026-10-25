@@ -22,8 +22,9 @@ exists; if not, say so and fall to the picker). While capture is still on,
 `squad debug dir` prints the current run's directory; use its basename.
 Otherwise:
 
-1. `squad debug list --json` gives one row per capture, newest first:
+1. `squad debug list --json` gives one row per run, newest first:
    `{date, first, last, members, deliveries, pause_resume_pairs, errors}`.
+   Each row is one run; its `date` field is the run id.
    Nothing listed: tell Tim there is no capture (was the orchestrator started
    with `--debug`, or `squad debug on` run?) and stop.
 2. Ask with `AskUserQuestion`, one option per capture, newest first, at most
@@ -53,9 +54,27 @@ Pass `2026-10-24` for it.
 
 ## 3. Locate the transcripts
 
-Transcripts are `~/.claude-{personal,exxo,exxo-personal}/projects/*/<session_id>.jsonl`.
+Transcripts are `~/.claude-{personal,exxo,exxo-personal}/projects/*/<session_id>.jsonl`,
+plus `~/.claude-exxo-openrouter/projects/*/<session_id>.jsonl` (the K3
+context — a separate history, **not** a symlink into the others).
 `~/.claude-exxo-personal/projects` is a symlink to exxo's: dedupe by
 resolved path (`realpath`) so nothing is read twice.
+
+Include each session's subagent transcripts, at
+`~/.claude-*/projects/*/<session_id>/subagents/agent-*.jsonl` — attribute
+their tokens to the session that launched them.
+
+Also read, over the window (both always on, so they exist for every run):
+
+- `~/.local/state/claude-openrouter/guard.jsonl` — the PreToolUse guard's
+  block/allow decisions (`ts, session_id, cwd, rule, target, form,
+  decision`); join to sessions on `session_id`.
+- `~/.local/state/claude-openrouter/keyhelper.jsonl` — key-helper failures
+  (`ts, reason`); any row in the window is an incident.
+
+If `$D/<date>/openrouter.jsonl` is absent, run `squad debug openrouter
+<date>` once to fetch the per-generation provider and cost records, then
+re-check the file exists before going on.
 
 - **Orchestrator**: `squad history orchestrator --limit 5`; take the newest
   gauge with `debug: true` and its `session_id`.
@@ -85,7 +104,11 @@ yours) and carry:
 - Mechanics: absolute paths only; read-only; transcripts are large JSONL, so
   filter with `jq`/`grep` to the window rather than reading whole files; do
   not print secrets or tokens.
-- The ask, **findings only, at most 80 lines**, no narrative of the process:
+- The ask, **findings only, at most 120 lines**, no narrative of the
+  process. Sort every incident into exactly one of four quadrants —
+  **worked**, **noise**, **missed or late**, **wrong or slow** — and give
+  every incident row its evidence pointer (a transcript path plus record
+  `uuid` and timestamp, or a capture file plus line `ts`):
   1. what worked (reactions that were correct and timely);
   2. turns that were noise (a `<squad-message>` delivered, no action taken);
   3. missed or late reactions (a quota wall hit despite a projection; a
@@ -107,7 +130,7 @@ yours) and carry:
   Every finding cites evidence: a log block, a seq, or a transcript path
   plus timestamp.
 
-Do not re-do its reading yourself. If it returns more than 80 lines or
+Do not re-do its reading yourself. If it returns more than 120 lines or
 findings without evidence, send it back once via `SendMessage`.
 
 ## 5. Write `review.md`
@@ -115,11 +138,79 @@ findings without evidence, send it back once via `SendMessage`.
 Write `~/.local/state/squad/debug/<date>/review.md` (Write tool) with:
 
 - **Summary**: window, members, headline numbers, the verdict in three
-  sentences.
+  sentences. If any anti-goal was breached, the first sentence says so.
 - **HITL interruptions** (first, before everything else): count, total and
   per-item wait, per-stream split; table of items (id, stream, raised,
   presented, resolved, wait); pre-emptable-in-preflight list; member-raised
   (unqueued) interruptions with transcript evidence; ranked reductions.
+- **K3 efficacy** (pass/fail table, one row per criterion):
+  - job success: `ok/finished` ≥ 80% passes, < 60% fails (between: judgement
+    call, explained);
+  - rework: `rework+rejected/reviewed` ≤ 25% passes, > 40% fails;
+  - cost: median per job ≤ $1.50 and none above $10 passes, otherwise
+    fails;
+  - wall time: median ≤ 50% of deadline and timeouts ≤ 10% passes,
+    timeouts > 20% fails;
+  - cache reads ≥ 50% of input tokens from each session's third turn
+    passes, < 25% fails;
+  - review pool share ≥ 50% of the run's reviews on K3 — reported, not
+    gated;
+  - tokens moved off Anthropic — reported, not gated.
+- **K3 issues register** (pass/fail table): zero anti-goal breaches; zero
+  silent fallback (a K3 job that quietly ran on a Claude account); zero
+  `wrong` denials or guard blocks that stopped a job (join
+  `~/.local/state/claude-openrouter/guard.jsonl` to jobs on
+  `session_id`); every 402 ended `failed/budget`; every issue class listed
+  in full and every `unclear` verdict explained.
+- **Round changes: efficacy** (pass/fail table; each change against the
+  defect it targeted, with the baseline value in brackets):
+  - ENG-339 delivery: max hold age while busy ≤ `max_hold_seconds` + one
+    tick (baseline: 44 held `next` messages); every crossed level
+    delivered to each matching subscriber (75 and 90 together at 92%, no
+    85); zero duplicate `joined` (two per builder); ack-gated directive
+    p95 delivery ≤ 5 s;
+  - ENG-337: every approval item has a `decision`, and denials and items
+    join 1:1 (baseline: a denial lost; Approve recorded nothing);
+  - ENG-338: every merge by a grant holder or infra, zero denied merges
+    retried, zero K3 merges;
+  - ENG-340: burn noticed (decision or operator line) within 15 min of
+    `burn started` (baseline: about £3 burnt unnoticed in 15 min);
+  - herder split: zero tmux calls in the concierge transcript, every
+    launch and close in `history.jsonl`, zero unreported
+    `close_mismatch`;
+  - federation: every job reaches a terminal state or is in flight at run
+    end, no requester waits beyond a deadline, queued→assigned p95 ≤ 5
+    min while a capable worker is free;
+  - rate-aware pausing: every rate-aware directive has a trigger, no wall
+    hit after a `walls_before_reset` projection made 30+ min earlier;
+  - host: at most one pressure flap per 15 min;
+  - capture: one run dir holds every sink and log.
+- **Round changes: issues**: for each change, every regression or new
+  failure mode it caused (e.g. a `max_hold` flush interrupting a turn, an
+  ack bypass storm, a herder relaunch loop, a job leaking a worktree),
+  with evidence; plus one rubric row each for:
+  - liaison: every liaison action checked against the per-client policy —
+    a send to a non-`act` client, a send as tim@ without
+    `send_as = "tim"`, or a rate-limit breach is an incident (audit:
+    `$D/<date>/mail.jsonl` and `<state>/mail/audit.jsonl`, decisions in
+    `$D/<date>/liaison-decisions.md`);
+  - rebalancing: every rebalance has a trigger and an outcome recorded; a
+    move without a decision-log block is an incident; judge each proposal
+    `correct` / `wrong` / `unclear`;
+  - batched trunks: every trunk test run attributed, and every attributed
+    failure counted — a member's comprehensive run without a slot, a
+    landing on red, or a commit unlanded for more than 8 h is an
+    incident.
+- **Baseline comparison**: the same metrics for the 2026-10-25 run
+  (Claude only), computed by `squad debug report 2026-10-24 --from <first
+  orchestrator decision> --until <wind-down>` over the frozen events
+  snapshot (`$D/2026-10-24/events-snapshot-20261025T0430Z`). Metrics for
+  both runs: deliveries, p50/p95 delivery latency, max hold age,
+  crossings published vs delivered per level, duplicate joins, HITL items
+  and wait, denials (and retries), wall hits, pause/resume pairs, exxo
+  five-hour %/h, extra usage burnt, Anthropic tokens by model including
+  subagents, and merged PRs, with Anthropic tokens per merged PR as the
+  normalised comparison.
 - **What worked**.
 - **Findings** (non-HITL): grouped as noise, missed/late, wrong rulings,
   confusing skill text; each with its evidence.
