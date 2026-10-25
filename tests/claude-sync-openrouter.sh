@@ -114,8 +114,10 @@ for cmd in 'cat ~/keys/openrouter.key' 'cat -n $HOME/keys/x' 'echo a | grep k /U
 done
 
 # Hooks: PreToolUse arrays concatenate across layers. exxo-openrouter keeps
-# every shared PreToolUse entry and adds the guard after them; the other
-# contexts' hooks equal the plain shared * account merge (pre-change result).
+# every shared PreToolUse entry, then the exxo fragment's (the squad heavy
+# gate, which it inherits as a squad member context), then the guard; the
+# exxo contexts get shared + the exxo fragment's PreToolUse; personal's hooks
+# equal the plain shared merge.
 GUARD_CMD="$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$C/settings.overlay.exxo-openrouter.json")"
 check "guard hook command names the guard and ends with its marker" \
     bash -c 'case "$1" in *scripts/claude-openrouter-guard*"# claude-openrouter-guard") exit 0;; *) exit 1;; esac' _ "$GUARD_CMD"
@@ -135,13 +137,13 @@ echo '{"session_id":"s","cwd":"/tmp","hook_event_name":"PreToolUse","tool_name":
 check "guard hook, python3 present: merge still denied" grep -q '"deny"' "$T/deny.out"
 check "exxo-openrouter PreToolUse = shared PreToolUse + guard" \
     test "$(jq -c '.hooks.PreToolUse' "$(S exxo-openrouter)")" = \
-         "$(jq -c --arg c "$GUARD_CMD" '.hooks.PreToolUse + [{matcher:"Bash", hooks:[{type:"command", command:$c}]}]' "$C/settings.shared.json")"
+         "$(jq -c --arg c "$GUARD_CMD" '(.[0].hooks.PreToolUse + (.[1].hooks.PreToolUse // [])) + [{matcher:"Bash", hooks:[{type:"command", command:$c}]}]' -s "$C/settings.shared.json" "$C/settings.exxo.json")"
 check "exxo-openrouter other hook events = exxo's" \
     test "$(jq -c '.hooks | del(.PreToolUse)' "$(S exxo-openrouter)")" = "$(jq -c '.hooks | del(.PreToolUse)' "$(S exxo)")"
 for pair in personal:personal exxo:exxo exxo-personal:exxo; do
     ctx="${pair%%:*}"; acct="${pair##*:}"
     check "$ctx: hooks unchanged (shared * account)" \
-        test "$(jq -c '.hooks' "$(S "$ctx")")" = "$(jq -cs '(.[0] * .[1]).hooks' "$C/settings.shared.json" "$C/settings.$acct.json")"
+        test "$(jq -c '.hooks' "$(S "$ctx")")" = "$(jq -cs '. as $f | ($f[0] * $f[1]) | .hooks.PreToolUse = (($f[0].hooks.PreToolUse // []) + ($f[1].hooks.PreToolUse // [])) | .hooks' "$C/settings.shared.json" "$C/settings.$acct.json")"
     check "$ctx: no guard hook" bash -c "! grep -q claude-openrouter-guard '$(S "$ctx")'"
 done
 

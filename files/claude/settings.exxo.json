@@ -44,5 +44,19 @@
       "Bash(gcloud compute ssh*)",
       "Bash(* gcloud compute ssh*)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v squad >/dev/null 2>&1 && squad heavy check --hook || true # squad-heavy-gate",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }
