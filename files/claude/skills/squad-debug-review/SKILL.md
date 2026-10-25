@@ -64,17 +64,28 @@ Include each session's subagent transcripts, at
 `~/.claude-*/projects/*/<session_id>/subagents/agent-*.jsonl` — attribute
 their tokens to the session that launched them.
 
-Also read, over the window (both always on, so they exist for every run):
+Also read, over the window. Some sources exist on squad main today and some
+are planned; for each, use the fallback when it is absent and label any
+estimate taken from transcripts as an estimate:
 
-- `~/.local/state/claude-openrouter/guard.jsonl` — the PreToolUse guard's
-  block/allow decisions (`ts, session_id, cwd, rule, target, form,
-  decision`); join to sessions on `session_id`.
-- `~/.local/state/claude-openrouter/keyhelper.jsonl` — key-helper failures
-  (`ts, reason`); any row in the window is an incident.
-
-If `$D/<date>/openrouter.jsonl` is absent, run `squad debug openrouter
-<date>` once to fetch the per-generation provider and cost records, then
-re-check the file exists before going on.
+- `~/.local/state/claude-openrouter/guard.jsonl` (exists today) — the
+  PreToolUse guard's block/allow decisions (`ts, session_id, cwd, rule,
+  target, form, decision`); join to sessions on `session_id`. Fallback if
+  absent: no guard evidence; say so rather than assume zero blocks.
+- `~/.local/state/claude-openrouter/keyhelper.jsonl` (planned, O10) — key-helper
+  failures (`ts, reason`); it logs failures only, so an absent file means no
+  failures, not a broken capture. Any row in the window is an incident.
+- `$D/<date>/openrouter.jsonl` (planned, O4) — per-generation provider and
+  cost records. If absent, run `squad debug openrouter <date>` once and
+  re-check the file exists. If that command is rejected, the binary predates
+  O4: estimate served model, cost and cache reads from the K3 transcripts
+  (`message.model`, `usage`), labelled as transcript estimates.
+- `squad debug report <date> --from/--until` (planned, O12) — if rejected,
+  the binary predates O12: compute baseline-window metrics from the events
+  snapshot by hand, labelled as estimates.
+- `$D/<date>/mail.jsonl`, `liaison-decisions.md` and
+  `<state>/mail/audit.jsonl` (planned, Plan F) — if absent, mark the liaison
+  rubric row "not assessable" rather than pass.
 
 - **Orchestrator**: `squad history orchestrator --limit 5`; take the newest
   gauge with `debug: true` and its `session_id`.
@@ -100,12 +111,13 @@ roster line before launching: **1. Transcript review** (`investigator`) —
 yours) and carry:
 
 - The report text in full, the decision-log path, the transcript table
-  (absolute paths), and the window.
+  (absolute paths), the window, and the absolute paths of `guard.jsonl`,
+  `keyhelper.jsonl` and `openrouter.jsonl` (say which are absent).
 - Mechanics: absolute paths only; read-only; transcripts are large JSONL, so
   filter with `jq`/`grep` to the window rather than reading whole files; do
   not print secrets or tokens.
 - The ask, **findings only, at most 120 lines**, no narrative of the
-  process. Sort every incident into exactly one of four quadrants —
+  process. Sort every incident in items 1-4 and 7 into exactly one of four quadrants —
   **worked**, **noise**, **missed or late**, **wrong or slow** — and give
   every incident row its evidence pointer (a transcript path plus record
   `uuid` and timestamp, or a capture file plus line `ts`):
@@ -127,6 +139,16 @@ yours) and carry:
   8. **Deliverables.** Every deliverable named in a member's prompt (the
      plan's `deliverables`, orchestrator skill §3a) is delivered or
      tracked-deferred; list any that are neither.
+  9. **K3 issues** (data for the issues register; one row per hit, with
+     pointer): served `message.model` and provider per K3 transcript, flagging
+     any that is not the K3 model (silent fallback); every 401/402/403/5xx
+     `apiErrorStatus` row, with the job's final state; guard blocks joined
+     on `session_id`; and the K3-integrity tally from the decision log:
+     `grep -c 'k3-integrity: clean'` and `grep 'k3-integrity: flagged'`
+     over `orchestrator-decisions.md`, listing each flagged line.
+  10. **Per-job K3 numbers**: for each K3 job, cost, wall time versus
+      deadline, and cache-read share of input tokens from the third turn,
+      from `openrouter.jsonl` or labelled transcript estimates.
   Every finding cites evidence: a log block, a seq, or a transcript path
   plus timestamp.
 
@@ -160,8 +182,11 @@ Write `~/.local/state/squad/debug/<date>/review.md` (Write tool) with:
   silent fallback (a K3 job that quietly ran on a Claude account); zero
   `wrong` denials or guard blocks that stopped a job (join
   `~/.local/state/claude-openrouter/guard.jsonl` to jobs on
-  `session_id`); every 402 ended `failed/budget`; every issue class listed
-  in full and every `unclear` verdict explained.
+  `session_id`); every 402 ended `failed/budget`; zero `k3-integrity:
+  flagged <job> <files>` lines in the orchestrator decision log (report
+  clean and flagged counts; each flagged line needs a follow-up block,
+  else it fails); every issue class listed in full and every `unclear`
+  verdict explained.
 - **Round changes: efficacy** (pass/fail table; each change against the
   defect it targeted, with the baseline value in brackets):
   - ENG-339 delivery: max hold age while busy ≤ `max_hold_seconds` + one
@@ -202,7 +227,7 @@ Write `~/.local/state/squad/debug/<date>/review.md` (Write tool) with:
     landing on red, or a commit unlanded for more than 8 h is an
     incident.
 - **Baseline comparison**: the same metrics for the 2026-10-25 run
-  (Claude only), computed by `squad debug report 2026-10-24 --from <first
+  (Claude only; its capture is the 2026-10-24 run dir), computed by `squad debug report 2026-10-24 --from <first
   orchestrator decision> --until <wind-down>` over the frozen events
   snapshot (`$D/2026-10-24/events-snapshot-20261025T0430Z`). Metrics for
   both runs: deliveries, p50/p95 delivery latency, max hold age,
