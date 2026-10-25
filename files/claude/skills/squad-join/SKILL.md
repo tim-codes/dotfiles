@@ -99,24 +99,17 @@ this is a genuinely separate stream.
 ## 3. Default subscriptions
 
 ```
-squad subscribe <name> quota.<account>.threshold
-squad subscribe <name> quota.<account>.reset
 squad subscribe <name> host.pressure
 squad subscribe <name> msg.<name>
 squad subscribe <name> msg.role.client
 squad subscribe <name> msg.all
 ```
 
-Then set the threshold levels as a separate command, never inside a loop over
-topics:
-
-```
-squad subscribe <name> quota.<account>.threshold --levels 75,90,95,100
-```
-
-`--levels` is a flag of `subscribe`, not part of the topic name: it applies
-to the one topic named in that command, so keep it out of any loop that
-subscribes several topics.
+Members do not subscribe to the quota topics. Quota is the orchestrator's
+business, and a member that acts on it only adds a second, uncoordinated
+throttle. If you want one anyway, give a topic a single `subscribe` command
+with all its flags (`--levels 85,95,100`): a second `subscribe` on the same
+topic replaces the first.
 
 The broker also delivers `msg.*` lanes to their recipients implicitly; the
 explicit subscriptions keep the roster self-describing. Do not subscribe to
@@ -147,9 +140,25 @@ separated by a blank line (deliveries coalesce while you are busy).
   information.
 - A message turn's JSON is `{"from":…,"text":…,"data":{…}}`.
 
-Quota events about your own account are your cue to checkpoint sooner (commit
-now, push if a draft PR exists) — they are not a pause by themselves.
+**Members do not self-throttle on quota.** Quota events are information: do
+not slow down, checkpoint early or defer work because of one. You act only on
+the orchestrator's `pause`, `fanout` and `priority` directives (§5).
 `host.pressure` `critical` means stop starting heavy jobs.
+
+**Safety net: check the history at the end of every turn.** Delivery can
+lag (a held turn, a restart), so before you end a turn run
+`squad history msg.<name> --since-seq <last seen seq>` and act on anything you
+have not seen, directives first. Keep the last seq you have seen in `squad set
+--name <name> --detail` (e.g. `seen msg.<name> seq 412`), or in a file under
+the worktree's `.git/` (`git rev-parse --git-dir`), and update it each time.
+
+**Only the broker reaches the concierge.** Send to it with `squad send
+concierge … --from <name>`, never a direct cross-session send (`SendMessage`
+to another session): nothing from the squad may land in an operator's input
+line.
+
+**`squad.member` events:** `joined` is a new member; `updated` (with
+`changed`) is the same session re-registering, not a second member.
 
 ## 5. Directives
 
@@ -157,6 +166,7 @@ now, push if a draft PR exists) — they are not a pause by themselves.
 |---|---|---|
 | `pause` | `{reason, resets_at?}` | ack first (below), then the pause procedure below |
 | `priority` | `{priority}` | note it; at 4 or 5 defer optional work (polish, extra refactors, nice-to-have tests) |
+| `fanout` | as the directive's text says | the orchestrator's instruction on parallel fan-out; follow it (see "Members do not self-throttle", §4) |
 | `heavy_slot` | `{decision: grant\|deny\|revoke, retry_after_s?}` | grant: start the heavy job. deny: wait `retry_after_s`, then request again (a deny with `retry_after_s` may mean a protected app is running; do non-heavy work meanwhile). revoke: stop the heavy job now (interrupt the command), then `release` |
 | `cleanup` | `{reason, top?}` | the orchestrator saw you idle with busy or large leftover processes (`top`: `{pid, cmd, cpu_pct, rss_mb}`). Run the self-cleanup rule (§7) now: `TaskStop` completed subagents, end background shells you started, kill your own leftovers (dev servers, browsers, builds; check each `top` pid is yours before killing, never another session's), then `squad set --name <name> --detail "cleanup done: <what was stopped>"` |
 | `preflight` | `{ttl_hours?}` | warm and refresh every credential path this stream's work will need, so nothing prompts later while Tim is away; the procedure is below |
@@ -174,7 +184,9 @@ the broker never has to guess between topics that share a seq:
 squad ack "<seq> topic=<topic>" [--note "<one line>"]
 ```
 
-An unacked directive is re-delivered at `now` and then escalated to Tim as
+Ack-gated directives (the orchestrator's `pause`, `resume`, `priority`, `fanout`
+and `heavy_slot` revoke) reach you at once, even while a batch of ordinary
+messages is held. An unacked directive is re-delivered at `now` and then escalated to Tim as
 "member not responding". A pause ack means "I have stopped launching new
 work", not "I have finished pausing"; the procedure below still follows.
 While paused, only `msg.*` and `squad.directive` reach you; quota and host

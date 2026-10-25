@@ -45,8 +45,7 @@ context and stop.
    squad subscribe concierge operator.item --priority next
    squad subscribe concierge squad.directive --priority now
    squad subscribe concierge squad.member --priority later
-   squad subscribe concierge quota.exxo.threshold --priority later
-   squad subscribe concierge quota.exxo.threshold --levels 85,95,100
+   squad subscribe concierge quota.exxo.threshold --levels 85,95,100 --priority later
    ```
 4. **Merge authority**: `test -n "$SQUAD_MERGE_AUTHORITY" && echo yes ||
    echo no` — state yes/no, never the value. You do not merge; it only

@@ -6,7 +6,7 @@ argument-hint: "[YYYY-MM-DD]"
 
 # Squad debug review
 
-Turns one night's debug capture (`~/.local/state/squad/debug/<date>/`) into a
+Turns one run's debug capture (`~/.local/state/squad/debug/<run>/`) into a
 ranked list of improvements to the squad. Personal context only. Read-only
 against the capture; the one file you write is `review.md` beside it.
 
@@ -15,8 +15,12 @@ Bash calls: spell the paths out each time.
 
 ## 1. Pick the capture
 
-With a `[YYYY-MM-DD]` argument, use it (check `$D/<date>` exists; if not, say
-so and fall to the picker). Otherwise:
+A capture is filed under its run id, normally a date (`YYYY-MM-DD`, or
+`YYYY-MM-DD-2` for a second run that day), not under each process's start
+date. With a `[YYYY-MM-DD]` argument, use it as the run id (check `$D/<date>`
+exists; if not, say so and fall to the picker). While capture is still on,
+`squad debug dir` prints the current run's directory; use its basename.
+Otherwise:
 
 1. `squad debug list --json` gives one row per capture, newest first:
    `{date, first, last, members, deliveries, pause_resume_pairs, errors}`.
@@ -27,7 +31,11 @@ so and fall to the picker). Otherwise:
    `<members> members, <deliveries> deliveries, <n> pause/resume pairs,
    <errors> errors`. The tool adds "Other" itself: say in the question text
    that Other takes an older date as `YYYY-MM-DD`.
-3. Use the chosen date for everything below (`<date>`).
+3. Use the chosen run id for everything below (`<date>`).
+
+The 2026-10-25 test run predates run ids: it lives in `debug/2026-10-24/`
+(the baseline), with its events snapshot at `events-snapshot-20261025T0430Z`.
+Pass `2026-10-24` for it.
 
 ## 2. Read the evidence
 
