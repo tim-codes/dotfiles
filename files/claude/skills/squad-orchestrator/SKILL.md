@@ -258,7 +258,7 @@ changes by Tim or members.
 
 The plan lives in the broker, surviving your restarts:
 ```
-{"streams":[{"member":"…","priority":1-5,"phase":"…","notes":"…"}],
+{"streams":[{"member":"…","priority":1-5,"phase":"…","notes":"…","prompt":"<kickoff prompt path>","deliverables":[…]}],
  "heavy_slots":1,"slots_reduced":false,"grants":[{"member","reason","granted_at","expires_at"}],
  "queue":[{"member","reason","est_minutes","requested_at"}],"paused":[…],
  "infra_authority":null,"pending_infra":[{"pr","repo","from","summary"}],
@@ -271,6 +271,42 @@ publish plan --kind gauge '<json>'` after every change.
 --priority <p>`, and `squad send <member> "priority <p>" --from orchestrator
 --ack-deadline-s 120 --data '{"directive":"priority","priority":<p>}'`;
 handle `unacked`/`escalated` as in §2 step 4. Don't micromanage tasks.
+
+## 3a. Post-batch deliverables check
+
+Work named in a member's kickoff prompt must not go missing or quiet (a
+client deck asked for in a prose aside, then deferred with nobody
+tracking it). Sources are only the member's original prompt file
+(`~/claude/prompts/<yymmdd>/…`; its path is in the launch or the
+concierge's launch line, record it as the stream's `prompt`) and the open
+operator items plus the Linear issues they or the prompt cite. Not meeting
+notes or chat.
+
+**When:** after each batch (a member reports `done`, is closed or
+relaunched, or your periodic review), and always before the morning report
+and before closing a member.
+
+**How** (delegate the reading, §7; you keep the table):
+1. Re-read the prompt. Extract every named deliverable: code, PRs, docs,
+   decks, screenshots, drafts, reports, tickets. Prose asides count ("we
+   also need…", "capture … as we go"). Mark the client-facing ones.
+2. Record each in the stream's `deliverables` as `{item, client_facing,
+   state, evidence}`: `delivered` (link or path), `deferred` (reason, owner,
+   and the open operator item id or Linear issue) or `missing`.
+3. `deferred` is valid only with that open item (`squad operator list`,
+   `get`) and is re-surfaced at every check; if the item is closed or gone,
+   it is `missing`. A deliverable never goes silent.
+4. `missing` becomes a directive to the owning member (`squad send <member>
+   … --from orchestrator`), or, once the member is closed, an operator item
+   (§2c, `squad operator raise`) saying so, client-facing flagged in the
+   title.
+
+**Where:** in the plan gauge (§3), per stream, so it survives your restarts
+like the rest of the plan; publish after every change. With `--debug`, also
+log each check in `orchestrator-decisions.md` (§9).
+
+**Morning report:** a "Deliverables vs brief" table: stream, deliverable,
+client-facing, state, evidence or tracking item.
 
 ## 4. Heavy slots
 
