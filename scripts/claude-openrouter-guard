@@ -721,6 +721,9 @@ def analyse(text, cwd, allowed):
         if risky:
             raise unresolved("unparseable git/gh command")
         return
+    if re.search(r"[@+?*!]\(", text):
+        # extglob pattern syntax: unresolvable whatever the shell options are
+        raise unresolved("extglob pattern in a git/gh command")
     parsed = Parsed(toks)
     segs = parsed.segments
     compound = len(segs) > 1

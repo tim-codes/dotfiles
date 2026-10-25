@@ -231,6 +231,9 @@ job|git pu?h origin job/x
 job|git push origin job/?
 job|gh api repos/o/r/pulls/{1,2}/reviews
 job|git -C {.,..} push origin job/x
+job|gh pr +(m)erge 1
+job|gh pr @(merge) 1
+job|git pu!(x)sh origin HEAD:main
 job|git push origin #job/x
 job|git push origin HEAD:main # comment
 job|git push origin HEAD:ma[i]n
