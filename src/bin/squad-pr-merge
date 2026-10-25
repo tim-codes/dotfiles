@@ -8,7 +8,7 @@
 # --into-trunk  admission: squash-merge a reviewed PR into a rolling trunk. The
 #               base must be `trunk/*` or listed in SQUAD_ADOPTED_TRUNKS (space
 #               or comma separated). Needs no merge grant; any Claude member
-#               may use it. Uses `gh pr merge --squash`.
+#               may use it. Uses `gh pr merge --squash --delete-branch`.
 # --land        landing: merge a trunk PR into the repo's default branch. The
 #               head must be `trunk/*` and the base the default branch.
 #               Needs SQUAD_MERGE_AUTHORITY to name the repo and today's date
@@ -16,7 +16,11 @@
 #               a bare `YYYY-MM-DD` is also accepted, as exxo-infra's pr-merge
 #               reads it). Uses `gh pr merge --merge`, never --squash.
 #
-# Both modes refuse a closed or draft PR and any non-passing check. Every
+# Both modes refuse a closed or draft PR and any non-passing required check
+# (all checks if the repo reports no required ones; pending blocks, nothing
+# waits), and pin the merge to the head sha read here (--match-head-commit).
+# --into-trunk also passes --delete-branch (member branches are disposable);
+# --land keeps the trunk branch. Every
 # refusal is one line on stderr and a non-zero exit (1 refused, 2 bad usage).
 # --dry-run prints the gh command instead of running it.
 set -uo pipefail
@@ -38,11 +42,11 @@ done
 [[ "$repo" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || usage "--repo must be <owner/name>"
 [ -n "$mode" ] || usage "choose --into-trunk or --land"
 
-read -r state draft base head < <(gh pr view "$n" -R "$repo" \
-  --json state,isDraft,baseRefName,headRefName \
-  --jq '[.state, (.isDraft|tostring), .baseRefName, .headRefName] | join(" ")') \
+read -r state draft base head oid < <(gh pr view "$n" -R "$repo" \
+  --json state,isDraft,baseRefName,headRefName,headRefOid \
+  --jq '[.state, (.isDraft|tostring), .baseRefName, .headRefName, .headRefOid] | join(" ")') \
   || die "cannot read PR #$n in $repo"
-[ -n "${head:-}" ] || die "cannot read PR #$n in $repo"
+[[ "${oid:-}" =~ ^[0-9a-f]{40}$ ]] || die "cannot read PR #$n in $repo"
 [ "$state" = OPEN ] || die "PR #$n is not open ($state)"
 [ "$draft" = false ] || die "PR #$n is a draft; mark it ready first"
 
@@ -51,7 +55,7 @@ if [ "$mode" = --into-trunk ]; then
   [[ "$base" == trunk/* ]] && ok=1
   adopted="${SQUAD_ADOPTED_TRUNKS:-}"; for t in ${adopted//,/ }; do [ "$t" = "$base" ] && ok=1; done
   [ "$ok" = 1 ] || die "PR #$n base '$base' is not trunk/* or in SQUAD_ADOPTED_TRUNKS; not admitting"
-  method=--squash
+  method=(--squash --delete-branch)
 else
   default="$(gh repo view "$repo" --json defaultBranchRef --jq .defaultBranchRef.name)" \
     && [ -n "$default" ] || die "cannot read the default branch of $repo"
@@ -62,14 +66,20 @@ else
     { [ "$g" = "$repo@$today" ] || [ "$g" = "$today" ]; } && granted=1
   done
   [ "$granted" = 1 ] || die "landing $repo needs SQUAD_MERGE_AUTHORITY=$repo@$today; none set"
-  method=--merge
+  method=(--merge)
 fi
 
-gh pr checks "$n" -R "$repo" >/dev/null 2>&1 || die "checks on PR #$n are not all passing; not merging"
+# Only required checks gate; if the repo reports none, fall back to all checks.
+# Pending counts as not passing (gh exits 8): no waiting here.
+cout="$(gh pr checks "$n" -R "$repo" --required 2>&1)"; crc=$?
+if [ "$crc" -ne 0 ] && grep -qi 'no required checks' <<<"$cout"; then
+  cout="$(gh pr checks "$n" -R "$repo" 2>&1)"; crc=$?
+fi
+[ "$crc" -eq 0 ] || { [ "$crc" -eq 8 ] && die "checks pending on PR #$n; not merging"; die "checks failing on PR #$n; not merging"; }
 
 if [ "$dry" = 1 ]; then
-  echo "gh pr merge $n -R $repo $method"
+  echo "gh pr merge $n -R $repo ${method[*]} --match-head-commit $oid"
   exit 0
 fi
-echo "squad-pr-merge: merging #$n in $repo ($mode, $method)"
-gh pr merge "$n" -R "$repo" "$method"
+echo "squad-pr-merge: merging #$n in $repo ($mode, ${method[*]})"
+gh pr merge "$n" -R "$repo" "${method[@]}" --match-head-commit "$oid"

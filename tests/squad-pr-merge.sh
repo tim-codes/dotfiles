@@ -16,9 +16,12 @@ cat >"$BIN/gh" <<'STUB'
 #!/bin/bash
 echo "gh $*" >>"$GH_LOG"
 case "$1 $2" in
-  "pr view")   echo "${STUB_STATE:-OPEN} ${STUB_DRAFT:-false} ${STUB_BASE:-trunk/261025-1} ${STUB_HEAD:-feat/x}" ;;
+  "pr view")   echo "${STUB_STATE:-OPEN} ${STUB_DRAFT:-false} ${STUB_BASE:-trunk/261025-1} ${STUB_HEAD:-feat/x} aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" ;;
   "repo view") echo "${STUB_DEFAULT:-main}" ;;
-  "pr checks") [ "${STUB_CHECKS:-green}" = green ] && exit 0; echo "build fail" >&2; exit 1 ;;
+  "pr checks") case " $* " in *" --required "*)
+                 [ "${STUB_REQUIRED:-some}" = none ] && { echo "no required checks reported on the 'x' branch" >&2; exit 1; } ;;
+               *) [ "${STUB_ALL:-}" = red ] && { echo "build fail" >&2; exit 1; } ;; esac
+               case "${STUB_CHECKS:-green}" in green) exit 0 ;; pending) echo pending >&2; exit 8 ;; *) echo "build fail" >&2; exit 1 ;; esac ;;
   "pr merge")  exit 0 ;;
 esac
 STUB
@@ -50,12 +53,15 @@ run "into-trunk refuses base main"        refuse "" STUB_BASE=main -- 7 --repo $
 run "into-trunk refuses draft"            refuse "" STUB_DRAFT=true -- 7 --repo $R --into-trunk
 run "into-trunk refuses red checks"       refuse "" STUB_CHECKS=red -- 7 --repo $R --into-trunk
 run "into-trunk refuses unknown base"     refuse "" STUB_BASE=feat/automations-trunk -- 7 --repo $R --into-trunk
+run "into-trunk refuses pending checks"   refuse "" STUB_CHECKS=pending -- 7 --repo $R --into-trunk
+run "into-trunk refuses red when no required checks" refuse "" STUB_REQUIRED=none STUB_CHECKS=red -- 7 --repo $R --into-trunk
 run "into-trunk refuses a closed PR"      refuse "" STUB_STATE=MERGED -- 7 --repo $R --into-trunk
-run "into-trunk accepts adopted trunk"    merge "pr merge 7 -R $R --squash" STUB_BASE=feat/automations-trunk SQUAD_ADOPTED_TRUNKS="a/b, feat/automations-trunk" -- 7 --repo $R --into-trunk
-run "into-trunk squashes, no grant needed" merge "pr merge 7 -R $R --squash" -- 7 --repo $R --into-trunk
+run "into-trunk accepts adopted trunk"    merge "pr merge 7 -R $R --squash --delete-branch --match-head-commit a{40}" STUB_BASE=feat/automations-trunk SQUAD_ADOPTED_TRUNKS="a/b, feat/automations-trunk" -- 7 --repo $R --into-trunk
+run "into-trunk squashes, no grant needed" merge "pr merge 7 -R $R --squash --delete-branch --match-head-commit a{40}" -- 7 --repo $R --into-trunk
 NOT='--merge'
-run "into-trunk never uses --merge"       merge "pr merge 7 -R $R --squash" -- 7 --repo $R --into-trunk
+run "into-trunk never uses --merge"       merge "pr merge 7 -R $R --squash --delete-branch --match-head-commit a{40}" -- 7 --repo $R --into-trunk
 NOT=zzz
+run "into-trunk falls back to all checks when none required" merge "pr merge 7 -R $R --squash" STUB_REQUIRED=none -- 7 --repo $R --into-trunk
 run "land refuses without grant"          refuse "" STUB_BASE=main STUB_HEAD=trunk/261025-1 -- 9 --repo $R --land
 run "land refuses a grant for another repo" refuse "" STUB_BASE=main STUB_HEAD=trunk/261025-1 SQUAD_MERGE_AUTHORITY="Other/repo@$TODAY" -- 9 --repo $R --land
 run "land refuses a stale grant"          refuse "" STUB_BASE=main STUB_HEAD=trunk/261025-1 SQUAD_MERGE_AUTHORITY="$R@2020-01-01" -- 9 --repo $R --land
@@ -63,9 +69,11 @@ run "land refuses non-default base"       refuse "" STUB_BASE=develop STUB_HEAD=
 run "land refuses non-trunk head"         refuse "" STUB_BASE=main STUB_HEAD=feat/x SQUAD_MERGE_AUTHORITY="$R@$TODAY" -- 9 --repo $R --land
 run "land refuses draft"                  refuse "" STUB_BASE=main STUB_HEAD=trunk/261025-1 STUB_DRAFT=true SQUAD_MERGE_AUTHORITY="$R@$TODAY" -- 9 --repo $R --land
 run "land refuses red checks"             refuse "" STUB_BASE=main STUB_HEAD=trunk/261025-1 STUB_CHECKS=red SQUAD_MERGE_AUTHORITY="$R@$TODAY" -- 9 --repo $R --land
+NOT='--delete-branch'
+run "land does not delete the branch"     merge "pr merge 9 -R $R --merge" STUB_BASE=main STUB_HEAD=trunk/261025-1 SQUAD_MERGE_AUTHORITY="$R@$TODAY" -- 9 --repo $R --land
 NOT='--squash'
-run "land uses --merge, never --squash"   merge "pr merge 9 -R $R --merge" STUB_BASE=main STUB_HEAD=trunk/261025-1 SQUAD_MERGE_AUTHORITY="$R@$TODAY" -- 9 --repo $R --land
-run "land accepts bare date grant"        merge "pr merge 9 -R $R --merge" STUB_BASE=main STUB_HEAD=trunk/261025-1 SQUAD_MERGE_AUTHORITY="$TODAY" -- 9 --repo $R --land
+run "land uses --merge, never --squash"   merge "pr merge 9 -R $R --merge --match-head-commit a{40}$" STUB_BASE=main STUB_HEAD=trunk/261025-1 SQUAD_MERGE_AUTHORITY="$R@$TODAY" -- 9 --repo $R --land
+run "land accepts bare date grant"        merge "pr merge 9 -R $R --merge --match-head-commit a{40}$" STUB_BASE=main STUB_HEAD=trunk/261025-1 SQUAD_MERGE_AUTHORITY="$TODAY" -- 9 --repo $R --land
 NOT=zzz
 run "bad mode refused"                    refuse "" -- 9 --repo $R
 run "non-numeric PR refused"              refuse "" -- x --repo $R --land
