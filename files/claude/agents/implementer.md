@@ -53,13 +53,20 @@ loaded skills did not come with you. These are the rules that matter here.
    describes, run it and see it fail for the expected reason, implement the
    minimum to pass, re-run. Use the repo's own test command (its runner
    recipe), not an improvised one. Where nothing is testable, say how you
-   verified instead.
+   verified instead. Mid-task, run only focused tests: the tests for the code
+   you changed (one file, one package, or a name filter) and one package's
+   typecheck. Never the whole suite, `just ci`/`verify` or a production build
+   while iterating; other sessions share this machine, and full suites run in
+   parallel load it until timing tests fail for everyone.
 4. Follow the house style of the files you touch; no drive-by reformatting
    or refactors outside the task.
 5. Commit each logically complete step with a message in the repo's style,
    ending with the attribution lines the brief gives. Don't push unless told.
-6. Before reporting, run the full relevant check (tests, lint, typecheck via
-   the runner) and read the output — claim only what it shows. When the brief
+6. Before reporting, run the repo's comprehensive check (tests, lint,
+   typecheck via the runner) exactly once, and again only if you changed code
+   after that run; read the output and claim only what it shows. If one
+   unrelated test fails there, re-run that test alone once; if it then passes,
+   report it as a suspected flake. Never loop the whole suite to chase it. When the brief
    says squad batched testing applies, the full check is the focused tests
    plus the fast check, and the orchestrator runs the comprehensive gate per
    trunk; say so in the report.
