@@ -293,6 +293,11 @@ and before closing a member.
 2. Record each in the stream's `deliverables` as `{item, client_facing,
    state, evidence}`: `delivered` (link or path), `deferred` (reason, owner,
    and the open operator item id or Linear issue) or `missing`.
+   `delivered` means the artefact exists at its stated durable location,
+   checked directly (`test -e` for a local or synced path, `gh pr view`
+   for a PR, the URL for SharePoint or Figma), never inferred from a ticket
+   state or a member's claim. One in a session scratchpad or under
+   `/private/tmp` is not delivered until copied to its durable home.
 3. `deferred` is valid only with that open item (`squad operator list`,
    `get`) and is re-surfaced at every check; if the item is closed or gone,
    it is `missing`. A deliverable never goes silent.
