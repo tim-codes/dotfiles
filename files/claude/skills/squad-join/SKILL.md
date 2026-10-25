@@ -16,13 +16,18 @@ how you do your own work; it adds coordination between sessions.
 Every `squad` command below is spelled as the CLI accepts it. Environment
 variables do not persist between Bash tool calls, so **always pass
 `--name <name>` to `squad set` and `--from <name>` to `squad send`**; never
-rely on `$SQUAD_MEMBER`.
+rely on `$SQUAD_MEMBER` being present in a later call (§2 reads it once, to
+pick the name).
 
 ## 1. Get out of the primary checkout
 
-**Register first, always.** Before this step, run §2 (with `--cwd "$PWD"`)
-and §3 so there is a channel to raise problems on; every start-up check below
-runs after. After moving into the worktree, re-run the same `squad register`
+**Kickoff repo preparation is the one step that precedes registration.**
+If your kickoff names any (`git pull --ff-only`, a rebase), do it first; it
+is yours to do.
+
+**Register straight after that, always.** Before the rest of this step, run
+§2 (with `--cwd "$PWD"`) and §3 so there is a channel to raise problems on;
+every start-up check below runs after. After moving into the worktree, re-run the same `squad register`
 with the worktree `--cwd` (safe, keeps subscriptions).
 
 **Safe drift is auto-fixed, never asked about**, one log line each: a
@@ -63,8 +68,9 @@ or not in a git repo: skip this step.
 
 ## 2. Register
 
-Pick the name: `--name` if given, else a short slug for the workstream
-(`<repo>-<topic>`). Lowercase letters, digits, `-` and `_` only; not `all`,
+Pick the name: `--name` if given, else `$SQUAD_MEMBER` (set when the herder
+launched you; read it with `echo "${SQUAD_MEMBER:-}"`), else a short slug for
+the workstream (`<repo>-<topic>`). Lowercase letters, digits, `-` and `_` only; not `all`,
 not starting `role`.
 
 ```
@@ -173,6 +179,7 @@ line.
 | `resume` / `msg` | `{}` / `{kind:"operator_done", id?}` | `resume` as below; a `msg` saying an `operator_task` of yours is done: continue the work it blocked (§6 Operator tasks); a `msg` `operator_decision` `{id, option, note}`: act on that option only (§6) |
 | `review` | `{findings}` | design-conformity findings on your ADR/plan or PR: address each blocking finding (or reply to the orchestrator with a justification), then re-send `design ready` / `pr_ready`; advisory ones are optional |
 | `infra` | `{action, pr, authority}` | infra role only; a client ignores it |
+| `stop` | `{reason}` | ack first; finish or abandon the current step; commit and push work in progress to the branch; `squad set --name <name> --status done --detail "stopped: <reason>; next: <step>"`; `squad deregister <name>`; end the turn. The herder then exits the session (`/exit`) |
 | `relaunch` | reserved | not implemented; reply that it is unsupported |
 
 **Acknowledge first.** A message carrying a trailer line `ack_required:
@@ -265,8 +272,11 @@ now, while Tim is at the machine.
 All client → orchestrator messages go to `role:orchestrator`, with the kind
 as the text's first word and a `kind` field in `data`.
 
-- **Heavy work** (browser/Playwright suites, full builds, large data jobs):
-  before starting,
+- **Heavy work** (browser/Playwright suites, full builds, large data jobs).
+  These always need a granted slot before they run: `just ci`, `just verify`,
+  any full test suite (`cargo test` with no filter, `pnpm test`, `vitest run`
+  with no file, `playwright test`), production builds, and any Docker build.
+  A filtered single test does not need one. Before starting,
 
   ```
   squad send role:orchestrator "heavy_slot request: <reason>" --from <name> \
@@ -282,8 +292,8 @@ as the text's first word and a `kind` field in `data`.
     --data '{"kind":"heavy_slot","action":"release"}'
   ```
 
-  With no live orchestrator in `squad roster`, run the job without a slot,
-  but not while `host.pressure` is `critical`.
+  With no live orchestrator in `squad roster`, run them anyway, one at a
+  time, but not while `host.pressure` is `critical`.
 - **PR ready** for merge or deploy:
 
   ```
