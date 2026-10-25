@@ -21,13 +21,13 @@ pick the name).
 
 ## 1. Get out of the primary checkout
 
-**Repo preparation named in your kickoff comes first** (`git pull
---ff-only`, a rebase): it is yours to do, as your first step, before any
-registration work.
+**Kickoff repo preparation is the one step that precedes registration.**
+If your kickoff names any (`git pull --ff-only`, a rebase), do it first; it
+is yours to do.
 
-**Register first, always.** Before this step, run §2 (with `--cwd "$PWD"`)
-and §3 so there is a channel to raise problems on; every start-up check below
-runs after. After moving into the worktree, re-run the same `squad register`
+**Register straight after that, always.** Before the rest of this step, run
+§2 (with `--cwd "$PWD"`) and §3 so there is a channel to raise problems on;
+every start-up check below runs after. After moving into the worktree, re-run the same `squad register`
 with the worktree `--cwd` (safe, keeps subscriptions).
 
 **Safe drift is auto-fixed, never asked about**, one log line each: a
@@ -69,7 +69,8 @@ or not in a git repo: skip this step.
 ## 2. Register
 
 Pick the name: `--name` if given, else `$SQUAD_MEMBER` (set when the herder
-launched you), else a short slug for the workstream (`<repo>-<topic>`). Lowercase letters, digits, `-` and `_` only; not `all`,
+launched you; read it with `echo "${SQUAD_MEMBER:-}"`), else a short slug for
+the workstream (`<repo>-<topic>`). Lowercase letters, digits, `-` and `_` only; not `all`,
 not starting `role`.
 
 ```

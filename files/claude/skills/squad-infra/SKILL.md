@@ -57,8 +57,7 @@ Messages not arriving: `squad status --pretty` and `squad roster --pretty`.
 6. **Merge authority.** If Tim has granted session-scoped merge authority for
    exxo-infra, the herder launches it, forwarding `SQUAD_MERGE_AUTHORITY` from the
    environment Tim launched the herder with (`env-pass`). Never set or export
-   it yourself. State at start-up whether
-   it is set (`test -n "$SQUAD_MERGE_AUTHORITY"`: yes or no, never the value).
+   it yourself. State at start-up whether it is set (`test -n "$SQUAD_MERGE_AUTHORITY"`: yes or no, never the value).
 7. Tell Tim (one line) you are registered as `infra` and waiting, then end the turn.
    Directives arrive as turns; do not poll.
 
