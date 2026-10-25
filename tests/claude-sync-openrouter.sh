@@ -108,8 +108,23 @@ done
 # Hooks: PreToolUse arrays concatenate across layers. exxo-openrouter keeps
 # every shared PreToolUse entry and adds the guard after them; the other
 # contexts' hooks equal the plain shared * account merge (pre-change result).
-# shellcheck disable=SC2016  # literal text, not expanded
-GUARD_CMD='"$HOME/dev/dotfiles/scripts/claude-openrouter-guard" # claude-openrouter-guard'
+GUARD_CMD="$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$C/settings.overlay.exxo-openrouter.json")"
+check "guard hook command names the guard and ends with its marker" \
+    bash -c 'case "$1" in *scripts/claude-openrouter-guard*"# claude-openrouter-guard") exit 0;; *) exit 1;; esac' _ "$GUARD_CMD"
+# Fail closed: with python3 unreachable the hook must emit a deny decision,
+# not exit 127 (a non-blocking error). Real guard via a fake $HOME/dev/dotfiles.
+mkdir -p "$T/ghome/dev" "$T/nopath"
+ln -s "$SRC_REPO" "$T/ghome/dev/dotfiles"
+nop_out="$(HOME="$T/ghome" PATH="$T/nopath" /bin/sh -c "$GUARD_CMD" </dev/null 2>/dev/null)"; nop_rc=$?
+check "guard hook, python3 missing: exits 0" test "$nop_rc" -eq 0
+check "guard hook, python3 missing: emits deny" \
+    bash -c 'jq -e ".hookSpecificOutput.permissionDecision == \"deny\"" <<<"$1" >/dev/null' _ "$nop_out"
+ok_out="$(echo '{"session_id":"s","cwd":"/tmp","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls"}}' \
+    | HOME="$T/ghome" SQUAD_GUARD_LOG="$T/guard.jsonl" /bin/sh -c "$GUARD_CMD" 2>/dev/null)"; ok_rc=$?
+check "guard hook, python3 present: benign command passes silently" bash -c '[ "$1" -eq 0 ] && [ -z "$2" ]' _ "$ok_rc" "$ok_out"
+echo '{"session_id":"s","cwd":"/tmp","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"gh pr merge 1"}}' \
+    | HOME="$T/ghome" SQUAD_GUARD_LOG="$T/guard.jsonl" /bin/sh -c "$GUARD_CMD" >"$T/deny.out" 2>/dev/null
+check "guard hook, python3 present: merge still denied" grep -q '"deny"' "$T/deny.out"
 check "exxo-openrouter PreToolUse = shared PreToolUse + guard" \
     test "$(jq -c '.hooks.PreToolUse' "$(S exxo-openrouter)")" = \
          "$(jq -c --arg c "$GUARD_CMD" '.hooks.PreToolUse + [{matcher:"Bash", hooks:[{type:"command", command:$c}]}]' "$C/settings.shared.json")"

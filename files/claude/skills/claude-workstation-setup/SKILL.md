@@ -1,6 +1,6 @@
 ---
 name: claude-workstation-setup
-description: Full disclosure of how Claude Code is set up on Tim's workstations — per-account contexts, shell wrappers, settings/CLAUDE.md fragment merge (incl. the global permission allow set and deny floor), the repo-config audit hook, repo-managed MCP servers, the two skill-delivery paths (including vendored upstream skills), and where approvals/memory live. Use when asked how the Claude setup/context segregation works, when changing any part of it (claude-sync, settings/CLAUDE.md/MCP fragments, skills, plugins), or when a session behaves as if it's in the wrong account, or when adding/updating a global (cross-session) instruction.
+description: Full disclosure of how Claude Code is set up on Tim's workstations — per-account contexts (personal, exxo, exxo-personal, and the exxo-openrouter (OpenRouter/Kimi K3) context), OpenRouter worker setup, shell wrappers, settings/CLAUDE.md fragment merge (incl. the global permission allow set and deny floor), the repo-config audit hook, repo-managed MCP servers, the two skill-delivery paths (including vendored upstream skills), and where approvals/memory live. Use when asked how the Claude setup/context segregation works, when changing any part of it (claude-sync, settings/CLAUDE.md/MCP fragments, skills, plugins), or when a session behaves as if it's in the wrong account, or when adding/updating a global (cross-session) instruction.
 ---
 
 # How Claude Code is set up on these workstations
@@ -106,11 +106,15 @@ of `shared * exxo`, applied only to this context (naming: `settings.overlay.
   (so no Anthropic credential is ever used), every tier variable
   (`ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU,FABLE}_MODEL`) and
   `CLAUDE_CODE_SUBAGENT_MODEL` all set to `moonshotai/kimi-k3`, and
-  `ENABLE_TOOL_SEARCH=false`. One session has one backend, hence the
+  `ENABLE_TOOL_SEARCH=false`. The `claude-exxo-*`, `claude` and `claude-default` wrappers unset these
+  variables (and `ANTHROPIC_AUTH_TOKEN`) for any non-openrouter launch, so a
+  nested launch from a K3 session cannot inherit the OpenRouter backend. One
+  session has one backend, hence the
   subagent-model exception to the global "unset" rule in `CLAUDE.md.shared`.
 - **Key helper**: `apiKeyHelper` runs `scripts/claude-openrouter-key`, which
   reads the local file `~/keys/openrouter.key` (file mode 0600, directory
-  0700) and refuses symlinks, loose modes and malformed content. Failures are
+  0700) and refuses missing, empty, unreadable and symlinked files, loose modes and
+  malformed content. Failures are
   logged, with reasons only, to
   `~/.local/state/claude-openrouter/keyhelper.jsonl`. There is deliberately no
   1Password or `agent/run` path, and no key literal in the repo. Backlog:
@@ -119,8 +123,12 @@ of `shared * exxo`, applied only to this context (naming: `settings.overlay.
   `esc`, `pulumi up`, `pulumi env open`, `op`, nor reads of `~/keys`. They are
   concatenated onto the exxo deny set; the allow set is exactly exxo's.
 - **PreToolUse guard** `scripts/claude-openrouter-guard`: allows only fully
-  resolved commands, blocks merges, default-branch pushes and workflow
-  triggers, and logs to `guard.jsonl` (no command text).
+  resolved commands: it blocks risk-mentioning commands it cannot fully
+  resolve, plus merges, default-branch pushes and workflow triggers. Its
+  `guard.jsonl` log records blocks and allowed pushes (rule, target, form; no
+  command text). The overlay's hook command fails closed: if the interpreter
+  cannot launch (exit 126/127, e.g. `python3` missing) it emits the deny
+  decision itself.
 
 `SETTINGS_MERGE` in `claude-sync` now also concatenates hook arrays per event
 (shared hooks first, the overlay's after), so the guard adds to the shared

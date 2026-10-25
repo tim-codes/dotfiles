@@ -17,6 +17,7 @@ echo "cfg=${CLAUDE_CONFIG_DIR-UNSET}"
 echo "tok=${ANTHROPIC_AUTH_TOKEN-UNSET}"
 echo "key=${ANTHROPIC_API_KEY-UNSET}"
 echo "cwd=$(pwd -P)"
+echo "leak=$(env | grep -E '^(ANTHROPIC_(BASE_URL|API_KEY|AUTH_TOKEN|DEFAULT_[A-Z]+_MODEL)|CLAUDE_CODE_SUBAGENT_MODEL)=' | tr '\n' ' ')"
 echo "args=$*"
 STUB
 chmod +x "$T/bin/claude"
@@ -32,6 +33,8 @@ run_zsh() { # $1 = start dir
         zsh -f -c "source '$SRC_REPO/src/.zshrc' >/dev/null 2>&1; cd '$1' && claude-exxo-openrouter --model x -p y"
 }
 
+LEAKENV='ANTHROPIC_BASE_URL=x ANTHROPIC_API_KEY=x ANTHROPIC_AUTH_TOKEN=x ANTHROPIC_DEFAULT_OPUS_MODEL=x ANTHROPIC_DEFAULT_SONNET_MODEL=x ANTHROPIC_DEFAULT_HAIKU_MODEL=x ANTHROPIC_DEFAULT_FABLE_MODEL=x CLAUDE_CODE_SUBAGENT_MODEL=x'
+
 if command -v zsh >/dev/null; then
     out="$(run_zsh "$FH/proj")"; rc=$?
     [ $rc -eq 0 ] && ok "zsh: exits 0" || bad "zsh: exit $rc"
@@ -45,6 +48,19 @@ if command -v zsh >/dev/null; then
         out="$(run_zsh "$d")"
         has "$out" "cwd=$HP/claude" "zsh: from ${d#"$FH"}/ starts in ~/claude"
     done
+    for fn in claude claude-default; do
+        for d in "$FH/proj" "$FH"; do
+            # shellcheck disable=SC2086
+            out="$(env -i HOME="$FH" PATH="$T/bin:/usr/bin:/bin:/opt/homebrew/bin" $LEAKENV \
+                zsh -f -c "source '$SRC_REPO/src/.zshrc' >/dev/null 2>&1; cd '$d' && $fn -p y")"
+            has "$out" "leak=
+" "zsh: $fn from ${d#"$FH"}/ sees none of the OpenRouter env"
+        done
+    done
+    # shellcheck disable=SC2086
+    out="$(env -i HOME="$FH" PATH="$T/bin:/usr/bin:/bin:/opt/homebrew/bin" $LEAKENV \
+        zsh -f -c "source '$SRC_REPO/src/.zshrc' >/dev/null 2>&1; cd '$FH/proj' && claude-exxo-openrouter -p y")"
+    has "$out" "ANTHROPIC_BASE_URL=x" "zsh: openrouter wrapper leaves env untouched"
     cnt="$(grep -c '\.claude-exxo-openrouter' "$SRC_REPO/src/.zshrc")"
     [ "$cnt" -ge 3 ] && ok "zsh: guard lists include the new dir" || bad "zsh: guard lists missing the new dir ($cnt)"
 else
@@ -61,6 +77,15 @@ if command -v fish >/dev/null; then
     has "$out" "tok=UNSET" "fish: no ANTHROPIC_AUTH_TOKEN"
     has "$out" "cwd=$HP/claude" "fish: from \$HOME starts in ~/claude"
     has "$out" "args=--model x -p y" "fish: args pass through"
+    for fn in claude-exxo claude-default claude-personal; do
+        out="$(env HOME="$FH" PATH="$T/bin:$PATH" ANTHROPIC_BASE_URL=x ANTHROPIC_API_KEY=x ANTHROPIC_AUTH_TOKEN=x ANTHROPIC_DEFAULT_OPUS_MODEL=x ANTHROPIC_DEFAULT_SONNET_MODEL=x ANTHROPIC_DEFAULT_HAIKU_MODEL=x ANTHROPIC_DEFAULT_FABLE_MODEL=x CLAUDE_CODE_SUBAGENT_MODEL=x \
+            fish -c "source '$FISHF' 2>/dev/null; set -gx PATH '$T/bin' \$PATH; cd '$FH/proj'; $fn -p y" 2>&1)"
+        has "$out" "leak=
+" "fish: $fn sees none of the OpenRouter env"
+    done
+    out="$(env HOME="$FH" PATH="$T/bin:$PATH" ANTHROPIC_BASE_URL=x CLAUDE_CODE_SUBAGENT_MODEL=x \
+        fish -c "source '$FISHF' 2>/dev/null; set -gx PATH '$T/bin' \$PATH; cd '$FH/proj'; claude-exxo-openrouter -p y" 2>&1)"
+    has "$out" "ANTHROPIC_BASE_URL=x" "fish: openrouter wrapper leaves env untouched"
 else
     echo "note: fish absent, skipping fish checks"
 fi

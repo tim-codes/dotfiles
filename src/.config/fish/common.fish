@@ -739,10 +739,19 @@ function __claude_ctx --description 'Run claude in a per-account config context'
         pushd $home/claude
         set jumped 1
     end
+    # The exxo-openrouter overlay env is inherited by anything a K3 session
+    # spawns; every other context must not see it, so it is unset for the
+    # launched process only. The openrouter wrapper is left untouched.
+    set -l scrub
+    if test "$dir" != "$HOME/.claude-exxo-openrouter"
+        for v in ANTHROPIC_BASE_URL ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_SONNET_MODEL ANTHROPIC_DEFAULT_HAIKU_MODEL ANTHROPIC_DEFAULT_FABLE_MODEL CLAUDE_CODE_SUBAGENT_MODEL
+            set -a scrub -u $v
+        end
+    end
     if test -n "$dir"
-        env CLAUDE_CONFIG_DIR=$dir claude $argv
+        env $scrub CLAUDE_CONFIG_DIR=$dir claude $argv
     else
-        env -u CLAUDE_CONFIG_DIR claude $argv
+        env $scrub -u CLAUDE_CONFIG_DIR claude $argv
     end
     set -l st $status
     test $jumped -eq 1; and popd

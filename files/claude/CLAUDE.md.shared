@@ -334,10 +334,10 @@ preference into behaviour. Dedicated agents exist because a transcript scan
 known procedure a cheaper model can run when the procedure is written down;
 `scripts/claude-usage-scan` in dotfiles measures progress against that
 baseline. `CLAUDE_CODE_SUBAGENT_MODEL`
-is deliberately NOT set globally — it would flatten the default model for
-every subagent that doesn't name one, which defeats the per-agent pins above
-(the variable no longer overrides a per-invocation `model` or an agent's
-`model:` field, as of Claude Code v2.1.251, so that is not the reason). The one
+is deliberately NOT set globally — a global value would replace the default
+model for every subagent that names none (per-agent pins and per-invocation
+`model` still win, as the variable no longer overrides them as of Claude Code
+v2.1.251), flattening the default; that is why it stays unset. The one
 exception: in the `exxo-openrouter` context only, `CLAUDE_CODE_SUBAGENT_MODEL`
 and every tier variable point at `moonshotai/kimi-k3`, because one session has
 one backend; the overlay settings fragment sets them, never a session.
