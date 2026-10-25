@@ -241,6 +241,13 @@ worktree made any other way (`git worktree add`, EnterWorktree, a subagent's
 `isolation: "worktree"`), run `worktree-copy-local-env <worktree>` yourself;
 don't ask the operator to copy them. Names are printed, never contents.
 
+Create worktrees with worktrunk. When the session itself must stay put (an
+orchestrator preparing worktrees for subagents, say), use `wt -C <repo> switch
+--create <branch> --base origin/main --no-cd -y`: hooks still run, so the local
+config is copied in. When the session should move in, use `wt switch --create`
+(or the `worktrunk:wt-switch-create` skill); for hooks, `-C` or config, load the
+`worktrunk:worktrunk` skill.
+
 **Why:** a worktree without its `.env` fails in confusing ways, and asking the
 operator each time is a round-trip for something fully mechanical and safe
 (no overwrite, ignored files only).
