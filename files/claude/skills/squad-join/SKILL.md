@@ -166,7 +166,7 @@ line.
 |---|---|---|
 | `pause` | `{reason, resets_at?}` | ack first (below), then the pause procedure below |
 | `priority` | `{priority}` | note it; at 4 or 5 defer optional work (polish, extra refactors, nice-to-have tests) |
-| `fanout` | as the directive's text says | the orchestrator's instruction on parallel fan-out; follow it (see "Members do not self-throttle", §4) |
+| `fanout` | `{max_subagents, model_ceiling?}` | ack first, then the fanout rule below |
 | `heavy_slot` | `{decision: grant\|deny\|revoke, retry_after_s?}` | grant: start the heavy job. deny: wait `retry_after_s`, then request again (a deny with `retry_after_s` may mean a protected app is running; do non-heavy work meanwhile). revoke: stop the heavy job now (interrupt the command), then `release` |
 | `cleanup` | `{reason, top?}` | the orchestrator saw you idle with busy or large leftover processes (`top`: `{pid, cmd, cpu_pct, rss_mb}`). Run the self-cleanup rule (§7) now: `TaskStop` completed subagents, end background shells you started, kill your own leftovers (dev servers, browsers, builds; check each `top` pid is yours before killing, never another session's), then `squad set --name <name> --detail "cleanup done: <what was stopped>"` |
 | `preflight` | `{ttl_hours?}` | warm and refresh every credential path this stream's work will need, so nothing prompts later while Tim is away; the procedure is below |
@@ -192,6 +192,16 @@ work", not "I have finished pausing"; the procedure below still follows.
 While paused, only `msg.*` and `squad.directive` reach you; quota and host
 topics are suppressed, so do not expect them. Requires squad built from PR S1
 or later (`ack_required` never appears on older brokers).
+
+**Fanout.** `max_subagents` (0-8) is the most subagents you may run in
+parallel; `model_ceiling` (`sonnet` or `opus`, optional) is the highest model
+any subagent may use (`sonnet` bars opus and fable; `opus` bars fable). With
+no directive the cap is 3. A new, lower cap applies at once: start no
+subagent until the running count is under it, let those already running
+finish rather than killing them, and run at 0 inline. The latest `fanout`
+stands until the next one; a raised cap needs a new directive too. Note it in
+`squad set --name <name> --detail "fanout <max>[, <ceiling>]: …"`. It limits
+parallelism and models only, not what your work is.
 
 **Pause**, in order:
 1. Finish the tool action in flight. Do not start a new task or subagent;

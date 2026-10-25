@@ -60,6 +60,7 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    squad subscribe orchestrator quota.A.threshold
    squad subscribe orchestrator quota.A.reset
    squad subscribe orchestrator quota.A.projection
+   squad subscribe orchestrator quota.A.burn
    # and once:
    squad subscribe orchestrator host --min-change 15 --debounce-s 300
    squad subscribe orchestrator host.pressure
@@ -107,40 +108,93 @@ A **busy member** has `jq .status <req.config_dir>/sessions/<req.pid>.json`
 `busy` with `statusUpdatedAt` (epoch ms) over 5 min old: mid-turn long
 enough to burn quota unattended.
 
-**A breach is impending** for `A` when `pct ≥ 85` on any window (read
-`squad get quota.A`; threshold events are your prompt to look)
-AND `A` has at least one busy member. With none busy and `pct` 85–95,
-pause nothing: idle members burn nothing. **Hard ceiling:** `pct ≥ 95`
-pauses the busiest member regardless of the busy test (level 100: below).
-Re-run the test at every janitor sweep and on any `squad.member` status
-transition to busy while `pct ≥ 85`, not only on threshold crossings.
-`quota.A.projection` ETAs are advisory: quote them, never trigger on them.
+**Act early on a projected wall.** For `A`, act when `pct ≥ 70` on any
+window or budget (read `squad get quota.A`) AND the latest
+`quota.A.projection` has `walls_before_reset: true` (the ETA to 100% is
+shorter than the time to the window's reset). `walls_before_reset` is also
+true when the reset time is unknown, so an unknown reset counts as a wall.
+Projection events, `quota.A.burn` events and the threshold events are your
+prompt to look; a `quota.A.burn started` on a `subscription` account counts
+as level 100. The hard ceilings are unchanged: `pct ≥ 95` pauses the busiest
+member regardless of the projection (level 100: below). Re-run the test at
+every janitor sweep, at each §2 recheck and on any `squad.member` status
+transition to busy while `pct ≥ 70`, not only on threshold crossings. Idle
+members burn nothing: if none of `A`'s members is busy and `pct` is under 95,
+shed nothing.
 
-**On impending breach:**
-1. Order A's members by plan priority, lowest first (5 before 1), then
-   busy before idle.
-2. Pause down that list until projected use at the remaining members'
-   share stays under the wall before `resets_at` (`pct + rate_pct_per_min ×
-   (busy remaining ÷ busy now) × minutes to reset < 97`) or only the
-   top-priority member is left (always left running unless level 100).
-3. For each member to pause (every pause or priority directive carries
-   `--ack-deadline-s 120`; requires squad built from PR S1 or later):
+**Shed load cheapest first.** Walk this ladder one rung at a time. Within a
+rung, take members lowest priority first (5 before 1), then highest
+`tokens_per_min` first (with `subagents_active` as the tie-break), read from
+the Task 14 per-member fields on the host gauge's `members[]` (`squad get
+host`). The member with the top priority is never taken below `fanout 1`
+unless level 100.
+1. **`fanout 1`, `model_ceiling sonnet`**: one parallel subagent, none above
+   sonnet.
+2. **Rebalance** to the other account, but only if it has headroom
+   (`squad get quota.B`: five-hour `pct ≤ 50` and seven-day `pct < 80`)
+   and only for a member not mandated to the exxo account (exxo repos,
+   exxo-infra and any brief that needs exxo credentials). Prefer moving
+   non-exxo-mandated members off exxo. The mover is the herder's relaunch,
+   `squad herd relaunch <member> --account <B>`: **the herder command is
+   pending (Plans A and G) and `squad --help` does not list it yet**; until
+   it lands, skip this rung and say so in the decision log.
+3. **Revoke heavy slots** (§4), lowest priority grant first.
+4. **`fanout 0`**: no subagents, work inline.
+5. **Pause** (below).
+
+A member whose registration `account` is null (K3) is never wall-paused or
+rebalanced and never gets a fanout step; the infra member is skipped at every
+rung except level 100.
+
+**Every directive carries its trigger.** Each `pause`, `resume`, `fanout`,
+`heavy_slot` revoke and rebalance sends `data.trigger`, the quota state it
+acted on, and the decision-log block (§9) quotes the same values; a
+rate-aware decision without a trigger counts as an incident in the review:
+```
+"trigger":{"account":"<A>","window":"<five_hour|seven_day|…>","pct":<pct>,
+ "eta_minutes":<minutes to cap>,"minutes_to_reset":<m or null>,
+ "walls_before_reset":<bool>,"rate_per_hour":<pct per hour>,
+ "target_tokens_per_min":<the member's tokens_per_min cap, or null>}
+```
+
+**Fanout** (the member keeps at most `max_subagents` parallel subagents, none
+above `model_ceiling`; `max_subagents` 0-8, `model_ceiling` optional
+`"sonnet"` or `"opus"`). Without a directive a member's cap is 3, so the
+first rung lowers it:
+```
+squad send <member> "fanout: max 1, sonnet, <A> <window> at <pct>%" --from orchestrator --priority next --ack-deadline-s 120 \
+  --data '{"directive":"fanout","max_subagents":1,"model_ceiling":"sonnet","trigger":{…}}'
+```
+Record the cap on the member's plan stream (`fanout`, §3) once its ack
+arrives; ack outcomes are as in step 4 below.
+
+**On a shed decision:**
+1. Choose the rung and members as above; do not re-send a rung a member
+   already holds.
+2. Send the rung's directive. Every pause or priority directive carries
+   `--ack-deadline-s 120` (requires squad built from PR S1 or later):
    ```
    squad send <member> "pause: <reason>, resets <local time>" --from orchestrator --priority next --ack-deadline-s 120 \
-     --data '{"directive":"pause","reason":"<A> <window> at <pct>%","resets_at":"<ISO>"}'
+     --data '{"directive":"pause","reason":"<A> <window> at <pct>%","resets_at":"<ISO>","trigger":{…}}'
    ```
-   Record it in the plan's `paused` list as `{member, account, window,
-   reason, resets_at, sent_at, by:"orchestrator", state:"sent"}` and publish
+   A pause goes in the plan's `paused` list as `{member, account, window,
+   reason, resets_at, sent_at, by:"orchestrator", state:"sent"}`; publish
    (§3). A member counts as paused only when `squad.directive` `acked`
-   arrives for its `directive_id`: set `state:"acked"` and `acked_at`, and
-   count it towards the projection in step 2 only then. The roster's
-   `pending_acks` shows what is outstanding.
+   arrives for its `directive_id`: set `state:"acked"` and `acked_at`. The
+   roster's `pending_acks` shows what is outstanding.
+3. **Re-check in 5 minutes.** Arm a background `sleep 300; squad send
+   orchestrator "rate recheck <A>" --from cli --data
+   '{"kind":"rate_recheck","account":"<A>"}'`. Still `pct ≥ 70` with
+   `walls_before_reset` true: take the next rung.
 4. **Ack outcomes** (`squad.directive`, matched by `directive_id`):
    - `unacked`: the broker has re-sent once at `now`; log it (§9), keep the
-     entry `state:"sent"`, and do not count the member as paused.
+     entry `state:"sent"`, and do not count the member as having complied.
    - `escalated`: raise an operator item NOW (§2c): "<member> not
-     responding to pause; kill or wait", with the quota numbers and reset.
-5. Tell Tim one line: who, acked or pending, why, reset time.
+     responding to <directive>; kill or wait", with the quota numbers and
+     reset.
+5. Republish the `insights` gauge (headline and per-account state) after each
+   decision, and tell Tim one line: who, which rung, acked or pending, why,
+   reset time.
 
 **Delivery priority:** only the orchestrator's `squad send --priority now`
 interrupts a busy member (others are downgraded to `next`); critical
@@ -163,13 +217,18 @@ second member.
 non-deploying infra included (`--priority now`, `--ack-deadline-s 120`);
 tell Tim.
 
-**On `quota.A.reset`** (or start-up step 6): `squad get quota.A`; if no
-window is at or above 90%, resume every `paused` entry for `A` with `by:
-"orchestrator"`, highest priority first, 60s apart, in one
-`run_in_background` command (a foreground `sleep` is refused):
+**Restore.** On `quota.A.reset` (or start-up step 6), or once
+`eta_minutes_to_100` has stayed over 60 for 15 minutes (arm the check with
+the same recheck timer): `squad get quota.A`; if no window is at or above
+90% (reset) or the ETA condition holds, undo the ladder in reverse, highest
+priority first. Resume every `paused` entry for `A` with `by:
+"orchestrator"`, 60s apart, in one `run_in_background` command (a foreground
+`sleep` is refused); then re-grant slots, and send `fanout` with
+`max_subagents` 3 and no ceiling to each member you lowered. A rebalanced
+member is not moved back; tell Tim where it is.
 ```
 for m in <top> <next> …; do squad send "$m" "resume" --from orchestrator \
-  --ack-deadline-s 120 --data '{"directive":"resume"}'; sleep 60; done
+  --ack-deadline-s 120 --data '{"directive":"resume","trigger":{…}}'; sleep 60; done
 ```
 Remove them from `paused`, publish the plan, tell Tim.
 Members Tim paused himself (no plan entry) are his to resume.
@@ -295,12 +354,14 @@ changes by Tim or members.
 
 The plan lives in the broker, surviving your restarts:
 ```
-{"streams":[{"member":"…","priority":1-5,"phase":"…","notes":"…","prompt":"<kickoff prompt path>","deliverables":[…]}],
+{"streams":[{"member":"…","priority":1-5,"phase":"…","notes":"…","prompt":"<kickoff prompt path>","deliverables":[…],
+   "fanout":{"max_subagents":3,"model_ceiling":null,"set_at":"<ISO>"}}],
  "heavy_slots":1,"slots_reduced":false,"grants":[{"member","reason","granted_at","expires_at"}],
  "queue":[{"member","reason","est_minutes","requested_at"}],"paused":[…],
  "infra_authority":null,"pending_infra":[{"pr","repo","from","summary"}],
  "updated_by":"orchestrator","updated_at":"<ISO>"}
 ```
+`fanout` is the cap last sent to that member (default 3, no ceiling).
 Read with `squad get plan | jq .data`; publish the whole object with `squad
 publish plan --kind gauge '<json>'` after every change.
 
@@ -522,7 +583,7 @@ deadline (§2).
 A message turn's JSON is `{"from":…,"text":…,"data":{…}}`; client →
 orchestrator messages carry `data.kind`: `pr_ready`, `heavy_slot` (`action`
 request|release), `blocked`, `done`, `infra_ready`, `infra_result`,
-`preflight`, `operator_task` (§2c), plus your own timers (`sweep_due`, `heavy_slot_expired`). On `blocked`, tell Tim
+`preflight`, `operator_task` (§2c), plus your own timers (`sweep_due`, `heavy_slot_expired`, `rate_recheck`). On `blocked`, tell Tim
 if it needs him; on `done`, drop the stream from the plan. Watcher events
 are information. Never send a `now` turn for what can wait until a member
 is idle. At session end: `squad deregister orchestrator`.
