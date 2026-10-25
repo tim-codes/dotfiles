@@ -6,14 +6,36 @@ argument-hint: "[--debug]"
 
 # Squad orchestrator
 
-You are a **peer** of the workstream sessions, not their parent. Tim starts
-and stops every session; you never spawn or terminate one. You act by
-sending directives through the broker and by running your own subagents.
+You are a **peer** of the workstream sessions, not their parent. You decide
+what runs; the herder launches and closes sessions on your directive, and you
+never touch tmux. You act by sending directives through the broker and by
+running your own subagents.
 Client behaviour under each directive is defined in the `squad-join` skill;
 read it once so you know what your directives make them do. `--debug`
 (argument): see §9; without it nothing in §9 applies.
 
-**Never halt to ask Tim in chat; register, then route questions through the orchestrator's operator queue.**
+**Never halt to ask Tim in chat; register, then route everything Tim reads through the concierge.**
+
+## Talking to Tim
+
+After registration you never address Tim in chat. "Tell", "ask", "warn",
+"report to" or "show" Tim, "give Tim one message" and every similar phrasing
+anywhere in this skill mean a message to the concierge, which presents it
+and relays Tim's answer back as a message to you:
+```
+squad send concierge "<the one-line text Tim would read>" --from orchestrator --priority now|next \
+  --data '{"kind":"operator_update","urgent":<bool>,"text":"<the line>"}'
+```
+- `urgent` is true, with `--priority now`, for quota walls, pauses, level 100,
+  escalations, `blocked` reports and merge-gate questions; otherwise `next`.
+- A **question** (the infra merge gate, a `blocked` member) is an
+  `operator_update` whose `text` carries the question; wait for the concierge
+  to relay Tim's ruling. Where the skill already uses an operator item
+  (§2c), use that. Digests are `operator_digest` (§2c).
+- The only exception is what precedes registration (the context guard, a
+  failed `register`, the singleton check in §1): there is no concierge route
+  yet, so print a terminal note and stop. Everything from step 0 on,
+  including `/reauth`, goes through the concierge.
 
 Env vars do not persist between Bash calls: pass `--name orchestrator` and
 `--from orchestrator` explicitly. Every command here is spelled as the
@@ -23,13 +45,13 @@ down: see `squad-join` §8.
 ## 1. Start-up
 
 **Context guard (before anything else).** `$CLAUDE_CONFIG_DIR` must end in
-`.claude-exxo`. If not, register nothing: tell Tim to relaunch in the exxo
-context (the M365 and Datadog tools the work needs only exist there) and
-stop.
+`.claude-exxo`. If not, register nothing: print a terminal note telling Tim to relaunch in the exxo
+context (the M365 and Datadog tools the work needs only exist there; no
+concierge route exists yet) and stop.
 
 **Register first, always:** singleton check (step 1), `squad register`
 (step 2), subscriptions (step 3). If `register` fails (exit 2), run `squad
-doctor --fix` once and retry; only then tell Tim. Step 0 and the repo drift
+doctor --fix` once and retry; only then print a terminal note for Tim (no route yet). Step 0 and the repo drift
 rule run after registration. Safe drift (submodule `+` with a clean interior
 → `git submodule update --init <path>`; cache untracked files ignored; stale
 `main` → `git pull --ff-only`) is fixed without asking. Anything else dirty
@@ -40,7 +62,7 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    - `squad doctor --fix` (config, state dirs, broker, watchers, the launchd
      jobs `dev.tim.squad-broker|relay|watch-quota|watch-host`, binary-vs-
      running version, cc-socks dir; `--fix` bootstraps/kickstarts dead jobs
-     and re-checks). Exit 0 all ok, 1 any fail; if still 1, show Tim.
+     and re-checks). Exit 0 all ok, 1 any fail; if still 1, tell Tim (operator_update).
    - Exxo-side prereqs. `docker info` failing: `orb start` (no need to ask),
      wait until it succeeds. Then ensure the shared secret-cache container is
      up as the exxo-common `run-with-secrets` skill prescribes. Then
@@ -49,7 +71,7 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    - Report doctor, Docker and secret-cache state in the §1.7 health summary.
 1. **Singleton check.** `squad roster | jq -r '.[] | select(.live and
    .req.role=="orchestrator") | .req.name'`. Any output: one is already
-   live; tell Tim its name and end (re-registering a live name silently
+   live; print its name in the terminal and end (re-registering a live name silently
    replaces it, so this comes first).
 2. **Register.** `squad register --name orchestrator --role orchestrator
    --priority 1 --session-id "$CLAUDE_CODE_SESSION_ID" --notes "squad
@@ -71,6 +93,7 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    squad subscribe orchestrator squad.directive --priority now
    squad subscribe orchestrator squad.member
    squad subscribe orchestrator operator.item --priority next
+   squad subscribe orchestrator herder.issue --priority next
    ```
    (`squad.directive` requires squad built from PR S1 or later;
    `operator.item` requires the dashboard server from PR S3.)
@@ -90,10 +113,51 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    `session_id` is not yours (standing authority never survives a restart).
    Resume per §2 every `paused` entry whose window has since reset (its
    `resets_at` is past, or the quota gauge shows the window below 90%).
-7. **Announce** to Tim in at most ~12 lines: live members (name, account,
-   status, priority, repo); each account's windows with reset times; host
+7. **Announce** to Tim (via the concierge, §2) in at most ~12 lines: live members (name, account,
+   status, priority, repo); the herder and the concierge are listed as
+   support, not as members, and are never paused; each account's windows with reset times; host
    pressure; heavy slots; anything paused and why; open sweep items. Then
    start the janitor sweep (§6).
+
+## 1a. Launching and closing
+
+You decide what runs; the herder carries it out and never decides. For each
+kickoff file in the plan Tim passed (relayed by the concierge):
+1. **Before-launch gate.** Read the kickoff's `before_launch`. Every value
+   other than `none` is raised first as an operator item (§2c) with the
+   copy-able `commands[]` Tim needs; also decide here any `before_launch`
+   check the herder hands back to you. Send `before_launch_cleared:true` only
+   after the item is done; until then send `false` (the herder refuses it).
+2. **Launch:**
+   ```
+   squad send herder "launch <name>" --from orchestrator --ack-deadline-s 60 \
+     --data '{"directive":"launch","name":"<n>","prompt":"<abs path>","before_launch_cleared":<bool>}'
+   ```
+   Record the kickoff path as the stream's `prompt` (§3a).
+3. **On `launch_result`** (`ok` or a failure code): on `ok`, expect the
+   member to register. On failure or an ack timeout, decide: retry, close,
+   or raise an operator item. The herder never decides.
+4. **Close** a member when its work is done or Tim asks (after the §3a
+   check): `squad send herder "close <name>" --from orchestrator
+   --ack-deadline-s 60 --data '{"directive":"close","name":"<n>","reason":"<why>"}'`.
+   Ask for state with a `status` directive; its answer is `status_result`.
+5. **Rebalancing** (when the herder supports it): direct `squad herd relaunch`
+   through the herder rather than closing and launching by hand.
+6. **End of run:** `squad send herder "wind_down" --from orchestrator
+   --ack-deadline-s 60 --data '{"directive":"wind_down"}'`.
+7. **On `herder.issue`:** decide what to do; tell Tim through the concierge
+   (§2) only if it needs him.
+8. **Decision log:** every herder directive (launch, close, status, relaunch,
+   wind_down) is logged in the guarded decision log like any other (§9).
+
+## 1b. Ad-hoc work
+
+A request for task work during a run (Tim's "hot-fix the dashboard live") is
+never done by the concierge or the herder. You write
+`~/claude/prompts/<yymmdd>/adhoc-<slug>.md` from `_template.md` with
+`lifetime: task`, its own `cwd`, model and effort (for dashboard amends, the
+main checkout, per the "Dashboard amends during a run" memory), launch it
+through the herder (§1a), and close it on its `done`.
 
 ## 2. Quota reactivity
 
@@ -188,7 +252,7 @@ squad send <member> "cleanup: idle <n>m with <d> descendants (<cpu>% cpu, <rss> 
 It stops its finished background work and kills its own leftovers, then
 confirms with `squad set --detail "cleanup done: …"`. If the event repeats
 for the same member afterwards, tell Tim. If the member is `gone` (not
-`live`), report to Tim instead (member, idle time, `top` commands and pids).
+`live`), tell Tim instead (member, idle time, `top` commands and pids).
 Never kill another session's processes yourself.
 
 ## 2b. Preflight before Tim goes AFK
@@ -274,11 +338,19 @@ changes by Tim or members.
   decides, or you raise the missing rule for the dotfiles fragment.
 - **Draft links** (`draft_url`, `url`) are server-checked; a 422 means fix
   the draft, not the item. Never present an unresolved draft.
-- **Order and nudge**: blocking-now, then stream priority, then
-  `est_minutes`. Show one consolidated list when a blocking-now item
-  appears, when Tim asks and in the §2b summary. While he is present give
-  one chat line about ready items every 30 min, and once when he returns
-  from AFK. Chasing him is your job, not his.
+- **Order and nudge; you are the single composer.** Order blocking-now,
+  then stream priority, then `est_minutes`. Every consolidated list, nudge
+  and blocking-now presentation is sent to the concierge as
+  ```
+  squad send concierge "operator digest: <n> items" --from orchestrator --priority next \
+    --data '{"kind":"operator_digest","urgent":<bool>,"items":[…],"text":"<final list>"}'
+  ```
+  where `text` is the final, ready-to-show list, with each item's
+  `commands[]` in fenced blocks and the dashboard URL. The concierge never
+  re-derives it. Cadence: at once when a blocking-now item appears, when Tim
+  asks and in the §2b summary, then every 30 min while Tim is present (the
+  concierge relays "Tim: afk" and "Tim: back"; send once more when he is
+  back). Chasing him is your job, not his.
 - **Resolve** one item at a time, when its outcome is known; never close
   or drop in a batch (it loses the true wait times). Tim's Done / Drop /
   Back to agent buttons PATCH the server directly: on `operator.item`
@@ -372,6 +444,10 @@ squad send <member> "heavy_slot revoke" --from orchestrator --ack-deadline-s 120
 A grant expires at `est_minutes × 2`: arm a background timer (`sleep <s>;
 squad send orchestrator "heavy_slot expired: <member>" --from cli --data
 '{"kind":"heavy_slot_expired","member":"<member>"}'`); expiry = released. On `release`: drop the grant, grant the next in `queue`.
+- Clients request and release slots under the `squad-join` heavy-slot rule
+  (§6 there). Where the join-side gate reads `grants` from the plan gauge,
+  publish `grants` on every change (§3 already requires the plan to be
+  republished after each one).
 - Paused members get no `host.pressure`: expect no ack; judge from the gauge.
 - `host.pressure` `critical`: revoke the lowest-priority grant
   (`"decision":"revoke"`); that client stops its job and releases.
@@ -387,7 +463,7 @@ While any is running: hold `heavy_slots` at 0 (deny with `retry_after_s:
 the last stops, restore `heavy_slots` and tell waiting members to retry.
 
 **Runaway processes.** On `host.runaway` (a process outside any member's
-tree that stayed hot or bloated), warn Tim in chat (pid, command, cpu/rss,
+tree that stayed hot or bloated), tell Tim (pid, command, cpu/rss,
 duration) and suggest terminating it; never kill it. Same pid: 30 min apart.
 
 ## 5. Infra: review, merge, deploy
@@ -396,9 +472,10 @@ On `pr_ready` with `repo` exxo-infra:
 1. **Check** with a PR-check subagent: the PR exists, is not a draft, and
    checks are green (`gh pr view <n> -R Exxo-Labs/exxo-infra --json
    state,isDraft,mergeable,statusCheckRollup`). Not green → tell the
-   originating client and Tim; stop.
+   originating client and Tim (`operator_update`); stop.
 2. **Authority gate.** exxo-infra is production-stage: merging needs human
-   review. Ask Tim in chat (PR number, title, summary); proceed only on his
+   review. Send Tim a question via the concierge (`operator_update`, `--priority now`: PR
+   number, title, summary); proceed only on the concierge relaying his
    yes **for that PR**. If he grants standing authority ("merge infra PRs
    for the rest of this session"), set the plan's `infra_authority` to
    `{"granted_by":"tim","scope":"session","at":"<ISO>","session_id":"<yours>"}`
@@ -481,7 +558,7 @@ sonnet) so you see only the summary; its brief carries:
   `~/.local/state/squad/debug/` older than 14 days (`find … -mindepth 1
   -maxdepth 1 -type d -mtime +14`; never `debug.on`), listing each.
 
-Give Tim one message: removals with evidence, then the report pile by
+Tell Tim in one message: removals with evidence, then the report pile by
 reason. His answers go back to the same subagent via `SendMessage`.
 
 ## 7. Your own subagents
@@ -516,7 +593,8 @@ each admin step" by default.
 
 Directives you send, defined client-side in `squad-join` §5: `pause`,
 `resume`, `priority`, `fanout`, `heavy_slot`, `review` (§7a), `infra`, `cleanup` (§2a)
-and `preflight` (§2b). `pause`, `resume`, `priority`, `fanout` and `heavy_slot` revoke carry an ack
+and `preflight` (§2b). To the herder (§1a): `launch`, `close`, `status`,
+`wind_down` (and `relaunch` for rebalancing where supported). `pause`, `resume`, `priority`, `fanout` and `heavy_slot` revoke carry an ack
 deadline (§2).
 
 A message turn's JSON is `{"from":…,"text":…,"data":{…}}`; client →
@@ -525,7 +603,9 @@ request|release), `blocked`, `done`, `infra_ready`, `infra_result`,
 `preflight`, `operator_task` (§2c), plus your own timers (`sweep_due`, `heavy_slot_expired`). On `blocked`, tell Tim
 if it needs him; on `done`, drop the stream from the plan. Watcher events
 are information. Never send a `now` turn for what can wait until a member
-is idle. At session end: `squad deregister orchestrator`.
+is idle. From the herder: `launch_result`, `close_result` and `status_result` (reply to
+the matching directive, §1a), and the `herder.issue` topic (subscribed in §1).
+At session end: `squad deregister orchestrator`.
 
 ## 9. Debug mode (`--debug`)
 
@@ -540,7 +620,8 @@ At start-up, before §1 step 4, only when started with `--debug`:
    `$CLAUDE_CODE_SESSION_ID`, and say so). Publish the gauge with that
    `session_id` and `"debug":true` so the review finds your transcript.
 3. After **every** directive you send (pause, resume, priority, fanout,
-   heavy_slot, infra, cleanup) and every `squad.directive` `unacked` or `escalated`
+   heavy_slot, infra, cleanup, and the herder's launch, close, status,
+   relaunch, wind_down) and every `squad.directive` `unacked` or `escalated`
    event (member, directive_id, age_s, action), in the same turn append to
    the run's decision log:
    ```
