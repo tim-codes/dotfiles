@@ -308,6 +308,21 @@ HOME="$FAKE" PATH="$BIN:/usr/bin:/bin" REC="$REC" CLAUDE_KICKOFF_CONTEXTS="$LAB"
 check "context env is applied to claude" grep -qx "LAB_VAR=from-table" "$REC"
 HOME="$FAKE" PATH="$BIN:/usr/bin:/bin" REC="$REC" LAB_VAR=caller CLAUDE_KICKOFF_CONTEXTS="$LAB" "$KICK" "$T/fixture.md" --account lab >/dev/null 2>&1
 check "a caller-set variable is not overwritten" grep -qx "LAB_VAR=caller" "$REC"
+# every repo context applies its TTL env (as #176 did for all of them)
+cat >"$BIN/claude" <<'EOF'
+#!/bin/bash
+echo "TTL=${EXXO_SECRET_CACHE_TTL_SECONDS-unset}" >"$REC"
+EOF
+for c in exxo exxo-personal personal exxo-openrouter; do
+    kick "$T/fixture.md" --account "$c" --dry-run
+    check "$c dry-run prints secret_cache_ttl_seconds: 43200" has "secret_cache_ttl_seconds: 43200"
+    kick "$T/fixture.md" --account "$c"
+    check "$c launch exports the TTL" grep -qx "TTL=43200" "$REC"
+done
+# a yq that is not v4 is refused
+mkdir -p "$T/pybin"; printf '#!/bin/sh\necho "yq 3.4.1"\n' >"$T/pybin/yq"; chmod +x "$T/pybin/yq"
+out=$(HOME="$FAKE" PATH="$T/pybin:/usr/bin:/bin" "$KICK" "$T/fixture.md" --dry-run 2>&1); rc=$?
+check "a non-v4 yq is exit 7" [ "$rc" -eq 7 ]
 # yq missing
 out=$(HOME="$FAKE" PATH="/usr/bin:/bin" "$KICK" "$T/fixture.md" --dry-run 2>&1); rc=$?
 check "yq missing is exit 7" [ "$rc" -eq 7 ]

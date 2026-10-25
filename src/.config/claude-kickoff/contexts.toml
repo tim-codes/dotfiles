@@ -50,7 +50,7 @@ harness = "claude-code"
 config_dir = "~/.claude-personal"
 account = "personal"
 provides = ["agent-run", "datadog", "boards"]
-env = {}
+env = { EXXO_SECRET_CACHE_TTL_SECONDS = "43200" }
 preconditions = []
 
 [[context]]

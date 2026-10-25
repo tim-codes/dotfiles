@@ -65,7 +65,7 @@ effort is used):
   capabilities, env-pass   comma lists, passed through to --dry-run for the herder
   add_dirs        comma or space separated paths (~ expanded), each passed as
                   --add-dir so the session may use them outside its cwd; each must
-                  exist (else exit 3)
+                  exist (else exit 3); a path cannot contain spaces
   before-launch   human steps first (`before launch` with a space is the same key)
 
 Options:
@@ -78,6 +78,7 @@ Options:
 Environment set for claude: CLAUDE_CONFIG_DIR=<context dir>, and the context's `env`
 table, each variable only where the caller has not set it. Outside an `openrouter`
 context the OpenRouter routing variables are unset, as the wrappers do.
+Preconditions also run under --dry-run (it validates everything but the launch).
 --dry-run prints, after the plan, harness, account, role, lifetime, needs,
 capabilities, provides, env_pass, before_launch and add_dirs (empty as `none`).
 
@@ -129,6 +130,7 @@ done
 
 # --- contexts table (yq v4 reads the TOML) -------------------------------------
 command -v yq >/dev/null 2>&1 || die 7 "yq is not on PATH (brew install yq)"
+yq --version 2>/dev/null | grep -q 'version v4\.' || die 7 "yq is not mikefarah yq v4 (the Python yq will not do): $(yq --version 2>&1 | head -n1)"
 [ -r "$CONTEXTS_FILE" ] || die 6 "contexts file not found or unreadable: $CONTEXTS_FILE"
 ctx_get() { # ctx_get <name> <yq expression on the context>: scalar, or a list one per line
     NAME="$1" yq -p toml -oy ".context[] | select(.name == strenv(NAME)) | $2" "$CONTEXTS_FILE" 2>/dev/null
@@ -304,17 +306,19 @@ else
 fi
 
 # --- preconditions: in order, output discarded, the first failure refuses -----
+preconds=$(ctx_get "$ctx" '(.preconditions // []) | .[]') || die 6 "cannot read the preconditions of $ctx from $CONTEXTS_FILE"
 while IFS= read -r cmd; do
     [ -n "$cmd" ] || continue
     sh -c "$cmd" >/dev/null 2>&1 || die 8 "precondition failed: $cmd (context $ctx)"
-done < <(ctx_get "$ctx" '(.preconditions // []) | .[]')
+done <<<"$preconds"
 
 # --- context env: set only where the caller has not -------------------------
+ctx_env=$(ctx_get "$ctx" '(.env // {}) | to_entries | .[] | .key + "=" + .value') || die 6 "cannot read the env of $ctx from $CONTEXTS_FILE"
 while IFS= read -r kv; do
     [ -n "$kv" ] || continue
     k="${kv%%=*}"
     [ -n "${!k+x}" ] || export "$k=${kv#*=}"
-done < <(ctx_get "$ctx" '(.env // {}) | to_entries | .[] | .key + "=" + .value')
+done <<<"$ctx_env"
 
 if [ "$dry" -eq 1 ]; then
     printf 'mode: %s\n'       "$mode"
