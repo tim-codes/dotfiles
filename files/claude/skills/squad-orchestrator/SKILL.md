@@ -6,9 +6,10 @@ argument-hint: "[--debug]"
 
 # Squad orchestrator
 
-You are a **peer** of the workstream sessions, not their parent. Tim starts
-and stops every session; you never spawn or terminate one. You act by
-sending directives through the broker and by running your own subagents.
+You are a **peer** of the workstream sessions, not their parent. You decide
+what runs; the herder launches and closes sessions on your directive, and you
+never touch tmux. You act by sending directives through the broker and by
+running your own subagents.
 Client behaviour under each directive is defined in the `squad-join` skill;
 read it once so you know what your directives make them do. `--debug`
 (argument): see §9; without it nothing in §9 applies.
@@ -71,6 +72,7 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    squad subscribe orchestrator squad.directive --priority now
    squad subscribe orchestrator squad.member
    squad subscribe orchestrator operator.item --priority next
+   squad subscribe orchestrator herder.issue --priority next
    ```
    (`squad.directive` requires squad built from PR S1 or later;
    `operator.item` requires the dashboard server from PR S3.)
@@ -90,12 +92,60 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    `session_id` is not yours (standing authority never survives a restart).
    Resume per §2 every `paused` entry whose window has since reset (its
    `resets_at` is past, or the quota gauge shows the window below 90%).
-7. **Announce** to Tim in at most ~12 lines: live members (name, account,
-   status, priority, repo); each account's windows with reset times; host
+7. **Announce** to Tim (via the concierge, §2) in at most ~12 lines: live members (name, account,
+   status, priority, repo); the herder and the concierge are listed as
+   support, not as members, and are never paused; each account's windows with reset times; host
    pressure; heavy slots; anything paused and why; open sweep items. Then
    start the janitor sweep (§6).
 
+## 1a. Launching and closing
+
+You decide what runs; the herder carries it out and never decides. For each
+kickoff file in the plan Tim passed (relayed by the concierge):
+1. **Before-launch gate.** Read the kickoff's `before_launch`. Every value
+   other than `none` is raised first as an operator item (§2c) with the
+   copy-able `commands[]` Tim needs; also decide here any `before_launch`
+   check the herder hands back to you. Send `before_launch_cleared:true` only
+   after the item is done; until then send `false` (the herder refuses it).
+2. **Launch:**
+   ```
+   squad send herder "launch <name>" --from orchestrator --ack-deadline-s 60 \
+     --data '{"directive":"launch","name":"<n>","prompt":"<abs path>","before_launch_cleared":<bool>}'
+   ```
+   Record the kickoff path as the stream's `prompt` (§3a).
+3. **On `launch_result`** (`ok` or a failure code): on `ok`, expect the
+   member to register. On failure or an ack timeout, decide: retry, close,
+   or raise an operator item. The herder never decides.
+4. **Close** a member when its work is done or Tim asks (after the §3a
+   check): `squad send herder "close <name>" --from orchestrator
+   --ack-deadline-s 60 --data '{"directive":"close","name":"<n>","reason":"<why>"}'`.
+   Ask for state with a `status` directive; its answer is `status_result`.
+5. **Rebalancing** (when the herder supports it): direct `squad herd relaunch`
+   through the herder rather than closing and launching by hand.
+6. **End of run:** `squad send herder "wind_down" --from orchestrator
+   --ack-deadline-s 60 --data '{"directive":"wind_down"}'`.
+7. **On `herder.issue`:** decide what to do; tell Tim through the concierge
+   (§2) only if it needs him.
+8. **Decision log:** every herder directive (launch, close, status, relaunch,
+   wind_down) is logged in the guarded decision log like any other (§9).
+
+## 1b. Ad-hoc work
+
+A request for task work during a run (Tim's "hot-fix the dashboard live") is
+never done by the concierge or the herder. You write
+`~/claude/prompts/<yymmdd>/adhoc-<slug>.md` from `_template.md` with
+`lifetime: task`, its own `cwd`, model and effort (for dashboard amends, the
+main checkout, per the "Dashboard amends during a run" memory), launch it
+through the herder (§1a), and close it on its `done`.
+
 ## 2. Quota reactivity
+
+**"Tell Tim"** anywhere in §2, §2a, §2b, §4 and §6 means a message to the
+concierge, which presents it:
+```
+squad send concierge --from orchestrator --data '{"kind":"operator_update","urgent":<bool>,"text":"<the line>"}'
+```
+`urgent` is true for level 100, escalations and anything blocking now.
 
 Account `A`'s members: `squad roster`, `.req.account == "A"`, `.live`,
 role `client`. A member whose registration `account` is null (K3,
@@ -140,7 +190,7 @@ transition to busy while `pct ≥ 85`, not only on threshold crossings.
      entry `state:"sent"`, and do not count the member as paused.
    - `escalated`: raise an operator item NOW (§2c): "<member> not
      responding to pause; kill or wait", with the quota numbers and reset.
-5. Tell Tim one line: who, acked or pending, why, reset time.
+5. Tell Tim one line (`operator_update`): who, acked or pending, why, reset time.
 
 **Delivery priority:** only the orchestrator's `squad send --priority now`
 interrupts a busy member (others are downgraded to `next`); critical
@@ -274,11 +324,18 @@ changes by Tim or members.
   decides, or you raise the missing rule for the dotfiles fragment.
 - **Draft links** (`draft_url`, `url`) are server-checked; a 422 means fix
   the draft, not the item. Never present an unresolved draft.
-- **Order and nudge**: blocking-now, then stream priority, then
-  `est_minutes`. Show one consolidated list when a blocking-now item
-  appears, when Tim asks and in the §2b summary. While he is present give
-  one chat line about ready items every 30 min, and once when he returns
-  from AFK. Chasing him is your job, not his.
+- **Order and nudge; you are the single composer.** Order blocking-now,
+  then stream priority, then `est_minutes`. Every consolidated list, nudge
+  and blocking-now presentation is sent to the concierge as
+  ```
+  squad send concierge --from orchestrator --data '{"kind":"operator_digest","urgent":<bool>,"items":[…],"text":"<final list>"}'
+  ```
+  where `text` is the final, ready-to-show list, with each item's
+  `commands[]` in fenced blocks and the dashboard URL. The concierge never
+  re-derives it. Cadence: at once when a blocking-now item appears, when Tim
+  asks and in the §2b summary, then every 30 min while Tim is present (the
+  concierge relays "Tim: afk" and "Tim: back"; send once more when he is
+  back). Chasing him is your job, not his.
 - **Resolve** one item at a time, when its outcome is known; never close
   or drop in a batch (it loses the true wait times). Tim's Done / Drop /
   Back to agent buttons PATCH the server directly: on `operator.item`
@@ -372,6 +429,10 @@ squad send <member> "heavy_slot revoke" --from orchestrator --ack-deadline-s 120
 A grant expires at `est_minutes × 2`: arm a background timer (`sleep <s>;
 squad send orchestrator "heavy_slot expired: <member>" --from cli --data
 '{"kind":"heavy_slot_expired","member":"<member>"}'`); expiry = released. On `release`: drop the grant, grant the next in `queue`.
+- Clients request and release slots under the `squad-join` heavy-slot rule
+  (§6 there). Where the join-side gate reads `grants` from the plan gauge,
+  publish `grants` on every change (§3 already requires the plan to be
+  republished after each one).
 - Paused members get no `host.pressure`: expect no ack; judge from the gauge.
 - `host.pressure` `critical`: revoke the lowest-priority grant
   (`"decision":"revoke"`); that client stops its job and releases.
@@ -516,7 +577,8 @@ each admin step" by default.
 
 Directives you send, defined client-side in `squad-join` §5: `pause`,
 `resume`, `priority`, `fanout`, `heavy_slot`, `review` (§7a), `infra`, `cleanup` (§2a)
-and `preflight` (§2b). `pause`, `resume`, `priority`, `fanout` and `heavy_slot` revoke carry an ack
+and `preflight` (§2b). To the herder (§1a): `launch`, `close`, `status`,
+`wind_down` (and `relaunch` for rebalancing where supported). `pause`, `resume`, `priority`, `fanout` and `heavy_slot` revoke carry an ack
 deadline (§2).
 
 A message turn's JSON is `{"from":…,"text":…,"data":{…}}`; client →
@@ -525,7 +587,9 @@ request|release), `blocked`, `done`, `infra_ready`, `infra_result`,
 `preflight`, `operator_task` (§2c), plus your own timers (`sweep_due`, `heavy_slot_expired`). On `blocked`, tell Tim
 if it needs him; on `done`, drop the stream from the plan. Watcher events
 are information. Never send a `now` turn for what can wait until a member
-is idle. At session end: `squad deregister orchestrator`.
+is idle. From the herder: `launch_result`, `close_result` and `status_result` (reply to
+the matching directive, §1a), and the `herder.issue` topic (subscribed in §1).
+At session end: `squad deregister orchestrator`.
 
 ## 9. Debug mode (`--debug`)
 
@@ -540,7 +604,8 @@ At start-up, before §1 step 4, only when started with `--debug`:
    `$CLAUDE_CODE_SESSION_ID`, and say so). Publish the gauge with that
    `session_id` and `"debug":true` so the review finds your transcript.
 3. After **every** directive you send (pause, resume, priority, fanout,
-   heavy_slot, infra, cleanup) and every `squad.directive` `unacked` or `escalated`
+   heavy_slot, infra, cleanup, and the herder's launch, close, status,
+   relaunch, wind_down) and every `squad.directive` `unacked` or `escalated`
    event (member, directive_id, age_s, action), in the same turn append to
    the run's decision log:
    ```
