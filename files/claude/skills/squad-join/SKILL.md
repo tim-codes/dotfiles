@@ -180,6 +180,8 @@ line.
 | `review` | `{findings}` | design-conformity findings on your ADR/plan or PR: address each blocking finding (or reply to the orchestrator with a justification), then re-send `design ready` / `pr_ready`; advisory ones are optional |
 | `infra` | `{action, pr, authority}` | infra role only; a client ignores it |
 | `stop` | `{reason}` | ack first; finish or abandon the current step; commit and push work in progress to the branch; `squad set --name <name> --status done --detail "stopped: <reason>; next: <step>"`; `squad deregister <name>`; end the turn. The herder then exits the session (`/exit`) |
+| `admit` | `{pr}` | squash-merge your own reviewed PR into the trunk with `squad-pr-merge <n> --repo <owner/name> --into-trunk`; run it only on this directive, never on your own initiative. Any Claude member may admit; no merge grant is needed (`--land` needs the merge grant: members never land) |
+| `trunk_failure` | `{trunk, commit, pr, tests, log_path}` | a gate failure attributed to your commit. Reproduce it with the focused command for `tests` (§6a — never rerun the full suite), fix forward with a PR into the trunk, then reply `trunk_fix` (`"kind":"trunk_fix","trunk":…,"pr":<n>`). A failure that is not yours goes back to the orchestrator with the reason |
 | `relaunch` | reserved | not implemented; reply that it is unsupported |
 
 **Acknowledge first.** A message carrying a trailer line `ack_required:
@@ -305,14 +307,15 @@ as the text's first word and a `kind` field in `data`.
 
   With no live orchestrator in `squad roster`, run them anyway, one at a
   time, but not while `host.pressure` is `critical`.
-- **PR ready** for merge or deploy:
+- **PR ready** for merge or deploy. In a trunked repo, open the PR against
+  the repo's open trunk (§6a) and include it in the report:
 
   ```
   squad send role:orchestrator "pr_ready: <repo>#<n> <title>" --from <name> \
-    --data '{"kind":"pr_ready","repo":"<repo>","pr":<n>,"summary":"<one line>"}'
+    --data '{"kind":"pr_ready","repo":"<repo>","pr":<n>,"trunk":"<branch>","summary":"<one line>"}'
   ```
 
-  For exxo-infra this starts the review → merge → deploy flow; the
+  For exxo-infra (not trunked) this starts the review → merge → deploy flow; the
   orchestrator still gets Tim's yes first.
 - **Operator tasks** (a step only Tim can do). **Never** trigger an auth
   prompt, Touch ID, browser login or admin-panel step yourself while Tim may
@@ -342,7 +345,74 @@ as the text's first word and a `kind` field in `data`.
   left returns `unknown-member`. Check `squad roster`; if it is gone, send the
   point to `role:orchestrator` instead of retrying.
 - **Done**: `squad send role:orchestrator "done: <summary>" --from <name>
-  --data '{"kind":"done"}'`.
+  --data '{"kind":"done","tested":"focused"}'`. The `"tested":"focused"` field
+  records that the mid-build verification was focused-only (§6a); the
+  comprehensive gate runs per trunk, not per branch.
+
+## 6a. Testing and trunks
+
+Mid-build testing is **focused only**. Run fast tests for the code you
+changed, plus the repo's fast check (`just check` or its equivalent) once
+before `pr_ready`. The comprehensive gate (`just ci` / `just verify`, the
+full test suite, production builds) runs once per rolling trunk, decided and
+run by the orchestrator — not by you, per branch.
+
+| Stack | Allowed mid-build | Not without a test slot |
+|---|---|---|
+| Rust | `cargo test <filter>`, `cargo test --test <file> <filter>`, `cargo test -p <crate> --lib <filter>`; `cargo check` | bare `cargo test` across a workspace, `--release`, benches |
+| TypeScript | `pnpm vitest run <file>` (or the repo's single-file recipe); one package's typecheck | the whole vitest suite, `turbo run test`, any production build (`next build`, `vite build`) |
+| Python | `pytest <path>::<test> -q` | the full `pytest` run |
+| Browser | nothing | Playwright, Lighthouse, any browser run |
+| Shell (dotfiles) | `bash tests/<file>.sh` for the touched script | — |
+
+Always heavy, whatever the stack: `just ci`, `just verify`, Docker compose
+stacks, data jobs.
+
+**Test-slot exception.** Ask for a heavy slot only when focused tests cannot
+show the change works: a migration, build or CI config, or behaviour only an
+e2e run exercises. The request is the ordinary `heavy_slot request` with
+`"purpose":"test"` and a one-line reason:
+
+```
+squad send role:orchestrator "heavy_slot request: <reason>" --from <name> \
+  --data '{"kind":"heavy_slot","action":"request","reason":"<reason>","est_minutes":<n>,"purpose":"test"}'
+```
+
+Grants are sparing and logged.
+
+**Subagent briefs.** Skills do not travel into a fresh subagent context, so
+every brief you write for an `implementer` (or any other subagent) must
+restate this policy in one line: focused tests only, the repo's fast check
+once before `pr_ready`, the orchestrator runs the comprehensive gate per
+trunk.
+
+**No live orchestrator.** Run your own gate before `pr_ready` and open the
+PR against the default branch, as before this policy.
+
+**PRs against the rolling trunk.** Each trunked repo has one open trunk
+(`trunk/<yymmdd>-<n>`), named in the plan gauge. Open your PR against it:
+
+```
+trunk=$(squad get plan | jq -r '.data.trunks[]|select(.repo=="<owner/repo>")|.branch')
+```
+
+With no open trunk for the repo, send a `trunk_request`:
+
+```
+squad send role:orchestrator "trunk_request: <repo>" --from <name> \
+  --data '{"kind":"trunk_request","repo":"<owner/repo>"}'
+```
+
+and open against the default branch meanwhile only if the orchestrator says
+to. Then report the PR with its trunk:
+
+```
+squad send role:orchestrator "pr_ready: <repo>#<n> <title>" --from <name> \
+  --data '{"kind":"pr_ready","repo":"<repo>","pr":<n>,"trunk":"<branch>","summary":"<one line>"}'
+```
+
+A member never pushes to a trunk directly; the trunk changes only through
+admitted PRs.
 
 ## 7. Keeping state honest
 
