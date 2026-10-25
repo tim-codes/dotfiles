@@ -43,7 +43,7 @@ Values may run long. A comment after `context` is fine: only its first word coun
                 contexts file lists in `account_bound` (m365, figma, notion, agent-run,
                 datadog, boards) must be provided by the context; an unmet one exits 9
   harness       optional, default claude-code; must equal the context's harness (else exit 5)
-  role          optional: client (default) | herder | concierge | orchestrator | infra;
+  role          optional: client (default) | herder | concierge | orchestrator | infra | liaison;
                 the herder reads it from --dry-run to order launches
   lifetime      optional: run | task; default task for a client, else run. `run` members
                 stay up for the whole run (managers, liaison, dashboard)

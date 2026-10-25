@@ -284,6 +284,9 @@ kick "$T/life.md" --dry-run
 check "an explicit lifetime wins over the role default" has "lifetime: task"
 sed 's|^model: .*|&\nrole: boss|' "$T/fixture.md" >"$T/badrole.md"
 expect_rc "an unknown role is exit 5" 5 "$T/badrole.md" --dry-run
+sed 's|^model: .*|&\nrole: liaison\ncapabilities: comms|' "$T/fixture.md" >"$T/liaison.md"
+kick "$T/liaison.md" --dry-run
+check "role liaison is accepted, lifetime run" bash -c 'printf "%s\n" "$1" | grep -qx "role: liaison" && printf "%s\n" "$1" | grep -qx "lifetime: run"' _ "$out"
 # add_dirs: passed in order as --add-dir, shown in --dry-run, must exist
 mkdir -p "$FAKE/briefs" "$FAKE/reports"
 sed 's|^model: .*|&\nadd_dirs: ~/briefs, '"$FAKE"'/reports|' "$T/fixture.md" >"$T/adddirs.md"
@@ -302,6 +305,14 @@ check "add_dirs also apply on resume" bash -c 'grep -qx "arg<--add-dir>" "$1" &&
 sed 's|^model: .*|&\nadd_dirs: ~/briefs ~/nowhere|' "$T/fixture.md" >"$T/baddirs.md"
 expect_rc "a missing add_dirs path" 3 "$T/baddirs.md" --dry-run
 has "nowhere" && ok "  message names the path" || bad "  message: $out"
+# deny: each rule becomes --disallowedTools
+sed 's|^model: .*|&\ndeny: Bash(curl:*), WebFetch(domain:localhost)|' "$T/fixture.md" >"$T/deny.md"
+kick "$T/deny.md" --dry-run
+check "deny is echoed" has "deny: Bash(curl:*), WebFetch(domain:localhost)"
+kick "$T/deny.md"
+check "deny rules become --disallowedTools flags, before --model" bash -c '[ "$(sed -n 1,5p "$1" | tr "\n" " ")" = "arg<--disallowedTools> arg<Bash(curl:*)> arg<--disallowedTools> arg<WebFetch(domain:localhost)> arg<--model> " ]' _ "$REC"
+kick "$T/nokeys.md" --dry-run
+check "deny defaults to none" has "deny: none"
 # context env: applied unless the caller set it
 cat >"$BIN/claude" <<'EOF'
 #!/bin/bash

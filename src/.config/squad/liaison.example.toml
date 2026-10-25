@@ -1,0 +1,24 @@
+# Squad liaison allow-list. Copy to ~/.config/squad/liaison.toml (not
+# committed). Every address and domain here is a fake placeholder.
+
+[[client]]
+key = "acme"
+mode = "act"                       # act | triage-only
+domains = ["acme.example"]
+contacts = ["alex@acme.example"]
+send_as = "claude"                 # claude: cc and Reply-To Tim | tim: gate appends the disclosure
+linear_team = "ACME"               # tickets are filed team-level, in Triage
+owner = "acme-owner"               # squad member that reviews and merges an auto-fix
+repos = ["~/dev/example-org/acme-site"]
+auto_fix = true
+
+[[client]]
+key = "globex"
+mode = "triage-only"
+domains = ["globex.example"]
+contacts = ["sam@globex.example"]
+send_as = "tim"
+linear_team = "GLBX"
+owner = "globex-owner"
+repos = ["~/dev/example-org/globex-portal"]
+auto_fix = false                   # listed but off until a trial has run

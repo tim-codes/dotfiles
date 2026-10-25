@@ -26,6 +26,7 @@
       "Bash(* git push*master*)",
       "Bash(*agent/run*)",
       "Bash(*agent-run*)",
+      "Bash(squad mail:*)",
       "Bash(esc)",
       "Bash(esc *)",
       "Bash(* esc *)",
