@@ -5,6 +5,7 @@ effort: medium
 role: liaison
 lifetime: run
 capabilities: comms
+deny: Bash(curl:*), Bash(wget:*), Bash(squad operator decide:*), Bash(squad operator set:*), WebFetch(domain:localhost), WebFetch(domain:127.0.0.1)
 needs: none
 launch: claude-kickoff ~/claude/prompts/<date>/04-liaison.md
 before-launch: none
@@ -18,6 +19,10 @@ Kickoff template for the squad liaison. Copy to
 delete every comment. The herder launches it after infra (it is a `run`
 support member in the exxo context, never exxo-openrouter), with
 `claude-kickoff <that file>`.
+
+The `deny:` line stops a prompt-injected session minting a "Tim" approval: the
+dashboard accepts `actor:"gui"` unauthenticated, and `squad operator decide|set`
+records decisions and rulings. Keep it.
 -->
 
 Run as the squad liaison for the whole run. Clients and their rules come

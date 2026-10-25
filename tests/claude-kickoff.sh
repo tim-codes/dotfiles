@@ -305,6 +305,14 @@ check "add_dirs also apply on resume" bash -c 'grep -qx "arg<--add-dir>" "$1" &&
 sed 's|^model: .*|&\nadd_dirs: ~/briefs ~/nowhere|' "$T/fixture.md" >"$T/baddirs.md"
 expect_rc "a missing add_dirs path" 3 "$T/baddirs.md" --dry-run
 has "nowhere" && ok "  message names the path" || bad "  message: $out"
+# deny: each rule becomes --disallowedTools
+sed 's|^model: .*|&\ndeny: Bash(curl:*), WebFetch(domain:localhost)|' "$T/fixture.md" >"$T/deny.md"
+kick "$T/deny.md" --dry-run
+check "deny is echoed" has "deny: Bash(curl:*), WebFetch(domain:localhost)"
+kick "$T/deny.md"
+check "deny rules become --disallowedTools flags, before --model" bash -c '[ "$(sed -n 1,5p "$1" | tr "\n" " ")" = "arg<--disallowedTools> arg<Bash(curl:*)> arg<--disallowedTools> arg<WebFetch(domain:localhost)> arg<--model> " ]' _ "$REC"
+kick "$T/nokeys.md" --dry-run
+check "deny defaults to none" has "deny: none"
 # context env: applied unless the caller set it
 cat >"$BIN/claude" <<'EOF'
 #!/bin/bash
