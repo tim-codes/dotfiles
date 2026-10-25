@@ -278,7 +278,8 @@ Work named in a member's kickoff prompt must not go missing or quiet (a
 client deck asked for in a prose aside, then deferred with nobody
 tracking it). Sources are only the member's original prompt file
 (`~/claude/prompts/<yymmdd>/…`; its path is in the launch or the
-concierge's launch line, record it as the stream's `prompt`) and the open
+concierge's launch line, or ask the concierge; record it as the stream's
+`prompt`) and the open
 operator items plus the Linear issues they or the prompt cite. Not meeting
 notes or chat.
 
@@ -298,13 +299,17 @@ and before closing a member.
    for a PR, the URL for SharePoint or Figma), never inferred from a ticket
    state or a member's claim. One in a session scratchpad or under
    `/private/tmp` is not delivered until copied to its durable home.
-3. `deferred` is valid only with that open item (`squad operator list`,
-   `get`) and is re-surfaced at every check; if the item is closed or gone,
-   it is `missing`. A deliverable never goes silent.
+3. `deferred` is valid only with that open item (`squad operator list
+   --status open,ready`, `get`) and is re-surfaced at every check; if the
+   item is closed or gone, it is `missing`. If Tim deliberately drops it
+   (a recorded ruling), the deliverable is `descoped`: not `missing`, not
+   re-raised. A deliverable never goes silent.
 4. `missing` becomes a directive to the owning member (`squad send <member>
    … --from orchestrator`), or, once the member is closed, an operator item
-   (§2c, `squad operator raise`) saying so, client-facing flagged in the
-   title.
+   (§2c, `squad operator raise --id deliverable-<member>-<slug> --kind
+   info|action --blocking later`; `action` needs `--command` or `--url`)
+   saying so, client-facing flagged in the title. The stable id means
+   re-raising each batch updates the item, not duplicates it.
 
 **Where:** in the plan gauge (§3), per stream, so it survives your restarts
 like the rest of the plan; publish after every change. With `--debug`, also
@@ -446,7 +451,8 @@ record only the ruling.
 Apply the global delegation policy, preferring the dedicated agents. Roster:
 **janitor** and **PR-check** (`git-pr-ops`, sonnet), **summariser**
 (`Explore` or `general-purpose`, sonnet; digests from the roster and `squad
-history`). Announce the numbered roster on every launch. Briefs restate what
+history`), **deliverables auditor** (`Explore`, sonnet; §3a: prompt
+vs delivered, checks artefacts directly, returns the table). Announce the numbered roster on every launch. Briefs restate what
 a fresh context lacks: absolute paths, `gh -R`, `run-with-secrets` for
 credentials. Admin or OAuth briefs also carry: the **brand name** for any
 consent artefact ("Exxo Labs"); the **exact identity list** for any access
