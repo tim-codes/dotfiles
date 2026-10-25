@@ -45,9 +45,11 @@ down: see `squad-join` §8.
 ## 1. Start-up
 
 **Context guard (before anything else).** `$CLAUDE_CONFIG_DIR` must end in
-`.claude-exxo`. If not, register nothing: print a terminal note telling Tim to relaunch in the exxo
-context (the M365 and Datadog tools the work needs only exist there; no
-concierge route exists yet) and stop.
+`.claude-exxo` or `.claude-exxo-personal` (the same Exxo identity on either
+quota; Datadog and `agent/run` work in both, and M365, Figma or Notion work
+goes to an exxo member as a job or directive). Anywhere else (for example
+`.claude-exxo-openrouter`), register nothing: print a terminal note telling Tim
+to relaunch in an exxo context (no concierge route exists yet) and stop.
 
 **Register first, always:** singleton check (step 1), `squad register`
 (step 2), subscriptions (step 3). If `register` fails (exit 2), run `squad

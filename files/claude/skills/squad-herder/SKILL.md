@@ -20,8 +20,9 @@ means the broker is down: see `squad-join` §8. Exit 64 is a clap usage error
 ## 1. Start-up
 
 **Context guard (before anything else).** `$CLAUDE_CONFIG_DIR` must end in
-`.claude-exxo`. If not, register nothing: tell Tim to relaunch in the exxo
-context and stop.
+`.claude-exxo` or `.claude-exxo-personal` (lifecycle needs no connectors).
+Anywhere else, register nothing: tell Tim to relaunch in an exxo context and
+stop.
 
 1. **Singleton check.** `squad roster | jq -r '.[] | select(.live and
    .req.role=="herder") | .req.name'` — any output: one is live; tell Tim
