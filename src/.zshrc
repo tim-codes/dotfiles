@@ -25,7 +25,20 @@ if [ -d "$HOME/.claude-personal" ]; then
     claude() {
         local dir="$HOME/.claude-personal"
         case "$PWD" in
-            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal)
+            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal|"$HOME"/.claude-exxo-openrouter)
+                mkdir -p "$HOME/claude"
+                ( cd "$HOME/claude" && CLAUDE_CONFIG_DIR="$dir" command claude "$@" )
+                return ;;
+        esac
+        CLAUDE_CONFIG_DIR="$dir" command claude "$@"
+    }
+    # exxo-openrouter context (Kimi K3 workers). The key comes from the
+    # overlay's apiKeyHelper, so only the config dir and start directory are
+    # set here. Anti-goal: sets no env that could route any other context.
+    claude-exxo-openrouter() {
+        local dir="$HOME/.claude-exxo-openrouter"
+        case "$PWD" in
+            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal|"$HOME"/.claude-exxo-openrouter)
                 mkdir -p "$HOME/claude"
                 ( cd "$HOME/claude" && CLAUDE_CONFIG_DIR="$dir" command claude "$@" )
                 return ;;
@@ -36,7 +49,7 @@ if [ -d "$HOME/.claude-personal" ]; then
     # ~/.claude and ~/.claude.json from scratch (fresh login/onboarding).
     claude-default() {
         case "$PWD" in
-            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal)
+            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal|"$HOME"/.claude-exxo-openrouter)
                 mkdir -p "$HOME/claude"
                 ( cd "$HOME/claude" && command env -u CLAUDE_CONFIG_DIR claude "$@" )
                 return ;;

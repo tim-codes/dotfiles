@@ -732,7 +732,7 @@ function __claude_ctx --description 'Run claude in a per-account config context'
     set -e argv[1]
     set -l home (path resolve $HOME)
     set -l here (path resolve .)
-    set -l ctx_dirs $home/.claude-personal $home/.claude-exxo $home/.claude-exxo-personal
+    set -l ctx_dirs $home/.claude-personal $home/.claude-exxo $home/.claude-exxo-personal $home/.claude-exxo-openrouter
     set -l jumped 0
     if test "$here" = "$home"; or contains -- "$here" $ctx_dirs
         mkdir -p $home/claude
@@ -767,6 +767,12 @@ end
 # config dir.
 function claude-exxo-personal --wraps claude --description 'claude in the exxo context on the personal subscription'
     __claude_ctx "$HOME/.claude-exxo-personal" $argv
+end
+# exxo-openrouter context (Kimi K3 workers). The key comes from the overlay's
+# apiKeyHelper, so only the config dir is set here. Anti-goal: sets no env
+# that could route any other context.
+function claude-exxo-openrouter --wraps claude --description 'claude in the exxo-openrouter context'
+    __claude_ctx "$HOME/.claude-exxo-openrouter" $argv
 end
 # Escape hatch past the wrong-account guard: the retired default context.
 # Using it RECREATES ~/.claude and ~/.claude.json from scratch (fresh
