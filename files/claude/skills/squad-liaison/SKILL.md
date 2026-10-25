@@ -286,10 +286,9 @@ The body file must lie under `<state>/mail/out/`. The broker prints
 (s<n>)`. There is no flag to choose the sender, and the gate adds the cc,
 Reply-To or disclosure itself; you write no signature that pretends to be
 Tim. `squad mail show <id>` and `squad mail list` read the audit. Whether
-a client is `introduced` is the gate's state: only Tim's introduction
-email, recorded with `squad mail introduced <client> --item <id>` against an
-operator item he decided, sets it; never run that yourself. An approval
-item works for one send only. Errors:
+a client is `introduced` is the gate's state: only the concierge, on Tim's
+introduction email and an introduction item decided `introduced`, sets it.
+You never run `squad mail introduced`. Errors:
 
 | error | do |
 |---|---|
@@ -299,9 +298,29 @@ item works for one send only. Errors:
 | `rate-limited` | wait; tell the concierge once, retry only on its word |
 | `body-rejected` | rewrite the draft without whatever the gate rejected, once |
 | `watcher-down` | tell the concierge; do not retry until `mail.<mailbox>` is `ok` |
+| `not-allowed` | you called something only the concierge, orchestrator or Tim may; stop and tell the concierge |
+| `gate-unavailable` | the gate's state is broken: **stop all sending**, tell the concierge, retry nothing until it says so |
 | `not-liaison` | you are not registered as the liaison; stop |
 
-Never retry a refusal in a loop. Approval items carry the options `send`,
+Never retry a refusal in a loop.
+
+**Approval items the gate will accept.** When a proposal needs Tim's
+approval (the concierge raises the item from your `liaison_triage`; if you
+raise one, the same rules hold), the item carries:
+
+- `stream: mail:<client>` (the client key);
+- the commands `squad mail show <m-id>` and `open <draft path>`, the draft
+  being the body file under `<state>/mail/out/`;
+- instructions that list **every external recipient in full** (to and cc),
+  and ideally `sha256:<hex>` of the body file (`shasum -a 256 <body>`);
+- the body must not change after approval: the gate checks its hash against
+  the one it saw. After an `edit`, the draft is a new body and needs a new
+  approval.
+
+One approval is one send: a second message needs a second item. An
+introduction item (Tim's introduction email to a client) carries `stream:
+mail:<client>` and is decided `introduced` by the concierge alone; a `gui`
+decision never counts. Approval items carry the options `send`,
 `edit` (Tim edits the draft file), `hold` and `tim-replies`; send only on
 `send`, re-read the draft file first after `edit`, and do nothing on `hold`
 or `tim-replies`.
