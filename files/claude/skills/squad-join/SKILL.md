@@ -1,6 +1,6 @@
 ---
 name: squad-join
-description: Join this Claude Code session to the local squad (the `squad` broker) as a client workstream — move into a worktree, register, subscribe to host/message topics, and follow the orchestrator's directives (pause, resume, priority, fanout, heavy_slot, preflight). Use when Tim says "/squad-join", "join the squad" or "register with the squad", and whenever a `<squad-message>` turn arrives and you need to know what it means or how to respond. Arguments `[--name N] [--priority 1-5] [--needs a,b] [--branch B]`.
+description: Join this Claude Code session to the local squad (the `squad` broker) as a client workstream — move into a worktree, register, subscribe to host/message topics, and follow the orchestrator's directives (pause, resume, priority, fanout, heavy_slot, preflight). Use when Tim says "/squad-join", "join the squad" or "register with the squad", and whenever a `<squad-message>` turn arrives and you need to know what it means or how to respond. Arguments `[--name N] [--priority 1-5] [--needs a,b] [--branch B] [--capabilities a,b] [--model ID]`.
 ---
 
 # Squad: joining as a client workstream
@@ -76,8 +76,18 @@ not starting `role`.
 ```
 squad register --name <name> --role client --priority <1-5, default 3> \
   --needs <a,b> --session-id "$CLAUDE_CODE_SESSION_ID" \
+  --capabilities <code,review,integration> --model <model id> \
   --cwd "<worktree path>" --notes "<one line: what this stream is doing>"
 ```
+
+`--capabilities` lists the kinds of delegated work you will take (`code`,
+`review`, `integration`): work tags, never model names. `--model` is the model
+this session actually runs on (e.g. `claude-opus-5-5`, `moonshotai/kimi-k3`).
+A Claude member whose context provides `agent-run` (exxo, exxo-personal)
+adds `credentials` to its capabilities, so `--need <work>,credentials` can
+match it; K3 members never do. Pass both when you serve jobs (§6c) and whenever you know them; omit
+`--capabilities` for a stream that takes none. Pool members register
+`--role client`.
 
 `--needs` lists connector or capability dependencies (e.g. `m365`); omit it
 if there are none. The pid comes from `$CLAUDE_CODE_MESSAGING_SOCKET` and the
@@ -182,6 +192,7 @@ line.
 | `stop` | `{reason}` | ack first; finish or abandon the current step; commit and push work in progress to the branch; `squad set --name <name> --status done --detail "stopped: <reason>; next: <step>"`; `squad deregister <name>`; end the turn. The herder then exits the session (`/exit`) |
 | `admit` | `{pr}` | squash-merge your own reviewed PR into the trunk with `squad-pr-merge <n> --repo <owner/name> --into-trunk`; run it only on this directive, never on your own initiative. Any Claude member may admit; no merge grant is needed (`--land` needs the merge grant: members never land) |
 | `trunk_failure` | `{trunk, commit, pr, tests, log_path}` | a gate failure attributed to your commit. Reproduce it with the focused command for `tests` (§6a — never rerun the full suite), fix forward with a PR into the trunk, then reply `trunk_fix` (`"kind":"trunk_fix","trunk":…,"pr":<n>`). A failure that is not yours goes back to the orchestrator with the reason |
+| `delegate_mode` | `{mode: "pool"\|"local", needs: [code, review]}` | ack first (it carries `--ack-deadline-s`, as `priority` does). `pool`: route new implementer and reviewer work that would have gone to a subagent through `squad delegate` (§6b) instead, for the listed `needs`, until a `local` arrives. `local`: back to subagents. Work already running finishes where it is |
 | `relaunch` | reserved | not implemented; reply that it is unsupported |
 
 **Acknowledge first.** A message carrying a trailer line `ack_required:
@@ -193,8 +204,8 @@ the broker never has to guess between topics that share a seq:
 squad ack "<seq> topic=<topic>" [--note "<one line>"]
 ```
 
-Ack-gated directives (the orchestrator's `pause`, `resume`, `priority`, `fanout`
-and `heavy_slot` revoke) reach you at once, even while a batch of ordinary
+Ack-gated directives (the orchestrator's `pause`, `resume`, `priority`, `fanout`,
+`delegate_mode` and `heavy_slot` revoke) reach you at once, even while a batch of ordinary
 messages is held. An unacked directive is re-delivered at `now` and then escalated to Tim as
 "member not responding". A pause ack means "I have stopped launching new
 work", not "I have finished pausing"; the procedure below still follows.
@@ -414,6 +425,150 @@ squad send role:orchestrator "pr_ready: <repo>#<n> <title>" --from <name> \
 A member never pushes to a trunk directly; the trunk changes only through
 admitted PRs.
 
+## 6b. Delegating a job
+
+Delegate when a self-contained implement, test or review unit would
+otherwise be a subagent and the orchestrator has sent you `delegate_mode`
+`pool` for that need, or when you judge a pool member is the better fit.
+Integration-shaped work (Notion, M365, Slack) goes to `integration`. A
+delegated job is asynchronous: you do other work, or end the turn.
+
+```
+squad delegate --need <cap[,cap…]> --brief <file> [--auto-ok] [--deadline 45m] --name <name>
+```
+
+Run it from your worktree: the workspace (repo, branch, `base_sha`) is
+captured from the cwd, and the worker branches from `base_sha`, so **commit
+before delegating**. It prints the job record (`id` is `j<N>`, plus
+`capable` and `routing`); a warning on stderr with `capable` 0 means nobody
+holds the capability yet and the job waits for its deadline.
+
+**Not K3 jobs.** Anything needing credentials (`agent/run`, `esc`, `pulumi
+up` / `env open`, `op`), a merge, or a push to `main`/`master` must not reach
+a K3 member. Delegate those with `--need <work>,credentials` so only Claude
+members match, or keep them local. Pass `--auto-ok` only when the job is
+read-only, or code/test on its job branch, with no secrets, no prod and no
+merge. Without it a job waits for an orchestrator to assign it and goes to
+Tim at its deadline.
+
+**The brief stands alone**, like a subagent brief. Copy this template and
+fill every field:
+
+```
+# Job brief: <title>
+Goal: <what done looks like, one paragraph>
+Repo: <absolute path>   base_sha: <sha>   (job id: leave `<id>`; the worker uses its own job id)   (gh -R <owner/name> for GitHub)
+Files in scope: <paths; nothing outside them>
+Acceptance: <tests, with the exact command, e.g. `just check`>
+Environment:
+- Absolute paths only. Use the repo's command runner (`just …`), not the raw tool.
+- Focused tests only; the repo's fast check once before you finish. The orchestrator runs the comprehensive gate per trunk.
+- Credentials, if any, only through `agent/run -- <cmd>` (the run-with-secrets skill).
+- Work in your own worktree: branch `job/<id>` off `<base_sha>`, push it, return its name. Do not open or merge PRs; do not push to `main`/`master`.
+- This job needs no credentials. If it turns out to, stop and report `failed --reason needs_credentials`.
+```
+
+Note the job id in `squad set --name <name> --detail "delegated j<N>: <what>"`,
+carry on or end the turn, and **never sleep-poll**. The result arrives as a
+`job_result` turn; `squad job show <id>` reads it (and the worker's summary)
+any time.
+
+**On `job_result`:**
+- `ok`: read `diff_summary` and `tests`, fetch the branch (`git fetch origin
+  job/<id>`) and review the diff yourself or with a reviewer subagent. Then
+  **you** open the PR from `job/<id>` (or fold it into your own branch's PR)
+  and send `pr_ready` as usual (§6). The merge path is unchanged: orchestrator
+  review, then the member, infra or Tim, as ENG-338 settles. Never ask the
+  worker to open or merge anything.
+- **K3 test integrity.** When the result came from a K3 worker (the `worker`'s
+  `.req.model` in `squad roster`, or the model on the job record) and its diff
+  changes existing test assertions or inputs, review it yourself against the
+  brief (or with a Claude reviewer subagent); do not accept a pool review of
+  it. Record `k3-integrity: flagged <job> <files>` or `k3-integrity: clean`
+  in your report.
+- `failed`: read `reason`. `budget`: re-delegate later or do it locally.
+  `needs_operator`: the linked operator item is with Tim; wait for its
+  resolution. `worker_lost`: re-delegate or do it locally. `needs_credentials`
+  or `needs_merge`: re-delegate to a Claude member (`--need <work>,credentials`)
+  or do it locally; the orchestrator will not do this for you. Any other
+  reason: do it locally.
+- `timeout` (status set by the broker): reason `timeout` means the job ran
+  out of time (a `late` result may still follow with the branch); `unrouted`
+  means nobody took it. Do it locally, or re-delegate with a later deadline.
+
+**Close the loop in the same turn.** After integrating or rejecting a
+result, record the verdict:
+
+```
+squad job review <id> --verdict accepted|rework|rejected [--reason <tag>] --name <name>
+```
+
+Reason tags (open set, this vocabulary expected): `wrong_approach`,
+`failing_tests`, `conflicts`, `integration`, `incomplete`. For `rework`,
+delegate the follow-up with `--rework-of <id>`.
+
+## 6c. Serving jobs (pool members)
+
+A pool member registers with `--capabilities` and `--model` (§2), does no
+other work, and serves delegated jobs one at a time.
+
+On `job_assigned`: if the message has an `ack_required:` trailer, ack it as
+the first action (§5), then `squad set --name <name> --status working
+--detail "job <id>"`.
+
+1. Read the brief at `brief_path` and take `workspace` (both under `data.job`
+   in the turn). Create your own worktree from `workspace.repo` at
+   `workspace.base_sha`: `git -C <repo> worktree add
+   <repo>-<id> -b job/<id> <base_sha>`, then `worktree-copy-local-env
+   <repo>-<id>`.
+2. Work test-first, commit as you go, then `git push -u origin job/<id>`.
+   **Never open or merge a PR, and never message anyone asking for one.**
+3. Write the summary to a file, then report:
+
+   ```
+   squad delegate-result <id> --status ok --summary <file> --branch job/<id> \
+     --test-command "<exact command>" --test-result pass|fail|not-run \
+     [--diff-summary "<one paragraph>"] [--pr <url of an existing PR the brief named>] \
+     [--operator-item <id>]... --name <name>
+   ```
+
+   `--diff-summary` is filled from `git diff --shortstat` when omitted.
+   `--test-command` and `--test-result` go together and are required with
+   `--branch` on an `ok` result.
+
+**What you cannot do here (K3 members).** `agent/run`, `agent-run`, `esc`,
+`pulumi up` / `env open`, `op`, `gh pr merge` and pushes to `main`/`master`
+are denied. A job that needs any of them is not yours: report `squad
+delegate-result <id> --status failed --reason needs_credentials --summary
+<file> --name <name>` (or `--reason needs_merge`) at once, so the requester
+re-delegates to a Claude member. Push only `job/<id>`.
+
+**Failures and stops:**
+- Something needs Tim: raise an operator item titled `job <id> needs Tim:
+  <what>` (the flags in §8 Denials), then report `--status failed --reason
+  needs_operator --operator-item <item id>`.
+- A 402 or credit error: report `--status failed --reason budget` at once.
+- A brief arrives as a squad message, not from Tim, so if auto mode refuses
+  an edit, commit or push, report `--status failed --reason classifier`
+  rather than retrying around it (§8 Denials).
+- `job_cancelled`: stop, commit, push what exists, and report `--status
+  failed --reason timeout --branch job/<id> …` (the CLI accepts `ok|failed`
+  only, so a timeout is a `failed` result with that reason).
+
+After any result: `squad set --name <name> --status working --detail "idle:
+waiting for jobs"` and end the turn. Remove the worktree with the
+`worktree-closedown` skill once the requester's result is in.
+
+**Kickoff block** (the herder's launch pastes this into a pool member's
+kickoff):
+
+```
+Join the squad with the squad-join skill. Register with
+--capabilities <code,review[,credentials]> --model <model id> and the
+default subscriptions (§3); `credentials` only for a Claude member with
+agent-run, never K3. Then serve jobs per §6c; do no other work.
+```
+
 ## 7. Keeping state honest
 
 - `squad set --name <name> --status working --detail "<milestone>"` at each
@@ -431,6 +586,8 @@ admitted PRs.
   sessions, not a new way of working inside this one. Keep applying the
   global orchestrator/subagent policy: dedicated agents first, the fan-out
   and scrollback tests, the numbered roster announcement on every launch.
+  The one change is a `delegate_mode` `pool` directive (§5, §6b), which
+  routes implementer and reviewer work through `squad delegate`.
 - **Done with the stream**: `squad set --name <name> --status done`, send
   `done` as above, then `squad deregister <name>`.
 
@@ -478,7 +635,7 @@ admitted PRs.
   command can itself be denied. Never ask for permissions or credentials in
   the text; they go in `--command` for Tim. Then **carry on** with other
   work, or wait if nothing else can proceed. A job blocked by a denial ends
-  `delegate-result --status failed --reason blocked-denial`. If the raise is
+  `delegate-result --status failed --reason blocked_denial`. If the raise is
   itself denied (the inline `--command` text can trip the same deny glob),
   send it to the orchestrator as an `operator_task` (§6), putting the
   command text in `--instructions-file` rather than inline.
