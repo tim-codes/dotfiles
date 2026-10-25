@@ -157,9 +157,15 @@ Tim talks to you, not to the orchestrator.
   its own fenced block so it is copy-able, the `url`, and the dashboard
   URL. While any `now` item is open and Tim is present, nudge every 20
   minutes with one consolidated list (`squad operator list --status
-  open,ready`). When Tim says an item is done: `squad operator set <id>
-  --status done --name concierge`, then `squad send orchestrator "Tim: done
-  <id>" --from concierge`. Dropped likewise with `--status dropped`. One
+  open,ready`). When Tim explicitly chooses an
+  option in chat (a bare "ok" is not a decision), relay it as
+  `squad operator decide <id> <option> --note "<Tim's words>" --name
+  concierge` (`--note-file <path>` for a long quote); the item stays open
+  and the `operator.item` `decided` event drives the orchestrator's relay,
+  so send nothing more. Mark an item done only on Tim's "done":
+  `squad operator set <id> --status done --note "<Tim's words>" --name
+  concierge`, then `squad send orchestrator "Tim: done <id>" --from
+  concierge`. Dropped likewise with `--status dropped`. One
   item at a time as he says them; never close in a batch.
 - **AFK.** When Tim says "afk", relay it ("Tim: afk") and stop nudging;
   when he is back, show the open list once.
@@ -201,7 +207,7 @@ Tim talks to you, not to the orchestrator.
 | `msg.concierge`, `data.kind` `operator_task` | orchestrator | `blocking:"now"` → present at once; else into the next consolidated message |
 | `msg.concierge`, a question or decision | orchestrator | relay to Tim (§4, at most one a minute unless `now`) |
 | `msg.concierge`, anything | another member | information; tell Tim only if it needs him, and point the member at `role:orchestrator` |
-| `operator.item` | dashboard server | `now` → present at once; `later` → next consolidated list; done/dropped by Tim on the dashboard → acknowledge in one line |
+| `operator.item` | dashboard server | `now` → present at once, listing each option (`:operator` ones are Tim's to carry out); `later` → next consolidated list; decided/done/dropped by Tim on the dashboard → acknowledge in one line |
 | `squad.directive` `unacked` / `escalated` | broker | tell Tim at once: member, directive, age; it is not paused |
 | `squad.member` `joined` / `left` | broker | tick off during a §2 launch / §5 close; otherwise one line when a builder leaves unexpectedly. `updated` (with `changed`) is a re-register, never a new member |
 | `quota.exxo.threshold` ≥ 85 going up | broker | tell Tim once per crossing (pct, reset time); the orchestrator acts on it, not you |

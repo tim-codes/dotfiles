@@ -98,7 +98,9 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
 ## 2. Quota reactivity
 
 Account `A`'s members: `squad roster`, `.req.account == "A"`, `.live`,
-role `client`. The infra member is never in the pause order (never pause it
+role `client`. A member whose registration `account` is null (K3,
+`extra_config_dirs`) belongs to no account, so it is never wall-paused by
+exxo or personal quota. The infra member is never in the pause order (never pause it
 mid-deploy) except at level 100.
 
 A **busy member** has `jq .status <req.config_dir>/sessions/<req.pid>.json`
@@ -245,9 +247,31 @@ changes by Tim or members.
   `ready` the moment the precondition clears.
 - **`blocking:"now"`** is anything blocking a member's next step; `later`
   only for work no stream waits on (a misfiled blocker cost Tim 80 minutes).
+- **Raise approvals with options.** An `approval` item carries one
+  `--option <id>=<label>` per choice, suffixed `:operator` when Tim must
+  carry that choice out himself (`squad operator raise --option
+  apply=Apply --option hold=Hold:operator`). An item stays open until Tim
+  says done; a decision moves it to `ready`, it never closes it.
+- **Relay a decision.** On `operator.item` `change:"decided"`, send it to
+  the item's owner, with the chosen option and Tim's note:
+  ```
+  squad send <owner> "decision <id>: <option>" --from orchestrator --ack-deadline-s 120 \
+    --data '{"kind":"operator_decision","id":"<id>","option":"<option>","note":"<note>"}'
+  ```
+- **You never decide or resolve an approval.** The server refuses it; only
+  Tim (dashboard) or the concierge on his word can. Read a decision as
+  consent to the chosen option's text and nothing beyond it.
 - **Every item carries copy-able `commands[]`** in the repo's CLI convention
   (`pulumi env set`, never `esc`), or a `url`; never "see the other pane".
   Refresh the text when facts change.
+- **Raise text never asks for permissions or credentials.** The classifier
+  denies a raise whose text requests a grant or a secret; put the command
+  Tim must run in `commands[]` instead. Long text goes through
+  `--instructions-file`, never inline.
+- **Denial items**: a member's denied command arrives as an item with id
+  `denied-<member>-<n>` and a title starting `denied (permission|classifier|
+  guard|keyhelper): `. Never tell the member to retry the command; Tim
+  decides, or you raise the missing rule for the dotfiles fragment.
 - **Draft links** (`draft_url`, `url`) are server-checked; a 422 means fix
   the draft, not the item. Never present an unresolved draft.
 - **Order and nudge**: blocking-now, then stream priority, then
@@ -258,9 +282,10 @@ changes by Tim or members.
 - **Resolve** one item at a time, when its outcome is known; never close
   or drop in a batch (it loses the true wait times). Tim's Done / Drop /
   Back to agent buttons PATCH the server directly: on `operator.item`
-  `done`, `resume` or `msg` the owner; on `dropped` or `with: agent:<m>`,
-  tell the owner. His chat "done <id>" is your PATCH with
-  `actor:"orchestrator"`.
+  `done`, `resume` or `msg` the owner; on `decided`, relay it as above;
+  on `dropped` or `with: agent:<m>`, tell the owner. His chat "done <id>"
+  is the concierge's to record, on his quoted word; you never PATCH `done`
+  or `dropped` on an approval or action item.
 - **Debug mode**: log each item's raised, presented and resolved times and
   wait minutes to the worklog and `orchestrator-decisions.md`; the morning
   report's "Interruptions" section counts them (total wait, per-stream,
