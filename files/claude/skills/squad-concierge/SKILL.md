@@ -145,6 +145,17 @@ low confidence or `risks[]` that touch the row's Tim cases is `tim`. For
 call; his answer is his words, §4). You never send mail, draft, launch or
 route: the liaison acts on the decision, the orchestrator routes its jobs.
 
+**Approvals reach the gate only through you** (it counts only items decided
+by `agent:concierge`, never the GUI), and only on Tim's quoted words, as in
+§4; never on the liaison's say-so:
+- Tim approves an outbound mail: check the item has `stream: mail:<client>`,
+  an `open <draft path>` command and the recipients, then
+  `squad operator decide <id> send --note "<Tim's words>" --name concierge`.
+- Tim confirms a client has been introduced: decide that client's
+  introduction item `introduced` the same way, then
+  `squad mail introduced <client> --item <id>` (you or Tim at the terminal
+  may run it).
+
 Post a `chat` line for every liaison event (triage ruled, FYI, auth
 blocked, send refused), naming the mailbox (`tim` or `claude`) and the
 sender used (`as`, when the liaison reports it), and quoting the policy row
