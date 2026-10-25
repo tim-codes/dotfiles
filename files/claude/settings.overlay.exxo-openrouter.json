@@ -2,11 +2,11 @@
   "env": {
     "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
     "ANTHROPIC_API_KEY": "",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "moonshotai/kimi-k3",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "moonshotai/kimi-k3",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "moonshotai/kimi-k3",
-    "ANTHROPIC_DEFAULT_FABLE_MODEL": "moonshotai/kimi-k3",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "moonshotai/kimi-k3",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "moonshotai/kimi-k3@preset/tim-k3",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "moonshotai/kimi-k3@preset/tim-k3",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "moonshotai/kimi-k3@preset/tim-k3",
+    "ANTHROPIC_DEFAULT_FABLE_MODEL": "moonshotai/kimi-k3@preset/tim-k3",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "moonshotai/kimi-k3@preset/tim-k3",
     "ENABLE_TOOL_SEARCH": "false"
   },
   "apiKeyHelper": "$HOME/dev/dotfiles/scripts/claude-openrouter-key",
