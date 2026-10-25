@@ -507,6 +507,21 @@ Reason tags (open set, this vocabulary expected): `wrong_approach`,
 `failing_tests`, `conflicts`, `integration`, `incomplete`. For `rework`,
 delegate the follow-up with `--rework-of <id>`.
 
+### Mail
+
+Only the liaison sends email. To have mail sent, write the body to a file and
+send the liaison a brief (`squad-liaison` §10 for the shape):
+```
+squad send liaison --from <name> --data '{"kind":"mail_request","to":["<addr>"],"subject":"<s>","body_file":"<path>","why":"<one line>"}'
+```
+or delegate a job needing `comms` (§6b). Never call `squad mail send` or
+use any mail credential yourself.
+
+**Auto-fix PRs.** A member holding `SQUAD_MERGE_AUTHORITY` that is the
+client's owner (`squad-liaison` §7) may merge a liaison auto-fix PR only
+after its reviewer subagent passes it, and never when the merge deploys
+production: it stops at the reviewed PR and reports `pr_ready` for Tim.
+
 ## 6c. Serving jobs (pool members)
 
 A pool member registers with `--capabilities` and `--model` (§2), does no

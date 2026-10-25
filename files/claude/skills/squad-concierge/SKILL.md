@@ -114,20 +114,48 @@ squad send orchestrator "Tim: done <id>" --from concierge
 ```
 `--ruling` is mandatory and carries his quoted word.
 
-## 5. Presence (pending Plan F)
+## 5. Presence
 
-Plan F adds a tracked `operator.presence` state, attending or away. You set
-it from Tim's own words ("afk", "back", "I'm here") with `squad presence
-...`, and relay the words as in §2. Until that command ships, relay "Tim:
-afk" / "Tim: back" only. You also hold the liaison's gate: what the liaison
-may settle automatically versus what is Tim's call; anything that is Tim's
-call waits for his words.
+Tim's attending or away state is the broker gauge `operator.presence`; you
+keep it, from his own words, with his words quoted:
+```
+squad presence set attending --source concierge --words "<Tim's words>" [--for 2h]
+squad presence set away --source concierge --words "<Tim's words>"
+```
+"afk" and "back" are no longer relayed informally: set the gauge, then relay
+his words as in §2. `attending` lapses 30 minutes after the last heartbeat
+unless `--for` holds it, so renew it each time he speaks while he is here.
+`squad presence get` reads it (unknown or stale is away).
+
+## 5a. The liaison's gate
+
+The liaison proposes; you rule. On `msg.concierge` with `data.kind`
+`liaison_triage`, read `squad presence get`, find the row of the liaison's
+policy table (`squad-liaison` §4) for its `class`, the client's `mode` and
+that presence, and answer by that row alone:
+```
+squad send liaison --from concierge --data "$(jq -nc --arg mail "<m-id>" \
+  --arg decision "<auto|tim|ignore>" --arg action "<action>" --arg rule "<class>" \
+  --argjson attending <true|false> \
+  '{kind:"liaison_decision",mail:$mail,decision:$decision,action:$action,rule:$rule,attending:$attending}')"
+```
+`auto` only where the row says auto; anything the table does not cover,
+low confidence or `risks[]` that touch the row's Tim cases is `tim`. For
+`tim`, ask the orchestrator to raise the operator item (the mail is Tim's
+call; his answer is his words, §4). You never send mail, draft, launch or
+route: the liaison acts on the decision, the orchestrator routes its jobs.
+
+Post a `chat` line for every liaison event (triage ruled, FYI, auth
+blocked, send refused), naming the mailbox (`tim` or `claude`) and the
+sender used (`as`, when the liaison reports it), and quoting the policy row
+applied.
 
 ## 6. Messages you receive
 
 | arrives as | from | reaction |
 |---|---|---|
 | `msg.concierge`, `data.kind` `operator_digest` / `operator_update` | orchestrator | present `text` verbatim (§3): urgent at once, else at most once a minute |
+| `msg.concierge`, `data.kind` `liaison_triage` | liaison | rule by the policy row and presence (§5a); `liaison_decision` back, one chat line |
 | `msg.concierge`, a question | orchestrator | quote it to Tim (§3) |
 | `msg.concierge`, anything | another member | information; tell Tim only if it needs him, and point the member at `role:orchestrator` |
 | `squad.directive` `unacked` / `escalated` | broker | tell Tim at once: member, directive, age; it is not paused |
