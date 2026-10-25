@@ -58,6 +58,8 @@ brewDeps=(
   pipx
   pmd
   pnpm
+  # PowerShell 7 (pwsh) — host for the ExchangeOnlineManagement module (scripts/pwsh-modules)
+  powershell
   # pdftoppm for rasterising PDF pages — Claude Code needs it to visually
   # inspect PDFs (e.g. verifying generated Exxo report renders)
   poppler
