@@ -53,7 +53,7 @@ ids (`gh auth status`, `az account show`, `op whoami`).
 ## Facts the table depends on
 
 - **Datadog is EU.** The exxo contexts get a user-scope `datadog` server from
-  `files/claude/mcp.exxo.json` pointing at `https://mcp.datadoghq.eu/v1/mcp`,
+  `files/claude/mcp.shared.json` pointing at `https://mcp.datadoghq.eu/v1/mcp`,
   so its OAuth goes straight to the EU approve flow. The engineering plugin's
   `plugin:engineering:datadog` is the US site and is denied — don't auth it.
 - `failed … not configured in this context` for a repo-managed server means

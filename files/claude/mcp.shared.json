@@ -9,6 +9,14 @@
     "Sanity": {
       "type": "http",
       "url": "https://mcp.sanity.io"
+    },
+    "datadog": {
+      "type": "http",
+      "url": "https://mcp.datadoghq.eu/v1/mcp"
+    },
+    "boards": {
+      "type": "http",
+      "url": "https://boards.exxo.tools/mcp"
     }
   }
 }

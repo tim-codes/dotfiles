@@ -11,6 +11,10 @@
   },
   "apiKeyHelper": "$HOME/dev/dotfiles/scripts/claude-openrouter-key",
   "model": "sonnet",
+  "deniedMcpServers": [
+    { "serverName": "datadog" },
+    { "serverName": "boards" }
+  ],
   "permissions": {
     "deny": [
       "Bash(gh pr merge*)",

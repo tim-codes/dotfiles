@@ -162,6 +162,8 @@ OVERLAY_FILES=(history.jsonl)
 # hooks.<Event> arrays concatenate too (earlier layer first, no dedupe):
 # otherwise an overlay adding one PreToolUse hook would replace every shared
 # PreToolUse entry. Events only one layer defines pass through unchanged.
+# deniedMcpServers concatenates too (deduped by serverName), so an overlay can
+# add denials without replacing the shared list.
 SETTINGS_MERGE='
   .[0] as $s | .[1] as $a
   | ($s * $a)
@@ -170,6 +172,9 @@ SETTINGS_MERGE='
       | if ($v | length) > 0
         then .permissions[$k] = ($v | reduce .[] as $x ([]; if any(.[]; . == $x) then . else . + [$x] end))
         else . end)
+  | if (($s.deniedMcpServers | type) == "array") and (($a.deniedMcpServers | type) == "array")
+    then .deniedMcpServers = ($s.deniedMcpServers + $a.deniedMcpServers | unique_by(.serverName))
+    else . end
   | reduce (($a.hooks // {}) | keys_unsorted[]) as $e (.;
       if (($s.hooks // {})[$e] | type) == "array" and ($a.hooks[$e] | type) == "array"
       then .hooks[$e] = ($s.hooks[$e] + $a.hooks[$e])
