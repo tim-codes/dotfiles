@@ -34,6 +34,7 @@ WORKER_DENY=(
     'Bash(git push*main*)' 'Bash(* git push*main*)'
     'Bash(git push*master*)' 'Bash(* git push*master*)'
     'Bash(*agent/run*)' 'Bash(*agent-run*)'
+    'Bash(squad mail:*)'
     'Bash(esc)' 'Bash(esc *)' 'Bash(* esc *)'
     'Bash(pulumi up*)' 'Bash(* pulumi up*)'
     'Bash(pulumi env open*)' 'Bash(* pulumi env open*)'

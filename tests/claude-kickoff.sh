@@ -284,6 +284,9 @@ kick "$T/life.md" --dry-run
 check "an explicit lifetime wins over the role default" has "lifetime: task"
 sed 's|^model: .*|&\nrole: boss|' "$T/fixture.md" >"$T/badrole.md"
 expect_rc "an unknown role is exit 5" 5 "$T/badrole.md" --dry-run
+sed 's|^model: .*|&\nrole: liaison\ncapabilities: comms|' "$T/fixture.md" >"$T/liaison.md"
+kick "$T/liaison.md" --dry-run
+check "role liaison is accepted, lifetime run" bash -c 'printf "%s\n" "$1" | grep -qx "role: liaison" && printf "%s\n" "$1" | grep -qx "lifetime: run"' _ "$out"
 # add_dirs: passed in order as --add-dir, shown in --dry-run, must exist
 mkdir -p "$FAKE/briefs" "$FAKE/reports"
 sed 's|^model: .*|&\nadd_dirs: ~/briefs, '"$FAKE"'/reports|' "$T/fixture.md" >"$T/adddirs.md"

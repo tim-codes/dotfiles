@@ -230,6 +230,7 @@ squad-orchestrator
 squad-debug-review
 squad-concierge
 squad-herder
+squad-liaison
 reauth
 LIST
 }

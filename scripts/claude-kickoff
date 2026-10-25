@@ -29,7 +29,7 @@
 set -uo pipefail
 
 CONTEXTS_FILE="${CLAUDE_KICKOFF_CONTEXTS:-$HOME/.config/claude-kickoff/contexts.toml}"
-ROLES="client herder concierge orchestrator infra"
+ROLES="client herder concierge orchestrator infra liaison"
 # Env the wrapper unsets for every context except exxo-openrouter, whose overlay
 # routes through OpenRouter; any other context must never inherit it.
 OPENROUTER_ENV="ANTHROPIC_BASE_URL ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_SONNET_MODEL ANTHROPIC_DEFAULT_HAIKU_MODEL ANTHROPIC_DEFAULT_FABLE_MODEL CLAUDE_CODE_SUBAGENT_MODEL"
@@ -57,7 +57,7 @@ effort is used):
   effort   passed as --effort
   Optional keys, all echoed by --dry-run (the herder's only source of launch facts):
   harness  must equal the context's harness (default claude-code; else exit 5)
-  role     client (default) | herder | concierge | orchestrator | infra
+  role     client (default) | herder | concierge | orchestrator | infra | liaison
   lifetime run | task; the default is task for a client, else run
   needs    comma or space separated; each one the file lists in `account_bound` must
            be in the context's `provides` (exit 9); other words are ignored with a
