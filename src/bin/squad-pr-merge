@@ -1,0 +1,75 @@
+#!/bin/bash
+# Merge a squad PR the gated way. Squad is a per-developer tool, so this lives
+# here rather than as a recipe in each client repo.
+#
+#   squad-pr-merge <n> --repo <owner/name> --into-trunk [--dry-run]
+#   squad-pr-merge <n> --repo <owner/name> --land       [--dry-run]
+#
+# --into-trunk  admission: squash-merge a reviewed PR into a rolling trunk. The
+#               base must be `trunk/*` or listed in SQUAD_ADOPTED_TRUNKS (space
+#               or comma separated). Needs no merge grant; any Claude member
+#               may use it. Uses `gh pr merge --squash`.
+# --land        landing: merge a trunk PR into the repo's default branch. The
+#               head must be `trunk/*` and the base the default branch.
+#               Needs SQUAD_MERGE_AUTHORITY to name the repo and today's date
+#               (`<owner/name>@YYYY-MM-DD`, in a space or comma separated list;
+#               a bare `YYYY-MM-DD` is also accepted, as exxo-infra's pr-merge
+#               reads it). Uses `gh pr merge --merge`, never --squash.
+#
+# Both modes refuse a closed or draft PR and any non-passing check. Every
+# refusal is one line on stderr and a non-zero exit (1 refused, 2 bad usage).
+# --dry-run prints the gh command instead of running it.
+set -uo pipefail
+
+die()   { echo "squad-pr-merge: $*" >&2; exit 1; }
+usage() { echo "squad-pr-merge: $* (usage: squad-pr-merge <n> --repo <owner/name> --into-trunk|--land [--dry-run])" >&2; exit 2; }
+
+n="" repo="" mode="" dry=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --repo) [ $# -ge 2 ] || usage "--repo needs a value"; repo="$2"; shift 2 ;;
+    --into-trunk|--land) [ -z "$mode" ] || usage "choose one of --into-trunk and --land"; mode="$1"; shift ;;
+    --dry-run) dry=1; shift ;;
+    -*) usage "unknown option $1" ;;
+    *) [ -z "$n" ] || usage "unexpected argument $1"; n="$1"; shift ;;
+  esac
+done
+[[ "$n" =~ ^[0-9]+$ ]] || usage "PR number must be numeric"
+[[ "$repo" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || usage "--repo must be <owner/name>"
+[ -n "$mode" ] || usage "choose --into-trunk or --land"
+
+read -r state draft base head < <(gh pr view "$n" -R "$repo" \
+  --json state,isDraft,baseRefName,headRefName \
+  --jq '[.state, (.isDraft|tostring), .baseRefName, .headRefName] | join(" ")') \
+  || die "cannot read PR #$n in $repo"
+[ -n "${head:-}" ] || die "cannot read PR #$n in $repo"
+[ "$state" = OPEN ] || die "PR #$n is not open ($state)"
+[ "$draft" = false ] || die "PR #$n is a draft; mark it ready first"
+
+if [ "$mode" = --into-trunk ]; then
+  ok=0
+  [[ "$base" == trunk/* ]] && ok=1
+  adopted="${SQUAD_ADOPTED_TRUNKS:-}"; for t in ${adopted//,/ }; do [ "$t" = "$base" ] && ok=1; done
+  [ "$ok" = 1 ] || die "PR #$n base '$base' is not trunk/* or in SQUAD_ADOPTED_TRUNKS; not admitting"
+  method=--squash
+else
+  default="$(gh repo view "$repo" --json defaultBranchRef --jq .defaultBranchRef.name)" \
+    && [ -n "$default" ] || die "cannot read the default branch of $repo"
+  [ "$base" = "$default" ] || die "PR #$n base '$base' is not the default branch '$default'; not landing"
+  [[ "$head" == trunk/* ]] || die "PR #$n head '$head' is not a trunk/* branch; not landing"
+  today="$(date +%F)"; granted=0
+  authority="${SQUAD_MERGE_AUTHORITY:-}"; for g in ${authority//,/ }; do
+    { [ "$g" = "$repo@$today" ] || [ "$g" = "$today" ]; } && granted=1
+  done
+  [ "$granted" = 1 ] || die "landing $repo needs SQUAD_MERGE_AUTHORITY=$repo@$today; none set"
+  method=--merge
+fi
+
+gh pr checks "$n" -R "$repo" >/dev/null 2>&1 || die "checks on PR #$n are not all passing; not merging"
+
+if [ "$dry" = 1 ]; then
+  echo "gh pr merge $n -R $repo $method"
+  exit 0
+fi
+echo "squad-pr-merge: merging #$n in $repo ($mode, $method)"
+gh pr merge "$n" -R "$repo" "$method"

@@ -97,7 +97,7 @@ Authority (Tim's words): "<merge authority, verbatim>"; "<credential authority, 
 Operator items to raise up front: <consents, DNS, device codes, admin panels, each with
 command or URL and the step it unblocks>.
 
-Testing: squad batched testing applies. Run only focused tests for the code you changed, plus the repo's fast check (`just check` or equivalent) once before `pr_ready`; do not run the full suite, `just ci` / `just verify` or a production build without a test slot. The orchestrator runs the comprehensive gate per trunk. Open your PR against the open trunk named in the plan gauge, and say in the report that testing was focused. (Delete this line if batched testing does not apply to this stream.)
+Testing: squad batched testing applies. Run only focused tests for the code you changed, plus the repo's fast check (`just check` or equivalent) once before `pr_ready`; do not run the full suite, `just ci` / `just verify` or a production build without a test slot. The orchestrator runs the comprehensive gate per trunk. Open your PR against the open trunk named in the plan gauge, admit it on the orchestrator's `admit` directive with `squad-pr-merge <n> --repo <owner/name> --into-trunk` (never `gh pr merge` directly), and say in the report that testing was focused. (Delete this line if batched testing does not apply to this stream.)
 
 Guardrails: <what the member must not do; evals kept minimal; heavy_slot before any
 browser or Lighthouse run; anything out of bounds>. Decisions you can make, make and
