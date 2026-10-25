@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.tim.squad-watch-mail</string>
+
+  <!-- Mail watcher: supervises one `agent-tooling mail serve` child that
+       polls tim@ and claude@ and executes sends, publishing mail.*.inbound
+       events and the mail.<mailbox> gauges. Optional: it is not in the
+       doctor's required job list, and does nothing useful until
+       [[watchers]] name = "mail" is in config.toml and
+       ~/.config/squad/liaison.toml exists. No ordering against the broker is
+       needed: the watcher reconnects with backoff, and KeepAlive restarts it
+       if it exits.
+
+       Credentials: this plist carries none. The child resolves
+       GRAPH_MAIL_CLIENT_ID / GRAPH_MAIL_CLIENT_SECRET itself through
+       agent-tooling's env / 1Password reference mechanism, so whatever that
+       needs (an `op` session) has to be reachable from launchd. Until that
+       is settled the job is bootstrapped by hand, not by `squad doctor
+       --fix`. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/tim/.cargo/bin/squad</string>
+    <string>watch</string>
+    <string>mail</string>
+  </array>
+
+  <!-- launchd's PATH is bare: agent-tooling (a node script) is found via
+       /opt/homebrew/bin and ~/.cargo/bin. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/Users/tim/.cargo/bin</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <!-- ~/.local/state/squad must exist before bootstrap: launchd does not
+       create the parent directory of these files. -->
+  <key>StandardOutPath</key>
+  <string>/Users/tim/.local/state/squad/watch-mail.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/tim/.local/state/squad/watch-mail.log</string>
+</dict>
+</plist>
