@@ -163,9 +163,9 @@ Tim talks to you, not to the orchestrator.
   concierge` (`--note-file <path>` for a long quote); the item stays open
   and the `operator.item` `decided` event drives the orchestrator's relay,
   so send nothing more. Mark an item done only on Tim's "done":
-  `squad operator set <id> --status done --note "<Tim's words>" --name
+  `squad operator set <id> --status done --ruling "<Tim's words>" --name
   concierge`, then `squad send orchestrator "Tim: done <id>" --from
-  concierge`. Dropped likewise with `--status dropped`. One
+  concierge`. Dropped likewise with `--status dropped`, and reopen with `--status open`, each with `--ruling`. One
   item at a time as he says them; never close in a batch.
 - **AFK.** When Tim says "afk", relay it ("Tim: afk") and stop nudging;
   when he is back, show the open list once.
