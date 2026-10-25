@@ -14,7 +14,28 @@ Client behaviour under each directive is defined in the `squad-join` skill;
 read it once so you know what your directives make them do. `--debug`
 (argument): see §9; without it nothing in §9 applies.
 
-**Never halt to ask Tim in chat; register, then route questions through the orchestrator's operator queue.**
+**Never halt to ask Tim in chat; register, then route everything Tim reads through the concierge.**
+
+## Talking to Tim
+
+After registration you never address Tim in chat. "Tell", "ask", "warn",
+"report to" or "show" Tim, "give Tim one message" and every similar phrasing
+anywhere in this skill mean a message to the concierge, which presents it
+and relays Tim's answer back as a message to you:
+```
+squad send concierge "<the one-line text Tim would read>" --from orchestrator --priority now|next \
+  --data '{"kind":"operator_update","urgent":<bool>,"text":"<the line>"}'
+```
+- `urgent` is true, with `--priority now`, for quota walls, pauses, level 100,
+  escalations, `blocked` reports and merge-gate questions; otherwise `next`.
+- A **question** (the infra merge gate, a `blocked` member) is an
+  `operator_update` whose `text` carries the question; wait for the concierge
+  to relay Tim's ruling. Where the skill already uses an operator item
+  (§2c), use that. Digests are `operator_digest` (§2c).
+- The only exception is what precedes registration (the context guard, a
+  failed `register`, the singleton check in §1): there is no concierge route
+  yet, so print a terminal note and stop. Everything from step 0 on,
+  including `/reauth`, goes through the concierge.
 
 Env vars do not persist between Bash calls: pass `--name orchestrator` and
 `--from orchestrator` explicitly. Every command here is spelled as the
@@ -24,13 +45,13 @@ down: see `squad-join` §8.
 ## 1. Start-up
 
 **Context guard (before anything else).** `$CLAUDE_CONFIG_DIR` must end in
-`.claude-exxo`. If not, register nothing: tell Tim to relaunch in the exxo
-context (the M365 and Datadog tools the work needs only exist there) and
-stop.
+`.claude-exxo`. If not, register nothing: print a terminal note telling Tim to relaunch in the exxo
+context (the M365 and Datadog tools the work needs only exist there; no
+concierge route exists yet) and stop.
 
 **Register first, always:** singleton check (step 1), `squad register`
 (step 2), subscriptions (step 3). If `register` fails (exit 2), run `squad
-doctor --fix` once and retry; only then tell Tim. Step 0 and the repo drift
+doctor --fix` once and retry; only then print a terminal note for Tim (no route yet). Step 0 and the repo drift
 rule run after registration. Safe drift (submodule `+` with a clean interior
 → `git submodule update --init <path>`; cache untracked files ignored; stale
 `main` → `git pull --ff-only`) is fixed without asking. Anything else dirty
@@ -41,7 +62,7 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    - `squad doctor --fix` (config, state dirs, broker, watchers, the launchd
      jobs `dev.tim.squad-broker|relay|watch-quota|watch-host`, binary-vs-
      running version, cc-socks dir; `--fix` bootstraps/kickstarts dead jobs
-     and re-checks). Exit 0 all ok, 1 any fail; if still 1, show Tim.
+     and re-checks). Exit 0 all ok, 1 any fail; if still 1, tell Tim (operator_update).
    - Exxo-side prereqs. `docker info` failing: `orb start` (no need to ask),
      wait until it succeeds. Then ensure the shared secret-cache container is
      up as the exxo-common `run-with-secrets` skill prescribes. Then
@@ -50,7 +71,7 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    - Report doctor, Docker and secret-cache state in the §1.7 health summary.
 1. **Singleton check.** `squad roster | jq -r '.[] | select(.live and
    .req.role=="orchestrator") | .req.name'`. Any output: one is already
-   live; tell Tim its name and end (re-registering a live name silently
+   live; print its name in the terminal and end (re-registering a live name silently
    replaces it, so this comes first).
 2. **Register.** `squad register --name orchestrator --role orchestrator
    --priority 1 --session-id "$CLAUDE_CODE_SESSION_ID" --notes "squad
@@ -140,13 +161,6 @@ through the herder (§1a), and close it on its `done`.
 
 ## 2. Quota reactivity
 
-**"Tell Tim"** anywhere in §2, §2a, §2b, §4 and §6 means a message to the
-concierge, which presents it:
-```
-squad send concierge --from orchestrator --data '{"kind":"operator_update","urgent":<bool>,"text":"<the line>"}'
-```
-`urgent` is true for level 100, escalations and anything blocking now.
-
 Account `A`'s members: `squad roster`, `.req.account == "A"`, `.live`,
 role `client`. A member whose registration `account` is null (K3,
 `extra_config_dirs`) belongs to no account, so it is never wall-paused by
@@ -190,7 +204,7 @@ transition to busy while `pct ≥ 85`, not only on threshold crossings.
      entry `state:"sent"`, and do not count the member as paused.
    - `escalated`: raise an operator item NOW (§2c): "<member> not
      responding to pause; kill or wait", with the quota numbers and reset.
-5. Tell Tim one line (`operator_update`): who, acked or pending, why, reset time.
+5. Tell Tim one line: who, acked or pending, why, reset time.
 
 **Delivery priority:** only the orchestrator's `squad send --priority now`
 interrupts a busy member (others are downgraded to `next`); critical
@@ -238,7 +252,7 @@ squad send <member> "cleanup: idle <n>m with <d> descendants (<cpu>% cpu, <rss> 
 It stops its finished background work and kills its own leftovers, then
 confirms with `squad set --detail "cleanup done: …"`. If the event repeats
 for the same member afterwards, tell Tim. If the member is `gone` (not
-`live`), report to Tim instead (member, idle time, `top` commands and pids).
+`live`), tell Tim instead (member, idle time, `top` commands and pids).
 Never kill another session's processes yourself.
 
 ## 2b. Preflight before Tim goes AFK
@@ -328,7 +342,8 @@ changes by Tim or members.
   then stream priority, then `est_minutes`. Every consolidated list, nudge
   and blocking-now presentation is sent to the concierge as
   ```
-  squad send concierge --from orchestrator --data '{"kind":"operator_digest","urgent":<bool>,"items":[…],"text":"<final list>"}'
+  squad send concierge "operator digest: <n> items" --from orchestrator --priority next \
+    --data '{"kind":"operator_digest","urgent":<bool>,"items":[…],"text":"<final list>"}'
   ```
   where `text` is the final, ready-to-show list, with each item's
   `commands[]` in fenced blocks and the dashboard URL. The concierge never
@@ -448,7 +463,7 @@ While any is running: hold `heavy_slots` at 0 (deny with `retry_after_s:
 the last stops, restore `heavy_slots` and tell waiting members to retry.
 
 **Runaway processes.** On `host.runaway` (a process outside any member's
-tree that stayed hot or bloated), warn Tim in chat (pid, command, cpu/rss,
+tree that stayed hot or bloated), tell Tim (pid, command, cpu/rss,
 duration) and suggest terminating it; never kill it. Same pid: 30 min apart.
 
 ## 5. Infra: review, merge, deploy
@@ -457,9 +472,10 @@ On `pr_ready` with `repo` exxo-infra:
 1. **Check** with a PR-check subagent: the PR exists, is not a draft, and
    checks are green (`gh pr view <n> -R Exxo-Labs/exxo-infra --json
    state,isDraft,mergeable,statusCheckRollup`). Not green → tell the
-   originating client and Tim; stop.
+   originating client and Tim (`operator_update`); stop.
 2. **Authority gate.** exxo-infra is production-stage: merging needs human
-   review. Ask Tim in chat (PR number, title, summary); proceed only on his
+   review. Send Tim a question via the concierge (`operator_update`, `--priority now`: PR
+   number, title, summary); proceed only on the concierge relaying his
    yes **for that PR**. If he grants standing authority ("merge infra PRs
    for the rest of this session"), set the plan's `infra_authority` to
    `{"granted_by":"tim","scope":"session","at":"<ISO>","session_id":"<yours>"}`
@@ -542,7 +558,7 @@ sonnet) so you see only the summary; its brief carries:
   `~/.local/state/squad/debug/` older than 14 days (`find … -mindepth 1
   -maxdepth 1 -type d -mtime +14`; never `debug.on`), listing each.
 
-Give Tim one message: removals with evidence, then the report pile by
+Tell Tim in one message: removals with evidence, then the report pile by
 reason. His answers go back to the same subagent via `SendMessage`.
 
 ## 7. Your own subagents
