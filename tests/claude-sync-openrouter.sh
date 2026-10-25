@@ -155,6 +155,13 @@ for d in skills agents; do
         diff <(ls "$OR/$d") <(ls "$FAKE/.claude-exxo/$d")
 done
 check "CLAUDE.md identical to exxo's" cmp -s "$OR/CLAUDE.md" "$FAKE/.claude-exxo/CLAUDE.md"
+# The shared note documents the exception, so every context carries it, and
+# the openrouter context adds no headings of its own.
+for ctx in personal exxo exxo-personal exxo-openrouter; do
+    check "$ctx: CLAUDE.md mentions exxo-openrouter" grep -q 'exxo-openrouter' "$FAKE/.claude-$ctx/CLAUDE.md"
+done
+check "exxo-openrouter CLAUDE.md has as many ## headings as exxo's" \
+    test "$(grep -c '^## ' "$OR/CLAUDE.md")" -eq "$(grep -c '^## ' "$FAKE/.claude-exxo/CLAUDE.md")"
 
 # Idempotence and --diff.
 sync >"$T/again.log" 2>&1; check "second run exits 0" test "$?" -eq 0
