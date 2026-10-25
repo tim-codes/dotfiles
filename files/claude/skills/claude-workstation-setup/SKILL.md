@@ -1,6 +1,6 @@
 ---
 name: claude-workstation-setup
-description: Full disclosure of how Claude Code is set up on Tim's workstations — per-account contexts, shell wrappers, settings/CLAUDE.md fragment merge (incl. the global permission allow set and deny floor), the repo-config audit hook, repo-managed MCP servers, the two skill-delivery paths (including vendored upstream skills), and where approvals/memory live. Use when asked how the Claude setup/context segregation works, when changing any part of it (claude-sync, settings/CLAUDE.md/MCP fragments, skills, plugins), or when a session behaves as if it's in the wrong account, or when adding/updating a global (cross-session) instruction.
+description: Full disclosure of how Claude Code is set up on Tim's workstations — per-account contexts (personal, exxo, exxo-personal, and the exxo-openrouter (OpenRouter/Kimi K3) context), OpenRouter worker setup, shell wrappers, settings/CLAUDE.md fragment merge (incl. the global permission allow set and deny floor), the repo-config audit hook, repo-managed MCP servers, the two skill-delivery paths (including vendored upstream skills), and where approvals/memory live. Use when asked how the Claude setup/context segregation works, when changing any part of it (claude-sync, settings/CLAUDE.md/MCP fragments, skills, plugins), or when a session behaves as if it's in the wrong account, or when adding/updating a global (cross-session) instruction.
 ---
 
 # How Claude Code is set up on these workstations
@@ -36,6 +36,17 @@ repo — prefer reading those before modifying anything they govern.
   are per user-data dir, so resume across the two profiles via the CLI.
   Never hand-create real files inside this context where a symlink belongs —
   claude-sync warns and leaves them, orphaning that history from exxo.
+- `~/.claude-exxo-openrouter` — FOURTH context, a worker sandbox: the exxo
+  fragments plus `settings.overlay.exxo-openrouter.json`, running Claude Code
+  against OpenRouter (model `moonshotai/kimi-k3`, "K3") instead of an Anthropic
+  subscription. Built for unattended or batch jobs; it is not a way to reach
+  Exxo's connectors. Unlike `exxo-personal` it shares almost nothing (see
+  "Sharing" below) and carries extra guard rails (see "The OpenRouter
+  overlay"). `claude-sync` builds it via `exxo-openrouter:exxo` in `CONTEXTS`
+  and `scripts/claude-contexts` creates the directory. Run `claude-sync` ONLY
+  from the primary checkout (`~/dev/dotfiles`): a sync run from a worktree
+  would deploy that branch's fragments to every live context, and the
+  deployed hook commands reference the primary checkout's scripts.
 
 The legacy default context (`~/.claude` plus the home-level `~/.claude.json`)
 is EXPECTED to exist alongside the dedicated ones — launchers that don't
@@ -84,6 +95,56 @@ output`, `agent-tooling:*`). Deny is evaluated before allow across every
 scope, so no repo file can loosen the floor. Repos keep only repo-specific
 grants — the conventions are the `claude-repo-config` skill.
 `tests/claude-sync-permissions.sh` checks the merge.
+
+### The OpenRouter overlay (`exxo-openrouter`)
+
+`files/claude/settings.overlay.exxo-openrouter.json` is a third layer on top
+of `shared * exxo`, applied only to this context (naming: `settings.overlay.
+<name>.json`, keyed by context name, not account fragment). It carries:
+
+- **env**: `ANTHROPIC_BASE_URL` (OpenRouter), an EMPTY `ANTHROPIC_API_KEY`
+  (so no Anthropic credential is ever used), every tier variable
+  (`ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU,FABLE}_MODEL`) and
+  `CLAUDE_CODE_SUBAGENT_MODEL` all set to `moonshotai/kimi-k3`, and
+  `ENABLE_TOOL_SEARCH=false`. The `claude-exxo-*`, `claude` and `claude-default` wrappers unset these
+  variables (and `ANTHROPIC_AUTH_TOKEN`) for any non-openrouter launch, so a
+  nested launch from a K3 session cannot inherit the OpenRouter backend. One
+  session has one backend, hence the
+  subagent-model exception to the global "unset" rule in `CLAUDE.md.shared`.
+- **Key helper**: `apiKeyHelper` runs `scripts/claude-openrouter-key`, which
+  reads the local file `~/keys/openrouter.key` (file mode 0600, directory
+  0700) and refuses missing, empty, unreadable and symlinked files, loose modes and
+  malformed content. Failures are
+  logged, with reasons only, to
+  `~/.local/state/claude-openrouter/keyhelper.jsonl`. There is deliberately no
+  1Password or `agent/run` path, and no key literal in the repo. Backlog:
+  revisit key storage (Keychain or 1Password).
+- **Worker deny rules**: no `gh pr merge`, default-branch pushes, `agent/run`,
+  `esc`, `pulumi up`, `pulumi env open`, `op`, nor reads of `~/keys`. They are
+  concatenated onto the exxo deny set; the allow set is exactly exxo's.
+- **PreToolUse guard** `scripts/claude-openrouter-guard`: allows only fully
+  resolved commands: it blocks risk-mentioning commands it cannot fully
+  resolve, plus merges, default-branch pushes and workflow triggers. Its
+  `guard.jsonl` log records blocks and allowed pushes (rule, target, form; no
+  command text). The overlay's hook command fails closed: if the interpreter
+  cannot launch (exit 126/127, e.g. `python3` missing) it emits the deny
+  decision itself.
+
+`SETTINGS_MERGE` in `claude-sync` now also concatenates hook arrays per event
+(shared hooks first, the overlay's after), so the guard adds to the shared
+hooks instead of replacing them. Other contexts'
+hooks are unchanged. `tests/claude-sync-openrouter.sh` covers all of this
+against a throwaway repo copy and fake `$HOME`.
+
+Known limits: deny rules are text-matched, so they can be dodged; the guard's
+residual gaps are scripts, Makefiles and git hooks, scripts authored with the
+Write tool, and obfuscated command names; behaviour under
+`bypassPermissions` is unverified (smoke test). Job branches must avoid
+"main" and "master" in their names or the push rules block them.
+
+K3 facts (as of build): 1,048,576 context, $0.239 per M input, $10.80 per M
+output; K3.1-pro is a later trial. Model ids carry no `[1m]` suffix yet
+(ruling R-C7), and a smoke row tests that.
 
 ## Repo config: conventions skill, audit script, SessionStart hook
 
@@ -295,6 +356,11 @@ plugin (`<context>/plugins/synced/`), which the fragments don't manage.
 - **Auto-memory** — per context, under `<context>/projects/<cwd-slug>/memory/`.
   Kept segregated on purpose (work/personal leakage); durable architecture
   facts belong here in this skill instead.
+- **OpenRouter context state** — `~/.claude-exxo-openrouter` links only
+  `plugins` to `~/.claude-exxo`. Its `projects/`, `history.jsonl`, `plans`,
+  `tasks` and `todos` are its own, and there is no cross-provider resume:
+  transcripts carry provider-specific thinking blocks, so a session started on
+  Anthropic cannot be continued on OpenRouter or vice versa.
 - **Login state** (`.claude.json`), sessions, history — per context. The one
   exception is that file's `.mcpServers` key, which claude-sync merges into
   (above); every other key in `.claude.json` is left exactly as Claude Code
@@ -306,7 +372,8 @@ plugin (`<context>/plugins/synced/`), which the fragments don't manage.
   CLAUDE_CONFIG_DIR. Concrete check: `echo $CLAUDE_CONFIG_DIR` —
   `/Users/tim/.claude-personal` for bare `claude`, `/Users/tim/.claude-exxo`
   for `claude-exxo`, `/Users/tim/.claude-exxo-personal` for
-  `claude-exxo-personal`; empty means the legacy default context (fine if
+  `claude-exxo-personal`, `/Users/tim/.claude-exxo-openrouter` for the
+  OpenRouter worker context; empty means the legacy default context (fine if
   launched deliberately via `claude-default` or an unpinned tool, wrong if
   an account wrapper was intended).
 - A settings or CLAUDE.md change vanished → it was hand-written into a

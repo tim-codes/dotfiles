@@ -1,0 +1,866 @@
+#!/usr/bin/env -S python3 -I
+"""PreToolUse hook (Bash) for the exxo-openrouter context.
+
+Kimi K3 workers in ~/.claude-exxo-openrouter must never merge a PR or push to
+the default branch, in any form. The overlay's permission deny rules match
+command text only; this hook tokenises the command. There is no GitHub branch
+protection behind it, so it fails closed.
+
+Model (controller rulings R-C9, R-C10): allow only what is fully resolved.
+  * A command whose de-quoted text mentions a risk word (push, merge, /merges,
+    refs/heads, heads/, PullRequest, automerge/AutoMerge, contents/, graphql,
+    default_branch) together with git, gh or api is "risk-mentioning". It is
+    allowed only if it is fully literal and resolved: no $, backticks,
+    process substitution, here-docs/here-strings, function definitions, shell
+    or interpreter invocations, eval/source/exec/xargs/find/export/alias and
+    similar; and every segment that mentions a risk word is a literal git/gh
+    (known wrappers only: timeout, nice, nohup, command, env VAR=x, VAR=x),
+    a cd, or a standalone echo/printf with no pipe or redirection anywhere in
+    the command.
+  * Literal git/gh segments are always analysed, risk words or not.
+  * In a git/gh command that can push, merge or trigger a workflow (git
+    push/plumbing/aliases; gh pr except view/list/diff/checks/status, gh api,
+    gh workflow, gh run), any word with an unquoted ?, * or [ or an unquoted
+    brace group bash would expand ({a,b}, {a..b}) is unresolved. This is
+    decided from the quoting alone, never the filesystem. gh's {owner},
+    {repo} and {branch} placeholders are literal to bash and stay allowed.
+
+Rule ids (also the log's `rule`):
+  gh-pr-merge          gh pr merge
+  gh-api-merge         gh api writes that merge or move the default branch:
+                       pulls/<n>/merge, /merges, heads/<default>, contents/
+                       writes without a non-default branch, branches/<default>
+                       writes, default_branch, graphql merge/ref mutations or
+                       a hidden graphql body; gh alias set/import; an unknown
+                       gh subcommand (possible alias or extension)
+  push-default-branch  git push whose destination is a default branch (main,
+                       master, origin/HEAD's target; case-insensitive;
+                       refs/heads/X, heads/X, +X, :X), --all/--mirror/--prune,
+                       any -c/--git-dir/--work-tree/GIT_* on a push, a
+                       configured remote.<r>.push or push.default that lands
+                       on a default branch, unreadable config, and an alias or
+                       plumbing command that hides a push
+  unparseable          a risk-mentioning command that is not fully resolved
+
+Contract (code.claude.com/docs/en/hooks): reads the PreToolUse JSON on stdin
+(tool_name, tool_input.command, cwd, session_id); a block prints
+hookSpecificOutput.permissionDecision "deny" with a one-line reason and exits
+0; anything else exits 0 silently (normal permission flow). Every failure
+path while reading the input denies.
+
+Log (Plan E O9, always on): each block, and each allowed `git push` as a
+positive control, appends one line to $SQUAD_GUARD_LOG (default
+~/.local/state/claude-openrouter/guard.jsonl; dir 0700, file 0600):
+{ts, session_id, cwd, rule, target, form, decision}. target is a branch name
+or PR number only; form is plain|git-C|sh-c|compound|other. The command text
+is never logged. The decision is printed before the log is written, the log
+is opened non-blocking and must be a regular file, and a logging failure
+never changes the decision.
+"""
+import datetime
+import json
+import os
+import re
+import stat
+import subprocess
+import sys
+
+GH_MERGE = "gh-pr-merge"
+GH_API = "gh-api-merge"
+PUSH = "push-default-branch"
+UNPARSEABLE = "unparseable"
+
+RISK_WORDS = re.compile(r"push|merge|/merges|refs/heads|heads/|PullRequest|automerge|AutoMerge"
+                        r"|contents/|graphql|default_branch")
+RISK_TOOLS = re.compile(r"git|gh|api")
+
+PUNCT = "();<>|&\n"
+OPERATORS = ["<<<", "<<-", "&>>", "<<", ">>", "&&", "||", ";;", "|&", "&>", ">&", "<&", ">|", "<>",
+             ";", "&", "|", "<", ">", "(", ")", "\n"]
+HEREDOC_OPS = {"<<", "<<<", "<<-"}
+
+RESERVED = {"if", "then", "else", "elif", "fi", "do", "done", "while", "until", "{", "}", "!", "time"}
+SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "fish", "csh", "tcsh", "nu", "elvish", "xonsh", "pwsh"}
+INTERPRETERS = {"osascript", "awk", "gawk", "tclsh", "expect", "Rscript", "julia", "lua", "php", "deno", "bun"}
+INTERPRETER_RE = re.compile(r"^(python|pypy|node|perl|ruby)[\d.]*$")
+# Builtins and runners that execute or redefine commands out of sight.
+HIDERS = {"eval", "source", ".", "exec", "xargs", "find", "export", "declare", "typeset", "local",
+          "readonly", "set", "unset", "alias", "unalias", "trap", "builtin", "enable", "hash",
+          "function", "sudo", "su", "doas", "ssh", "parallel", "watch", "script", "env", "command",
+          "coproc", "fc", "mapfile", "readarray", "read"}
+INERT = {"echo", "printf"}
+
+GIT_TRUSTED = {"/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git",
+               "/Library/Developer/CommandLineTools/usr/bin/git",
+               "/Applications/Xcode.app/Contents/Developer/usr/bin/git"}
+GH_TRUSTED = {"/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh"}
+
+# git subcommands a risk-mentioning command may use (push is analysed).
+GIT_SAFE = {
+    "add", "am", "apply", "archive", "bisect", "blame", "branch", "cat-file", "check-ignore", "checkout",
+    "cherry", "cherry-pick", "clean", "clone", "commit", "commit-tree", "config", "count-objects",
+    "describe", "diff", "fetch", "for-each-ref", "format-patch", "fsck", "gc", "grep", "hash-object",
+    "help", "init", "interpret-trailers", "log", "ls-files", "ls-remote", "ls-tree", "maintenance",
+    "merge", "merge-base", "merge-file", "merge-tree", "mv", "name-rev", "notes", "pull", "push",
+    "range-diff", "read-tree", "rebase", "reflog", "remote", "reset", "restore", "rev-list",
+    "rev-parse", "revert", "rm", "shortlog", "show", "show-ref", "sparse-checkout", "stash", "status",
+    "submodule", "switch", "symbolic-ref", "tag", "update-ref", "var", "verify-commit", "verify-tag",
+    "version", "whatchanged", "worktree", "write-tree",
+}
+GIT_PUSHERS = {"send-pack", "http-push", "subtree", "p4", "svn", "push-to-checkout"}
+GIT_SAFE_C = ("user.", "color.", "core.pager", "core.editor", "core.quotepath", "advice.", "commit.gpgsign",
+              "gpg.", "log.", "diff.", "format.", "pager.", "merge.conflictstyle", "init.defaultbranch",
+              "safe.directory", "pull.rebase", "column.", "status.")
+
+GH_KNOWN = {"agent-task", "alias", "api", "attestation", "auth", "browse", "cache", "co", "codespace",
+            "completion", "config", "copilot", "extension", "ext", "gist", "gpg-key", "help", "issue",
+            "label", "org", "pr", "preview", "project", "release", "repo", "ruleset", "run", "search",
+            "secret", "ssh-key", "status", "variable", "version", "workflow"}
+GH_PR_READ_ONLY = {"view", "list", "diff", "checks", "status"}
+GH_GRAPHQL_MUTATIONS = re.compile(r"\b(mergePullRequest|enablePullRequestAutoMerge|mergeBranch|updateRefs?"
+                                  r"|createCommitOnBranch|deleteRef|createRef|updatePullRequestBranch)\b")
+PR_MERGE_PATH = re.compile(r"pulls/([^/\s?]+)/merge\b")
+
+
+class Block(Exception):
+    """rule: rule id; target: branch name or PR number (or None); detail: the
+    one-line reason shown to the model; form: how the command was reached."""
+    def __init__(self, rule, target, detail, form="other"):
+        super().__init__(detail)
+        self.rule, self.target, self.detail, self.form = rule, target, detail, form
+
+
+def unresolved(detail, form="other"):
+    return Block(UNPARSEABLE, None,
+                 f"{detail}; a command that pushes or merges must be fully literal "
+                 "(no $, backticks, shells or interpreters) - split it into plain git/gh commands",
+                 form)
+
+
+def has_expansion(word):
+    return "$" in word or "`" in word
+
+
+# Characters bash expands or re-reads that the guard does not resolve. In a
+# risk-mentioning command any of them blocks outright (R-C9, review round 2);
+# '{'/'}' used as standalone group words are exempt.
+UNRESOLVED_CHARS = re.compile(r"[{}?\[\]#]")
+GROUP_BRACE = re.compile(r"(?:^|(?<=[\s;&|]))[{}](?=[\s;&|]|$)")
+BRACE_EXPANSION = re.compile(r"\{[^{}\s]*(?:,|\.\.)[^{}\s]*\}")
+GLOB_CHARS = re.compile(r"[?*\[]")
+
+
+def globby(word):
+    """Unquoted ?, * or [, or an unquoted brace group bash would expand (one
+    with ',' or '..'). Decided from the text alone, never the filesystem
+    (ruling R-C10: a glob can be made to match in the same command)."""
+    masked = getattr(word, "masked", word)
+    return bool(GLOB_CHARS.search(masked) or BRACE_EXPANSION.search(masked))
+
+
+def unresolved_word(word):
+    return has_expansion(word) or globby(word) or "\n" in word
+
+
+def dequote(text):
+    """Bash's view of the words for risk matching: backslash-newline joins
+    lines, quotes and backslashes vanish."""
+    return re.sub(r"[\"'\\]", "", text.replace("\\\n", ""))
+
+
+def is_risky(text):
+    dq = dequote(text)
+    return bool(RISK_WORDS.search(dq)) and bool(RISK_TOOLS.search(dq))
+
+
+# ---- tokenising -----------------------------------------------------------------
+
+class Word(str):
+    """A shell word after quote removal. `masked` is the same text with every
+    quoted or escaped character replaced by NUL, so the unquoted (expandable)
+    characters can be examined."""
+    masked = ""
+
+
+class Op(str):
+    """A run of unquoted operator characters."""
+
+
+def tokens(text):
+    """POSIX-ish lexer: quotes, backslash escapes, backslash-newline joins
+    (as bash does), '#' comments only at the start of a word, and runs of
+    ;&|<>() as operators. Raises ValueError on unbalanced quotes."""
+    out, val, mask, started = [], [], [], False
+    i, n = 0, len(text)
+
+    def add(ch, quoted):
+        val.append(ch)
+        mask.append("\0" if quoted else ch)
+
+    def flush():
+        nonlocal val, mask, started
+        if started:
+            w = Word("".join(val))
+            w.masked = "".join(mask)
+            out.append(w)
+        val, mask, started = [], [], False
+
+    while i < n:
+        c = text[i]
+        if c in " \t\r":
+            flush()
+            i += 1
+        elif c == "#" and not started:
+            while i < n and text[i] != "\n":
+                i += 1
+        elif c in PUNCT:
+            flush()
+            j = i
+            while j < n and text[j] in PUNCT:
+                j += 1
+            out.append(Op(text[i:j]))
+            i = j
+        elif c == "\\":
+            if i + 1 < n and text[i + 1] == "\n":
+                i += 2  # line continuation: bash joins the lines
+                continue
+            started = True
+            if i + 1 < n:
+                add(text[i + 1], True)
+            i += 2
+        elif c == "'":
+            j = text.find("'", i + 1)
+            if j < 0:
+                raise ValueError("unbalanced single quote")
+            started = True
+            for ch in text[i + 1:j]:
+                add(ch, True)
+            i = j + 1
+        elif c == '"':
+            started = True
+            j = i + 1
+            while True:
+                if j >= n:
+                    raise ValueError("unbalanced double quote")
+                ch = text[j]
+                if ch == "\\" and j + 1 < n and text[j + 1] in '$`"\\\n':
+                    if text[j + 1] != "\n":
+                        add(text[j + 1], True)
+                    j += 2
+                elif ch == '"':
+                    break
+                else:
+                    add(ch, True)
+                    j += 1
+            i = j + 1
+        else:
+            started = True
+            add(c, False)
+            i += 1
+    flush()
+    return out
+
+
+def split_ops(tok):
+    """Split a run of punctuation (e.g. ';>' or '&&>') into shell operators."""
+    out, i = [], 0
+    while i < len(tok):
+        for op in OPERATORS:
+            if tok.startswith(op, i):
+                out.append(op)
+                i += len(op)
+                break
+        else:  # unreachable: every PUNCT char is an operator
+            out.append(tok[i])
+            i += 1
+    return out
+
+
+class Parsed:
+    """Simple commands split on separators, with redirections (operator plus
+    target word, and a leading fd number) removed and noted."""
+    def __init__(self, toks):
+        self.segments = []
+        self.pipe = self.redirect = self.heredoc = False
+        seg, skip = [], False
+        for t in toks:
+            if isinstance(t, Op):
+                for op in split_ops(t):
+                    if "<" in op or ">" in op:
+                        self.redirect = True
+                        self.heredoc |= op in HEREDOC_OPS
+                        if seg and seg[-1].isdigit():
+                            seg.pop()
+                        skip = True
+                        continue
+                    self.pipe |= op in ("|", "|&")
+                    if seg:
+                        self.segments.append(seg)
+                    seg = []
+                continue
+            if skip:
+                skip = False
+                continue
+            seg.append(t)
+        if seg:
+            self.segments.append(seg)
+
+
+ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
+
+def strip_wrappers(seg):
+    """Return (argv, assignments, wrapped). Only the R-C9 wrappers are
+    stripped: VAR=x, reserved words, timeout, nice, nohup, `command` without
+    flags and `env` followed by VAR=x only. Anything else stays argv[0]."""
+    assigns, wrapped, i = [], False, 0
+    while i < len(seg):
+        w = seg[i]
+        nxt = seg[i + 1] if i + 1 < len(seg) else ""
+        if ASSIGN.match(w):
+            assigns.append(w)
+            i += 1
+        elif w in RESERVED:
+            i += 1
+        elif w == "nohup":
+            wrapped = True
+            i += 1
+        elif w == "command" and nxt and not nxt.startswith("-"):
+            wrapped = True
+            i += 1
+        elif w == "env" and ASSIGN.match(nxt):
+            wrapped = True
+            i += 1
+            while i < len(seg) and ASSIGN.match(seg[i]):
+                assigns.append(seg[i])
+                i += 1
+        elif w == "nice":
+            wrapped = True
+            i += 1
+            while i < len(seg) and seg[i].startswith("-"):
+                if seg[i] in ("-n", "--adjustment"):
+                    i += 1
+                i += 1
+        elif w in ("timeout", "gtimeout"):
+            wrapped = True
+            i += 1
+            while i < len(seg) and seg[i].startswith("-"):
+                if seg[i] in ("-s", "-k", "--signal", "--kill-after"):
+                    i += 1
+                i += 1
+            i += 1  # duration
+        else:
+            break
+    return seg[i:], assigns, wrapped
+
+
+def tool_of(argv0):
+    if argv0 == "git" or argv0 in GIT_TRUSTED:
+        return "git"
+    if argv0 == "gh" or argv0 in GH_TRUSTED:
+        return "gh"
+    return None
+
+
+# ---- git helpers --------------------------------------------------------------------
+
+def git_run(cwd, *args):
+    """(returncode, stdout), or (None, "") when git could not run."""
+    try:
+        r = subprocess.run(["git", "-C", cwd, *args], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None, ""
+    return r.returncode, r.stdout
+
+
+def git_config(cwd):
+    """All config entries as {key: [values]}, or None when unreadable."""
+    rc, out = git_run(cwd, "config", "--list", "-z")
+    if rc != 0:
+        return None
+    cfg = {}
+    for entry in out.split("\0"):
+        if entry:
+            key, _, val = entry.partition("\n")
+            cfg.setdefault(key, []).append(val)
+    return cfg
+
+
+def current_branch(cwd):
+    rc, out = git_run(cwd, "symbolic-ref", "--short", "-q", "HEAD")
+    return out.strip() if rc == 0 and out.strip() else None
+
+
+def default_branches(cwd, remotes=()):
+    names = {"main", "master"}
+    for r in set(remotes) | {"origin"}:
+        rc, out = git_run(cwd, "symbolic-ref", "--short", "-q", f"refs/remotes/{r}/HEAD")
+        if rc == 0 and "/" in out.strip():
+            names.add(out.strip().split("/", 1)[1])
+    return names
+
+
+def is_default(name, defaults):
+    return name.lower() in {d.lower() for d in defaults}
+
+
+def norm_dst(dst):
+    for prefix in ("refs/heads/", "heads/"):
+        if dst.startswith(prefix):
+            return dst[len(prefix):]
+    return dst
+
+
+def resolve(base, path):
+    return os.path.normpath(os.path.join(base, os.path.expanduser(path)))
+
+
+# ---- git -------------------------------------------------------------------------------
+
+def check_git(args, assigns, cwd, form, strict, allowed):
+    """Raise Block for anything that can land on a default branch; append
+    (target, form) to allowed for a push that passes."""
+    for a in assigns:
+        if a.startswith(("GIT_", "PATH=")):
+            raise Block(PUSH, None, "GIT_*/PATH environment overrides on git are not allowed for workers", form)
+    cfg_c, aliases_c, bad_globals = [], {}, False
+    i = 0
+    while i < len(args) and args[i].startswith("-"):
+        a = args[i]
+        nxt = args[i + 1] if i + 1 < len(args) else ""
+        if has_expansion(a):
+            raise unresolved("unresolved git option", form)
+        if a == "-C" and nxt:
+            if has_expansion(nxt):
+                raise unresolved("unresolved git -C directory", form)
+            cwd = resolve(cwd, nxt)
+            if form in ("plain", "other"):
+                form = "git-C"
+            i += 2
+            continue
+        if a == "-c" and nxt:
+            if has_expansion(nxt):
+                raise unresolved("unresolved git -c value", form)
+            cfg_c.append(nxt)
+            m = re.match(r"^alias\.([^=]+)=(.*)$", nxt, re.S | re.I)
+            if m:
+                aliases_c[m.group(1)] = m.group(2)
+            i += 2
+            continue
+        if a in ("--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"):
+            bad_globals = True
+            i += 2
+            continue
+        if a.split("=", 1)[0] in ("--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"):
+            bad_globals = True
+        i += 1
+    if i >= len(args):
+        return
+    sub, rest = args[i], args[i + 1:]
+    if unresolved_word(sub):
+        raise unresolved("unresolved git subcommand", form)
+    # R-C10: a git command that can push (push, plumbing pushers, aliases)
+    # must have no unquoted glob or brace-expansion word anywhere.
+    if (sub == "push" or sub in GIT_PUSHERS or sub not in GIT_SAFE) and any(globby(w) for w in args):
+        raise unresolved(f"unquoted glob or brace expansion in git {sub}", form)
+
+    if sub in GIT_PUSHERS:
+        raise Block(PUSH, None, f"git {sub} can push and is not allowed for workers", form)
+    if sub not in GIT_SAFE:
+        alias = aliases_c.get(sub)
+        if alias is None:
+            cfg = git_config(cwd)
+            if cfg is None and strict:
+                raise Block(PUSH, None, "git config unreadable while resolving a possible alias", form)
+            alias = ((cfg or {}).get(f"alias.{sub}") or [None])[-1]
+        if alias is not None and (alias.startswith("!") or re.search(r"push|merge|send-pack|subtree", alias)):
+            raise Block(PUSH, None, f"git alias '{sub}' hides push/merge or a shell command", form)
+        if strict:
+            raise unresolved(f"git {sub} is not a resolvable subcommand in a command mentioning push/merge", form)
+        return
+
+    if strict:
+        for kv in cfg_c:
+            if not kv.lower().startswith(GIT_SAFE_C):
+                raise Block(PUSH, None, "git -c overrides are not allowed in a command that pushes or merges", form)
+        if bad_globals:
+            raise Block(PUSH, None, "--git-dir/--work-tree are not allowed in a command that pushes or merges", form)
+        if sub == "rebase" and any(a in ("-x", "--exec") or a.startswith("--exec=") or
+                                   (re.match(r"^-[A-Za-z]*x", a) and not a.startswith("--")) for a in rest):
+            raise unresolved("git rebase --exec runs commands", form)
+        if sub == "submodule" and "foreach" in rest:
+            raise unresolved("git submodule foreach runs commands", form)
+        if sub == "bisect" and "run" in rest:
+            raise unresolved("git bisect run runs commands", form)
+        if sub == "config":
+            reads = {"--get", "--get-all", "--get-regexp", "--list", "-l", "get", "list"}
+            if not any(a in reads for a in rest):
+                raise Block(PUSH, None, "git config writes are not allowed in a command that pushes or merges", form)
+
+    if sub != "push":
+        return
+    if cfg_c or bad_globals:
+        raise Block(PUSH, None, "git -c/--git-dir/--work-tree on a push are not allowed for workers", form)
+    check_push(rest, cwd, form, allowed)
+
+
+def check_push(push, cwd, form, allowed):
+    positional, j = [], 0
+    while j < len(push):
+        a = push[j]
+        if unresolved_word(a):
+            raise unresolved("unresolved git push argument", form)
+        if a == "--":
+            positional += push[j + 1:]
+            break
+        if a in ("--all", "--mirror", "--branches", "--prune"):
+            raise Block(PUSH, None, f"git push {a} is not allowed for workers (it can move the default branch)", form)
+        if a in ("--receive-pack", "--exec") or a.startswith(("--receive-pack=", "--exec=")):
+            raise Block(PUSH, None, "git push --receive-pack/--exec are not allowed for workers", form)
+        if a in ("--repo", "-o", "--push-option"):
+            j += 2
+            continue
+        if not a.startswith("-"):
+            positional.append(a)
+        j += 1
+
+    cfg = git_config(cwd)
+    if cfg is None:
+        raise Block(PUSH, None, "git config unreadable; cannot resolve the push destination", form)
+
+    def last(key):
+        v = cfg.get(key)
+        return v[-1] if v else None
+
+    cur = current_branch(cwd)
+    remote = positional[0] if positional else (
+        (last(f"branch.{cur}.pushremote") if cur else None) or last("remote.pushdefault")
+        or (last(f"branch.{cur}.remote") if cur else None) or "origin")
+    refspecs = positional[1:]
+    defaults = default_branches(cwd, (remote,))
+
+    def need_cur():
+        if not cur:
+            raise Block(PUSH, None, "git push where the current branch cannot be resolved (detached HEAD?)", form)
+        return cur
+
+    def dst_of(spec):
+        if "*" in spec:
+            raise Block(PUSH, None, "git push with a glob refspec is not allowed for workers", form)
+        src, sep, dst = spec.lstrip("+").partition(":")
+        if sep and dst:
+            dst = norm_dst(dst)
+            return need_cur() if dst in ("HEAD", "@") else dst
+        if src in ("HEAD", "@"):
+            return need_cur()
+        if not src or re.search(r"[@^~{}:]", src):
+            raise Block(PUSH, None, "git push refspec source is not a plain branch name; name the destination", form)
+        return norm_dst(src)
+
+    targets = []
+    # remote.<r>.push maps refspecs (and is the default refspec), so any
+    # default-branch destination configured there blocks every push to <r>.
+    for spec in cfg.get(f"remote.{remote}.push", []):
+        d = dst_of(spec)
+        if is_default(d, defaults):
+            raise Block(PUSH, d, f"remote.{remote}.push lands on the default branch", form)
+        if not refspecs:
+            targets.append(d)
+
+    if refspecs:
+        for spec in refspecs:
+            d = dst_of(spec)
+            if is_default(d, defaults):
+                raise Block(PUSH, d, "git push to the default branch is not allowed for workers", form)
+            targets.append(d)
+    elif not targets:
+        mode = (last("push.default") or "simple").lower()
+        if mode == "matching":
+            raise Block(PUSH, None, "push.default=matching can push the default branch", form)
+        if mode != "nothing":
+            c = need_cur()
+            cands = [c]
+            if mode in ("upstream", "tracking", "simple"):
+                merge = last(f"branch.{c}.merge")
+                if merge:
+                    cands.append(norm_dst(merge))
+            for d in cands:
+                if is_default(d, defaults):
+                    raise Block(PUSH, d, "git push to the default branch is not allowed for workers", form)
+            targets.append(c)
+    allowed.append((targets[0] if targets else None, form))
+
+
+# ---- gh ----------------------------------------------------------------------------------
+
+def check_gh(args, assigns, cwd, form, strict):
+    for a in assigns:
+        if a.startswith("PATH="):
+            raise unresolved("PATH override on gh", form)
+    i = 0
+    while i < len(args) and args[i].startswith("-"):
+        if args[i] in ("-R", "--repo", "--hostname"):
+            i += 1
+        i += 1
+    if any(unresolved_word(a) for a in args[:i + 1]):
+        raise unresolved("unresolved gh option or subcommand", form)
+    rest = args[i:]
+    if not rest:
+        return
+    top = rest[0]
+    if top not in GH_KNOWN:
+        raise Block(GH_API, None, f"unknown gh subcommand '{top}' (possible alias or extension)", form)
+    if top == "alias" and len(rest) > 1 and rest[1] in ("set", "import"):
+        raise Block(GH_API, None, "gh alias set/import is not allowed for workers", form)
+    if top == "pr":
+        j = 1
+        while j < len(rest) and rest[j].startswith("-"):
+            if rest[j] in ("-R", "--repo"):
+                j += 1
+            j += 1
+        if any(unresolved_word(a) for a in rest[1:j + 1]):
+            raise unresolved("unresolved gh pr subcommand", form)
+        if j < len(rest) and rest[j] == "merge":
+            tail = rest[j + 1:]
+            num = next((w for w in tail if w.isdigit()), None)
+            if num is None:
+                pos = next((w for w in tail if not w.startswith("-")), None)
+                m = re.search(r"/pull/(\d+)", pos or "")
+                num = m.group(1) if m else pos
+            raise Block(GH_MERGE, num, "gh pr merge is not allowed for workers", form)
+    # R-C10: gh pr (other than read-only subcommands), api, workflow and run
+    # can merge or trigger a workflow; no unquoted glob/brace word allowed.
+    sub = next((a for a in rest[1:] if not a.startswith("-")), None)
+    read_only = top == "pr" and sub in GH_PR_READ_ONLY
+    if top in ("pr", "api", "workflow", "run") and not read_only and any(globby(w) for w in args):
+        raise unresolved(f"unquoted glob or brace expansion in gh {top}", form)
+    if (top == "workflow" and "run" in rest[1:2]) or (top == "run" and "rerun" in rest[1:2]):
+        raise Block(GH_API, None, f"gh {top} {rest[1]} can start a workflow that merges; not allowed for workers", form)
+    if top == "api":
+        check_gh_api(rest[1:], cwd, form, strict)
+
+
+def check_gh_api(args, cwd, form, strict):
+    if any(has_expansion(a) for a in args):
+        raise unresolved("unresolved gh api argument", form)
+    method, fields, paths, has_input = None, [], [], False
+    i = 0
+    while i < len(args):
+        a = args[i]
+        nxt = args[i + 1] if i + 1 < len(args) else ""
+        if a in ("-X", "--method"):
+            method, i = nxt.upper(), i + 2
+            continue
+        if a in ("-f", "-F", "--field", "--raw-field"):
+            fields.append(nxt)
+            i += 2
+            continue
+        if a == "--input":
+            has_input, i = True, i + 2
+            continue
+        if a in ("-H", "--header", "-q", "--jq", "-t", "--template", "--hostname", "-p", "--preview", "--cache"):
+            i += 2
+            continue
+        if a.startswith("-X") and len(a) > 2:
+            method = a[2:].upper()
+        elif a.startswith("--method="):
+            method = a.split("=", 1)[1].upper()
+        elif a.startswith(("--field=", "--raw-field=")):
+            fields.append(a.split("=", 1)[1])
+        elif a.startswith("--input="):
+            has_input = True
+        elif not a.startswith("-"):
+            paths.append(a)
+        i += 1
+    path = paths[0] if paths else ""
+    write = method in ("POST", "PUT", "PATCH", "DELETE") or (method is None and (fields or has_input))
+    defaults = default_branches(cwd)
+    fkv = {}
+    for f in fields:
+        k, _, v = f.partition("=")
+        fkv[k] = v
+
+    for a in args:
+        m = PR_MERGE_PATH.search(a)
+        if m:
+            raise Block(GH_API, m.group(1), "the PR merge API is not allowed for workers", form)
+        for d in defaults:
+            if re.search(r"heads/" + re.escape(d) + r"(?![\w./-])", a, re.I):
+                raise Block(GH_API, d, "gh api on the default branch ref is not allowed for workers", form)
+    if any(re.search(r"(^|/)dispatches\b", p) for p in paths):
+        raise Block(GH_API, None, "workflow/repository dispatch can start a merge; not allowed for workers", form)
+    if any(unresolved_word(p) for p in paths):
+        raise unresolved("unresolved gh api path", form)
+    if re.search(r"(^|/)merges\b", path):
+        raise Block(GH_API, None, "the repository merges API is not allowed for workers", form)
+    if path.strip("/") == "graphql":
+        if has_input or any(v.startswith("@") for v in fkv.values()):
+            raise Block(GH_API, None, "a graphql body from a file is not allowed for workers", form)
+        if GH_GRAPHQL_MUTATIONS.search(" ".join(fields)):
+            raise Block(GH_API, None, "graphql merge/ref mutations are not allowed for workers", form)
+    if "default_branch" in fkv:
+        raise Block(GH_API, None, "changing the default branch is not allowed for workers", form)
+    if write and "/contents/" in path:
+        branch = fkv.get("branch")
+        if has_input or not branch or is_default(branch, defaults):
+            raise Block(GH_API, branch or None, "contents API writes must name a non-default branch", form)
+    m = re.search(r"/branches/([^/]+)", path)
+    if write and m and is_default(m.group(1), defaults):
+        raise Block(GH_API, m.group(1), "writes to the default branch settings are not allowed for workers", form)
+
+
+# ---- command analysis ---------------------------------------------------------------------
+
+def analyse(text, cwd, allowed):
+    risky = is_risky(text)
+    if not risky and not re.search(r"git|gh", dequote(text)):
+        return
+    try:
+        toks = tokens(text)
+    except ValueError:
+        if risky:
+            raise unresolved("unparseable git/gh command")
+        return
+    if re.search(r"[@+?*!]\(", text):
+        # extglob pattern syntax: unresolvable whatever the shell options are
+        raise unresolved("extglob pattern in a git/gh command")
+    parsed = Parsed(toks)
+    segs = parsed.segments
+    compound = len(segs) > 1
+
+    if risky:
+        if "$" in text or "`" in text:
+            raise unresolved("$ or backtick expansion", "compound" if compound else "other")
+        if UNRESOLVED_CHARS.search(GROUP_BRACE.sub("", text)) or "\\\n" in text:
+            raise unresolved("brace, glob, comment or line continuation", "compound" if compound else "other")
+        if "<(" in text or ">(" in text or parsed.heredoc:
+            raise unresolved("process substitution or here-document", "sh-c")
+        if re.search(r"(^|[\s;&|(){}])function\s", text) or re.search(r"[\w.-]\s*\(\s*\)", text):
+            raise unresolved("function definition", "sh-c")
+
+    for seg in segs:
+        argv, assigns, wrapped = strip_wrappers(seg)
+        if not argv:
+            if risky and any(a.startswith(("GIT_", "PATH=")) for a in assigns):
+                raise unresolved("GIT_*/PATH assignment in a command that pushes or merges")
+            continue
+        argv0 = argv[0]
+        base = os.path.basename(argv0)
+        tool = tool_of(argv0)
+        if compound:
+            form = "compound"
+        elif wrapped or assigns or (tool and argv0 != tool):
+            form = "other"
+        else:
+            form = "plain"
+
+        if risky:
+            if base in SHELLS or base in HIDERS or base in INTERPRETERS or INTERPRETER_RE.match(base):
+                raise unresolved(f"'{base}' in a command that pushes or merges", "sh-c")
+            if tool is None and base in ("git", "gh"):
+                raise unresolved(f"untrusted {base} path", form)
+            if tool is None and RISK_WORDS.search(dequote(" ".join(seg))):
+                inert = base in INERT and not parsed.pipe and not parsed.redirect
+                if not inert and base not in ("cd", "pushd"):
+                    raise unresolved(f"'{base}' mentions push/merge and is not a plain git/gh command", form)
+
+        if tool is None and base in ("cd", "pushd"):
+            target = next((a for a in argv[1:] if not a.startswith("-")), "~")
+            if has_expansion(target):
+                if risky:
+                    raise unresolved("unresolved cd target")
+                continue
+            cwd = resolve(cwd, target)
+        elif tool == "git":
+            check_git(argv[1:], assigns, cwd, form, risky, allowed)
+        elif tool == "gh":
+            check_gh(argv[1:], assigns, cwd, form, risky)
+
+
+# ---- output ----------------------------------------------------------------------------------
+
+def log(payload, rule, target, form, decision):
+    """Append one O9 record. Never raises, never blocks; never records command text."""
+    try:
+        path = os.environ.get("SQUAD_GUARD_LOG") or os.path.expanduser(
+            "~/.local/state/claude-openrouter/guard.jsonl")
+        d = os.path.dirname(path)
+        os.makedirs(d, mode=0o700, exist_ok=True)
+        os.chmod(d, 0o700)
+        entry = {
+            "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+            "session_id": payload.get("session_id"),
+            "cwd": payload.get("cwd"),
+            "rule": rule,
+            "target": target,
+            "form": form,
+            "decision": decision,
+        }
+        flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path, flags, 0o600)
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise OSError("log path is not a regular file")
+            os.fchmod(fd, 0o600)
+            os.write(fd, (json.dumps(entry) + "\n").encode("utf-8"))
+        finally:
+            os.close(fd)
+    except Exception as e:  # logging must never change the decision
+        try:
+            print(f"claude-openrouter-guard: log write failed: {type(e).__name__}", file=sys.stderr)
+        except Exception:
+            pass
+
+
+def deny(payload, b):
+    """Print the decision first, then log; always exit 0 here."""
+    try:
+        sys.stdout.write(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": f"claude-openrouter-guard ({b.rule}): {b.detail}",
+        }}) + "\n")
+        sys.stdout.flush()
+    finally:
+        log(payload if isinstance(payload, dict) else {}, b.rule, b.target, b.form, "block")
+        os._exit(0)
+
+
+def main():
+    payload = {}
+    try:
+        raw = sys.stdin.read()
+        try:
+            payload = json.loads(raw)
+        except ValueError:
+            payload = None
+        if not isinstance(payload, dict):
+            if RISK_WORDS.search(raw or "") or "Bash" in (raw or ""):
+                deny({}, Block(UNPARSEABLE, None, "unparseable hook input"))
+            return
+        if payload.get("tool_name") != "Bash":
+            return
+        ti = payload.get("tool_input")
+        command = ti.get("command") if isinstance(ti, dict) else None
+        if not isinstance(command, str):
+            deny(payload, Block(UNPARSEABLE, None, "malformed Bash tool_input"))
+        if not command:
+            return
+        cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else os.getcwd()
+        allowed = []
+        analyse(command, cwd, allowed)
+    except Block as b:
+        deny(payload, b)
+    except Exception as e:  # fail closed on any guard bug
+        try:
+            print(f"claude-openrouter-guard: internal error: {type(e).__name__}", file=sys.stderr)
+        except Exception:
+            pass
+        deny(payload, Block(UNPARSEABLE, None, "guard error while checking the command"))
+    else:
+        for target, form in allowed:
+            log(payload, PUSH, target, form, "allow")
+
+
+if __name__ == "__main__":
+    main()

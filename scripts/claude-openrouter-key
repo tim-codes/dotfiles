@@ -1,0 +1,49 @@
+#!/bin/bash
+# apiKeyHelper for the exxo-openrouter Claude Code context: prints the
+# OpenRouter key from $HOME/keys/openrouter.key (file 0600, dir 0700) and
+# nothing else on stdout. Claude Code runs it itself, every few minutes.
+# On failure: one generic line on stderr, nothing on stdout, non-zero exit,
+# and {ts, reason} appended to ~/.local/state/claude-openrouter/keyhelper.jsonl
+# (dir 0700, file 0600). The key, its length and its prefix are never logged.
+set -euo pipefail
+
+KEY_FILE="$HOME/keys/openrouter.key"
+LOG="$HOME/.local/state/claude-openrouter/keyhelper.jsonl"
+
+fail() { # reason message
+  local ts
+  ts="$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"
+  {
+    umask 077
+    mkdir -p "$(dirname "$LOG")"
+    chmod 700 "$(dirname "$LOG")"
+    printf '{"ts": "%s", "reason": "%s"}\n' "$ts" "$1" >>"$LOG"
+    chmod 600 "$LOG"
+  } 2>/dev/null || true
+  echo "claude-openrouter-key: $2" >&2
+  exit 1
+}
+
+[ -e "$KEY_FILE" ] || fail missing "key file missing: $KEY_FILE"
+[ ! -L "$KEY_FILE" ] || fail symlink "key file is a symlink: $KEY_FILE"
+[ -f "$KEY_FILE" ] || fail read_error "not a regular file: $KEY_FILE"
+
+# GNU stat first: BSD stat rejects -c and falls through, whereas GNU stat
+# accepts -f (filesystem status) and would print junk.
+mode="$(stat -c %a "$KEY_FILE" 2>/dev/null || stat -f %Lp "$KEY_FILE" 2>/dev/null || true)"
+[ -n "$mode" ] || fail read_error "cannot stat $KEY_FILE"
+mode="$(printf '%03d' "$((10#$mode))")"
+# Any group/other permission bit (the last two octal digits) is too loose.
+[ "${mode: -2}" = "00" ] || fail mode "mode $mode on $KEY_FILE is looser than 600"
+
+# The stat-then-read race is accepted: the parent dir is 0700.
+content="$(cat "$KEY_FILE" 2>/dev/null)" || fail read_error "cannot read $KEY_FILE"
+# Trim leading and trailing whitespace.
+content="${content#"${content%%[![:space:]]*}"}"
+content="${content%"${content##*[![:space:]]}"}"
+[ -n "$content" ] || fail empty "key file is empty: $KEY_FILE"
+
+# Whitespace left inside would make stdout multi-line, which Claude Code rejects.
+case "$content" in *[[:space:]]*) fail malformed "key file content is malformed: $KEY_FILE";; esac
+
+printf '%s\n' "$content"

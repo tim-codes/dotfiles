@@ -22,10 +22,27 @@
 # from ~/claude, the default working directory, via a subshell so the caller's
 # shell stays where it was. `command claude` is the PATH binary, no recursion.
 if [ -d "$HOME/.claude-personal" ]; then
+    # The exxo-openrouter overlay env is inherited by anything a K3 session
+    # spawns; claude and claude-default must not see it, so it is unset for the
+    # launched process only. claude-exxo-openrouter is left untouched.
+    _claude_scrub=(-u ANTHROPIC_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u ANTHROPIC_DEFAULT_OPUS_MODEL -u ANTHROPIC_DEFAULT_SONNET_MODEL -u ANTHROPIC_DEFAULT_HAIKU_MODEL -u ANTHROPIC_DEFAULT_FABLE_MODEL -u CLAUDE_CODE_SUBAGENT_MODEL)
     claude() {
         local dir="$HOME/.claude-personal"
         case "$PWD" in
-            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal)
+            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal|"$HOME"/.claude-exxo-openrouter)
+                mkdir -p "$HOME/claude"
+                ( cd "$HOME/claude" && command env "${_claude_scrub[@]}" CLAUDE_CONFIG_DIR="$dir" claude "$@" )
+                return ;;
+        esac
+        command env "${_claude_scrub[@]}" CLAUDE_CONFIG_DIR="$dir" claude "$@"
+    }
+    # exxo-openrouter context (Kimi K3 workers). The key comes from the
+    # overlay's apiKeyHelper, so only the config dir and start directory are
+    # set here. Anti-goal: sets no env that could route any other context.
+    claude-exxo-openrouter() {
+        local dir="$HOME/.claude-exxo-openrouter"
+        case "$PWD" in
+            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal|"$HOME"/.claude-exxo-openrouter)
                 mkdir -p "$HOME/claude"
                 ( cd "$HOME/claude" && CLAUDE_CONFIG_DIR="$dir" command claude "$@" )
                 return ;;
@@ -36,11 +53,11 @@ if [ -d "$HOME/.claude-personal" ]; then
     # ~/.claude and ~/.claude.json from scratch (fresh login/onboarding).
     claude-default() {
         case "$PWD" in
-            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal)
+            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal|"$HOME"/.claude-exxo-openrouter)
                 mkdir -p "$HOME/claude"
-                ( cd "$HOME/claude" && command env -u CLAUDE_CONFIG_DIR claude "$@" )
+                ( cd "$HOME/claude" && command env "${_claude_scrub[@]}" -u CLAUDE_CONFIG_DIR claude "$@" )
                 return ;;
         esac
-        command env -u CLAUDE_CONFIG_DIR claude "$@"
+        command env "${_claude_scrub[@]}" -u CLAUDE_CONFIG_DIR claude "$@"
     }
 fi
