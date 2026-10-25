@@ -61,19 +61,32 @@ fails_quietly regular
 # read error (mode 600 but unreadable is impossible at 600 for owner; use 000 -> mode reason)
 run "$KEY\n" 000
 fails_quietly unreadable
+case "$ERR" in *looser*) bad "000: wrongly reports mode";; *) ok "000: not reported as mode";; esac
+last_reason() { tail -1 "$LOG" | sed 's/.*"reason": "\([a-z_]*\)".*/\1/'; }
+[ "$(id -u)" -eq 0 ] || { [ "$(last_reason)" = read_error ] && ok "000: logged read_error" || bad "000: reason $(last_reason)"; }
+
+# symlink refused even when the target is a valid 600 key
+run; printf '%s\n' "$KEY" >"$HOME/real.key"; chmod 600 "$HOME/real.key"; ln -s "$HOME/real.key" "$KF"
+OUT="$("$HELPER" 2>"$T/err")"; RC=$?; ERR="$(cat "$T/err")"
+fails_quietly symlink
+[ "$(last_reason)" = symlink ] && ok "symlink: logged symlink" || bad "symlink: reason"
+
+# CRLF is trimmed
+run "$KEY\r\n" 600
+[ "$RC" -eq 0 ] && [ "$OUT" = "$KEY" ] && ok "crlf: trimmed" || bad "crlf: out='$OUT'"
+[ "$("$HELPER" 2>/dev/null | wc -l | tr -d ' ')" = 1 ] && ok "crlf: single line" || bad "crlf: lines"
+
+# embedded whitespace refused
+run "$KEY\nsecond\n" 600
+fails_quietly embedded
+[ "$(last_reason)" = malformed ] && ok "embedded: logged malformed" || bad "embedded: reason"
 
 # f/O10: failure log has ts + reason only, never key, length or prefix
 run "$KEY\n" 644
 if [ "$(wc -l <"$LOG")" -eq 1 ] \
-   && python3 - "$LOG" <<'PY'
-import json, sys
-r = json.loads(open(sys.argv[1]).read())
-assert set(r) == {"ts", "reason"}, r
-assert r["reason"] == "mode"
-assert "sk-or" not in json.dumps(r)
-PY
+   && jq -e '(keys == ["reason","ts"]) and .reason == "mode" and (tostring | contains("sk-or") | not)' "$LOG" >/dev/null
 then ok "failure_logged_without_key_or_length: shape"; else bad "failure_logged_without_key_or_length: shape"; fi
-[ "$(stat -f %Lp "$LOG" 2>/dev/null || stat -c %a "$LOG")" = 600 ] && ok "log mode 600" || bad "log mode"
-[ "$(stat -f %Lp "$(dirname "$LOG")" 2>/dev/null || stat -c %a "$(dirname "$LOG")")" = 700 ] && ok "log dir mode 700" || bad "log dir mode"
+[ "$(stat -c %a "$LOG" 2>/dev/null || stat -f %Lp "$LOG")" = 600 ] && ok "log mode 600" || bad "log mode"
+[ "$(stat -c %a "$(dirname "$LOG")" 2>/dev/null || stat -f %Lp "$(dirname "$LOG")")" = 700 ] && ok "log dir mode 700" || bad "log dir mode"
 
 exit $fail
