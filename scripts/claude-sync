@@ -159,6 +159,9 @@ OVERLAY_FILES=(history.jsonl)
 # silently drop the shared read-only allow set from that context. allow, deny
 # and ask are concatenated instead (shared first, duplicates dropped, order
 # kept), which is also how Claude Code itself merges them across scopes.
+# hooks.<Event> arrays concatenate too (earlier layer first, no dedupe):
+# otherwise an overlay adding one PreToolUse hook would replace every shared
+# PreToolUse entry. Events only one layer defines pass through unchanged.
 SETTINGS_MERGE='
   .[0] as $s | .[1] as $a
   | ($s * $a)
@@ -167,12 +170,16 @@ SETTINGS_MERGE='
       | if ($v | length) > 0
         then .permissions[$k] = ($v | reduce .[] as $x ([]; if any(.[]; . == $x) then . else . + [$x] end))
         else . end)
+  | reduce (($a.hooks // {}) | keys_unsorted[]) as $e (.;
+      if (($s.hooks // {})[$e] | type) == "array" and ($a.hooks[$e] | type) == "array"
+      then .hooks[$e] = ($s.hooks[$e] + $a.hooks[$e])
+      else . end)
 '
 
 # Build the merged settings for context <name> (fragment account <account>)
 # into <outfile>: shared + account fragment, then, if
 # files/claude/settings.overlay.<name>.json exists, merged again through
-# SETTINGS_MERGE so permission arrays concatenate. Returns 1 if the account
+# SETTINGS_MERGE so permission and hook arrays concatenate. Returns 1 if the account
 # fragment is missing.
 build_settings() {
     local name="$1" account="$2" out="$3"

@@ -93,6 +93,44 @@ while IFS= read -r pat; do
 done < <(jq -r '.permissions.deny[]' "$(S exxo-openrouter)")
 ok "no deny pattern matches job-branch push / gh pr view / gh pr list"
 
+# Every key-reading spelling is caught by at least one deny pattern.
+# shellcheck disable=SC2016  # literal text, not expanded
+for cmd in 'cat ~/keys/openrouter.key' 'cat -n $HOME/keys/x' 'echo a | grep k /Users/tim/keys/x' 'cp ~/keys/x /tmp'; do
+    hit=0
+    while IFS= read -r pat; do
+        case "$pat" in Bash\(*\)) p="${pat#Bash(}"; p="${p%)}" ;; *) continue ;; esac
+        # shellcheck disable=SC2053
+        if [[ "$cmd" == $p ]]; then hit=1; break; fi
+    done < <(jq -r '.permissions.deny[]' "$(S exxo-openrouter)")
+    check "deny pattern matches: $cmd" test "$hit" -eq 1
+done
+
+# Hooks: PreToolUse arrays concatenate across layers. exxo-openrouter keeps
+# every shared PreToolUse entry and adds the guard after them; the other
+# contexts' hooks equal the plain shared * account merge (pre-change result).
+# shellcheck disable=SC2016  # literal text, not expanded
+GUARD_CMD='"$HOME/dev/dotfiles/scripts/claude-openrouter-guard" # claude-openrouter-guard'
+check "exxo-openrouter PreToolUse = shared PreToolUse + guard" \
+    test "$(jq -c '.hooks.PreToolUse' "$(S exxo-openrouter)")" = \
+         "$(jq -c --arg c "$GUARD_CMD" '.hooks.PreToolUse + [{matcher:"Bash", hooks:[{type:"command", command:$c}]}]' "$C/settings.shared.json")"
+check "exxo-openrouter other hook events = exxo's" \
+    test "$(jq -c '.hooks | del(.PreToolUse)' "$(S exxo-openrouter)")" = "$(jq -c '.hooks | del(.PreToolUse)' "$(S exxo)")"
+for pair in personal:personal exxo:exxo exxo-personal:exxo; do
+    ctx="${pair%%:*}"; acct="${pair##*:}"
+    check "$ctx: hooks unchanged (shared * account)" \
+        test "$(jq -c '.hooks' "$(S "$ctx")")" = "$(jq -cs '(.[0] * .[1]).hooks' "$C/settings.shared.json" "$C/settings.$acct.json")"
+    check "$ctx: no guard hook" bash -c "! grep -q claude-openrouter-guard '$(S "$ctx")'"
+done
+
+# SETTINGS_MERGE concatenates hook arrays per event and leaves events only
+# one side has untouched.
+MERGE_EXPR="$(awk "/^SETTINGS_MERGE='/{f=1;next} f&&/^'/{exit} f" "$REPO/scripts/claude-sync")"
+merged="$(jq -cs "$MERGE_EXPR" \
+    <(echo '{"hooks":{"PreToolUse":[{"matcher":"A"}],"Stop":[{"matcher":"S"}]}}') \
+    <(echo '{"hooks":{"PreToolUse":[{"matcher":"B"}],"SessionEnd":[{"matcher":"E"}]}}'))"
+check "SETTINGS_MERGE: hook arrays concatenate" \
+    test "$merged" = '{"hooks":{"PreToolUse":[{"matcher":"A"},{"matcher":"B"}],"Stop":[{"matcher":"S"}],"SessionEnd":[{"matcher":"E"}]}}'
+
 # Other contexts are untouched by the overlay.
 for ctx in personal exxo exxo-personal; do
     check "$ctx: no OpenRouter env" \

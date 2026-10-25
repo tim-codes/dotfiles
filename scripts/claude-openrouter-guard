@@ -1,0 +1,467 @@
+#!/usr/bin/env -S python3 -I
+"""PreToolUse hook (Bash) for the exxo-openrouter context.
+
+Kimi K3 workers in ~/.claude-exxo-openrouter must never merge a PR or push to
+the default branch, in any form. The overlay's permission deny rules match
+command text only; this hook tokenises the command and catches the bypass
+forms (wrappers, global flags, sh -c / eval, command substitution, refspecs
+such as HEAD:main or +main, and a bare `git push` while on the default
+branch). There is no GitHub branch protection behind it, so it fails closed.
+
+Blocks:
+  gh-pr-merge          gh pr merge (gh global flags allowed before or after `pr`)
+  gh-api-merge         gh api (or curl/wget to api.github.com) on a
+                       pulls/<n>/merge path, any method, or a graphql
+                       mergePullRequest mutation
+  push-default-branch  git push whose destination is the default branch (main,
+                       master, and the target of refs/remotes/origin/HEAD);
+                       --all/--mirror; a glob or unresolvable ($VAR) refspec;
+                       a git alias hiding push; push via xargs; or no/HEAD
+                       refspec while the current branch is the default branch
+  unparseable          a command mentioning git/gh with push/merge that cannot
+                       be tokenised (fail closed)
+
+Contract (code.claude.com/docs/en/hooks): reads the PreToolUse JSON on stdin
+(tool_name, tool_input.command, cwd, session_id); a block prints
+hookSpecificOutput.permissionDecision "deny" with a one-line reason and exits
+0; anything else exits 0 silently (normal permission flow).
+
+Log (Plan E O9, always on): each block, and each allowed `git push` as a
+positive control, appends one line to $SQUAD_GUARD_LOG (default
+~/.local/state/claude-openrouter/guard.jsonl; dir 0700, file 0600):
+{ts, session_id, cwd, rule, target, form, decision}. target is a branch name
+or PR number only; form is plain|git-C|sh-c|compound|other. The command text
+is never logged. A logging failure never changes the decision.
+"""
+import datetime
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+
+PUNCT = "();<>|&\n"
+SHELLS = {"sh", "bash", "zsh", "dash", "ksh"}
+RESERVED = {"if", "then", "else", "elif", "fi", "do", "done", "while", "until", "for",
+            "case", "esac", "{", "}", "!", "time", "exec", "sudo"}
+MAX_DEPTH = 8
+
+GH_MERGE = "gh-pr-merge"
+GH_API = "gh-api-merge"
+PUSH = "push-default-branch"
+UNPARSEABLE = "unparseable"
+
+GITHUB_API_MERGE = re.compile(r"pulls/([^/\s?]+)/merge\b")
+
+
+class Block(Exception):
+    """rule: rule id; target: branch name or PR number (or None); detail: the
+    one-line reason shown to the model; form: how the command was reached."""
+    def __init__(self, rule, target, detail, form="other"):
+        super().__init__(detail)
+        self.rule, self.target, self.detail, self.form = rule, target, detail, form
+
+
+def mentions_risk(text):
+    return bool(re.search(r"\b(git|gh)\b", text)) and bool(re.search(r"\b(push|merge)", text))
+
+
+# ---- tokenising -------------------------------------------------------------
+
+def tokens(text):
+    lex = shlex.shlex(text, posix=True, punctuation_chars=PUNCT)
+    lex.whitespace = " \t\r"
+    lex.whitespace_split = True
+    return list(lex)
+
+
+def segments(toks):
+    """Split a token list into simple commands on separators, dropping
+    redirections (operator plus its target, and a leading fd number)."""
+    seg, out = [], []
+    i = 0
+    while i < len(toks):
+        t = toks[i]
+        if t and all(c in PUNCT for c in t):
+            if "<" in t or ">" in t:
+                if seg and seg[-1].isdigit():
+                    seg.pop()
+                i += 2  # operator and its target word
+                continue
+            if seg:
+                out.append(seg)
+            seg = []
+        else:
+            seg.append(t)
+        i += 1
+    if seg:
+        out.append(seg)
+    return out
+
+
+def substitutions(text):
+    """Bodies of $(...) and `...` outside single quotes."""
+    found, i, n, quote = [], 0, len(text), None
+    while i < n:
+        c = text[i]
+        if quote == "'":
+            if c == "'":
+                quote = None
+        elif c == "\\":
+            i += 1
+        elif c == "'" and quote is None:
+            quote = "'"
+        elif c == '"':
+            quote = None if quote == '"' else '"'
+        elif c == "$" and text.startswith("$(", i):
+            depth, j = 1, i + 2
+            while j < n and depth:
+                if text[j] == "(":
+                    depth += 1
+                elif text[j] == ")":
+                    depth -= 1
+                j += 1
+            found.append(text[i + 2:j - 1] if depth == 0 else text[i + 2:])
+            i = j
+            continue
+        elif c == "`":
+            j = text.find("`", i + 1)
+            found.append(text[i + 1:] if j < 0 else text[i + 1:j])
+            i = n if j < 0 else j + 1
+            continue
+        i += 1
+    return found
+
+
+# ---- git helpers --------------------------------------------------------------
+
+def git_out(cwd, gitdir, *args):
+    cmd = ["git"]
+    if gitdir:
+        cmd += ["--git-dir", gitdir]
+    cmd += ["-C", cwd, *args]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def default_branches(cwd, gitdir):
+    names = {"main", "master"}
+    head = git_out(cwd, gitdir, "symbolic-ref", "--short", "-q", "refs/remotes/origin/HEAD")
+    if head and "/" in head:
+        names.add(head.split("/", 1)[1])
+    return names
+
+
+def resolve(base, path):
+    return os.path.normpath(os.path.join(base, os.path.expandvars(os.path.expanduser(path))))
+
+
+# ---- command analysis -------------------------------------------------------------
+
+def strip_wrappers(argv):
+    """Drop env assignments, reserved words and wrapper commands; return
+    (argv, via_xargs). A non-empty drop means the command was wrapped."""
+    via_xargs = False
+    i = 0
+    while i < len(argv):
+        w = argv[i]
+        base = os.path.basename(w)
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w) or w in RESERVED:
+            i += 1
+        elif base in ("nohup", "command", "builtin"):
+            i += 1
+            while i < len(argv) and argv[i].startswith("-"):
+                i += 1
+        elif base == "env":
+            i += 1
+            while i < len(argv) and (argv[i].startswith("-") or "=" in argv[i]):
+                if argv[i] in ("-u", "-C", "-S", "--unset", "--chdir"):
+                    i += 1
+                i += 1
+        elif base == "nice":
+            i += 1
+            while i < len(argv) and argv[i].startswith("-"):
+                if argv[i] in ("-n", "--adjustment"):
+                    i += 1
+                i += 1
+        elif base in ("timeout", "gtimeout"):
+            i += 1
+            while i < len(argv) and argv[i].startswith("-"):
+                if argv[i] in ("-s", "-k", "--signal", "--kill-after"):
+                    i += 1
+                i += 1
+            i += 1  # duration
+        elif base == "xargs":
+            via_xargs = True
+            i += 1
+            while i < len(argv) and argv[i].startswith("-"):
+                if argv[i] in ("-n", "-I", "-L", "-P", "-s", "-d", "-E", "-a"):
+                    i += 1
+                i += 1
+        else:
+            break
+    return argv[i:], via_xargs
+
+
+def pr_target(words):
+    """First positional (PR number, URL or branch) -> a number or branch name."""
+    for w in words:
+        if w.startswith("-"):
+            continue
+        m = re.search(r"/pull/(\d+)", w)
+        return m.group(1) if m else w
+    return None
+
+
+def check_gh(args, form):
+    i = 0
+    while i < len(args) and args[i].startswith("-"):
+        if args[i] in ("-R", "--repo", "--hostname"):
+            i += 1
+        i += 1
+    rest = args[i:]
+    if rest and rest[0] == "pr":
+        # gh flags (-R o/r) may also sit between `pr` and the subcommand
+        j = 1
+        while j < len(rest) and rest[j].startswith("-"):
+            if rest[j] in ("-R", "--repo"):
+                j += 1
+            j += 1
+        if j < len(rest) and rest[j] == "merge":
+            # option values (e.g. --subject x) can precede the number; take
+            # the first all-digit word if any, else the first positional
+            tail = rest[j + 1:]
+            num = next((w for w in tail if w.isdigit()), None)
+            raise Block(GH_MERGE, num or pr_target(tail), "gh pr merge is not allowed for workers", form)
+    if rest and rest[0] == "api":
+        for a in rest[1:]:
+            m = GITHUB_API_MERGE.search(a)
+            if m or "mergePullRequest" in a:
+                raise Block(GH_API, m.group(1) if m else None,
+                            "gh api PR merge endpoint is not allowed for workers", form)
+
+
+def check_http(args, form):
+    for a in args:
+        if "api.github.com" in a or "/api/v3/" in a:
+            m = GITHUB_API_MERGE.search(a)
+            if m:
+                raise Block(GH_API, m.group(1), "GitHub API PR merge endpoint is not allowed for workers", form)
+        if "mergePullRequest" in a:
+            raise Block(GH_API, None, "GitHub graphql mergePullRequest is not allowed for workers", form)
+
+
+PUSH_VALUE_OPTS = {"--repo", "-o", "--push-option", "--receive-pack", "--exec"}
+
+
+def check_git(args, cwd, form, allowed):
+    """Raise Block for a default-branch push; append (target, form) to
+    allowed for a push that passes."""
+    gitdir = None
+    aliases = {}
+    i = 0
+    while i < len(args) and args[i].startswith("-"):
+        a = args[i]
+        if a == "-C" and i + 1 < len(args):
+            cwd = resolve(cwd, args[i + 1])
+            if form == "plain" or form == "other":
+                form = "git-C"
+            i += 2
+            continue
+        if a == "--git-dir" and i + 1 < len(args):
+            gitdir = resolve(cwd, args[i + 1])
+            i += 2
+            continue
+        if a.startswith("--git-dir="):
+            gitdir = resolve(cwd, a.split("=", 1)[1])
+        elif a == "-c" and i + 1 < len(args):
+            m = re.match(r"^alias\.([^=]+)=(.*)$", args[i + 1], re.S)
+            if m:
+                aliases[m.group(1)] = m.group(2)
+            i += 1
+        elif a in ("--work-tree", "--namespace", "--exec-path", "--config-env") and i + 1 < len(args):
+            i += 1
+        i += 1
+    if i >= len(args):
+        return
+    sub = args[i]
+    if sub in aliases and re.search(r"\b(push|merge)\b", aliases[sub]):
+        raise Block(PUSH, None, "git alias hiding push/merge is not allowed for workers", form)
+    if sub != "push":
+        return
+    push = args[i + 1:]
+    positional = []
+    j = 0
+    while j < len(push):
+        a = push[j]
+        if a == "--":
+            positional += push[j + 1:]
+            break
+        if a in ("--all", "--mirror", "--branches"):
+            raise Block(PUSH, None, "git push --all/--mirror is not allowed for workers (it pushes the default branch)", form)
+        if a in PUSH_VALUE_OPTS:
+            j += 2
+            continue
+        if a.startswith("-"):
+            j += 1
+            continue
+        positional.append(a)
+        j += 1
+    refspecs = positional[1:]
+    defaults = default_branches(cwd, gitdir)
+    current = None
+
+    def current_branch():
+        nonlocal current
+        if current is None:
+            current = git_out(cwd, gitdir, "rev-parse", "--abbrev-ref", "HEAD") or ""
+        if not current:
+            raise Block(PUSH, None, "git push where the current branch cannot be resolved is not allowed for workers", form)
+        return current
+
+    if not refspecs:
+        cur = current_branch()
+        if cur in defaults:
+            raise Block(PUSH, cur, "git push to the default branch is not allowed for workers", form)
+        allowed.append((cur, form))
+        return
+    targets = []
+    for spec in refspecs:
+        if "$" in spec or "`" in spec or "*" in spec:
+            raise Block(PUSH, None, "git push with an unresolvable refspec is not allowed for workers "
+                                    "(name the branch literally or use HEAD)", form)
+        spec = spec.lstrip("+")
+        src, sep, dst = spec.partition(":")
+        if not sep or not dst:
+            dst = src
+        if dst in ("HEAD", "@"):
+            dst = current_branch()
+        if dst.startswith("refs/heads/"):
+            dst = dst[len("refs/heads/"):]
+        if dst in defaults:
+            raise Block(PUSH, dst, "git push to the default branch is not allowed for workers", form)
+        targets.append(dst)
+    allowed.append((targets[0], form))
+
+
+def analyse(text, cwd, allowed, depth=0):
+    nested = depth > 0
+    if depth > MAX_DEPTH:
+        if mentions_risk(text):
+            raise Block(UNPARSEABLE, None, "unparseable git/gh command (nesting too deep)")
+        return
+    for body in substitutions(text):
+        analyse(body, cwd, allowed, depth + 1)
+    try:
+        toks = tokens(text)
+    except ValueError:
+        if mentions_risk(text):
+            raise Block(UNPARSEABLE, None, "unparseable git/gh command")
+        return
+    segs = segments(toks)
+    for seg in segs:
+        argv, via_xargs = strip_wrappers(seg)
+        if not argv:
+            continue
+        base = os.path.basename(argv[0])
+        if nested:
+            form = "sh-c"
+        elif len(segs) > 1:
+            form = "compound"
+        elif len(argv) != len(seg) or argv[0] != base:
+            form = "other"
+        else:
+            form = "plain"
+        if base in ("cd", "pushd"):
+            target = next((a for a in argv[1:] if not a.startswith("-")), "~")
+            cwd = resolve(cwd, target)
+        elif base in SHELLS:
+            for k, a in enumerate(argv[1:], 1):
+                if re.match(r"^-[A-Za-z]*c[A-Za-z]*$", a) and k + 1 < len(argv):
+                    analyse(argv[k + 1], cwd, allowed, depth + 1)
+                    break
+        elif base == "eval":
+            analyse(" ".join(argv[1:]), cwd, allowed, depth + 1)
+        elif base == "gh":
+            check_gh(argv[1:], form)
+        elif base == "git":
+            if via_xargs and "push" in argv[1:]:
+                raise Block(PUSH, None, "git push via xargs is not allowed for workers (refspec not visible)", form)
+            check_git(argv[1:], cwd, form, allowed)
+        elif base in ("curl", "wget", "http", "https", "xh"):
+            check_http(argv[1:], form)
+
+
+# ---- output ---------------------------------------------------------------------
+
+def log(payload, rule, target, form, decision):
+    """Append one O9 record. Never raises; never records command text."""
+    try:
+        path = os.environ.get("SQUAD_GUARD_LOG") or os.path.expanduser(
+            "~/.local/state/claude-openrouter/guard.jsonl")
+        d = os.path.dirname(path)
+        os.makedirs(d, mode=0o700, exist_ok=True)
+        os.chmod(d, 0o700)
+        entry = {
+            "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+            "session_id": payload.get("session_id"),
+            "cwd": payload.get("cwd"),
+            "rule": rule,
+            "target": target,
+            "form": form,
+            "decision": decision,
+        }
+        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as f:
+            os.fchmod(f.fileno(), 0o600)
+            f.write(json.dumps(entry) + "\n")
+    except Exception as e:  # logging must never change the decision
+        print(f"claude-openrouter-guard: log write failed: {type(e).__name__}", file=sys.stderr)
+
+
+def deny(payload, b):
+    log(payload, b.rule, b.target, b.form, "block")
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": f"claude-openrouter-guard ({b.rule}): {b.detail}",
+    }}))
+    sys.exit(0)
+
+
+def main():
+    raw = sys.stdin.read()
+    try:
+        payload = json.loads(raw)
+        if not isinstance(payload, dict):
+            raise ValueError("not an object")
+    except ValueError:
+        if mentions_risk(raw):
+            deny({}, Block(UNPARSEABLE, None, "unparseable hook input"))
+        return
+    if payload.get("tool_name") != "Bash":
+        return
+    command = (payload.get("tool_input") or {}).get("command")
+    if not isinstance(command, str) or not command:
+        return
+    cwd = payload.get("cwd") or os.getcwd()
+    allowed = []
+    try:
+        analyse(command, cwd, allowed)
+    except Block as b:
+        deny(payload, b)
+    except Exception as e:  # fail closed on a guard bug when the text looks risky
+        if mentions_risk(command):
+            print(f"claude-openrouter-guard: internal error: {type(e).__name__}", file=sys.stderr)
+            deny(payload, Block(UNPARSEABLE, None, "unparseable git/gh command (guard error)"))
+        return
+    for target, form in allowed:
+        log(payload, PUSH, target, form, "allow")
+
+
+if __name__ == "__main__":
+    main()
