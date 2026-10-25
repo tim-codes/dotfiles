@@ -134,7 +134,7 @@ The liaison proposes; you rule. On `msg.concierge` with `data.kind`
 policy table (`squad-liaison` §4) for its `class`, the client's `mode` and
 that presence, and answer by that row alone:
 ```
-squad send liaison --from concierge --data "$(jq -nc --arg mail "<m-id>" \
+squad send liaison "liaison_decision <m-id>" --from concierge --data "$(jq -nc --arg mail "<m-id>" \
   --arg decision "<auto|tim|ignore>" --arg action "<action>" --arg rule "<class>" \
   --argjson attending <true|false> \
   '{kind:"liaison_decision",mail:$mail,decision:$decision,action:$action,rule:$rule,attending:$attending}')"

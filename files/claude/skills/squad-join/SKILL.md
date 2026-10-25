@@ -512,7 +512,7 @@ delegate the follow-up with `--rework-of <id>`.
 Only the liaison sends email. To have mail sent, write the body to a file and
 send the liaison a brief (`squad-liaison` §9 for the shape):
 ```
-squad send liaison --from <name> --data '{"kind":"mail_request","to":["<addr>"],"subject":"<s>","body_file":"<path>","why":"<one line>"}'
+squad send liaison "mail_request: <subject>" --from <name> --data '{"kind":"mail_request","to":["<addr>"],"subject":"<s>","body_file":"<path>","why":"<one line>"}'
 ```
 or delegate a job needing `comms` (§6b). Never call `squad mail send` or
 use any mail credential yourself.

@@ -605,11 +605,10 @@ incapable one. The record keeps `assigned_by` (you or `broker`).
   (`--need review`) and auto-fixes (`--need code`, branch `job/<id>`); route
   both as any job. Route an auto-fix branch on to the client's `owner`
   member (tpe-seo, rena-parity; ario-golive once H2 is enabled), never to
-  the liaison or the job worker. The owner reviews it through a reviewer
-  subagent and merges only under its own `SQUAD_MERGE_AUTHORITY`. Where the
-  merge deploys production (TPE), it stops at the reviewed PR for Tim; you
-  never deploy production unattended. Sanity content stays an unpublished
-  draft.
+  the liaison or the job worker. The owner's review and merge rules, including
+  that a production-deploying merge waits for Tim, are in `squad-join`
+  "Mail"; you never deploy production unattended. Sanity content stays an
+  unpublished draft.
 - Job traffic is not for Tim: nothing here goes through the concierge unless
   it becomes an operator item.
 - For a job you route that needs a Claude reviewer, assign a Claude
