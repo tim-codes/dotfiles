@@ -121,6 +121,7 @@ $DOTFILES_ROOT/scripts/cargo-update
 # gcloud: python 3.12 virtualenv with numpy (and compiled crcmod for gsutil,
 # which gcloud installs into the virtualenv itself)
 $DOTFILES_ROOT/scripts/gcloud-setup
+$DOTFILES_ROOT/scripts/pwsh-modules
 
 # add fonts
 $DOTFILES_ROOT/scripts/install-fonts-mac

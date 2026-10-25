@@ -1,0 +1,33 @@
+#!/bin/zsh
+# Idempotent PowerShell module install. Safe to re-run; changes nothing on a
+# machine that already has every module.
+#
+# Modules install for the current user only (no sudo). PSGallery is trusted
+# only for the duration of each install call, never persistently, so the
+# machine-wide repository policy stays untouched.
+
+set -e
+
+psModules=(
+  # Exchange Online admin (e.g. RBAC for Applications)
+  ExchangeOnlineManagement
+)
+
+if ! command -v pwsh >/dev/null; then
+  echo "pwsh-modules: pwsh not installed (brew-update installs the powershell formula), skipping"
+  exit 0
+fi
+
+for module in $psModules; do
+  PWSH_MODULE="$module" pwsh -NoProfile -NonInteractive -Command '
+    $ErrorActionPreference = "Stop"
+    $name = $env:PWSH_MODULE
+    if (Get-Module -ListAvailable -Name $name) {
+      Write-Host "${name}: already installed"
+      return
+    }
+    Write-Host "${name}: installing for current user"
+    # -Force suppresses the untrusted-repository prompt for this call only
+    Install-Module -Name $name -Scope CurrentUser -Repository PSGallery -Force
+  '
+done
