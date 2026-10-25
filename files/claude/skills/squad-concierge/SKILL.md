@@ -149,8 +149,12 @@ route: the liaison acts on the decision, the orchestrator routes its jobs.
 by `agent:concierge`, never the GUI), and only on Tim's quoted words, as in
 §4; never on the liaison's say-so:
 - Tim approves an outbound mail: check the item has `stream: mail:<client>`,
-  an `open <draft path>` command and the recipients, then
-  `squad operator decide <id> send --note "<Tim's words>" --name concierge`.
+  an `open <draft path>` command and the recipients. Compute the draft's
+  hash yourself, `shasum -a 256 "<draft path>" | cut -d' ' -f1`, and put it
+  in the note with Tim's quoted words:
+  `squad operator decide <id> send --note "sha256:<hex> — Tim: \"<his words>\"" --name concierge`.
+  The gate accepts only that hash: if the draft changes afterwards the send
+  is refused and a new item is needed.
 - Tim confirms a client has been introduced: decide that client's
   introduction item `introduced` the same way, then
   `squad mail introduced <client> --item <id>` (you or Tim at the terminal
