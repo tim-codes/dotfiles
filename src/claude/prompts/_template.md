@@ -37,10 +37,15 @@ Values may run long. A comment after `context` is fine: only its first word coun
                 contexts file lists in `account_bound` (m365, figma, notion, agent-run,
                 datadog, boards) must be provided by the context; an unmet one exits 9
   harness       optional, default claude-code; must equal the context's harness (else exit 5)
-  role          optional: client (default) | herder | concierge | orchestrator | infra
-  lifetime      optional: run | task; default task for a client, else run
-  capabilities  optional comma list, passed to the herder via --dry-run
-  env-pass      optional comma list of variable names the herder forwards from its environment
+  role          optional: client (default) | herder | concierge | orchestrator | infra;
+                the herder reads it from --dry-run to order launches
+  lifetime      optional: run | task; default task for a client, else run. `run` members
+                stay up for the whole run (managers, liaison, dashboard)
+  harness       optional, default claude-code (listed again for completeness)
+  needs         the account_bound connectors the context must provide (see above)
+  capabilities  optional comma list (e.g. comms), passed to the herder via --dry-run
+  env-pass      optional comma list of variable names the herder forwards from its
+                environment (names only, never values)
   add_dirs      optional comma or space separated paths (~ expanded), each passed as
                 `--add-dir`, so the member can read and write brief and report files outside
                 its cwd without prompts; each must exist (else exit 3)
@@ -50,8 +55,12 @@ Values may run long. A comment after `context` is fine: only its first word coun
   base          base branch the work starts from (and PRs target), if not main
   depends       other streams or PRs that must land before this one starts or merges
   tickets       the tickets in scope, in the order to take them
-  before-launch the human steps that must happen first (a pull, a consent, a merge);
-                `none` if there are none (`before launch` with a space reads the same)
+  before-launch ONLY human steps that must happen first (a consent, a merge, a device
+                code); `none` if there are none (`before launch` with a space reads
+                the same). Repo commands such as `git pull --ff-only` are NOT listed
+                here: they are the member's own first step, in the body. The herder
+                never runs commands in a member's repo, and `squad herd launch` exits 10
+                unless the orchestrator says Tim has cleared the listed steps.
 -->
 
 <!--
@@ -86,7 +95,7 @@ Brand: <exact brand and client names>.
 Transcripts and handoffs: <where they live>.
 Auth seam: <who owns what>.
 
-1. <First step: usually preflight and operator pre-enumeration, then the first ticket.>
+1. <First step: your own repo set-up (e.g. `git pull --ff-only`; you own your worktree and resolve any conflict), preflight and operator pre-enumeration, then the first ticket.>
 2. <Next step, with the ticket key, the acceptance check and what to report back.>
 3. <Production or irreversible steps: quote Tim's words granting the authority, and the
    evidence required before using it.>
