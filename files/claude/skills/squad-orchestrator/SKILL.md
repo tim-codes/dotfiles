@@ -69,6 +69,7 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    squad subscribe orchestrator msg.role.orchestrator
    squad subscribe orchestrator msg.all
    squad subscribe orchestrator squad.directive --priority now
+   squad subscribe orchestrator squad.member
    squad subscribe orchestrator operator.item --priority next
    ```
    (`squad.directive` requires squad built from PR S1 or later;
@@ -141,9 +142,20 @@ transition to busy while `pct ≥ 85`, not only on threshold crossings.
 
 **Delivery priority:** only the orchestrator's `squad send --priority now`
 interrupts a busy member (others are downgraded to `next`); critical
-`host.pressure` is always `now`. Reserve `now` for `pause` at level 100 and
-`heavy_slot revoke` on critical pressure. A broker restart drops held turns:
-after a `kickstart`, re-send any pending `pause`/`resume`.
+`host.pressure` is always `now`. Control directives (`pause`, `resume`,
+`priority`, `fanout` and `heavy_slot revoke`) are always sent with
+`--ack-deadline-s 120`: that makes them ack-gated, so the broker delivers them
+at once instead of holding them behind a busy member's batch (a `resume` loop
+below carries it too). `now` stays reserved for level 100 and critical
+pressure.
+
+**Held turns.** Subscribe to `squad.member` and act on `data.event ==
+"held_long"` (fields `name`, `count`, `oldest_age_s`, `reason`
+`prompt|not_live|busy`). Tell Tim one line: member, count, age, reason. If the
+reason is `prompt`, raise an operator item (§2c): the member is waiting on a
+permission prompt only Tim can answer. A `joined` event is a new member; an
+`updated` event (with `changed`) is the same session re-registering, not a
+second member.
 
 **Level 100** going up: pause every member of `A`, top priority and
 non-deploying infra included (`--priority now`, `--ack-deadline-s 120`);
@@ -155,9 +167,9 @@ window is at or above 90%, resume every `paused` entry for `A` with `by:
 `run_in_background` command (a foreground `sleep` is refused):
 ```
 for m in <top> <next> …; do squad send "$m" "resume" --from orchestrator \
-  --data '{"directive":"resume"}'; sleep 60; done
+  --ack-deadline-s 120 --data '{"directive":"resume"}'; sleep 60; done
 ```
-Resumes need no ack. Remove them from `paused`, publish the plan, tell Tim.
+Remove them from `paused`, publish the plan, tell Tim.
 Members Tim paused himself (no plan entry) are his to resume.
 
 ## 2a. Idle members with leftover processes
@@ -327,6 +339,11 @@ highest-priority requester in `queue`; else deny with a retry time.
 squad send <member> "heavy_slot grant" --from orchestrator --data '{"directive":"heavy_slot","decision":"grant"}'
 squad send <member> "heavy_slot deny" --from orchestrator --data '{"directive":"heavy_slot","decision":"deny","retry_after_s":<s>}'
 ```
+A revoke is a control directive, so it is ack-gated (§2, §8):
+```
+squad send <member> "heavy_slot revoke" --from orchestrator --ack-deadline-s 120 \
+  --data '{"directive":"heavy_slot","decision":"revoke"}'
+```
 A grant expires at `est_minutes × 2`: arm a background timer (`sleep <s>;
 squad send orchestrator "heavy_slot expired: <member>" --from cli --data
 '{"kind":"heavy_slot_expired","member":"<member>"}'`); expiry = released. On `release`: drop the grant, grant the next in `queue`.
@@ -435,7 +452,7 @@ sonnet) so you see only the summary; its brief carries:
 - **Stale members**: roster members whose last `squad set` is older than 2h
   while `jq -r .status <req.config_dir>/sessions/<req.pid>.json` is `idle`
   (usually a finished or stalled stream). Report-only.
-- **Debug retention**: remove date-named dirs under
+- **Debug retention**: remove run dirs under
   `~/.local/state/squad/debug/` older than 14 days (`find … -mindepth 1
   -maxdepth 1 -type d -mtime +14`; never `debug.on`), listing each.
 
@@ -473,8 +490,9 @@ each admin step" by default.
 ## 8. Messages you receive
 
 Directives you send, defined client-side in `squad-join` §5: `pause`,
-`resume`, `priority`, `heavy_slot`, `review` (§7a), `infra`, `cleanup` (§2a)
-and `preflight` (§2b). `pause`/`priority` carry an ack deadline (§2).
+`resume`, `priority`, `fanout`, `heavy_slot`, `review` (§7a), `infra`, `cleanup` (§2a)
+and `preflight` (§2b). `pause`, `resume`, `priority`, `fanout` and `heavy_slot` revoke carry an ack
+deadline (§2).
 
 A message turn's JSON is `{"from":…,"text":…,"data":{…}}`; client →
 orchestrator messages carry `data.kind`: `pr_ready`, `heavy_slot` (`action`
@@ -487,19 +505,21 @@ is idle. At session end: `squad deregister orchestrator`.
 ## 9. Debug mode (`--debug`)
 
 At start-up, before §1 step 4, only when started with `--debug`:
-1. `squad debug on` (`squad debug off` is Tim's call, not yours). Tell Tim
-   once that capture lands in `~/.local/state/squad/debug/<date>/` and that
-   `/squad-debug-review` reads it; §6 prunes dirs over 14 days.
+1. Pick a run id (today's date, or `<date>-2` for a second run that day) and
+   `squad debug on --run <id>` (`squad debug off` is Tim's call, not yours).
+   `squad debug dir` then prints the run's capture dir. Tell Tim once that
+   capture lands there and that `/squad-debug-review` reads it; §6 prunes dirs
+   over 14 days.
 2. Session id: pid = basename of `$CLAUDE_CODE_MESSAGING_SOCKET`; `jq -r
    .sessionId "$CLAUDE_CONFIG_DIR/sessions/<pid>.json"` (missing: use
    `$CLAUDE_CODE_SESSION_ID`, and say so). Publish the gauge with that
    `session_id` and `"debug":true` so the review finds your transcript.
-3. After **every** directive you send (pause, resume, priority, heavy_slot,
-   infra, cleanup) and every `squad.directive` `unacked` or `escalated`
+3. After **every** directive you send (pause, resume, priority, fanout,
+   heavy_slot, infra, cleanup) and every `squad.directive` `unacked` or `escalated`
    event (member, directive_id, age_s, action), in the same turn append to
-   today's decision log:
+   the run's decision log:
    ```
-   d=~/.local/state/squad/debug/$(date +%F); mkdir -p "$d"; cat >> "$d/orchestrator-decisions.md" <<'EOF'
+   d=$(squad debug dir) && mkdir -p "$d" && cat >> "$d/orchestrator-decisions.md" <<'EOF'
    ## <ISO ts> <directive> → <member>
    Why: <reasoning, with the quota / host numbers acted on>
    Triggered by: <squad-message> seq <n>[, <n>] (topic)
