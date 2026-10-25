@@ -11,7 +11,9 @@ SRC_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WRAP="$SRC_REPO/src/bin/squad-watch-mail-launch"
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
-mkdir -p "$T/bin"
+mkdir -p "$T/bin" "$T/home/.config/exxo"
+touch "$T/home/.config/exxo/unattended.env"
+export HOME="$T/home"
 fail=0
 ok() { echo "ok   $1"; }
 bad() { echo "FAIL $1"; fail=1; }
@@ -26,7 +28,7 @@ STUB
 # A stub `squad` that records its argv and whether the token arrived.
 cat > "$T/bin/squad" <<'STUB'
 #!/bin/bash
-{ echo "argv: $*"; [ "${OP_SERVICE_ACCOUNT_TOKEN:-}" = "fake-sa-token" ] && echo "token: yes"; } > "$SQUAD_OUT"
+{ echo "argv: $*"; echo "envfile: ${AGENT_ENV_FILE:-}"; [ "${OP_SERVICE_ACCOUNT_TOKEN:-}" = "fake-sa-token" ] && echo "token: yes"; } > "$SQUAD_OUT"
 STUB
 chmod +x "$T/bin/security" "$T/bin/squad"
 
@@ -34,6 +36,7 @@ export SQUAD_OUT="$T/out"
 out="$(PATH="$T/bin:/usr/bin:/bin" FAKE_TOKEN=fake-sa-token bash "$WRAP" 2>&1)"; rc=$?
 [ "$rc" = 0 ] && ok "starts when the item exists" || bad "starts when the item exists (rc=$rc)"
 grep -qx "argv: watch mail" "$T/out" && ok "runs squad watch mail" || bad "runs squad watch mail"
+grep -qx "envfile: $T/home/.config/exxo/unattended.env" "$T/out" && ok "AGENT_ENV_FILE points at unattended.env" || bad "AGENT_ENV_FILE"
 grep -qx "token: yes" "$T/out" && ok "token reaches squad in OP_SERVICE_ACCOUNT_TOKEN" || bad "token reaches squad"
 case "$out" in *fake-sa-token*) bad "token printed" ;; *) ok "token never printed" ;; esac
 
@@ -42,5 +45,10 @@ out="$(PATH="$T/bin:/usr/bin:/bin" FAKE_TOKEN= bash "$WRAP" 2>&1)"; rc=$?
 [ "$rc" = 78 ] && ok "exits 78 without the item" || bad "exits 78 without the item (rc=$rc)"
 [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = 1 ] && ok "one error line" || bad "one error line: $out"
 [ ! -e "$T/out" ] && ok "squad not started" || bad "squad started without a token"
+
+rm -f "$T/out" "$T/home/.config/exxo/unattended.env"
+out="$(PATH="$T/bin:/usr/bin:/bin" FAKE_TOKEN=fake-sa-token bash "$WRAP" 2>&1)"; rc=$?
+[ "$rc" = 78 ] && [ ! -e "$T/out" ] && ok "exits 78 without unattended.env" || bad "missing unattended.env (rc=$rc)"
+[ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" = 1 ] && ok "one error line for it" || bad "one error line: $out"
 
 exit "$fail"
