@@ -83,7 +83,9 @@ squad register --name <name> --role client --priority <1-5, default 3> \
 `--capabilities` lists the kinds of delegated work you will take (`code`,
 `review`, `integration`): work tags, never model names. `--model` is the model
 this session actually runs on (e.g. `claude-opus-5-5`, `moonshotai/kimi-k3`).
-Pass both when you serve jobs (§6c) and whenever you know them; omit
+A Claude member whose context provides `agent-run` (exxo, exxo-personal)
+adds `credentials` to its capabilities, so `--need <work>,credentials` can
+match it; K3 members never do. Pass both when you serve jobs (§6c) and whenever you know them; omit
 `--capabilities` for a stream that takes none. Pool members register
 `--role client`.
 
@@ -455,7 +457,7 @@ fill every field:
 ```
 # Job brief: <title>
 Goal: <what done looks like, one paragraph>
-Repo: <absolute path>   base_sha: <sha>   (gh -R <owner/name> for GitHub)
+Repo: <absolute path>   base_sha: <sha>   (job id: leave `<id>`; the worker uses its own job id)   (gh -R <owner/name> for GitHub)
 Files in scope: <paths; nothing outside them>
 Acceptance: <tests, with the exact command, e.g. `just check`>
 Environment:
@@ -478,14 +480,21 @@ any time.
   and send `pr_ready` as usual (§6). The merge path is unchanged: orchestrator
   review, then the member, infra or Tim, as ENG-338 settles. Never ask the
   worker to open or merge anything.
+- **K3 test integrity.** When the result came from a K3 worker (the `worker`'s
+  `.req.model` in `squad roster`, or the model on the job record) and its diff
+  changes existing test assertions or inputs, review it yourself against the
+  brief (or with a Claude reviewer subagent); do not accept a pool review of
+  it. Record `k3-integrity: flagged <job> <files>` or `k3-integrity: clean`
+  in your report.
 - `failed`: read `reason`. `budget`: re-delegate later or do it locally.
   `needs_operator`: the linked operator item is with Tim; wait for its
   resolution. `worker_lost`: re-delegate or do it locally. `needs_credentials`
   or `needs_merge`: re-delegate to a Claude member (`--need <work>,credentials`)
   or do it locally; the orchestrator will not do this for you. Any other
   reason: do it locally.
-- A `timeout` reason means the job ran out of time; a `late` result may still
-  follow with the branch.
+- `timeout` (status set by the broker): reason `timeout` means the job ran
+  out of time (a `late` result may still follow with the branch); `unrouted`
+  means nobody took it. Do it locally, or re-delegate with a later deadline.
 
 **Close the loop in the same turn.** After integrating or rejecting a
 result, record the verdict:
@@ -507,8 +516,9 @@ On `job_assigned`: if the message has an `ack_required:` trailer, ack it as
 the first action (§5), then `squad set --name <name> --status working
 --detail "job <id>"`.
 
-1. Read the brief at `brief_path`. Create your own worktree from
-   `workspace.repo` at `workspace.base_sha`: `git -C <repo> worktree add
+1. Read the brief at `brief_path` and take `workspace` (both under `data.job`
+   in the turn). Create your own worktree from `workspace.repo` at
+   `workspace.base_sha`: `git -C <repo> worktree add
    <repo>-<id> -b job/<id> <base_sha>`, then `worktree-copy-local-env
    <repo>-<id>`.
 2. Work test-first, commit as you go, then `git push -u origin job/<id>`.
@@ -554,8 +564,9 @@ kickoff):
 
 ```
 Join the squad with the squad-join skill. Register with
---capabilities <code,review> --model <model id> and the default
-subscriptions (§3). Then serve jobs per §6c; do no other work.
+--capabilities <code,review[,credentials]> --model <model id> and the
+default subscriptions (§3); `credentials` only for a Claude member with
+agent-run, never K3. Then serve jobs per §6c; do no other work.
 ```
 
 ## 7. Keeping state honest
