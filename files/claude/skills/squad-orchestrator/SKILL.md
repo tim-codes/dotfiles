@@ -367,15 +367,25 @@ sonnet) so you see only the summary; its brief carries:
   idle over 8h with no squad registration and members gone past the grace
   period.
 - **Dangling subagents**: per context (`~/.claude-*`) scan
-  `<CONFIG_DIR>/projects/*/<session>/subagents/agent-*.meta.json` (the
-  sibling `agent-<id>.jsonl` is the transcript; the meta has no timestamps).
-  "Started, no completion" = transcript first line older than 2h, **and**
-  mtime stale or last assistant record without `stop_reason: end_turn`,
-  **and** the parent `<session>.jsonl` shows no result or
-  `<task-notification>` for the `toolUseId` / agent id after the launch
-  acknowledgement. Skip sessions whose `sessions/<pid>.json` is `busy`. List
-  each hit (context, project, session, agent id, `description`, age);
-  report-only.
+  `<CONFIG_DIR>/projects/*/<session>/subagents/agent-*.meta.json`; the meta
+  holds `toolUseId` (the id of the launching `Agent` tool_use) and
+  `description`. A subagent is dangling iff the parent session transcript
+  `<CONFIG_DIR>/projects/*/<session>.jsonl` has no `tool_result` record whose
+  `tool_use_id` equals that `toolUseId`. Two wrinkles: a background launch
+  gets an immediate `tool_result` too, the "Async agent launched" ack
+  (`toolUseResult.status == "async_launched"`), which does not count; it
+  finishes with a `<task-notification>` carrying the id instead. And a
+  subagent launched by another subagent (`spawnDepth` 2+) has its launch in
+  that subagent's transcript, so search `<session>.jsonl` plus
+  `<session>/subagents/agent-*.jsonl` (`$T`). With `$ID` the `toolUseId`, it
+  is NOT dangling if either of these finds something:
+  `jq -e --arg id "$ID" 'select(.type=="user" and (.toolUseResult.status? //
+  "") != "async_launched") | .message.content | arrays | .[] |
+  select(.type=="tool_result" and .tool_use_id==$id)' $T` or
+  `grep -q "<tool-use-id>$ID</tool-use-id>" $T`. Skip sessions whose
+  `sessions/<pid>.json` is `busy`. List each hit (context, project, session,
+  agent id, `description`, age from the first line's `timestamp` in
+  `agent-<id>.jsonl`); report-only, never act.
 - **Stale members**: roster members whose last `squad set` is older than 2h
   while `jq -r .status <req.config_dir>/sessions/<req.pid>.json` is `idle`
   (usually a finished or stalled stream). Report-only.
