@@ -193,7 +193,7 @@ line.
 | `admit` | `{pr}` | squash-merge your own reviewed PR into the trunk with `squad-pr-merge <n> --repo <owner/name> --into-trunk`; run it only on this directive, never on your own initiative. Any Claude member may admit; no merge grant is needed (`--land` needs the merge grant: members never land) |
 | `trunk_failure` | `{trunk, commit, pr, tests, log_path}` | a gate failure attributed to your commit. Reproduce it with the focused command for `tests` (§6a — never rerun the full suite), fix forward with a PR into the trunk, then reply `trunk_fix` (`"kind":"trunk_fix","trunk":…,"pr":<n>`). A failure that is not yours goes back to the orchestrator with the reason |
 | `delegate_mode` | `{mode: "pool"\|"local", needs: [code, review]}` | ack first (it carries `--ack-deadline-s`, as `priority` does). `pool`: route new implementer and reviewer work that would have gone to a subagent through `squad delegate` (§6b) instead, for the listed `needs`, until a `local` arrives. `local`: back to subagents. Work already running finishes where it is |
-| `relaunch` | reserved | not implemented; reply that it is unsupported |
+| `pause` with `"relaunch":true` | `{reason, relaunch:true}` | the herder is moving you to another account (see **Relaunch** below) |
 
 **Acknowledge first.** A message carrying a trailer line `ack_required:
 <seq> topic=<topic>` must be acknowledged as the first action of the turn,
@@ -239,6 +239,26 @@ It limits parallelism and models only, not what your work is.
 **Resume**: run `squad roster` and re-read your own `detail`; pick up from
 the next step it names; `squad set --name <name> --status working
 --detail "<resumed: …>"`.
+
+**Relaunch.** A `pause` whose data has `"relaunch":true` is the checkpoint
+for an account move: run the pause procedure above exactly as written,
+except that running subagents and background shells are left alone — never
+killed to comply. Then report your readiness to the herder:
+
+```
+squad send herder "relaunch ready" --from <name> \
+  --data '{"kind":"relaunch_ready","ready":<bool>,"subagents":<n>,"background":<n>,"reason":"..."}'
+```
+
+`ready` is true only with nothing running (`subagents` and `background`
+both 0); with live work, say false with the counts and a `reason`, and the
+herder sends `resume` and defers the move. On a ready reply the herder
+exits the session and resumes it on the other account. When the relaunch
+note arrives, run §2's `squad register` again with the same name and
+session, re-subscribe (§3), re-read your `detail`, `squad set --name
+<name> --status working --detail "<resumed: …>"` and carry on. If the new
+context lacks a connector the stream later needs (M365, Datadog), raise
+`blocked` to the orchestrator (§6); never start a login yourself.
 
 ## 5a. Preflight
 
