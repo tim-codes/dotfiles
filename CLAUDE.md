@@ -23,6 +23,7 @@ This is a personal dotfiles repository for macOS and Linux development environme
 - `~/dev/dotfiles/scripts/cargo-update` - Update Rust packages
 - `~/dev/dotfiles/scripts/firefox-prefs` - Link codified Firefox prefs into each installation's active profile (only needed for a new profile/machine; the link means repo edits apply on Firefox restart)
 - `restow` - Update symlinks after adding new files to src/
+- `claude-kickoff <prompt.md> [--account A] [--resume ID] [--dry-run]` - Launch a Claude session from a kickoff prompt file (frontmatter `cwd/context/model/effort`, body as the prompt); the only launcher the squad herder calls. Source `scripts/claude-kickoff`, on PATH via the `src/bin` symlink; exit codes in `--help`; test `bash tests/claude-kickoff.sh`. The prompt template stows to `~/claude/prompts/_template.md` (`src/claude/prompts/`)
 - `~/dev/dotfiles/scripts/tmux-plugins [--update]` - Converge tmux plugins on `.tmux.conf` (install missing, remove dropped, build tmux-home); called by setup-macbook and deps-up
 
 ### Development

@@ -1,0 +1,268 @@
+#!/bin/bash
+# Launch a Claude Code session from a kickoff prompt file: read its frontmatter,
+# cd to the working directory, and exec claude in the right account context with
+# the stated model and effort. It is the ONLY launcher the squad herder calls
+# (docs/superpowers/specs/2026-10-25-squad-herder-design.md in tim-codes/squad,
+# section 4.3), so the interface and exit codes below are a stable contract.
+#
+#   claude-kickoff <prompt.md> [--account CONTEXT]
+#                              [--resume <session_id>] [--dry-run]
+#
+# The context wrappers (claude-personal, claude-exxo, claude-exxo-personal,
+# claude-exxo-openrouter) are
+# fish functions (src/.config/fish/common.fish, __claude_ctx), not executables, so
+# this does not call them. It reproduces their whole effect instead: `env
+# CLAUDE_CONFIG_DIR=<context dir> claude ...`, plus the wrapper's guard that never
+# starts a session in $HOME or a context dir (redirected to ~/claude). That is
+# more robust than `fish -c`: no fish startup per launch, no second layer of
+# argument quoting around a multi-kilobyte prompt body, no dependence on fish
+# existing on the box, and exec replaces this process so the herder's pane runs
+# claude directly. The context table and scrub list below must stay in step with
+# those functions; tests/claude-kickoff.sh fails when they drift (the drift guard).
+set -uo pipefail
+
+# Known contexts (config dir ~/.claude-<name>). Must equal the context dirs in
+# __claude_ctx and the claude-<name> wrappers in src/.config/fish/common.fish.
+CONTEXTS="personal exxo exxo-personal exxo-openrouter"
+# Env the wrapper unsets for every context except exxo-openrouter, whose overlay
+# routes through OpenRouter; any other context must never inherit it.
+OPENROUTER_ENV="ANTHROPIC_BASE_URL ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_SONNET_MODEL ANTHROPIC_DEFAULT_HAIKU_MODEL ANTHROPIC_DEFAULT_FABLE_MODEL CLAUDE_CODE_SUBAGENT_MODEL"
+
+usage() {
+    cat <<'EOF'
+Usage: claude-kickoff <prompt.md> [--account CONTEXT]
+                                  [--resume <session_id>] [--dry-run]
+
+Reads the frontmatter of <prompt.md>, changes to its cwd and execs claude in the
+matching account context with --model and --effort from the file. A new session
+gets the prompt body as its single positional argument; --resume continues an
+existing session instead and passes no body.
+
+Prompt file format: key: value lines, ended by the first line that is exactly
+`---`; the body is everything after it. A leading `---` line (conventional YAML
+frontmatter, closed by the second `---`) is accepted too. Keys used (others are
+ignored; values may be long free text, only the first word of context, model and
+effort is used):
+  cwd      working directory; ~ is expanded. A bare name (no / or ~) is looked up as
+           the git checkout of that name under ~/dev, at most three
+           levels deep (the shallowest wins; a tie is an error).
+  context  personal | exxo | exxo-personal | exxo-openrouter  (a trailing comment is ignored)
+  model    passed as --model
+  effort   passed as --effort
+  needs    optional, comma or space separated; checked against the context (exit 9):
+             m365 figma notion  claude.ai connectors, exxo context only
+             agent-run          not in exxo-openrouter (its deny rules block agent/run)
+             datadog boards     shared MCP servers, every context except exxo-openrouter
+           other words are ignored
+
+Options:
+  --account A     override the frontmatter context (any of the contexts above)
+  --resume ID     continue session ID (--resume ID --model M --effort E, no body)
+  --dry-run       resolve and validate everything, print the plan (never the body,
+                  only its size) and exit 0 without launching
+  -h, --help      this text
+
+Environment set for claude: CLAUDE_CONFIG_DIR=<context dir>, and
+EXXO_SECRET_CACHE_TTL_SECONDS=43200 unless the caller already set it. Outside
+exxo-openrouter the OpenRouter routing variables are unset, as the wrappers do.
+
+Exit codes (stable):
+  0   launched (never returns: claude is exec'd) / --dry-run succeeded
+  2   usage error: bad or missing argument, unknown --account, malformed --resume id
+  3   prompt file unusable: missing, unreadable, no `---` terminator, or empty body
+      for a new session
+  4   frontmatter lacks a required key (cwd, context, model or effort); the message
+      names it
+  5   invalid value: unknown context, or cwd that does not resolve to one directory
+  6   the context's config dir does not exist (run scripts/claude-contexts)
+  7   the claude binary is not on PATH (nor ~/.local/bin)
+  9   a `needs` entry cannot be met by the context (8 is unused)
+Nothing secret is ever printed; the prompt body is never printed.
+EOF
+}
+
+die() { # die <code> <message...>
+    local code="$1"; shift
+    printf 'claude-kickoff: %s\n' "$*" >&2
+    exit "$code"
+}
+
+prompt="" account="" resume="" dry=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help) usage; exit 0 ;;
+        --account)
+            [ $# -ge 2 ] || die 2 "--account needs a value (exxo, exxo-personal or personal)"
+            account="$2"; shift 2 ;;
+        --account=*) account="${1#--account=}"; shift ;;
+        --resume)
+            [ $# -ge 2 ] || die 2 "--resume needs a session id"
+            resume="$2"; shift 2 ;;
+        --resume=*) resume="${1#--resume=}"; shift ;;
+        --dry-run) dry=1; shift ;;
+        -*) die 2 "unknown option: $1 (see --help)" ;;
+        *)
+            [ -z "$prompt" ] || die 2 "only one prompt file is accepted (got '$prompt' and '$1')"
+            prompt="$1"; shift ;;
+    esac
+done
+
+[ -n "$prompt" ] || { usage >&2; exit 2; }
+case "$account" in
+    "") ;;
+    *) case " $CONTEXTS " in *" $account "*) ;; *) die 2 "unknown --account '$account' (expected one of: $CONTEXTS)" ;; esac ;;
+esac
+if [ -n "$resume" ]; then
+    case "$resume" in
+        *[!A-Za-z0-9_-]*) die 2 "--resume id may only contain letters, digits, '-' and '_'" ;;
+    esac
+fi
+
+[ -f "$prompt" ] && [ -r "$prompt" ] || die 3 "prompt file not found or unreadable: $prompt"
+
+# --- frontmatter -------------------------------------------------------------
+# Line numbers: the frontmatter occupies lines first..last, the body starts after
+# the terminator. Fixture form has no opening `---`; the conventional form does.
+first=1
+IFS= read -r head1 <"$prompt" || true
+if [ "$head1" = "---" ]; then first=2; fi
+term=$(awk -v first="$first" 'NR >= first && $0 == "---" { print NR; exit }' "$prompt")
+[ -n "$term" ] || die 3 "no '---' line ends the frontmatter in $prompt"
+
+fm_get() { # fm_get <key>: first matching `key: value` line in the frontmatter
+    awk -v first="$first" -v last="$term" -v key="$1" '
+        NR < first || NR >= last { next }
+        {
+            i = index($0, ":")
+            if (i == 0) next
+            k = substr($0, 1, i - 1)
+            if (k != key) next
+            v = substr($0, i + 1)
+            sub(/^[ \t]+/, "", v); sub(/[ \t\r]+$/, "", v)
+            print v; exit
+        }' "$prompt"
+}
+first_word() { # first whitespace-separated word of stdin
+    awk '{ print $1; exit }'
+}
+
+cwd_raw=$(fm_get cwd)
+context_raw=$(fm_get context)
+model=$(fm_get model | first_word)
+effort=$(fm_get effort | first_word)
+needs_raw=$(fm_get needs)
+
+[ -n "$cwd_raw" ] || die 4 "frontmatter key 'cwd' is missing or empty in $prompt"
+[ -n "$account" ] || [ -n "$context_raw" ] || die 4 "frontmatter key 'context' is missing or empty in $prompt (or pass --account)"
+[ -n "$model" ] || die 4 "frontmatter key 'model' is missing or empty in $prompt"
+[ -n "$effort" ] || die 4 "frontmatter key 'effort' is missing or empty in $prompt"
+
+# --- context -> config dir (mirrors claude-exxo / claude-exxo-personal / claude-personal)
+ctx="$account"
+[ -n "$ctx" ] || ctx=$(printf '%s\n' "$context_raw" | first_word)
+case " $CONTEXTS " in
+    *" $ctx "*) ;;
+    *) die 5 "unknown context '$ctx' (expected one of: $CONTEXTS)" ;;
+esac
+
+# --- needs: what the context cannot provide -----------------------------------
+# claude.ai connectors follow the logged-in account, so only the exxo context has
+# them; exxo-openrouter denies agent/run and the datadog and boards servers (see
+# files/claude/settings.overlay.exxo-openrouter.json). Unknown words are ignored.
+for need in $(printf '%s\n' "$needs_raw" | tr ',[:upper:]' ' [:lower:]'); do
+    case "$need" in
+        m365|figma|notion) [ "$ctx" = exxo ] || die 9 "needs '$need' (a claude.ai connector) is only available in the exxo context, not $ctx" ;;
+        agent-run|agent/run) [ "$ctx" != exxo-openrouter ] || die 9 "needs '$need' but exxo-openrouter denies agent/run" ;;
+        datadog|boards) [ "$ctx" != exxo-openrouter ] || die 9 "needs '$need' but exxo-openrouter denies that MCP server" ;;
+        *) printf 'claude-kickoff: warning: unknown need %s ignored\n' "'$need'" >&2 ;;
+    esac
+done
+config_dir="$HOME/.claude-$ctx"
+[ -d "$config_dir" ] || die 6 "config dir $config_dir does not exist (run scripts/claude-contexts)"
+
+# --- cwd ---------------------------------------------------------------------
+case "$cwd_raw" in
+    "~")   cwd="$HOME" ;;
+    "~/"*) cwd="$HOME/${cwd_raw#"~/"}" ;;
+    /*)    cwd="$cwd_raw" ;;
+    */*)   die 5 "cwd '$cwd_raw' is neither absolute, ~-relative nor a bare checkout name" ;;
+    *)
+        # A bare name: the one git checkout of that name under ~/dev (depth <= 3).
+        matches=()
+        while IFS= read -r m; do
+            [ -n "$m" ] && [ -e "$m/.git" ] && matches+=("$m")
+        done < <(find "$HOME/dev" -maxdepth 3 \( -name node_modules -o -name .git \) -prune -o \
+                      -type d -name "$cwd_raw" -print 2>/dev/null)
+        [ "${#matches[@]}" -ge 1 ] || die 5 "cwd '$cwd_raw' matches no git checkout under ~/dev"
+        # The shallowest checkout wins (a stale clone deeper down must not shadow
+        # ~/dev/<name>); two at the same depth are ambiguous.
+        best="" nbest=0 bestdepth=99
+        for m in "${matches[@]}"; do
+            d="${m//[^\/]/}"; d=${#d}
+            if [ "$d" -lt "$bestdepth" ]; then best="$m"; bestdepth="$d"; nbest=1
+            elif [ "$d" -eq "$bestdepth" ]; then nbest=$((nbest + 1)); fi
+        done
+        [ "$nbest" -eq 1 ] || die 5 "cwd '$cwd_raw' is ambiguous under ~/dev: ${matches[*]}"
+        cwd="$best" ;;
+esac
+[ -d "$cwd" ] || die 5 "cwd '$cwd' is not a directory"
+cwd=$(cd "$cwd" && pwd -P) || die 5 "cannot enter cwd '$cwd'"
+# The wrappers never start a session in $HOME or a context dir (it would ask to
+# trust the whole home directory); they redirect into ~/claude.
+home_real=$(cd "$HOME" && pwd -P)
+redirect=0
+[ "$cwd" = "$home_real" ] && redirect=1
+for c in $CONTEXTS; do
+    [ "$cwd" = "$home_real/.claude-$c" ] && redirect=1
+done
+if [ "$redirect" -eq 1 ]; then
+    mkdir -p "$home_real/claude" 2>/dev/null
+    cwd="$home_real/claude"
+fi
+
+# --- claude binary -----------------------------------------------------------
+claude_bin=$(command -v claude 2>/dev/null || true)
+if [ -z "$claude_bin" ] && [ -x "$HOME/.local/bin/claude" ]; then claude_bin="$HOME/.local/bin/claude"; fi
+[ -n "$claude_bin" ] || die 7 "claude is not on PATH (nor in ~/.local/bin)"
+
+# --- body --------------------------------------------------------------------
+mode=new body=""
+if [ -n "$resume" ]; then
+    mode=resume
+else
+    # Same as `$(sed '1,/^---$/d' file)`: everything after the terminator, trailing
+    # newlines trimmed by the command substitution.
+    body=$(tail -n +"$((term + 1))" "$prompt")
+    [ -n "$body" ] || die 3 "the prompt body (after the '---' line) is empty in $prompt"
+fi
+
+if [ "$dry" -eq 1 ]; then
+    printf 'mode: %s\n'       "$mode"
+    printf 'context: %s\n'    "$ctx"
+    printf 'config_dir: %s\n' "$config_dir"
+    printf 'cwd: %s\n'        "$cwd"
+    printf 'model: %s\n'      "$model"
+    printf 'effort: %s\n'     "$effort"
+    printf 'needs: %s\n'      "${needs_raw:-none}"
+    if [ "$mode" = resume ]; then
+        printf 'session_id: %s\n' "$resume"
+        printf 'body_bytes: 0 (not passed on resume)\n'
+    else
+        printf 'body_bytes: %s\n' "$(printf '%s' "$body" | wc -c | tr -d ' ')"
+    fi
+    printf 'claude: %s\n'     "$claude_bin"
+    printf 'secret_cache_ttl_seconds: %s\n' "${EXXO_SECRET_CACHE_TTL_SECONDS:-43200}"
+    exit 0
+fi
+
+cd "$cwd" || die 5 "cannot enter cwd '$cwd'"
+export CLAUDE_CONFIG_DIR="$config_dir"
+export EXXO_SECRET_CACHE_TTL_SECONDS="${EXXO_SECRET_CACHE_TTL_SECONDS:-43200}"
+if [ "$ctx" != exxo-openrouter ]; then
+    # shellcheck disable=SC2086
+    unset $OPENROUTER_ENV
+fi
+if [ "$mode" = resume ]; then
+    exec "$claude_bin" --resume "$resume" --model "$model" --effort "$effort"
+fi
+exec "$claude_bin" --model "$model" --effort "$effort" "$body"
