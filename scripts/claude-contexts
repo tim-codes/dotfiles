@@ -11,6 +11,12 @@
 #                            creates the empty dir; scripts/claude-sync
 #                            builds its config from the exxo fragments and
 #                            symlinks its durable state into ~/.claude-exxo.
+#   ~/.claude-exxo-openrouter
+#                            exxo overlay that runs Claude Code against
+#                            OpenRouter (Kimi K3). Built by scripts/claude-sync
+#                            from the exxo fragments plus an overlay settings
+#                            fragment; shares only plugins with ~/.claude-exxo
+#                            and keeps its own transcripts and history.
 #
 # Idempotent: existing files/dirs are never overwritten. Each context is
 # seeded with a settings.json (copied — NOT symlinked — from ~/.claude if one
@@ -31,7 +37,7 @@ adopt=0
 
 legacy="$HOME/.claude"
 
-for ctx in personal exxo exxo-personal; do
+for ctx in personal exxo exxo-personal exxo-openrouter; do
     dir="$HOME/.claude-$ctx"
     mkdir -p "$dir"
 

@@ -131,7 +131,7 @@ SRC_AGENTS="$REPO_DIR/files/claude/agents"
 # context name : fragment account. The fragment account picks which
 # settings.<account>.json / CLAUDE.md.<account> the context is built from —
 # exxo-personal deliberately reuses the exxo fragments (see header).
-CONTEXTS=("personal:personal" "exxo:exxo" "exxo-personal:exxo")
+CONTEXTS=("personal:personal" "exxo:exxo" "exxo-personal:exxo" "exxo-openrouter:exxo")
 
 # The durable state exxo-personal shares back into ~/.claude-exxo. Runtime
 # state (daemon, caches, session-env, shell-snapshots, sessions) and auth
@@ -139,6 +139,12 @@ CONTEXTS=("personal:personal" "exxo:exxo" "exxo-personal:exxo")
 # --adopt-default draws.
 OVERLAY_DIRS=(projects plugins file-history plans tasks todos paste-cache)
 OVERLAY_FILES=(history.jsonl)
+
+# exxo-openrouter is a SECOND overlay with different sharing: it is also built
+# from the exxo fragments, but then merged once more with
+# files/claude/settings.overlay.exxo-openrouter.json (env pointing Claude Code
+# at OpenRouter, a key helper, and worker deny rules). It shares ONLY plugins
+# back into ~/.claude-exxo and keeps its own transcripts, history and plans.
 
 # Deep merge, account fragment wins — EXCEPT the permissions rule arrays.
 # jq's `*` replaces arrays wholesale, so an account fragment carrying
@@ -155,6 +161,25 @@ SETTINGS_MERGE='
         then .permissions[$k] = ($v | reduce .[] as $x ([]; if any(.[]; . == $x) then . else . + [$x] end))
         else . end)
 '
+
+# Build the merged settings for context <name> (fragment account <account>)
+# into <outfile>: shared + account fragment, then, if
+# files/claude/settings.overlay.<name>.json exists, merged again through
+# SETTINGS_MERGE so permission arrays concatenate. Returns 1 if the account
+# fragment is missing.
+build_settings() {
+    local name="$1" account="$2" out="$3"
+    local fragment="$REPO_DIR/files/claude/settings.$account.json"
+    local overlay="$REPO_DIR/files/claude/settings.overlay.$name.json"
+    [ -f "$fragment" ] || return 1
+    if [ -f "$overlay" ]; then
+        jq -s "$SETTINGS_MERGE" "$SRC_SETTINGS_SHARED" "$fragment" > "$out.base"
+        jq -s "$SETTINGS_MERGE" "$out.base" "$overlay" > "$out"
+        rm -f "$out.base"
+    else
+        jq -s "$SETTINGS_MERGE" "$SRC_SETTINGS_SHARED" "$fragment" > "$out"
+    fi
+}
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33mwarn:\033[0m %s\n' "$*"; }
@@ -346,7 +371,7 @@ if [ "$diff_only" = 1 ]; then
             continue
         fi
         info "${ctx/#$HOME/~} vs repo (settings.shared.json + settings.$account.json)"
-        jq -s "$SETTINGS_MERGE" "$SRC_SETTINGS_SHARED" "$fragment" > "$MERGE_TMP"
+        build_settings "$name" "$account" "$MERGE_TMP"
         if diff -u "$ctx/settings.json" "$MERGE_TMP" 2>/dev/null; then
             echo "  identical"
         fi
@@ -371,14 +396,14 @@ fi
 
 # ---- settings: merge shared baseline + account fragment, write if changed ----
 sync_settings() {
-    local account="$1" ctx="$2"
+    local name="$1" account="$2" ctx="$3"
     local fragment="$REPO_DIR/files/claude/settings.$account.json"
 
     if [ ! -f "$fragment" ]; then
         warn "  settings.$account.json missing — skipping settings for this context"
         return
     fi
-    jq -s "$SETTINGS_MERGE" "$SRC_SETTINGS_SHARED" "$fragment" > "$MERGE_TMP"
+    build_settings "$name" "$account" "$MERGE_TMP"
 
     # A symlink here is the old homelab arrangement; replace it with a real file.
     if [ -L "$ctx/settings.json" ]; then
@@ -694,8 +719,9 @@ sync_agents() {
 # would orphan).
 sync_overlay() {
     local ctx="$1" base="$2" entry src dst
+    shift 2
 
-    for entry in "${OVERLAY_DIRS[@]}" "${OVERLAY_FILES[@]}"; do
+    for entry in "$@"; do
         src="$base/$entry"
         dst="$ctx/$entry"
 
@@ -733,13 +759,15 @@ for mapping in "${CONTEXTS[@]}"; do
     fi
     info "${ctx/#$HOME/~}"
 
-    sync_settings "$account" "$ctx"
+    sync_settings "$name" "$account" "$ctx"
     sync_claude_md "$account" "$ctx"
     sync_mcp_servers "$account" "$ctx"
     sync_skills "$name" "$account" "$ctx"
     sync_agents "$name" "$account" "$ctx"
     if [ "$name" = "exxo-personal" ]; then
-        sync_overlay "$ctx" "$HOME/.claude-exxo"
+        sync_overlay "$ctx" "$HOME/.claude-exxo" "${OVERLAY_DIRS[@]}" "${OVERLAY_FILES[@]}"
+    elif [ "$name" = "exxo-openrouter" ]; then
+        sync_overlay "$ctx" "$HOME/.claude-exxo" plugins
     fi
 done
 
