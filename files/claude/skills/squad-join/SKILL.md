@@ -150,7 +150,7 @@ lag (a held turn, a restart), so before you end a turn run `squad history
 have not seen, directives first. Keep the last seen seq per topic in a file
 under the worktree's `.git/` (`$(git rev-parse --git-dir)/squad-seen`), and
 update it each time. Only if there is no worktree, fall back to `squad set
---name <name> --detail` (e.g. `seen msg.<name> 412`).
+--name <name> --detail`, as a compact `topic:seq,…` list (e.g. `seen msg.<name>:412,msg.all:97`).
 
 **Only the broker reaches the concierge.** Send to it with `squad send
 concierge … --from <name>`, never a direct cross-session send (`SendMessage`
