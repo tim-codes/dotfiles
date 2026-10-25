@@ -55,8 +55,9 @@ Messages not arriving: `squad status --pretty` and `squad roster --pretty`.
    `squad send role:orchestrator "infra_ready" --from infra --data
    '{"kind":"infra_ready"}'`. No orchestrator live is fine.
 6. **Merge authority.** If Tim has granted session-scoped merge authority for
-   exxo-infra, he launches this session with `SQUAD_MERGE_AUTHORITY=$(date
-   +%F)` exported. Never set or export it yourself. State at start-up whether
+   exxo-infra, the herder launches it, forwarding `SQUAD_MERGE_AUTHORITY` from the
+   environment Tim launched the herder with (`env-pass`). Never set or export
+   it yourself. State at start-up whether
    it is set (`test -n "$SQUAD_MERGE_AUTHORITY"`: yes or no, never the value).
 7. Tell Tim (one line) you are registered as `infra` and waiting, then end the turn.
    Directives arrive as turns; do not poll.
