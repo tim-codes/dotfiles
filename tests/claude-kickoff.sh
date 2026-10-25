@@ -176,6 +176,17 @@ expect_rc "needs agent-run is unmet in exxo-openrouter" 9 "$T/needs.md" --accoun
 withneeds "Datadog, M365 something-else"
 expect_rc "needs is case-insensitive, comma or space separated, ignores unknown words" 9 "$T/needs.md" --account personal --dry-run
 has "'m365'" && ok "  message names the unmet need" || bad "  message does not name m365: $out"
+withneeds "frobnicate"
+expect_rc "an unknown need still exits 0" 0 "$T/needs.md" --account exxo --dry-run
+has "claude-kickoff: warning: unknown need 'frobnicate' ignored" && ok "  and warns on stderr" || bad "  no warning: $out"
+withneeds "datadog"
+expect_rc "a known need prints no warning" 0 "$T/needs.md" --account exxo --dry-run
+has "warning" && bad "  unexpected warning: $out" || ok "  no warning"
+for c in "$FAKE/.claude-exxo-openrouter" "$FAKE/.claude-exxo"; do
+    sed "s|^cwd: .*|cwd: $c|" "$T/fixture.md" >"$T/ctxcwd.md"
+    expect_rc "cwd in a context dir is redirected" 0 "$T/ctxcwd.md" --dry-run
+    has "cwd: $(cd "$FAKE" && pwd -P)/claude" && ok "  to ~/claude" || bad "  not redirected: $out"
+done
 expect_rc "exxo-openrouter is a known context" 0 "$T/fixture.md" --account exxo-openrouter --dry-run
 has "config_dir: $FAKE/.claude-exxo-openrouter" && ok "  maps to its config dir" || bad "  wrong config dir: $out"
 
