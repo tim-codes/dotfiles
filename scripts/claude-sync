@@ -1,6 +1,7 @@
 #!/bin/bash
 # Distribute repo-managed Claude Code config into every per-account context
-# (~/.claude-personal, ~/.claude-exxo — created by scripts/claude-contexts).
+# (~/.claude-personal, ~/.claude-exxo, ~/.claude-exxo-personal,
+# ~/.claude-exxo-openrouter — created by scripts/claude-contexts).
 #
 # Replaces homelab's projects/macos-common/sync-claude-config.sh. Two changes
 # of substance beyond the move:
@@ -90,6 +91,15 @@
 # quota. Its settings/CLAUDE.md/skills are built from the SAME exxo fragments
 # via the CONTEXTS mapping below, so the two contexts cannot skew.
 #
+# exxo-openrouter is a SECOND overlay context with different sharing: it runs
+# Claude Code against OpenRouter (Kimi K3). Its settings are built from the
+# same exxo fragments, then layered with
+# files/claude/settings.overlay.exxo-openrouter.json (OpenRouter env, key
+# helper, worker deny rules; see build_settings). Unlike exxo-personal it
+# shares ONLY plugins back into ~/.claude-exxo; its transcripts, history,
+# plans, tasks and todos stay its own, so a different model's sessions never
+# mix into the exxo history. CLAUDE.md, skills and agents match exxo's.
+#
 # Usage:
 #   claude-sync            apply settings + CLAUDE.md + MCP servers + skills + agents
 #                          to every context
@@ -140,11 +150,8 @@ CONTEXTS=("personal:personal" "exxo:exxo" "exxo-personal:exxo" "exxo-openrouter:
 OVERLAY_DIRS=(projects plugins file-history plans tasks todos paste-cache)
 OVERLAY_FILES=(history.jsonl)
 
-# exxo-openrouter is a SECOND overlay with different sharing: it is also built
-# from the exxo fragments, but then merged once more with
-# files/claude/settings.overlay.exxo-openrouter.json (env pointing Claude Code
-# at OpenRouter, a key helper, and worker deny rules). It shares ONLY plugins
-# back into ~/.claude-exxo and keeps its own transcripts, history and plans.
+# (exxo-openrouter: see the header — exxo fragments + settings overlay file,
+# plugins-only sharing.)
 
 # Deep merge, account fragment wins — EXCEPT the permissions rule arrays.
 # jq's `*` replaces arrays wholesale, so an account fragment carrying
