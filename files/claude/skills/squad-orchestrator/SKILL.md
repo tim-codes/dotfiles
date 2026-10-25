@@ -280,9 +280,10 @@ changes by Tim or members.
 - **Resolve** one item at a time, when its outcome is known; never close
   or drop in a batch (it loses the true wait times). Tim's Done / Drop /
   Back to agent buttons PATCH the server directly: on `operator.item`
-  `done`, `resume` or `msg` the owner; on `decided`, relay it as above; on `dropped` or `with: agent:<m>`,
-  tell the owner. His chat "done <id>" is your PATCH with
-  `actor:"orchestrator"`.
+  `done`, `resume` or `msg` the owner; on `decided`, relay it as above;
+  on `dropped` or `with: agent:<m>`, tell the owner. His chat "done <id>"
+  is the concierge's to record, on his quoted word; you never PATCH `done`
+  or `dropped` on an approval or action item.
 - **Debug mode**: log each item's raised, presented and resolved times and
   wait minutes to the worklog and `orchestrator-decisions.md`; the morning
   report's "Interruptions" section counts them (total wait, per-stream,
