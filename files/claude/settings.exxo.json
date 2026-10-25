@@ -52,7 +52,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v squad >/dev/null 2>&1 && squad heavy check --hook || true # squad-heavy-gate"
+            "command": "command -v squad >/dev/null 2>&1 && squad heavy check --hook || true # squad-heavy-gate",
+            "timeout": 10
           }
         ]
       }

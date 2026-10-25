@@ -30,6 +30,10 @@ hook_cmd() { jq -r --arg m "$MARK" '[.hooks.PreToolUse[]? | select(.matcher == "
 for ctx in exxo exxo-personal exxo-openrouter; do
     check "$ctx carries the heavy gate" test -n "$(hook_cmd "$ctx")"
 done
+for ctx in exxo exxo-personal exxo-openrouter; do
+    check "$ctx: heavy gate has a 10 s timeout (a timeout is non-blocking, so it fails open)" \
+        test "$(jq -r --arg m "$MARK" '[.hooks.PreToolUse[]? | select(.matcher == "Bash") | .hooks[] | select(.command | endswith($m)) | .timeout] | first' "$(S "$ctx")")" = 10
+done
 check "personal has no heavy gate" test -z "$(hook_cmd personal)"
 check "shared PreToolUse entries survive in exxo" \
     test "$(jq '.hooks.PreToolUse | length' "$(S exxo)")" -gt 1
