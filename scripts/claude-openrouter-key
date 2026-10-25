@@ -1,0 +1,41 @@
+#!/bin/bash
+# apiKeyHelper for the exxo-openrouter Claude Code context: prints the
+# OpenRouter key from $HOME/keys/openrouter.key (file 0600, dir 0700) and
+# nothing else on stdout. Claude Code runs it itself, every few minutes.
+# On failure: one generic line on stderr, nothing on stdout, non-zero exit,
+# and {ts, reason} appended to ~/.local/state/claude-openrouter/keyhelper.jsonl
+# (dir 0700, file 0600). The key, its length and its prefix are never logged.
+set -euo pipefail
+
+KEY_FILE="$HOME/keys/openrouter.key"
+LOG="$HOME/.local/state/claude-openrouter/keyhelper.jsonl"
+
+fail() { # reason message
+  local ts
+  ts="$(date -u +%Y-%m-%dT%H:%M:%S+00:00)"
+  {
+    umask 077
+    mkdir -p "$(dirname "$LOG")"
+    chmod 700 "$(dirname "$LOG")"
+    printf '{"ts": "%s", "reason": "%s"}\n' "$ts" "$1" >>"$LOG"
+    chmod 600 "$LOG"
+  } 2>/dev/null || true
+  echo "claude-openrouter-key: $2" >&2
+  exit 1
+}
+
+[ -e "$KEY_FILE" ] || fail missing "key file missing: $KEY_FILE"
+[ -f "$KEY_FILE" ] || fail read_error "not a regular file: $KEY_FILE"
+
+mode="$(stat -f %Lp "$KEY_FILE" 2>/dev/null || stat -c %a "$KEY_FILE" 2>/dev/null || true)"
+[ -n "$mode" ] || fail read_error "cannot stat $KEY_FILE"
+# Any group/other permission bit (the last two octal digits) is too loose.
+[ "${mode: -2}" = "00" ] || fail mode "mode $mode on $KEY_FILE is looser than 600"
+
+content="$(cat "$KEY_FILE" 2>/dev/null)" || fail read_error "cannot read $KEY_FILE"
+# Trim leading and trailing whitespace.
+content="${content#"${content%%[![:space:]]*}"}"
+content="${content%"${content##*[![:space:]]}"}"
+[ -n "$content" ] || fail empty "key file is empty: $KEY_FILE"
+
+printf '%s\n' "$content"
