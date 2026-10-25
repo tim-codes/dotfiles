@@ -339,6 +339,11 @@ highest-priority requester in `queue`; else deny with a retry time.
 squad send <member> "heavy_slot grant" --from orchestrator --data '{"directive":"heavy_slot","decision":"grant"}'
 squad send <member> "heavy_slot deny" --from orchestrator --data '{"directive":"heavy_slot","decision":"deny","retry_after_s":<s>}'
 ```
+A revoke is a control directive, so it is ack-gated (§2, §8):
+```
+squad send <member> "heavy_slot revoke" --from orchestrator --ack-deadline-s 120 \
+  --data '{"directive":"heavy_slot","decision":"revoke"}'
+```
 A grant expires at `est_minutes × 2`: arm a background timer (`sleep <s>;
 squad send orchestrator "heavy_slot expired: <member>" --from cli --data
 '{"kind":"heavy_slot_expired","member":"<member>"}'`); expiry = released. On `release`: drop the grant, grant the next in `queue`.
@@ -447,7 +452,7 @@ sonnet) so you see only the summary; its brief carries:
 - **Stale members**: roster members whose last `squad set` is older than 2h
   while `jq -r .status <req.config_dir>/sessions/<req.pid>.json` is `idle`
   (usually a finished or stalled stream). Report-only.
-- **Debug retention**: remove date-named dirs under
+- **Debug retention**: remove run dirs under
   `~/.local/state/squad/debug/` older than 14 days (`find … -mindepth 1
   -maxdepth 1 -type d -mtime +14`; never `debug.on`), listing each.
 
@@ -509,8 +514,8 @@ At start-up, before §1 step 4, only when started with `--debug`:
    .sessionId "$CLAUDE_CONFIG_DIR/sessions/<pid>.json"` (missing: use
    `$CLAUDE_CODE_SESSION_ID`, and say so). Publish the gauge with that
    `session_id` and `"debug":true` so the review finds your transcript.
-3. After **every** directive you send (pause, resume, priority, heavy_slot,
-   infra, cleanup) and every `squad.directive` `unacked` or `escalated`
+3. After **every** directive you send (pause, resume, priority, fanout,
+   heavy_slot, infra, cleanup) and every `squad.directive` `unacked` or `escalated`
    event (member, directive_id, age_s, action), in the same turn append to
    the run's decision log:
    ```

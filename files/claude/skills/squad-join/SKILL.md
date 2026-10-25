@@ -1,6 +1,6 @@
 ---
 name: squad-join
-description: Join this Claude Code session to the local squad (the `squad` broker) as a client workstream — move into a worktree, register, subscribe to quota/host/message topics, and follow the orchestrator's directives (pause, resume, priority, heavy_slot, preflight). Use when Tim says "/squad-join", "join the squad" or "register with the squad", and whenever a `<squad-message>` turn arrives and you need to know what it means or how to respond. Arguments `[--name N] [--priority 1-5] [--needs a,b] [--branch B]`.
+description: Join this Claude Code session to the local squad (the `squad` broker) as a client workstream — move into a worktree, register, subscribe to host/message topics, and follow the orchestrator's directives (pause, resume, priority, fanout, heavy_slot, preflight). Use when Tim says "/squad-join", "join the squad" or "register with the squad", and whenever a `<squad-message>` turn arrives and you need to know what it means or how to respond. Arguments `[--name N] [--priority 1-5] [--needs a,b] [--branch B]`.
 ---
 
 # Squad: joining as a client workstream
@@ -107,9 +107,7 @@ squad subscribe <name> msg.all
 
 Members do not subscribe to the quota topics. Quota is the orchestrator's
 business, and a member that acts on it only adds a second, uncoordinated
-throttle. If you want one anyway, give a topic a single `subscribe` command
-with all its flags (`--levels 85,95,100`): a second `subscribe` on the same
-topic replaces the first.
+throttle.
 
 The broker also delivers `msg.*` lanes to their recipients implicitly; the
 explicit subscriptions keep the roster self-describing. Do not subscribe to
@@ -146,11 +144,13 @@ the orchestrator's `pause`, `fanout` and `priority` directives (§5).
 `host.pressure` `critical` means stop starting heavy jobs.
 
 **Safety net: check the history at the end of every turn.** Delivery can
-lag (a held turn, a restart), so before you end a turn run
-`squad history msg.<name> --since-seq <last seen seq>` and act on anything you
-have not seen, directives first. Keep the last seq you have seen in `squad set
---name <name> --detail` (e.g. `seen msg.<name> seq 412`), or in a file under
-the worktree's `.git/` (`git rev-parse --git-dir`), and update it each time.
+lag (a held turn, a restart), so before you end a turn run `squad history
+<topic> --since-seq <last seen seq>` for each of `msg.<name>`, `msg.all` and
+`msg.role.<role>` (`msg.role.client` for a client), and act on anything you
+have not seen, directives first. Keep the last seen seq per topic in a file
+under the worktree's `.git/` (`$(git rev-parse --git-dir)/squad-seen`), and
+update it each time. Only if there is no worktree, fall back to `squad set
+--name <name> --detail` (e.g. `seen msg.<name> 412`).
 
 **Only the broker reaches the concierge.** Send to it with `squad send
 concierge … --from <name>`, never a direct cross-session send (`SendMessage`
