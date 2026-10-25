@@ -35,6 +35,17 @@ g clone -q -b job/x "$T/origin.git" "$T/job-clone"
 g clone -q -b job/x "$T/origin.git" "$T/trunk-clone"
 g -C "$T/trunk-clone" remote set-head origin trunk
 mkdir -p "$T/job-clone/sub"
+# Review round 1 (R-C9) fixtures: push targets that come from repo config.
+#   pushcfg-clone: on job/x with remote.origin.push=HEAD:main
+#   upstream-clone: on job/y tracking origin/main, push.default=upstream
+#   matching-clone: on job/x with push.default=matching
+#   alias-clone: on job/x with alias.p = "push origin main"
+for c in pushcfg upstream matching alias; do g clone -q -b job/x "$T/origin.git" "$T/$c-clone"; done
+g -C "$T/pushcfg-clone" config remote.origin.push HEAD:main
+g -C "$T/upstream-clone" checkout -q -b job/y --track origin/main
+g -C "$T/upstream-clone" config push.default upstream
+g -C "$T/matching-clone" config push.default matching
+g -C "$T/alias-clone" config alias.p "push origin main"
 [ "$(git -C "$T/main-clone" rev-parse --abbrev-ref HEAD)" = main ] || bad "fixture: main-clone not on main"
 [ "$(git -C "$T/job-clone" rev-parse --abbrev-ref HEAD)" = job/x ] || bad "fixture: job-clone not on job/x"
 
@@ -54,7 +65,7 @@ run_guard() {
     fi
 }
 
-# expect <deny|allow> <cwd-key> <command>; cwd-key: main | job | trunk
+# expect <deny|allow> <cwd-key> <command>; cwd-key names a <key>-clone fixture
 expect() {
     local want="$1" key="$2" cmd="$3" got
     got="$(run_guard "$T/$key-clone" "$cmd")"
@@ -134,6 +145,64 @@ job|gh pr merge "unbalanced
 job|echo main | xargs git push origin
 TABLE
 
+# --- BLOCK: review round 1 findings (R-C9) --------------------------------
+while IFS='|' read -r key cmd; do
+    [ -z "$key" ] && continue
+    expect deny "$key" "$cmd"
+done <<'TABLE'
+job|echo 'git push origin main' | bash
+job|printf 'gh pr merge 1' | sh
+job|bash <<< 'gh pr merge 1'
+job|bash -c -- 'gh pr merge 1'
+job|bash -c -e 'git push origin main'
+job|fish -c 'gh pr merge 1'
+job|$'git' push origin main
+job|G=git; $G push origin main
+job|${NOPE}gh pr merge 1
+job|git -c remote.origin.push=HEAD:main push origin
+job|GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=remote.origin.push GIT_CONFIG_VALUE_0=HEAD:main git push origin
+job|GIT_DIR=../main-clone/.git git push
+pushcfg|git push
+pushcfg|git push origin
+pushcfg|git push origin job/x
+upstream|git push
+matching|git push
+alias|git p
+job|git push origin HEAD:heads/main
+job|git push origin job/x:heads/master
+job|git push origin HEAD:MAIN
+job|true;>x gh pr merge 1
+job|true&&>/dev/null git push origin main
+job|function f { gh pr merge 1; }; f
+job|f() { gh pr merge 1; }; f
+job|env -S 'git push origin main'
+job|xcrun git push origin main
+job|arch -arm64 git push origin main
+job|caffeinate -i gh pr merge 1
+job|find . -exec gh pr merge 1 \;
+job|cat <(gh pr merge 1)
+job|gh api repos/o/r/merges -f base=main -f head=job/x
+job|gh api -X PATCH repos/o/r/git/refs/heads/main -f sha=abc123
+job|gh api graphql -f query='mutation { enablePullRequestAutoMerge(input:{pullRequestId:"x"}) { clientMutationId } }'
+job|gh api graphql -f query='mutation { mergePullRequest(input:{pullRequestId:"x"}) { clientMutationId } }'
+job|gh api graphql --input body.json
+job|gh api -X PUT repos/o/r/contents/f.txt -f message=m -f content=eA==
+job|gh api -X PUT repos/o/r/contents/f.txt -f message=m -f content=eA== -f branch=main
+job|gh alias set m 'pr merge'
+job|gh m 1
+job|g""it pu""sh origin main
+job|git send-pack ../../origin.git HEAD:refs/heads/main
+job|git submodule foreach 'git push origin main'
+job|git rebase -x 'git push origin main' HEAD
+job|git config alias.p 'push origin main'
+job|git push --receive-pack=x origin job/x
+job|./git push origin job/x
+job|git commit -m "$(cat msg)" && git push origin job/x
+job|export GIT_DIR=../main-clone/.git; git push
+job|alias g=git; g push origin main
+job|python3 -c 'import os; os.system("git push origin main")'
+TABLE
+
 # --- ALLOW -----------------------------------------------------------------
 while IFS='|' read -r key cmd; do
     [ -z "$key" ] && continue
@@ -163,6 +232,15 @@ job|curl https://api.github.com/repos/o/r/pulls/1
 job|git -c alias.st=status st
 job|ls; git status && git diff main
 job|echo 'unbalanced
+job|cargo test
+job|ls
+job|gh run list
+job|git commit -m "fix: x"
+job|gh pr create --draft --body "$(cat body.md)"
+job|gh api -X PUT repos/o/r/contents/f.txt -f message=m -f content=eA== -f branch=job/x
+job|gh api repos/o/r/contents/README.md
+job|cargo test && git push origin job/x
+job|git rebase main
 TABLE
 
 # --- Non-Bash tool ---------------------------------------------------------
@@ -199,7 +277,7 @@ logcheck "log: push block, plain form" 'git push origin main' \
 logcheck "log: git-C form" 'git -C . push origin HEAD:main' \
     '.rule == "push-default-branch" and .target == "main" and .form == "git-C"'
 logcheck "log: sh-c form" "sh -c 'gh pr merge 3'" \
-    '.rule == "gh-pr-merge" and .target == "3" and .form == "sh-c"'
+    '.rule == "unparseable" and .target == null and .form == "sh-c" and .decision == "block"'
 logcheck "log: compound form" 'cd x && gh pr merge 1' \
     '.rule == "gh-pr-merge" and .target == "1" and .form == "compound"'
 logcheck "log: other form (wrapper)" 'timeout 5 git push origin master' \
@@ -232,6 +310,30 @@ mkdir -p "$T/ro"; chmod 500 "$T/ro"
 got="$(SQUAD_GUARD_LOG="$T/ro/sub/guard.jsonl" run_guard "$T/job-clone" "gh pr merge 1")"
 chmod 700 "$T/ro"
 if [ "$got" = deny ]; then ok "unwritable_log_still_blocks"; else bad "unwritable_log_still_blocks: got $got"; fi
+
+# I3: a FIFO at the log path must not hang the hook (a hook timeout fails open).
+rm -f "$L"; mkfifo "$L"
+( run_guard "$T/job-clone" "gh pr merge 1" >"$T/fifo.out" ) & pid=$!
+for _ in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null; pkill -f claude-openrouter-guard 2>/dev/null
+    bad "fifo_log_path_still_blocks: guard hung on a FIFO log path"
+elif [ "$(cat "$T/fifo.out")" = deny ]; then
+    ok "fifo_log_path_still_blocks"
+else
+    bad "fifo_log_path_still_blocks: got $(cat "$T/fifo.out")"
+fi
+rm -f "$L"
+
+# M1: malformed tool_input on a Bash call fails closed.
+for ti in '"gh pr merge 1"' '["gh pr merge 1"]' '{"command":["git","push","origin","main"]}' 'null'; do
+    out="$(printf '{"tool_name":"Bash","cwd":"%s","tool_input":%s}' "$T/job-clone" "$ti" | "$GUARD" 2>/dev/null)"; rc=$?
+    if [ "$rc" = 0 ] && jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<<"$out" >/dev/null 2>&1; then
+        ok "malformed tool_input denied: $ti"
+    else
+        bad "malformed tool_input not denied (rc=$rc): $ti"
+    fi
+done
 
 # The deny reason is one line naming the rule.
 reason="$(jq -n --arg d "$T/job-clone" '{cwd:$d, tool_name:"Bash", tool_input:{command:"git push origin main"}}' \
