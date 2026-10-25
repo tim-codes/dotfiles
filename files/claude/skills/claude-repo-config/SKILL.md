@@ -24,11 +24,14 @@ list`, `gh pr view/list/checks/diff`, `gh run view/list`, `just --list`,
 `mcp__ide__getDiagnostics`. The local `squad` broker CLI (same-uid Unix-socket IPC to the
 broker, no network or credentials) is granted subcommand by subcommand: `squad
 send/set/publish/subscribe/unsubscribe/register/deregister/status/roster/get/
-history/doctor/debug/ack` and `squad operator raise/set/decide/list/get`. Exxo adds an enumerated set of read-only `gcloud` commands
+history/doctor/debug/ack` and `squad operator raise/set/decide/list/get`. Exxo
+adds an enumerated set of read-only `gcloud` commands
 (`projects list`, `config list`, `run services list/describe`, `compute
 instances list/describe`, `logging read`, `storage ls`, ...) plus `gsutil ls`,
 `pulumi preview/whoami/stack ls/stack output`, and `agent-tooling:*` (with an
-`ask` on `agent-tooling mail send`, which sends real mail), and
+`ask` on `agent-tooling mail send`, which sends real mail, and on the
+`agent/run -- ` and `./agent/run -- ` wrapped forms; the wrapped form never
+matched `agent-tooling:*` anyway, so the ask makes it prompt explicitly), and
 denies `gcloud compute ssh`. There is deliberately no `gcloud * list` grant:
 a middle `*` also matches `gcloud compute ssh vm --command "... list"`. A repo
 never restates any of these.

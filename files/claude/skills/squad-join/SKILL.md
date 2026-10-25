@@ -383,7 +383,9 @@ as the text's first word and a `kind` field in `data`.
   the text; they go in `--command` for Tim. Then **carry on** with other
   work, or wait if nothing else can proceed. A job blocked by a denial ends
   `delegate-result --status failed --reason blocked-denial`. If the raise is
-  itself denied, send it to the orchestrator as an `operator_task` (§6).
+  itself denied (the inline `--command` text can trip the same deny glob),
+  send it to the orchestrator as an `operator_task` (§6), putting the
+  command text in `--instructions-file` rather than inline.
   Never record a denial as Tim's ruling or abandon the work on the strength
   of it.
 - **A `<squad-message>` with `priority now` arrives mid-turn**: an urgent

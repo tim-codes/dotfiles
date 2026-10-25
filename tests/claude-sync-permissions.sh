@@ -55,7 +55,8 @@ for ctx in exxo exxo-personal; do
     check "$ctx: no middle-wildcard gcloud grants" \
         test "$(jq '[.permissions.allow[] | select(test("^Bash\\(gcloud \\*"))] | length' "$FAKE/.claude-$ctx/settings.json")" -eq 0
     check "$ctx: agent-tooling mail send asks" has "$ctx" ask 'Bash(agent-tooling mail send*)'
-    check "$ctx: wrapped agent-tooling mail send asks" has "$ctx" ask 'Bash(agent-run -- agent-tooling mail send*)'
+    check "$ctx: wrapped agent-tooling mail send asks" has "$ctx" ask 'Bash(agent/run -- agent-tooling mail send*)'
+    check "$ctx: ./-wrapped agent-tooling mail send asks" has "$ctx" ask 'Bash(./agent/run -- agent-tooling mail send*)'
     check "$ctx: gcloud compute ssh is denied" has "$ctx" deny 'Bash(gcloud compute ssh*)'
     check "$ctx: nested gcloud compute ssh is denied" has "$ctx" deny 'Bash(* gcloud compute ssh*)'
 done
