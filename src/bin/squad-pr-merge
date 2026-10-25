@@ -42,12 +42,13 @@ done
 [[ "$repo" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || usage "--repo must be <owner/name>"
 [ -n "$mode" ] || usage "choose --into-trunk or --land"
 
-read -r state draft base head oid < <(gh pr view "$n" -R "$repo" \
-  --json state,isDraft,baseRefName,headRefName,headRefOid \
-  --jq '[.state, (.isDraft|tostring), .baseRefName, .headRefName, .headRefOid] | join(" ")') \
+read -r state draft base head oid fork < <(gh pr view "$n" -R "$repo" \
+  --json state,isDraft,baseRefName,headRefName,headRefOid,isCrossRepository \
+  --jq '[.state, (.isDraft|tostring), .baseRefName, .headRefName, .headRefOid, (.isCrossRepository|tostring)] | join(" ")' 2>/dev/null) \
   || die "cannot read PR #$n in $repo"
 [[ "${oid:-}" =~ ^[0-9a-f]{40}$ ]] || die "cannot read PR #$n in $repo"
 [ "$state" = OPEN ] || die "PR #$n is not open ($state)"
+[ "${fork:-}" = false ] || die "PR #$n is from a fork; not merging"
 [ "$draft" = false ] || die "PR #$n is a draft; mark it ready first"
 
 if [ "$mode" = --into-trunk ]; then
@@ -61,6 +62,8 @@ else
     && [ -n "$default" ] || die "cannot read the default branch of $repo"
   [ "$base" = "$default" ] || die "PR #$n base '$base' is not the default branch '$default'; not landing"
   [[ "$head" == trunk/* ]] || die "PR #$n head '$head' is not a trunk/* branch; not landing"
+  # Local date (`date +%F`), exactly as exxo-infra agent/ops.Justfile pr-merge
+  # compares SQUAD_MERGE_AUTHORITY; not UTC.
   today="$(date +%F)"; granted=0
   authority="${SQUAD_MERGE_AUTHORITY:-}"; for g in ${authority//,/ }; do
     { [ "$g" = "$repo@$today" ] || [ "$g" = "$today" ]; } && granted=1

@@ -16,7 +16,7 @@ cat >"$BIN/gh" <<'STUB'
 #!/bin/bash
 echo "gh $*" >>"$GH_LOG"
 case "$1 $2" in
-  "pr view")   echo "${STUB_STATE:-OPEN} ${STUB_DRAFT:-false} ${STUB_BASE:-trunk/261025-1} ${STUB_HEAD:-feat/x} aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" ;;
+  "pr view")   [ "${STUB_FAIL:-}" = view ] && { echo "boom" >&2; exit 1; }; echo "${STUB_STATE:-OPEN} ${STUB_DRAFT:-false} ${STUB_BASE:-trunk/261025-1} ${STUB_HEAD:-feat/x} ${STUB_OID-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} ${STUB_FORK:-false}" ;;
   "repo view") echo "${STUB_DEFAULT:-main}" ;;
   "pr checks") case " $* " in *" --required "*)
                  [ "${STUB_REQUIRED:-some}" = none ] && { echo "no required checks reported on the 'x' branch" >&2; exit 1; } ;;
@@ -55,6 +55,11 @@ run "into-trunk refuses red checks"       refuse "" STUB_CHECKS=red -- 7 --repo 
 run "into-trunk refuses unknown base"     refuse "" STUB_BASE=feat/automations-trunk -- 7 --repo $R --into-trunk
 run "into-trunk refuses pending checks"   refuse "" STUB_CHECKS=pending -- 7 --repo $R --into-trunk
 run "into-trunk refuses red when no required checks" refuse "" STUB_REQUIRED=none STUB_CHECKS=red -- 7 --repo $R --into-trunk
+run "into-trunk refuses a fork PR"        refuse "" STUB_FORK=true -- 7 --repo $R --into-trunk
+run "land refuses a fork PR"              refuse "" STUB_FORK=true STUB_BASE=main STUB_HEAD=trunk/1-1 SQUAD_MERGE_AUTHORITY="$R@$TODAY" -- 9 --repo $R --land
+run "refuses when gh pr view fails"       refuse "" STUB_FAIL=view -- 7 --repo $R --into-trunk
+run "refuses an empty head sha"           refuse "" STUB_OID= -- 7 --repo $R --into-trunk
+run "refuses a malformed head sha"        refuse "" STUB_OID=notasha -- 7 --repo $R --into-trunk
 run "into-trunk refuses a closed PR"      refuse "" STUB_STATE=MERGED -- 7 --repo $R --into-trunk
 run "into-trunk accepts adopted trunk"    merge "pr merge 7 -R $R --squash --delete-branch --match-head-commit a{40}" STUB_BASE=feat/automations-trunk SQUAD_ADOPTED_TRUNKS="a/b, feat/automations-trunk" -- 7 --repo $R --into-trunk
 run "into-trunk squashes, no grant needed" merge "pr merge 7 -R $R --squash --delete-branch --match-head-commit a{40}" -- 7 --repo $R --into-trunk
@@ -62,6 +67,7 @@ NOT='--merge'
 run "into-trunk never uses --merge"       merge "pr merge 7 -R $R --squash --delete-branch --match-head-commit a{40}" -- 7 --repo $R --into-trunk
 NOT=zzz
 run "into-trunk falls back to all checks when none required" merge "pr merge 7 -R $R --squash" STUB_REQUIRED=none -- 7 --repo $R --into-trunk
+if grep -qE '^gh pr checks 7 -R [^ ]+$' "$LOG"; then ok "fallback made the unfiltered pr checks call"; else bad "fallback did not call unfiltered pr checks: $(cat "$LOG")"; fi
 run "land refuses without grant"          refuse "" STUB_BASE=main STUB_HEAD=trunk/261025-1 -- 9 --repo $R --land
 run "land refuses a grant for another repo" refuse "" STUB_BASE=main STUB_HEAD=trunk/261025-1 SQUAD_MERGE_AUTHORITY="Other/repo@$TODAY" -- 9 --repo $R --land
 run "land refuses a stale grant"          refuse "" STUB_BASE=main STUB_HEAD=trunk/261025-1 SQUAD_MERGE_AUTHORITY="$R@2020-01-01" -- 9 --repo $R --land
