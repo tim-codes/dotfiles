@@ -18,7 +18,13 @@ Kickoff prompt template. Copy to ~/claude/prompts/<yymmdd>/<NN>-<member>.md,
 fill it in and delete every comment. Launch with
 `claude-kickoff <that file>` (add `--account` to override the context, and
 `--dry-run` to see what it would do first); the squad herder calls the same
-launcher, never a hand-built `claude` line.
+launcher, never a hand-built `claude` line. To continue an existing session in
+another context, the herder calls `claude-kickoff <file> --resume <session-id>
+--account <context> --cwd <the member's live directory>`: the frontmatter cwd is
+ignored, the account-bound and precondition checks run as for a launch, and the
+session restarts with a fixed relaunch note (re-register, then squad-join §5
+`relaunch`); `--dry-run` also prints `resume: <id>` and the context's
+`resume_group`.
 
 FRONTMATTER (key: value lines, ended by the first line that is exactly `---`;
 the body is everything after it). claude-kickoff reads the first four keys and the optional
