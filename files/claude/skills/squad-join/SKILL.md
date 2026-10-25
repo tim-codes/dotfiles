@@ -200,8 +200,9 @@ no directive the cap is 3. A new, lower cap applies at once: start no
 subagent until the running count is under it, let those already running
 finish rather than killing them, and run at 0 inline. The latest `fanout`
 stands until the next one; a raised cap needs a new directive too. Note it in
-`squad set --name <name> --detail "fanout <max>[, <ceiling>]: …"`. It limits
-parallelism and models only, not what your work is.
+`squad set --name <name> --detail "fanout <max>[, <ceiling>]: …"`. On a rejoin (`joined`/`updated`) the orchestrator re-sends the stored
+`streams[].fanout` value, so a restart does not silently revert you to 3.
+It limits parallelism and models only, not what your work is.
 
 **Pause**, in order:
 1. Finish the tool action in flight. Do not start a new task or subagent;

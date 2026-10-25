@@ -114,8 +114,9 @@ window or budget (read `squad get quota.A`) AND the latest
 shorter than the time to the window's reset). `walls_before_reset` is also
 true when the reset time is unknown, so an unknown reset counts as a wall.
 Projection events, `quota.A.burn` events and the threshold events are your
-prompt to look; a `quota.A.burn started` on a `subscription` account counts
-as level 100. The hard ceilings are unchanged: `pct ≥ 95` pauses the busiest
+prompt to look; a `quota.A.burn started` counts as level 100 when `squad get
+quota.A` shows `.data.kind` `subscription` (the burn payload carries no
+`kind`, so read it there). The hard ceilings are unchanged: `pct ≥ 95` pauses the busiest
 member regardless of the projection (level 100: below). Re-run the test at
 every janitor sweep, at each §2 recheck and on any `squad.member` status
 transition to busy while `pct ≥ 70`, not only on threshold crossings. Idle
@@ -136,7 +137,10 @@ unless level 100.
    exxo-infra and any brief that needs exxo credentials). Prefer moving
    non-exxo-mandated members off exxo. The mover is the herder's relaunch,
    `squad herd relaunch <member> --account <B>`: **the herder command is
-   pending (Plans A and G) and `squad --help` does not list it yet**; until
+   pending (Plans A and G) and `squad --help` does not list it yet** and the `--account` flag is
+   pending too; it takes no `--data`, so log the `trigger` in the decision
+   log (`d=$(squad debug dir) && cat >> "$d/orchestrator-decisions.md"`,
+   §9) until the herder defines a payload; until
    it lands, skip this rung and say so in the decision log.
 3. **Revoke heavy slots** (§4), lowest priority grant first.
 4. **`fanout 0`**: no subagents, work inline.
@@ -166,7 +170,8 @@ squad send <member> "fanout: max 1, sonnet, <A> <window> at <pct>%" --from orche
   --data '{"directive":"fanout","max_subagents":1,"model_ceiling":"sonnet","trigger":{…}}'
 ```
 Record the cap on the member's plan stream (`fanout`, §3) once its ack
-arrives; ack outcomes are as in step 4 below.
+arrives, and re-send the stored value (ack-gated) whenever that member
+rejoins (`squad.member` `joined` or `updated`); ack outcomes are as in step 4 below.
 
 **On a shed decision:**
 1. Choose the rung and members as above; do not re-send a rung a member
@@ -219,17 +224,25 @@ tell Tim.
 
 **Restore.** On `quota.A.reset` (or start-up step 6), or once
 `eta_minutes_to_100` has stayed over 60 for 15 minutes (arm the check with
-the same recheck timer): `squad get quota.A`; if no window is at or above
-90% (reset) or the ETA condition holds, undo the ladder in reverse, highest
-priority first. Resume every `paused` entry for `A` with `by:
-"orchestrator"`, 60s apart, in one `run_in_background` command (a foreground
-`sleep` is refused); then re-grant slots, and send `fanout` with
-`max_subagents` 3 and no ceiling to each member you lowered. A rebalanced
-member is not moved back; tell Tim where it is.
+the same recheck timer), run `squad get quota.A` and undo the ladder in
+reverse, highest priority first, in either of two cases:
+- **Reset:** no window is at or above 90%.
+- **ETA recovered:** `walls_before_reset` is false, or the ETA has been over
+  60 minutes for the full 15.
+
+Resume every `paused` entry for `A` with `by: "orchestrator"`, 60s apart, in
+one `run_in_background` command (a foreground `sleep` is refused); then
+re-grant slots and send `fanout` with `max_subagents` 3 and no ceiling to
+each member you lowered. Each of these carries `data.trigger`, quoting the
+reset or ETA state that cleared it. A rebalanced member is not moved back;
+tell Tim where it is.
 ```
 for m in <top> <next> …; do squad send "$m" "resume" --from orchestrator \
   --ack-deadline-s 120 --data '{"directive":"resume","trigger":{…}}'; sleep 60; done
 ```
+A re-granted slot is a `heavy_slot` grant with the same `trigger` in its
+`data`; the restoring `fanout` is
+`{"directive":"fanout","max_subagents":3,"trigger":{…}}`.
 Remove them from `paused`, publish the plan, tell Tim.
 Members Tim paused himself (no plan entry) are his to resume.
 
