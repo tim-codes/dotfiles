@@ -97,6 +97,11 @@ Exit codes (stable):
   8   a context precondition failed (the message names the command, never its output)
   9   an `account_bound` need is not provided by the context
 Nothing secret is ever printed; the prompt body is never printed.
+
+tmux marker: when $TMUX_PANE is set, just before exec the launcher sets the pane
+options @agent (the context's `agent` key: claude, or kimi for exxo-openrouter) and
+@agent_model (the model passed to claude; unset if none) for the tmux-home TUI.
+tmux failures never block the launch; --dry-run prints the two commands instead.
 EOF
 }
 
@@ -320,6 +325,22 @@ while IFS= read -r kv; do
     [ -n "${!k+x}" ] || export "$k=${kv#*=}"
 done <<<"$ctx_env"
 
+# --- tmux pane marker (consumed by tmux-home): @agent and @agent_model -------
+agent=$(ctx_get "$ctx" '.agent // "claude"')
+[ -n "$agent" ] || agent=claude
+mark_pane() { # mark_pane [--dry-run]: never fails, never blocks the launch
+    [ -n "${TMUX_PANE:-}" ] || return 0
+    if [ "${1:-}" = "--dry-run" ]; then
+        printf 'tmux set-option -p -t %s @agent %s\n' "$TMUX_PANE" "$agent"
+        if [ -n "$model" ]; then printf 'tmux set-option -p -t %s @agent_model %s\n' "$TMUX_PANE" "$model"
+        else printf 'tmux set-option -pu -t %s @agent_model\n' "$TMUX_PANE"; fi
+        return 0
+    fi
+    tmux set-option -p -t "$TMUX_PANE" @agent "$agent" 2>/dev/null || true
+    if [ -n "$model" ]; then tmux set-option -p -t "$TMUX_PANE" @agent_model "$model" 2>/dev/null || true
+    else tmux set-option -pu -t "$TMUX_PANE" @agent_model 2>/dev/null || true; fi
+}
+
 if [ "$dry" -eq 1 ]; then
     printf 'mode: %s\n'       "$mode"
     printf 'context: %s\n'    "$ctx"
@@ -346,6 +367,7 @@ if [ "$dry" -eq 1 ]; then
     printf 'env_pass: %s\n'      "${env_pass_raw:-none}"
     printf 'before_launch: %s\n' "${before_launch_raw:-none}"
     printf 'add_dirs: %s\n'      "${add_dirs[*]:-none}"
+    mark_pane --dry-run
     exit 0
 fi
 
@@ -355,6 +377,7 @@ if [ "$(ctx_get "$ctx" '.openrouter // false')" != true ]; then
     # shellcheck disable=SC2086
     unset $OPENROUTER_ENV
 fi
+mark_pane
 if [ "$mode" = resume ]; then
     exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" --resume "$resume" --model "$model" --effort "$effort"
 fi

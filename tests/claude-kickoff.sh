@@ -360,6 +360,38 @@ mkdir -p "$T/yqbin"; ln -s "$YQ_REAL" "$T/yqbin/yq"
 HOME="$FAKE" PATH="$T/yqbin:/usr/bin:/bin" "$KICK" "$T/fixture.md" --dry-run >/dev/null 2>&1; rc=$?
 check "claude not on PATH (exit 7)" [ "$rc" -eq 7 ]
 
+# --- tmux pane marker: stub tmux records argv; nothing touches a real server ---
+cat >"$BIN/tmux" <<'EOF'
+#!/bin/bash
+echo "tmux $*" >>"$TMUX_REC"
+EOF
+chmod +x "$BIN/tmux"
+export TMUX_REC="$T/tmux-rec"
+tkick() { # tkick <pane, or empty for none> <args...>: kick with TMUX_PANE set or unset
+    local pane="$1"; shift; : >"$TMUX_REC"
+    if [ -n "$pane" ]; then
+        out=$(HOME="$FAKE" PATH="$BIN:/usr/bin:/bin:/usr/sbin:/sbin" REC="$REC" TMUX_PANE="$pane" "$KICK" "$@" 2>&1); rc=$?
+    else
+        out=$(unset TMUX_PANE; HOME="$FAKE" PATH="$BIN:/usr/bin:/bin:/usr/sbin:/sbin" REC="$REC" "$KICK" "$@" 2>&1); rc=$?
+    fi
+}
+trec_has() { grep -qxF -- "$1" "$TMUX_REC"; }
+trec_empty() { [ ! -s "$TMUX_REC" ]; }
+sed 's|^model: .*|model: moonshotai/kimi-k3@preset/tim-k3|' "$T/fixture.md" >"$T/kimi.md"
+tkick %7 "$T/kimi.md" --account exxo-openrouter
+check "tmux marker: openrouter sets @agent kimi" trec_has "tmux set-option -p -t %7 @agent kimi"
+check "tmux marker: openrouter sets @agent_model" trec_has "tmux set-option -p -t %7 @agent_model moonshotai/kimi-k3@preset/tim-k3"
+check "tmux marker: claude is still launched" [ -s "$REC" ]
+tkick %7 "$T/fixture.md" --account exxo
+check "tmux marker: exxo sets @agent claude" trec_has "tmux set-option -p -t %7 @agent claude"
+check "tmux marker: exxo sets @agent_model to the frontmatter model" trec_has "tmux set-option -p -t %7 @agent_model opus"
+tkick "" "$T/fixture.md" --account exxo
+check "tmux marker: no TMUX_PANE, no tmux call" trec_empty
+tkick %7 "$T/kimi.md" --account exxo-openrouter --dry-run
+check "tmux marker: dry-run prints @agent" has "tmux set-option -p -t %7 @agent kimi"
+check "tmux marker: dry-run prints @agent_model" has "tmux set-option -p -t %7 @agent_model moonshotai/kimi-k3@preset/tim-k3"
+check "tmux marker: dry-run does not call tmux" trec_empty
+
 # --- every kickoff prompt of the 261024 batch, real HOME, stub claude ---
 if [ -d "$FIXTURES" ] && [ -d "$REAL_HOME/.claude-exxo" ] && [ -d "$REAL_HOME/dev" ]; then
     for f in "$FIXTURES"/*.md; do
