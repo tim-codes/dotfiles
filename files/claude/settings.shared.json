@@ -555,5 +555,6 @@
     {
       "serverName": "plugin:enterprise-search:atlassian"
     }
-  ]
+  ],
+  "promptSuggestionEnabled": false
 }
