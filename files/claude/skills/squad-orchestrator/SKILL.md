@@ -95,8 +95,11 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    squad subscribe orchestrator squad.member
    squad subscribe orchestrator operator.item --priority next
    squad subscribe orchestrator herder.issue --priority next
+   squad subscribe orchestrator squad.job --priority later
    ```
-   (`squad.directive` requires squad built from PR S1 or later;
+   (`squad.job` is for the decision log only: routing needs just the
+   `job_queued` and `job_worker_free` turns, which arrive regardless.
+   `squad.directive` requires squad built from PR S1 or later;
    `operator.item` requires the dashboard server from PR S3.)
    Not `quota.*`: it also matches the `quota.A` gauges, which republish on
    every sample; read them on demand with `squad get quota.A`.
@@ -186,6 +189,21 @@ every janitor sweep, at each §2 recheck and on any `squad.member` status
 transition to busy while `pct ≥ 70`, not only on threshold crossings. Idle
 members burn nothing: if none of `A`'s members is busy and `pct` is under 95,
 shed nothing.
+
+**Shed load before pausing: delegate to the pool.** When an exxo window's
+projection says a wall is coming (the test above) and pool members with
+`code` or `review` are live and free (`squad roster`, `.req.capabilities`,
+status not working), first send `delegate_mode` to each exxo member running
+Opus implementer fan-out, and only then fall back to the ladder below:
+```
+squad send <member> "delegate_mode: pool for code, review; exxo <window> at <pct>%" --from orchestrator --priority next --ack-deadline-s 120 \
+  --data '{"directive":"delegate_mode","mode":"pool","needs":["code","review"],"trigger":{…}}'
+```
+On `quota.exxo.reset` (or once the ETA test clears, as in Restore), send
+`{"directive":"delegate_mode","mode":"local"}` with its trigger to the same
+members. A pool member that is mid-job is not free; a `metered` account's
+members are never paused by exxo or personal window walls, but pause, resume
+and priority directives still apply to them.
 
 **Shed load cheapest first.** Walk this ladder one rung at a time. Within a
 rung, take members lowest priority first (5 before 1), then highest
@@ -540,6 +558,44 @@ the last stops, restore `heavy_slots` and tell waiting members to retry.
 tree that stayed hot or bloated), tell Tim (pid, command, cpu/rss,
 duration) and suggest terminating it; never kill it. Same pid: 30 min apart.
 
+## 4a. Routing delegated jobs
+
+Members hand work to the pool with `squad delegate` (client side: `squad-join`
+§6b). You route it; with no orchestrator registered the broker auto-assigns
+only `auto_ok` jobs and sends the rest to Tim at their deadline, so routing is
+yours only while you are registered.
+
+On `job_queued` (`data.kind`; fields `job`, `need`, `auto_ok`, `deadline_at`,
+`candidates`), pick from `candidates` and assign:
+```
+squad job assign <id> <member> --name orchestrator
+```
+The broker refuses a requester, a non-client, a paused member, a busy or
+incapable one. The record keeps `assigned_by` (you or `broker`).
+
+- **Model policy.** `code`, `review` and `test` go to the cheapest healthy
+  pool model first (K3 once live); Claude members only for work that needs
+  Anthropic-only tools. `integration` goes to the integration assistant.
+- **Credentials, merges, `main`/`master` pushes: Claude members only.** The
+  `credentials` tag makes the broker enforce it; if a brief obviously needs
+  them and lacks the tag, refuse it: `squad job refuse <id> --reason
+  needs_credentials --name orchestrator`. On a `needs_credentials` or
+  `needs_merge` result, re-delegating to a Claude member is the requester's
+  job; tell the requester so.
+- **No candidate:** leave the job queued and note it in the plan gauge. With
+  an empty pool and a deadline under 15 minutes away, consider refusing it.
+- **Refuse** (`squad job refuse <id> --reason budget|policy --name
+  orchestrator`) when spend or quota rules say no. A metered account's budget
+  escalation is an operator item (§2c) with the ENG-337 decision field, titled
+  `job <id> needs Tim: …`.
+- On `job_worker_free`, route the oldest queued job first.
+- Job traffic is not for Tim: nothing here goes through the concierge unless
+  it becomes an operator item.
+- **Reviewing results.** A K3 `code` result whose diff changes existing test
+  assertions or inputs gets a Claude reviewer (`reviewer` subagent, or a
+  `review` job to a Claude member), not a pool review: K3 code is never
+  reviewed by K3 alone.
+
 ## 5. Infra: review, merge, deploy
 
 On `pr_ready` with `repo` exxo-infra:
@@ -641,7 +697,8 @@ reason. His answers go back to the same subagent via `SendMessage`.
 surveys or email drafting inline.** Launch a subagent (or direct a member);
 record only the ruling.
 
-Apply the global delegation policy, preferring the dedicated agents. Roster:
+Apply the global delegation policy, preferring the dedicated agents. Conformity
+and code reviews are delegated to the pool, not run here (§7a). Roster:
 **janitor** and **PR-check** (`git-pr-ops`, sonnet), **summariser**
 (`Explore` or `general-purpose`, sonnet; digests from the roster and `squad
 history`), **deliverables auditor** (`Explore`, sonnet; §3a: prompt
@@ -655,8 +712,15 @@ each admin step" by default.
 ## 7a. Design conformity
 
 - On a member's `design ready` message (ADR/plan) and at every `pr_ready`,
-  dispatch `conformity-reviewer` (sonnet) with the ADR path or the PR
-  (`gh -R <repo>`); announce it on the numbered roster.
+  get a conformity review of the ADR path or the PR (`gh -R <repo>`). **Reviews
+  go to the pool**, not to your own subagents on exxo (the 2026-10-25 run
+  spent about 25 reviews at 65-100k tokens each there): delegate them `squad
+  delegate --need review --auto-ok --brief <file> --name orchestrator`, batched
+  per repo where possible (one job naming every PR or ADR pending in that repo,
+  plus the conformity brief, §7's standalone-brief rules). Fall back to a local
+  `conformity-reviewer` (sonnet, announced on the numbered roster) only when no
+  `review` member is live or the review needs credentials. Code reviews
+  follow the same rule, subject to the test-assertion exception in §4a.
 - Blocking findings go back to the member as a `review` directive, data
   `{findings:[…]}` (dimension, established pattern, proposed, smallest
   change). Advisory ones are passed along, never held on.
@@ -666,9 +730,9 @@ each admin step" by default.
 ## 8. Messages you receive
 
 Directives you send, defined client-side in `squad-join` §5: `pause`,
-`resume`, `priority`, `fanout`, `heavy_slot`, `review` (§7a), `infra`, `cleanup` (§2a)
+`resume`, `priority`, `fanout`, `delegate_mode` (§2), `heavy_slot`, `review` (§7a), `infra`, `cleanup` (§2a)
 and `preflight` (§2b). To the herder (§1a): `launch`, `close`, `status`,
-`wind_down` (and `relaunch` for rebalancing where supported). `pause`, `resume`, `priority`, `fanout` and `heavy_slot` revoke carry an ack
+`wind_down` (and `relaunch` for rebalancing where supported). `pause`, `resume`, `priority`, `fanout`, `delegate_mode` and `heavy_slot` revoke carry an ack
 deadline (§2).
 
 A message turn's JSON is `{"from":…,"text":…,"data":{…}}`; client →
@@ -677,7 +741,9 @@ request|release), `blocked`, `done`, `infra_ready`, `infra_result`,
 `preflight`, `operator_task` (§2c), plus your own timers (`sweep_due`, `heavy_slot_expired`, `rate_recheck`). On `blocked`, tell Tim
 if it needs him; on `done`, drop the stream from the plan. Watcher events
 are information. Never send a `now` turn for what can wait until a member
-is idle. From the herder: `launch_result`, `close_result` and `status_result` (reply to
+is idle. Job turns: `job_queued` and `job_worker_free` (route per §4a); the `squad.job`
+topic (job lifecycle events such as `started`, `unacked` and `escalated`)
+is information for the decision log. From the herder: `launch_result`, `close_result` and `status_result` (reply to
 the matching directive, §1a), and the `herder.issue` topic (subscribed in §1).
 At session end: `squad deregister orchestrator`.
 
@@ -694,7 +760,7 @@ At start-up, before §1 step 4, only when started with `--debug`:
    `$CLAUDE_CODE_SESSION_ID`, and say so). Publish the gauge with that
    `session_id` and `"debug":true` so the review finds your transcript.
 3. After **every** directive you send (pause, resume, priority, fanout,
-   heavy_slot, infra, cleanup, and the herder's launch, close, status,
+   delegate_mode, heavy_slot, infra, cleanup, and the herder's launch, close, status,
    relaunch, wind_down) and every `squad.directive` `unacked` or `escalated`
    event (member, directive_id, age_s, action), in the same turn append to
    the run's decision log:
@@ -705,3 +771,10 @@ At start-up, before §1 step 4, only when started with `--debug`:
    Triggered by: <squad-message> seq <n>[, <n>] (topic)
    EOF
    ```
+   Every `squad job assign` and `squad job refuse` gets a block too, with an
+   extra `Candidates:` line naming each member of the `job_queued`
+   `candidates` considered and why it was taken or passed over. Any
+   decision where K3 limited the options (no capable member, worker lost,
+   budget floor, a job needing credentials) also carries a `k3:` line saying
+   how, e.g. `k3: no capable member; only K3 held review and the job needs
+   credentials, so Claude-only`.
