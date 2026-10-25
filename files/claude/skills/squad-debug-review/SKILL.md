@@ -93,6 +93,9 @@ yours) and carry:
      raised by a member directly instead of queued (grep the transcripts for
      auth prompts, `Touch ID`, `waiting for you`, browser-login steps); and the ranked changes that
      would remove or shorten them.
+  8. **Deliverables.** Every deliverable named in a member's prompt (the
+     plan's `deliverables`, orchestrator skill §3a) is delivered or
+     tracked-deferred; list any that are neither.
   Every finding cites evidence: a log block, a seq, or a transcript path
   plus timestamp.
 
