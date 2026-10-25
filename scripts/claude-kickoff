@@ -100,7 +100,8 @@ Nothing secret is ever printed; the prompt body is never printed.
 
 tmux marker: when $TMUX_PANE is set, just before exec the launcher sets the pane
 options @agent (the context's `agent` key: claude, or kimi for exxo-openrouter) and
-@agent_model (the model passed to claude; unset if none) for the tmux-home TUI.
+@agent_model (the model passed to claude, a tier alias resolved via the context's
+settings.json env ANTHROPIC_DEFAULT_<TIER>_MODEL when set; unset if none) for tmux-home.
 tmux failures never block the launch; --dry-run prints the two commands instead.
 EOF
 }
@@ -328,16 +329,27 @@ done <<<"$ctx_env"
 # --- tmux pane marker (consumed by tmux-home): @agent and @agent_model -------
 agent=$(ctx_get "$ctx" '.agent // "claude"')
 [ -n "$agent" ] || agent=claude
+# A tier alias (opus|sonnet|haiku|fable, optionally with [1m]) is resolved through
+# the context's own settings.json env (ANTHROPIC_DEFAULT_<TIER>_MODEL); absent key,
+# unreadable file or no jq all fall back to publishing the model as given.
+marker_model="$model"
+tier="${model%\[1m\]}"
+case "$tier" in
+    opus|sonnet|haiku|fable)
+        resolved=$(jq -r --arg k "ANTHROPIC_DEFAULT_$(printf '%s' "$tier" | tr '[:lower:]' '[:upper:]')_MODEL" \
+            '.env[$k] // empty' "$config_dir/settings.json" 2>/dev/null) || resolved=""
+        [ -z "$resolved" ] || marker_model="$resolved" ;;
+esac
 mark_pane() { # mark_pane [--dry-run]: never fails, never blocks the launch
     [ -n "${TMUX_PANE:-}" ] || return 0
     if [ "${1:-}" = "--dry-run" ]; then
         printf 'tmux set-option -p -t %s @agent %s\n' "$TMUX_PANE" "$agent"
-        if [ -n "$model" ]; then printf 'tmux set-option -p -t %s @agent_model %s\n' "$TMUX_PANE" "$model"
+        if [ -n "$marker_model" ]; then printf 'tmux set-option -p -t %s @agent_model %s\n' "$TMUX_PANE" "$marker_model"
         else printf 'tmux set-option -pu -t %s @agent_model\n' "$TMUX_PANE"; fi
         return 0
     fi
     tmux set-option -p -t "$TMUX_PANE" @agent "$agent" 2>/dev/null || true
-    if [ -n "$model" ]; then tmux set-option -p -t "$TMUX_PANE" @agent_model "$model" 2>/dev/null || true
+    if [ -n "$marker_model" ]; then tmux set-option -p -t "$TMUX_PANE" @agent_model "$marker_model" 2>/dev/null || true
     else tmux set-option -pu -t "$TMUX_PANE" @agent_model 2>/dev/null || true; fi
 }
 

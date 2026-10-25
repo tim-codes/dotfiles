@@ -21,6 +21,9 @@ mkdir -p "$FAKE/.claude-exxo" "$FAKE/.claude-exxo-openrouter" "$FAKE/.claude-exx
 # The launcher parses its contexts file with yq (v4); put the real one on the stub PATH.
 YQ_REAL="$(command -v yq || true)"
 [ -n "$YQ_REAL" ] && ln -s "$YQ_REAL" "$BIN/yq"
+# The tmux marker resolves tier aliases with jq; the stub PATH needs it too.
+JQ_REAL="$(command -v jq || true)"
+[ -n "$JQ_REAL" ] && ln -s "$JQ_REAL" "$BIN/jq"
 # Tests read the repo's contexts file unless a case sets its own.
 REPO_CONTEXTS="$SRC_REPO/src/.config/claude-kickoff/contexts.toml"
 export CLAUDE_KICKOFF_CONTEXTS="$REPO_CONTEXTS"
@@ -377,14 +380,29 @@ tkick() { # tkick <pane, or empty for none> <args...>: kick with TMUX_PANE set o
 }
 trec_has() { grep -qxF -- "$1" "$TMUX_REC"; }
 trec_empty() { [ ! -s "$TMUX_REC" ]; }
-sed 's|^model: .*|model: moonshotai/kimi-k3@preset/tim-k3|' "$T/fixture.md" >"$T/kimi.md"
+# The openrouter context maps every tier to K3 in its own settings.json (fixture here).
+cat >"$FAKE/.claude-exxo-openrouter/settings.json" <<'EOF'
+{ "env": { "ANTHROPIC_DEFAULT_SONNET_MODEL": "moonshotai/kimi-k3@preset/tim-k3" } }
+EOF
+sed 's|^model: .*|model: sonnet|' "$T/fixture.md" >"$T/kimi.md"
+cat >"$BIN/claude" <<'EOF'
+#!/bin/bash
+for a in "$@"; do printf 'arg<%s>\n' "$a"; done >"$REC"
+EOF
+rm -f "$REC"
 tkick %7 "$T/kimi.md" --account exxo-openrouter
 check "tmux marker: openrouter sets @agent kimi" trec_has "tmux set-option -p -t %7 @agent kimi"
-check "tmux marker: openrouter sets @agent_model" trec_has "tmux set-option -p -t %7 @agent_model moonshotai/kimi-k3@preset/tim-k3"
-check "tmux marker: claude is still launched" [ -s "$REC" ]
+check "tmux marker: openrouter resolves the sonnet alias via settings.json" trec_has "tmux set-option -p -t %7 @agent_model moonshotai/kimi-k3@preset/tim-k3"
+check "tmux marker: claude is still launched with the alias as --model" bash -c 'grep -qx "arg<--model>" "$1" && grep -qx "arg<sonnet>" "$1"' _ "$REC"
+rm -f "$REC"
 tkick %7 "$T/fixture.md" --account exxo
 check "tmux marker: exxo sets @agent claude" trec_has "tmux set-option -p -t %7 @agent claude"
-check "tmux marker: exxo sets @agent_model to the frontmatter model" trec_has "tmux set-option -p -t %7 @agent_model opus"
+check "tmux marker: exxo publishes the alias as given" trec_has "tmux set-option -p -t %7 @agent_model opus"
+check "tmux marker: exxo launch recorded its own argv" bash -c 'grep -qx "arg<--model>" "$1" && grep -qx "arg<opus>" "$1"' _ "$REC"
+printf 'not json' >"$FAKE/.claude-exxo/settings.json"
+tkick %7 "$T/fixture.md" --account exxo
+check "tmux marker: unreadable settings.json falls back to the alias, launch unaffected" bash -c '[ "$1" -eq 0 ] && grep -qx "tmux set-option -p -t %7 @agent_model opus" "$2"' _ "$rc" "$TMUX_REC"
+rm -f "$FAKE/.claude-exxo/settings.json"
 tkick "" "$T/fixture.md" --account exxo
 check "tmux marker: no TMUX_PANE, no tmux call" trec_empty
 tkick %7 "$T/kimi.md" --account exxo-openrouter --dry-run
