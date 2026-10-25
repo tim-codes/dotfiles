@@ -109,8 +109,10 @@ of `shared * exxo`, applied only to this context (naming: `settings.overlay.
 - **env**: `ANTHROPIC_BASE_URL` (OpenRouter), an EMPTY `ANTHROPIC_API_KEY`
   (so no Anthropic credential is ever used), every tier variable
   (`ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU,FABLE}_MODEL`) and
-  `CLAUDE_CODE_SUBAGENT_MODEL` all set to `moonshotai/kimi-k3`, and
-  `ENABLE_TOOL_SEARCH=false`. The `claude-exxo-*`, `claude` and `claude-default` wrappers unset these
+  `CLAUDE_CODE_SUBAGENT_MODEL` all set to `moonshotai/kimi-k3@preset/tim-k3`
+  (an OpenRouter preset named tim-k3: provider order inference-net then Wafer,
+  fallbacks on, chosen for cost and cache hits; Moonshot first-party was
+  rejected as about 12× the price), and `ENABLE_TOOL_SEARCH=false`. The `claude-exxo-*`, `claude` and `claude-default` wrappers unset these
   variables (and `ANTHROPIC_AUTH_TOKEN`) for any non-openrouter launch, so a
   nested launch from a K3 session cannot inherit the OpenRouter backend. One
   session has one backend, hence the

@@ -346,7 +346,7 @@ model for every subagent that names none (per-agent pins and per-invocation
 `model` still win, as the variable no longer overrides them as of Claude Code
 v2.1.251), flattening the default; that is why it stays unset. The one
 exception: in the `exxo-openrouter` context only, `CLAUDE_CODE_SUBAGENT_MODEL`
-and every tier variable point at `moonshotai/kimi-k3`, because one session has
+and every tier variable point at `moonshotai/kimi-k3@preset/tim-k3`, because one session has
 one backend; the overlay settings fragment sets them, never a session.
 
 ## Always set up the task tracker

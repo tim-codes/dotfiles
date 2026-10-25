@@ -53,7 +53,7 @@ check "ANTHROPIC_API_KEY present and empty" \
     jq -e '.env | has("ANTHROPIC_API_KEY") and .ANTHROPIC_API_KEY == ""' "$(S exxo-openrouter)" >/dev/null
 for v in ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_SONNET_MODEL ANTHROPIC_DEFAULT_HAIKU_MODEL \
          ANTHROPIC_DEFAULT_FABLE_MODEL CLAUDE_CODE_SUBAGENT_MODEL; do
-    check "$v is moonshotai/kimi-k3" jqeq exxo-openrouter ".env.$v" 'moonshotai/kimi-k3'
+    check "$v is moonshotai/kimi-k3@preset/tim-k3" jqeq exxo-openrouter ".env.$v" 'moonshotai/kimi-k3@preset/tim-k3'
 done
 check "ENABLE_TOOL_SEARCH is false" jqeq exxo-openrouter '.env.ENABLE_TOOL_SEARCH' 'false'
 check "model pinned to sonnet" jqeq exxo-openrouter '.model' 'sonnet'
