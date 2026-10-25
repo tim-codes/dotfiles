@@ -79,9 +79,9 @@ to last — it reverts on the next sync. Put it in the right fragment instead.
 Account-specific keys (the exxo-skills marketplace, its plugin) live only in
 `settings.exxo.json`; `~/.claude-personal` must never receive Exxo config.
 The one carve-out is OAuth-only MCP servers (`datadog`, `boards`): they hold
-no credential and no Exxo reference beyond a public endpoint, so they live in
-`mcp.shared.json` and reach every context. Access stays gated by the sign-in
-each user completes per context, never by the fragment.
+no credential and access is gated by Exxo's WorkOS org, so they live in
+`mcp.shared.json` and reach every context. `exxo-openrouter` denies them via
+`deniedMcpServers` in its overlay, since workers cannot authenticate.
 
 One exception to "account fragment wins": the permission rule arrays
 (`permissions.allow`/`deny`/`ask`) are CONCATENATED across the two fragments

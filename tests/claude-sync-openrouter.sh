@@ -74,6 +74,14 @@ check "merged deny length = exxo ($exxo_deny) + $extra new rules" \
 check "shared-floor pulumi env open rules appear exactly once" \
     test "$(jq '[.permissions.deny[] | select(. == "Bash(pulumi env open*)" or . == "Bash(* pulumi env open*)")] | length' "$(S exxo-openrouter)")" -eq 2
 
+# OAuth-only shared MCP servers are denied for workers; shared denials survive.
+for n in datadog boards; do
+    check "deniedMcpServers includes $n" \
+        jqeq exxo-openrouter ".deniedMcpServers | any(.serverName == \"$n\")" true
+done
+check "shared deniedMcpServers kept" \
+    jqeq exxo-openrouter '.deniedMcpServers | any(.serverName == "plugin:data:hex")' true
+
 # Allow set: exactly the inherited one; nothing from the overlay.
 check "allow set equals exxo's" \
     test "$(jq -c '.permissions.allow' "$(S exxo-openrouter)")" = "$(jq -c '.permissions.allow' "$(S exxo)")"

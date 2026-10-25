@@ -19,7 +19,7 @@ servers = ["playwright"]
 [personal]
 servers = ["Sanity", "mantine"]
 
-# Datadog is the user-scope `datadog` server from mcp.exxo.json (EU site,
+# Datadog is the user-scope `datadog` server from mcp.shared.json (EU site,
 # mcp.datadoghq.eu/v1/mcp), not the engineering plugin's US-site
 # `plugin:engineering:datadog`, whose OAuth starts on the wrong site.
 # `claude.ai Datadog` is the account connector — present only where the
