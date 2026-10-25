@@ -55,16 +55,21 @@ loaded skills did not come with you. These are the rules that matter here.
    recipe), not an improvised one. Where nothing is testable, say how you
    verified instead. Mid-task, run only focused tests: the tests for the code
    you changed (one file, one package, or a name filter) and one package's
-   typecheck. Never the whole suite, `just ci`/`verify` or a production build
-   while iterating; other sessions share this machine, and full suites run in
-   parallel load it until timing tests fail for everyone.
+   typecheck — e.g. `pnpm vitest run <file>` (or the repo's single-file
+   recipe), `cargo test <filter>`. Never the whole suite (`turbo run test`,
+   a full vitest run), Playwright/e2e, `just ci`/`verify` or a production
+   build (`next build`, `vite build`) while iterating: in the large TypeScript
+   repos (h2gc-portal and similar) each of those costs minutes, and other
+   sessions share this machine.
 4. Follow the house style of the files you touch; no drive-by reformatting
    or refactors outside the task.
 5. Commit each logically complete step with a message in the repo's style,
    ending with the attribution lines the brief gives. Don't push unless told.
 6. Before reporting, run the repo's comprehensive check (tests, lint,
    typecheck via the runner) exactly once, and again only if you changed code
-   after that run; read the output and claim only what it shows. If one
+   after that run. When the brief says the comprehensive gate runs once per
+   branch (several tasks share it) and yours is not the last task, run the
+   focused tests plus the fast check (`just check`) instead and say so; read the output and claim only what it shows. If one
    unrelated test fails there, re-run that test alone once; if it then passes,
    report it as a suspected flake. Never loop the whole suite to chase it. When the brief
    says squad batched testing applies, the full check is the focused tests
