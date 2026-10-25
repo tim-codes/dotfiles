@@ -170,7 +170,7 @@ line.
 | `heavy_slot` | `{decision: grant\|deny\|revoke, retry_after_s?}` | grant: start the heavy job. deny: wait `retry_after_s`, then request again (a deny with `retry_after_s` may mean a protected app is running; do non-heavy work meanwhile). revoke: stop the heavy job now (interrupt the command), then `release` |
 | `cleanup` | `{reason, top?}` | the orchestrator saw you idle with busy or large leftover processes (`top`: `{pid, cmd, cpu_pct, rss_mb}`). Run the self-cleanup rule (§7) now: `TaskStop` completed subagents, end background shells you started, kill your own leftovers (dev servers, browsers, builds; check each `top` pid is yours before killing, never another session's), then `squad set --name <name> --detail "cleanup done: <what was stopped>"` |
 | `preflight` | `{ttl_hours?}` | warm and refresh every credential path this stream's work will need, so nothing prompts later while Tim is away; the procedure is below |
-| `resume` / `msg` | `{}` / `{kind:"operator_done", id?}` | `resume` as below; a `msg` saying an `operator_task` of yours is done: continue the work it blocked (§6 Operator tasks) |
+| `resume` / `msg` | `{}` / `{kind:"operator_done", id?}` | `resume` as below; a `msg` saying an `operator_task` of yours is done: continue the work it blocked (§6 Operator tasks); a `msg` `operator_decision` `{id, option, note}`: act on that option only (§6) |
 | `review` | `{findings}` | design-conformity findings on your ADR/plan or PR: address each blocking finding (or reply to the orchestrator with a justification), then re-send `design ready` / `pr_ready`; advisory ones are optional |
 | `infra` | `{action, pr, authority}` | infra role only; a client ignores it |
 | `relaunch` | reserved | not implemented; reply that it is unsupported |
@@ -308,6 +308,11 @@ as the text's first word and a `kind` field in `data`.
   is `ready` (`"operator task ready: <title>"`, `"kind":"operator_task"`,
   `"status":"ready"`). On `resume`, or a `msg` saying the task is done,
   continue. Ask the orchestrator, not Tim, so one list reaches him.
+  An item you raise yourself for an approval carries `--option
+  <id>=<label>` per choice (`:operator` when only Tim can carry it out) and
+  exact `--command`s. Tim's choice arrives as `decision <id>: <option>`
+  (`"kind":"operator_decision"`, ack it): do exactly that option's text,
+  nothing wider, and treat the item as open until a `msg` says it is done.
 - **Blocked**: `squad set --name <name> --status blocked --detail "<what on>"`
   and `squad send role:orchestrator "blocked: <what on>" --from <name>
   --data '{"kind":"blocked","detail":"<what on>"}'`. Asking Tim directly is
