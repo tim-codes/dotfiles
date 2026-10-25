@@ -46,9 +46,6 @@ g -C "$T/upstream-clone" checkout -q -b job/y --track origin/main
 g -C "$T/upstream-clone" config push.default upstream
 g -C "$T/matching-clone" config push.default matching
 g -C "$T/alias-clone" config alias.p "push origin main"
-# glob-clone: files that make an unquoted glob expand to a merge word.
-g clone -q -b job/x "$T/origin.git" "$T/glob-clone"
-mkdir -p "$T/glob-clone/repos/o/r/pulls/1"; touch "$T/glob-clone/merge" "$T/glob-clone/repos/o/r/pulls/1/merge"
 [ "$(git -C "$T/main-clone" rev-parse --abbrev-ref HEAD)" = main ] || bad "fixture: main-clone not on main"
 [ "$(git -C "$T/job-clone" rev-parse --abbrev-ref HEAD)" = job/x ] || bad "fixture: job-clone not on job/x"
 
@@ -221,9 +218,19 @@ job|gh api repos/o/r/pulls/1/{merge,}
 job|git pu{s,}h origin HEAD:main
 job|touch HEAD:main; git push origin HEAD:mai?
 job|gh api -X PATCH repos/{owner}/{repo}/git/refs/heads/{branch} -f sha=abc
-glob|gh api repos/o/r/pulls/1/mer?e
-glob|gh pr mer?e 1
-glob|gh pr [m]erge 1
+job|touch merge; gh pr mer?e 1
+job|mkdir -p x && gh pr mer[g]e 1
+job|gh pr me*e 1
+job|gh pr mer?e 1
+job|gh pr [m]erge 1
+job|gh api repos/o/r/pulls/1/mer?e
+job|gh api repos/o/r/pulls?state=all
+job|gh workflow ru? merge.yml
+job|gh ru* rerun 1
+job|git pu?h origin job/x
+job|git push origin job/?
+job|gh api repos/o/r/pulls/{1,2}/reviews
+job|git -C {.,..} push origin job/x
 job|git push origin #job/x
 job|git push origin HEAD:main # comment
 job|git push origin HEAD:ma[i]n
@@ -277,9 +284,16 @@ job|gh api repos/o/r/contents/README.md
 job|cargo test && git push origin job/x
 job|git rebase main
 job|gh run list --workflow ci.yml
-job|gh pr mer?e 1
 job|gh api repos/{owner}/{repo}/pulls
 job|gh api 'repos/o/r/pulls?state=all'
+job|gh api repos/{owner}/{repo}/branches/{branch}
+job|gh api "repos/o/r/pulls?state=open&per_page=5"
+job|gh pr list --search 'is:open draft:*'
+job|gh pr view 1 --json title -q .title
+job|gh issue list --label bug*
+job|git log --oneline -- *.md
+job|git push origin 'job/x'
+job|git push origin "HEAD:job/x"
 job|{ git status; }
 job|git log --oneline # recent
 job|gh pr view 1 --json title -q '.title'

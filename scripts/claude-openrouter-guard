@@ -6,7 +6,7 @@ the default branch, in any form. The overlay's permission deny rules match
 command text only; this hook tokenises the command. There is no GitHub branch
 protection behind it, so it fails closed.
 
-Model (controller ruling R-C9): allow only what is fully resolved.
+Model (controller rulings R-C9, R-C10): allow only what is fully resolved.
   * A command whose de-quoted text mentions a risk word (push, merge, /merges,
     refs/heads, heads/, PullRequest, automerge/AutoMerge, contents/, graphql,
     default_branch) together with git, gh or api is "risk-mentioning". It is
@@ -18,6 +18,12 @@ Model (controller ruling R-C9): allow only what is fully resolved.
     a cd, or a standalone echo/printf with no pipe or redirection anywhere in
     the command.
   * Literal git/gh segments are always analysed, risk words or not.
+  * In a git/gh command that can push, merge or trigger a workflow (git
+    push/plumbing/aliases; gh pr except view/list/diff/checks/status, gh api,
+    gh workflow, gh run), any word with an unquoted ?, * or [ or an unquoted
+    brace group bash would expand ({a,b}, {a..b}) is unresolved. This is
+    decided from the quoting alone, never the filesystem. gh's {owner},
+    {repo} and {branch} placeholders are literal to bash and stay allowed.
 
 Rule ids (also the log's `rule`):
   gh-pr-merge          gh pr merge
@@ -52,11 +58,9 @@ is opened non-blocking and must be a regular file, and a logging failure
 never changes the decision.
 """
 import datetime
-import glob
 import json
 import os
 import re
-import shlex
 import stat
 import subprocess
 import sys
@@ -112,6 +116,7 @@ GH_KNOWN = {"agent-task", "alias", "api", "attestation", "auth", "browse", "cach
             "completion", "config", "copilot", "extension", "ext", "gist", "gpg-key", "help", "issue",
             "label", "org", "pr", "preview", "project", "release", "repo", "ruleset", "run", "search",
             "secret", "ssh-key", "status", "variable", "version", "workflow"}
+GH_PR_READ_ONLY = {"view", "list", "diff", "checks", "status"}
 GH_GRAPHQL_MUTATIONS = re.compile(r"\b(mergePullRequest|enablePullRequestAutoMerge|mergeBranch|updateRefs?"
                                   r"|createCommitOnBranch|deleteRef|createRef|updatePullRequestBranch)\b")
 PR_MERGE_PATH = re.compile(r"pulls/([^/\s?]+)/merge\b")
@@ -145,20 +150,16 @@ BRACE_EXPANSION = re.compile(r"\{[^{}\s]*(?:,|\.\.)[^{}\s]*\}")
 GLOB_CHARS = re.compile(r"[?*\[]")
 
 
-def unresolved_word(word, cwd, strict):
-    """True when bash would not pass `word` through literally: expansion,
-    brace expansion, an embedded (backslash-)newline, or a glob that is
-    unresolved (strict) or matches a file (otherwise bash leaves it as is)."""
-    if has_expansion(word) or BRACE_EXPANSION.search(word) or "\n" in word:
-        return True
-    if GLOB_CHARS.search(word):
-        if strict:
-            return True
-        try:
-            return bool(glob.glob(word, root_dir=cwd))
-        except (OSError, ValueError):
-            return True
-    return False
+def globby(word):
+    """Unquoted ?, * or [, or an unquoted brace group bash would expand (one
+    with ',' or '..'). Decided from the text alone, never the filesystem
+    (ruling R-C10: a glob can be made to match in the same command)."""
+    masked = getattr(word, "masked", word)
+    return bool(GLOB_CHARS.search(masked) or BRACE_EXPANSION.search(masked))
+
+
+def unresolved_word(word):
+    return has_expansion(word) or globby(word) or "\n" in word
 
 
 def dequote(text):
@@ -174,15 +175,90 @@ def is_risky(text):
 
 # ---- tokenising -----------------------------------------------------------------
 
+class Word(str):
+    """A shell word after quote removal. `masked` is the same text with every
+    quoted or escaped character replaced by NUL, so the unquoted (expandable)
+    characters can be examined."""
+    masked = ""
+
+
+class Op(str):
+    """A run of unquoted operator characters."""
+
+
 def tokens(text):
-    lex = shlex.shlex(text, posix=True, punctuation_chars=PUNCT)
-    lex.whitespace = " \t\r"
-    lex.whitespace_split = True
-    # bash only starts a comment at the start of a word; shlex would drop the
-    # rest of the line at a mid-word '#'. Risk-mentioning commands with '#'
-    # are blocked before tokenising, so no comment handling is needed.
-    lex.commenters = ""
-    return list(lex)
+    """POSIX-ish lexer: quotes, backslash escapes, backslash-newline joins
+    (as bash does), '#' comments only at the start of a word, and runs of
+    ;&|<>() as operators. Raises ValueError on unbalanced quotes."""
+    out, val, mask, started = [], [], [], False
+    i, n = 0, len(text)
+
+    def add(ch, quoted):
+        val.append(ch)
+        mask.append("\0" if quoted else ch)
+
+    def flush():
+        nonlocal val, mask, started
+        if started:
+            w = Word("".join(val))
+            w.masked = "".join(mask)
+            out.append(w)
+        val, mask, started = [], [], False
+
+    while i < n:
+        c = text[i]
+        if c in " \t\r":
+            flush()
+            i += 1
+        elif c == "#" and not started:
+            while i < n and text[i] != "\n":
+                i += 1
+        elif c in PUNCT:
+            flush()
+            j = i
+            while j < n and text[j] in PUNCT:
+                j += 1
+            out.append(Op(text[i:j]))
+            i = j
+        elif c == "\\":
+            if i + 1 < n and text[i + 1] == "\n":
+                i += 2  # line continuation: bash joins the lines
+                continue
+            started = True
+            if i + 1 < n:
+                add(text[i + 1], True)
+            i += 2
+        elif c == "'":
+            j = text.find("'", i + 1)
+            if j < 0:
+                raise ValueError("unbalanced single quote")
+            started = True
+            for ch in text[i + 1:j]:
+                add(ch, True)
+            i = j + 1
+        elif c == '"':
+            started = True
+            j = i + 1
+            while True:
+                if j >= n:
+                    raise ValueError("unbalanced double quote")
+                ch = text[j]
+                if ch == "\\" and j + 1 < n and text[j + 1] in '$`"\\\n':
+                    if text[j + 1] != "\n":
+                        add(text[j + 1], True)
+                    j += 2
+                elif ch == '"':
+                    break
+                else:
+                    add(ch, True)
+                    j += 1
+            i = j + 1
+        else:
+            started = True
+            add(c, False)
+            i += 1
+    flush()
+    return out
 
 
 def split_ops(tok):
@@ -206,12 +282,9 @@ class Parsed:
     def __init__(self, toks):
         self.segments = []
         self.pipe = self.redirect = self.heredoc = False
-        seg, skip, comment = [], False, False
+        seg, skip = [], False
         for t in toks:
-            if t and all(c in PUNCT for c in t):
-                if comment and "\n" not in t:
-                    continue
-                comment = False
+            if isinstance(t, Op):
                 for op in split_ops(t):
                     if "<" in op or ">" in op:
                         self.redirect = True
@@ -227,11 +300,6 @@ class Parsed:
                 continue
             if skip:
                 skip = False
-                continue
-            if comment:
-                continue
-            if t.startswith("#"):
-                comment = True  # bash: '#' at the start of a word comments to end of line
                 continue
             seg.append(t)
         if seg:
@@ -360,10 +428,10 @@ def check_git(args, assigns, cwd, form, strict, allowed):
     while i < len(args) and args[i].startswith("-"):
         a = args[i]
         nxt = args[i + 1] if i + 1 < len(args) else ""
-        if unresolved_word(a, cwd, strict):
+        if has_expansion(a):
             raise unresolved("unresolved git option", form)
         if a == "-C" and nxt:
-            if unresolved_word(nxt, cwd, strict):
+            if has_expansion(nxt):
                 raise unresolved("unresolved git -C directory", form)
             cwd = resolve(cwd, nxt)
             if form in ("plain", "other"):
@@ -371,7 +439,7 @@ def check_git(args, assigns, cwd, form, strict, allowed):
             i += 2
             continue
         if a == "-c" and nxt:
-            if unresolved_word(nxt, cwd, strict):
+            if has_expansion(nxt):
                 raise unresolved("unresolved git -c value", form)
             cfg_c.append(nxt)
             m = re.match(r"^alias\.([^=]+)=(.*)$", nxt, re.S | re.I)
@@ -389,8 +457,12 @@ def check_git(args, assigns, cwd, form, strict, allowed):
     if i >= len(args):
         return
     sub, rest = args[i], args[i + 1:]
-    if unresolved_word(sub, cwd, strict):
+    if unresolved_word(sub):
         raise unresolved("unresolved git subcommand", form)
+    # R-C10: a git command that can push (push, plumbing pushers, aliases)
+    # must have no unquoted glob or brace-expansion word anywhere.
+    if (sub == "push" or sub in GIT_PUSHERS or sub not in GIT_SAFE) and any(globby(w) for w in args):
+        raise unresolved(f"unquoted glob or brace expansion in git {sub}", form)
 
     if sub in GIT_PUSHERS:
         raise Block(PUSH, None, f"git {sub} can push and is not allowed for workers", form)
@@ -436,7 +508,7 @@ def check_push(push, cwd, form, allowed):
     positional, j = [], 0
     while j < len(push):
         a = push[j]
-        if unresolved_word(a, cwd, True):
+        if unresolved_word(a):
             raise unresolved("unresolved git push argument", form)
         if a == "--":
             positional += push[j + 1:]
@@ -530,7 +602,7 @@ def check_gh(args, assigns, cwd, form, strict):
         if args[i] in ("-R", "--repo", "--hostname"):
             i += 1
         i += 1
-    if any(unresolved_word(a, cwd, strict) for a in args[:i + 1]):
+    if any(unresolved_word(a) for a in args[:i + 1]):
         raise unresolved("unresolved gh option or subcommand", form)
     rest = args[i:]
     if not rest:
@@ -546,7 +618,7 @@ def check_gh(args, assigns, cwd, form, strict):
             if rest[j] in ("-R", "--repo"):
                 j += 1
             j += 1
-        if any(unresolved_word(a, cwd, strict) for a in rest[1:j + 1]):
+        if any(unresolved_word(a) for a in rest[1:j + 1]):
             raise unresolved("unresolved gh pr subcommand", form)
         if j < len(rest) and rest[j] == "merge":
             tail = rest[j + 1:]
@@ -556,6 +628,12 @@ def check_gh(args, assigns, cwd, form, strict):
                 m = re.search(r"/pull/(\d+)", pos or "")
                 num = m.group(1) if m else pos
             raise Block(GH_MERGE, num, "gh pr merge is not allowed for workers", form)
+    # R-C10: gh pr (other than read-only subcommands), api, workflow and run
+    # can merge or trigger a workflow; no unquoted glob/brace word allowed.
+    sub = next((a for a in rest[1:] if not a.startswith("-")), None)
+    read_only = top == "pr" and sub in GH_PR_READ_ONLY
+    if top in ("pr", "api", "workflow", "run") and not read_only and any(globby(w) for w in args):
+        raise unresolved(f"unquoted glob or brace expansion in gh {top}", form)
     if (top == "workflow" and "run" in rest[1:2]) or (top == "run" and "rerun" in rest[1:2]):
         raise Block(GH_API, None, f"gh {top} {rest[1]} can start a workflow that merges; not allowed for workers", form)
     if top == "api":
@@ -611,8 +689,8 @@ def check_gh_api(args, cwd, form, strict):
                 raise Block(GH_API, d, "gh api on the default branch ref is not allowed for workers", form)
     if any(re.search(r"(^|/)dispatches\b", p) for p in paths):
         raise Block(GH_API, None, "workflow/repository dispatch can start a merge; not allowed for workers", form)
-    if any(unresolved_word(p, cwd, strict) or "{branch}" in p for p in paths):
-        raise unresolved("unresolved gh api path (expansion, glob or {branch} placeholder)", form)
+    if any(unresolved_word(p) for p in paths):
+        raise unresolved("unresolved gh api path", form)
     if re.search(r"(^|/)merges\b", path):
         raise Block(GH_API, None, "the repository merges API is not allowed for workers", form)
     if path.strip("/") == "graphql":
