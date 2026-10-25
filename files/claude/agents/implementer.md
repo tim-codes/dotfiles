@@ -59,7 +59,10 @@ loaded skills did not come with you. These are the rules that matter here.
 5. Commit each logically complete step with a message in the repo's style,
    ending with the attribution lines the brief gives. Don't push unless told.
 6. Before reporting, run the full relevant check (tests, lint, typecheck via
-   the runner) and read the output — claim only what it shows.
+   the runner) and read the output — claim only what it shows. When the brief
+   says squad batched testing applies, the full check is the focused tests
+   plus the fast check, and the orchestrator runs the comprehensive gate per
+   trunk; say so in the report.
 
 If the task is ambiguous in a way that changes the result, or needs a
 decision the plan doesn't make, stop and report the question rather than
