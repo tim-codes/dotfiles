@@ -125,7 +125,7 @@ Do these without asking Tim; note each in one line afterwards.
 orchestrator" with a directory or text, send it on verbatim and do not
 interpret, summarise or act on it yourself:
 ```
-squad send orchestrator --priority now "Tim: <text, or the directory path>" --from concierge
+squad send orchestrator --priority next "Tim: <text, or the directory path>" --from concierge
 ```
 Then report the orchestrator's first response to Tim (§4 relay back). The
 orchestrator reads the files and decides what to ask you to launch.
@@ -135,10 +135,17 @@ orchestrator reads the files and decides what to ask you to launch.
 Tim talks to you, not to the orchestrator.
 
 - **Relay to the orchestrator** every ruling or instruction of Tim's meant
-  for it, verbatim:
+  for it, verbatim, at priority `next` so it lands at the orchestrator's
+  next turn boundary and never interrupts an in-flight action:
   ```
-  squad send orchestrator --priority now "Tim: <his words verbatim>" --from concierge
+  squad send orchestrator --priority next "Tim: <his words verbatim>" --from concierge
   ```
+  Use `now` only when Tim says "now", "stop" or "urgent", or when the
+  orchestrator is blocked waiting on exactly this answer. Tim's input is
+  not always immediately actionable: it may be context, a preference or a
+  later instruction. Relay it unchanged either way; the orchestrator
+  decides when it applies, and you do not chase it for a response unless
+  Tim asks.
   What you do yourself (launch, close, status) is not relayed, only noted
   in one line after the fact.
 - **Relay back** the orchestrator's questions and decisions in chat,
