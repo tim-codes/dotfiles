@@ -98,7 +98,9 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
 ## 2. Quota reactivity
 
 Account `A`'s members: `squad roster`, `.req.account == "A"`, `.live`,
-role `client`. The infra member is never in the pause order (never pause it
+role `client`. A member whose registration `account` is null (K3,
+`extra_config_dirs`) belongs to no account, so it is never wall-paused by
+exxo or personal quota. The infra member is never in the pause order (never pause it
 mid-deploy) except at level 100.
 
 A **busy member** has `jq .status <req.config_dir>/sessions/<req.pid>.json`

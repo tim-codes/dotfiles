@@ -42,11 +42,11 @@ If cwd is inside a git repo, check whether it is the primary checkout:
 top=$(git rev-parse --show-toplevel)
 common=$(git rev-parse --path-format=absolute --git-common-dir)
 [ "$common" = "$top/.git" ] && echo primary || echo worktree
-git -C "$top" show-ref --verify --quiet refs/heads/main && echo main
-git -C "$top" show-ref --verify --quiet refs/heads/master && echo master
+git -C "$top" branch --list main master --format='%(refname:short)'
 ```
 
-Primary checkout with a `main` or `master` branch: create a worktree and
+The last command prints `main` and/or `master` for each that exists. Primary
+checkout (first line `primary`) with `main` or `master` printed: create a worktree and
 work there. The branch is `--branch B` if given, else `squad/<name>`.
 
 ```
