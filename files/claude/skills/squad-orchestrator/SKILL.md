@@ -519,6 +519,12 @@ and before closing a member.
 like the rest of the plan; publish after every change. With `--debug`, also
 log each check in `orchestrator-decisions.md` (§9).
 
+**Liaison tickets.** Also list the open liaison tickets (those the liaison
+reports on `liaison.activity` and `squad get liaison.activity`, not closed
+by Tim's word) beside the open operator items, each with its client, ticket
+key and owner. An open one is `deferred` only with its ticket and an owner,
+else `missing`.
+
 **Morning report:** a "Deliverables vs brief" table: stream, deliverable,
 client-facing, state, evidence or tracking item.
 
@@ -595,6 +601,14 @@ incapable one. The record keeps `assigned_by` (you or `broker`).
   escalation is an operator item (§2c) with the ENG-337 decision field, titled
   `job <id> needs Tim: …`.
 - On `job_worker_free`, route the oldest queued job first.
+- **Liaison jobs.** The liaison (`squad-liaison` §6) delegates investigations
+  (`--need review`) and auto-fixes (`--need code`, branch `job/<id>`); route
+  both as any job. Route an auto-fix branch on to the client's `owner`
+  member (tpe-seo, rena-parity; ario-golive once H2 is enabled), never to
+  the liaison or the job worker. The owner's review and merge rules, including
+  that a production-deploying merge waits for Tim, are in `squad-join`
+  "Mail"; you never deploy production unattended. Sanity content stays an
+  unpublished draft.
 - Job traffic is not for Tim: nothing here goes through the concierge unless
   it becomes an operator item.
 - For a job you route that needs a Claude reviewer, assign a Claude
