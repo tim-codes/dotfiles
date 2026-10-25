@@ -14,6 +14,7 @@ src/bin/*
 !src/bin/squad-tunnel
 !src/bin/claude-kickoff
 !src/bin/squad-pr-merge
+!src/bin/squad-watch-mail-launch
 .claude
 src/.config/alacritty/local.toml
 src/.config/alacritty/theme.toml
