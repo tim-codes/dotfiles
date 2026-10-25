@@ -19,6 +19,10 @@
 #                  the ANTHROPIC_* routing variables every other context unsets
 #   agent          optional, which agent the pane runs (claude | kimi; default claude);
 #                  claude-kickoff publishes it as the tmux pane option @agent
+#   resume_group   optional; contexts sharing a group may be resumed across each
+#                  other (the squad herder rebalances only within a group). A context
+#                  with none can never be a rebalance target, and exxo-openrouter
+#                  must never have one (its transcript store is not shared).
 
 # Needs that only a login with that connector satisfies; a member needing one
 # launches only in a context that `provides` it (exit 9 otherwise). A need not
@@ -36,6 +40,7 @@ account = "exxo"
 provides = ["m365", "figma", "notion", "agent-run", "datadog", "boards"]
 env = { EXXO_SECRET_CACHE_TTL_SECONDS = "43200" }
 preconditions = []
+resume_group = "exxo"
 
 [[context]]
 name = "exxo-personal"
@@ -45,6 +50,7 @@ account = "personal"
 provides = ["agent-run", "datadog", "boards"]
 env = { EXXO_SECRET_CACHE_TTL_SECONDS = "43200" }
 preconditions = []
+resume_group = "exxo"
 
 [[context]]
 name = "personal"
@@ -54,6 +60,7 @@ account = "personal"
 provides = ["agent-run", "datadog", "boards"]
 env = { EXXO_SECRET_CACHE_TTL_SECONDS = "43200" }
 preconditions = []
+resume_group = "personal"
 
 [[context]]
 name = "exxo-openrouter"

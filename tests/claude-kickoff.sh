@@ -100,9 +100,9 @@ kick "$T/fixture.md" --account exxo-personal --dry-run
 check "--account overrides context" has "config_dir: $FAKE/.claude-exxo-personal"
 kick "$T/fixture.md" --account=personal --dry-run
 check "--account=VALUE form works" has "config_dir: $FAKE/.claude-personal"
-kick "$T/fixture.md" --resume abc-123_X --dry-run
-check "--resume dry-run reports resume mode, id, no body" bash -c 'printf "%s\n" "$1" | grep -qx "mode: resume" && printf "%s\n" "$1" | grep -qx "session_id: abc-123_X" && printf "%s\n" "$1" | grep -q "^body_bytes: 0"' _ "$out"
-kick "$T/fixture.md" --resume abc --account exxo-personal --dry-run
+kick "$T/fixture.md" --resume abc-123_X --account exxo --cwd "$W" --dry-run
+check "--resume dry-run reports resume mode, id and the fixed note size" bash -c 'printf "%s\n" "$1" | grep -qx "mode: resume" && printf "%s\n" "$1" | grep -qx "session_id: abc-123_X" && printf "%s\n" "$1" | grep -q "^body_bytes: [1-9][0-9]* (fixed relaunch note"' _ "$out"
+kick "$T/fixture.md" --resume abc --account exxo-personal --cwd "$W" --dry-run
 check "--resume with --account targets that dir" has "config_dir: $FAKE/.claude-exxo-personal"
 
 # --- real exec of the stub ---
@@ -120,12 +120,12 @@ check "claude started in the prompt cwd" bash -c 'printf "%s\n" "$1" | grep -qx 
 out=$(HOME="$FAKE" PATH="$BIN:/usr/bin:/bin" REC="$REC" EXXO_SECRET_CACHE_TTL_SECONDS=60 "$KICK" "$T/fixture.md" 2>&1)
 check "a caller-set TTL is respected" bash -c 'grep -qx "TTL=60" "$1"' _ "$REC"
 
-kick "$T/fixture.md" --resume sess-1 --account exxo-personal
+kick "$T/fixture.md" --resume sess-1 --account exxo-personal --cwd "$W"
 check "resume launch exits 0 (stub)" [ "$rc" -eq 0 ]
 rec=$(cat "$REC")
-check "resume argv is --resume ID --model M --effort E, no body" \
-    [ "$(printf '%s\n' "$rec" | sed -n '1,7p' | tr '\n' ' ')" = "argc=6 arg<--resume> arg<sess-1> arg<--model> arg<opus> arg<--effort> arg<high> " ]
-check "resume passes no body" bash -c '! printf "%s\n" "$1" | grep -q "Do the thing"' _ "$rec"
+check "resume argv is --resume ID --model M --effort E, then the relaunch note" \
+    [ "$(printf '%s\n' "$rec" | sed -n '1,7p' | tr '\n' ' ')" = "argc=7 arg<--resume> arg<sess-1> arg<--model> arg<opus> arg<--effort> arg<high> " ]
+check "resume passes the relaunch note, never the file body" bash -c '! printf "%s\n" "$1" | grep -q "Do the thing" && printf "%s\n" "$1" | grep -q "squad relaunch: you are now on context exxo-personal\."' _ "$rec"
 check "resume uses the overridden config dir" bash -c 'printf "%s\n" "$1" | grep -qx "CLAUDE_CONFIG_DIR=$2"' _ "$rec" "$FAKE/.claude-exxo-personal"
 check "resume keeps the cwd and TTL" bash -c 'printf "%s\n" "$1" | grep -qx "PWD=$2" && printf "%s\n" "$1" | grep -qx "TTL=43200"' _ "$rec" "$(cd "$W" && pwd -P)"
 
@@ -149,7 +149,7 @@ printf 'cwd: x\nmodel: opus\n' >"$T/noterm.md"
 expect_rc "no --- terminator" 3 "$T/noterm.md" --dry-run
 printf 'cwd: %s\ncontext: exxo\nmodel: opus\neffort: low\n---\n\n' "$W" >"$T/nobody.md"
 expect_rc "empty body on a new session" 3 "$T/nobody.md" --dry-run
-expect_rc "empty body is fine on resume" 0 "$T/nobody.md" --resume s1 --dry-run
+expect_rc "empty body is fine on resume" 0 "$T/nobody.md" --resume s1 --account exxo --cwd "$W" --dry-run
 for k in cwd context model effort; do
     grep -v "^$k:" "$T/fixture.md" >"$T/no-$k.md"
     expect_rc "missing $k" 4 "$T/no-$k.md" --dry-run
@@ -297,7 +297,7 @@ for a in "$@"; do printf 'arg<%s>\n' "$a"; done >"$REC"
 EOF
 kick "$T/adddirs.md"
 check "add_dirs become --add-dir flags, in order, before --model" bash -c '[ "$(sed -n 1,6p "$1" | tr "\n" " ")" = "arg<--add-dir> arg<$2/briefs> arg<--add-dir> arg<$2/reports> arg<--model> arg<opus> " ]' _ "$REC" "$FAKE"
-kick "$T/adddirs.md" --resume s1
+kick "$T/adddirs.md" --resume s1 --account exxo --cwd "$W"
 check "add_dirs also apply on resume" bash -c 'grep -qx "arg<--add-dir>" "$1" && grep -qx "arg<--resume>" "$1"' _ "$REC"
 sed 's|^model: .*|&\nadd_dirs: ~/briefs ~/nowhere|' "$T/fixture.md" >"$T/baddirs.md"
 expect_rc "a missing add_dirs path" 3 "$T/baddirs.md" --dry-run
@@ -341,6 +341,53 @@ for c in exxo exxo-openrouter; do
     if [ "$c" = exxo ]; then check "exxo launch drops the OpenRouter env" bash -c '! grep -q "ANTHROPIC_\|SUBAGENT" "$1"' _ "$REC"
     else check "exxo-openrouter launch keeps its env" bash -c 'grep -q "ANTHROPIC_BASE_URL" "$1"' _ "$REC"; fi
 done
+
+# --- resume: resume_group, explicit cwd and the relaunch note ---
+sed 's|^cwd: .*|cwd: /also/nonexistent-2|' "$T/fixture.md" >"$T/rcwd.md"
+kick "$T/rcwd.md" --resume sess-2 --account exxo --cwd "$W" --dry-run
+check "resume ignores the frontmatter cwd" [ "$rc" -eq 0 ]
+expect_rc "resume without --cwd is a usage error" 2 "$T/rcwd.md" --resume sess-2 --account exxo --dry-run
+kick "$T/rcwd.md" --resume sess-2 --account exxo --cwd "$FAKE/work/other" --dry-run
+check "resume_prints_resume_and_group" bash -c '
+    printf "%s\n" "$1" | grep -qx "resume: sess-2" &&
+    printf "%s\n" "$1" | grep -qx "resume_group: exxo"' _ "$out"
+check "resume_uses_given_cwd_not_frontmatter" bash -c '
+    printf "%s\n" "$1" | grep -qx "cwd: $(cd "$2" && pwd -P)" &&
+    ! printf "%s\n" "$1" | grep -q nonexistent-2' _ "$out" "$FAKE/work/other"
+sed "s|^model: .*|&\nneeds: m365|" "$T/rcwd.md" >"$T/rneeds.md"
+expect_rc "resume_needs_m365_on_exxo_personal_exits_9" 9 "$T/rneeds.md" --resume sess-2 --cwd "$W" --account exxo-personal --dry-run
+kick "$T/rcwd.md" --resume sess-2 --cwd "$W" --account personal --dry-run
+check "personal is its own resume_group" has "resume_group: personal"
+kick "$T/rcwd.md" --resume sess-2 --cwd "$W" --account exxo-openrouter --dry-run
+check "context_without_group_prints_none" has "resume_group: none"
+expect_rc "resume_without_account_exits_2" 2 "$T/rcwd.md" --resume sess-2 --cwd "$W" --dry-run
+expect_rc "resume with a cwd that is not a directory" 5 "$T/rcwd.md" --resume sess-2 --cwd "$FAKE/nothere" --account exxo --dry-run
+expect_rc "resume --cwd still refuses the bare home" 0 "$T/rcwd.md" --resume sess-2 --cwd "$FAKE" --account exxo --dry-run
+has "cwd: $(cd "$FAKE" && pwd -P)/claude" && ok "  redirected to ~/claude" || bad "  not redirected: $out"
+# real resume exec: from the given cwd, with the relaunch note as the prompt
+cat >"$BIN/claude" <<'EOF'
+#!/bin/bash
+{
+  echo "argc=$#"
+  for a in "$@"; do printf 'arg<%s>\n' "$a"; done
+  echo "CFG=${CLAUDE_CONFIG_DIR-unset}"
+  echo "PWD=$(pwd -P)"
+} >"$REC"
+EOF
+kick "$T/rcwd.md" --resume sess-9 --cwd "$FAKE/work/other" --account exxo
+check "resume launch exits 0 with explicit cwd (stub)" [ "$rc" -eq 0 ]
+rec=$(cat "$REC")
+check "resume argv is --resume ID --model M --effort E <note>" bash -c '
+    printf "%s\n" "$1" | grep -qx "argc=7" &&
+    printf "%s\n" "$1" | sed -n "2,7p" | tr "\n" " " | grep -qx "arg<--resume> arg<sess-9> arg<--model> arg<opus> arg<--effort> arg<high> "' _ "$rec"
+check "the relaunch note is the final positional arg" bash -c '
+    printf "%s\n" "$1" | sed -n "8p" | grep -qx "arg<squad relaunch: you are now on context exxo\. Re-register under the same name (squad-join §2, same session), then follow squad-join §5 \`relaunch\`\.>"' _ "$rec"
+check "resume ran from the explicit cwd, not the frontmatter one" bash -c '
+    printf "%s\n" "$1" | grep -qx "PWD=$2" &&
+    printf "%s\n" "$1" | grep -qx "CFG=$3"' _ "$rec" "$(cd "$FAKE/work/other" && pwd -P)" "$FAKE/.claude-exxo"
+# --cwd without --resume changes nothing
+kick "$T/fixture.md" --cwd "$FAKE/work/other" --dry-run
+check "--cwd without --resume is ignored: frontmatter cwd still wins" has "cwd: $(cd "$W" && pwd -P)"
 
 # --- drift guard: the contexts file must match the fish wrappers ---
 FISH="$SRC_REPO/src/.config/fish/common.fish"

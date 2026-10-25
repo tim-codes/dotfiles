@@ -6,7 +6,7 @@
 # section 4.3), so the interface and exit codes below are a stable contract.
 #
 #   claude-kickoff <prompt.md> [--account CONTEXT]
-#                              [--resume <session_id>] [--dry-run]
+#                              [--resume <session_id> --cwd <dir>] [--dry-run]
 #
 # The context wrappers (claude-personal, claude-exxo, claude-exxo-personal,
 # claude-exxo-openrouter) are
@@ -37,7 +37,7 @@ OPENROUTER_ENV="ANTHROPIC_BASE_URL ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHRO
 usage() {
     cat <<'EOF'
 Usage: claude-kickoff <prompt.md> [--account CONTEXT]
-                                  [--resume <session_id>] [--dry-run]
+                                  [--resume <session_id> --cwd <dir>] [--dry-run]
 
 Reads the frontmatter of <prompt.md>, changes to its cwd and execs claude in the
 matching account context with --model and --effort from the file. A new session
@@ -69,8 +69,17 @@ effort is used):
   before-launch   human steps first (`before launch` with a space is the same key)
 
 Options:
-  --account A     override the frontmatter context (any context name in the file)
-  --resume ID     continue session ID (--resume ID --model M --effort E, no body)
+  --account A     override the frontmatter context (any context name in the file);
+                  required with --resume: the frontmatter context is not trusted then,
+                  and the relaunch note names this context
+  --resume ID     continue session ID in the context --account names, from the
+                  member's live cwd (--cwd); the prompt becomes the fixed relaunch
+                  note. --dry-run also prints resume: <id> and resume_group: <g>
+                  (the context's group, `none` when it has none; only members of a
+                  group may be resumed across contexts)
+  --cwd DIR       the member's live working directory; required with --resume
+                  (the frontmatter cwd is ignored then, and the frontmatter need
+                  not carry one). Without --resume it has no effect.
   --dry-run       resolve and validate everything, print the plan (never the body,
                   only its size) and exit 0 without launching
   -h, --help      this text
@@ -112,7 +121,7 @@ die() { # die <code> <message...>
     exit "$code"
 }
 
-prompt="" account="" resume="" dry=0
+prompt="" account="" resume="" resume_cwd="" dry=0
 while [ $# -gt 0 ]; do
     case "$1" in
         -h|--help) usage; exit 0 ;;
@@ -124,6 +133,10 @@ while [ $# -gt 0 ]; do
             [ $# -ge 2 ] || die 2 "--resume needs a session id"
             resume="$2"; shift 2 ;;
         --resume=*) resume="${1#--resume=}"; shift ;;
+        --cwd)
+            [ $# -ge 2 ] || die 2 "--cwd needs a directory"
+            resume_cwd="$2"; shift 2 ;;
+        --cwd=*) resume_cwd="${1#--cwd=}"; shift ;;
         --dry-run) dry=1; shift ;;
         -*) die 2 "unknown option: $1 (see --help)" ;;
         *)
@@ -199,7 +212,16 @@ add_dirs_raw=$(fm_get add_dirs)
 before_launch_raw=$(fm_get before-launch)
 [ -n "$before_launch_raw" ] || before_launch_raw=$(fm_get "before launch")
 
-[ -n "$cwd_raw" ] || die 4 "frontmatter key 'cwd' is missing or empty in $prompt"
+# On resume the member's live cwd (--cwd) replaces the frontmatter one: the file
+# was written for the original launch and may point at a directory that no longer
+# exists. The account must also come from the herder, not the file.
+if [ -n "$resume" ]; then
+    [ -n "$account" ] || die 2 "--resume needs --account (the relaunch note names the target context)"
+    [ -n "$resume_cwd" ] || die 2 "--resume needs --cwd <dir> (the member's live working directory; the frontmatter cwd is not trusted)"
+    cwd_raw="$resume_cwd"
+else
+    [ -n "$cwd_raw" ] || die 4 "frontmatter key 'cwd' is missing or empty in $prompt"
+fi
 [ -n "$account" ] || [ -n "$context_raw" ] || die 4 "frontmatter key 'context' is missing or empty in $prompt (or pass --account)"
 [ -n "$model" ] || die 4 "frontmatter key 'model' is missing or empty in $prompt"
 [ -n "$effort" ] || die 4 "frontmatter key 'effort' is missing or empty in $prompt"
@@ -304,6 +326,10 @@ if [ -z "$claude_bin" ] && [ -x "$HOME/.local/bin/claude" ]; then claude_bin="$H
 mode=new body=""
 if [ -n "$resume" ]; then
     mode=resume
+    # `claude --resume <id> <prompt>` takes a positional prompt in interactive mode
+    # (claude --help: "Usage: claude [options] [command] [prompt]"), so the relaunch
+    # note travels with the resume and the member sees it as its first message.
+    body="squad relaunch: you are now on context $ctx. Re-register under the same name (squad-join §2, same session), then follow squad-join §5 \`relaunch\`."
 else
     # Same as `$(sed '1,/^---$/d' file)`: everything after the terminator, trailing
     # newlines trimmed by the command substitution.
@@ -361,8 +387,10 @@ if [ "$dry" -eq 1 ]; then
     printf 'model: %s\n'      "$model"
     printf 'effort: %s\n'     "$effort"
     if [ "$mode" = resume ]; then
+        printf 'resume: %s\n' "$resume"
         printf 'session_id: %s\n' "$resume"
-        printf 'body_bytes: 0 (not passed on resume)\n'
+        printf 'resume_group: %s\n' "$(ctx_get "$ctx" '(.resume_group // "none")')"
+        printf 'body_bytes: %s (fixed relaunch note, not the file body)\n' "$(printf '%s' "$body" | wc -c | tr -d ' ')"
     else
         printf 'body_bytes: %s\n' "$(printf '%s' "$body" | wc -c | tr -d ' ')"
     fi
@@ -391,7 +419,7 @@ if [ "$(ctx_get "$ctx" '.openrouter // false')" != true ]; then
 fi
 mark_pane
 if [ "$mode" = resume ]; then
-    exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" --resume "$resume" --model "$model" --effort "$effort"
+    exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" --resume "$resume" --model "$model" --effort "$effort" "$body"
 fi
 # --add-dir is variadic in claude, so its flags go first: the next option ends the
 # list and the body stays a lone positional.
