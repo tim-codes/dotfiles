@@ -17,7 +17,13 @@ trap 'rm -rf "$T"' EXIT
 FAKE="$T/home"; BIN="$T/bin"; REC="$T/rec"
 mkdir -p "$FAKE/.claude-exxo" "$FAKE/.claude-exxo-openrouter" "$FAKE/.claude-exxo-personal" "$FAKE/.claude-personal" \
          "$FAKE/work/proj/.git" "$FAKE/work/other" "$FAKE/dev/grp/named/.git" "$FAKE/dev/one/dup/.git" \
-         "$FAKE/dev/two/dup/.git" "$FAKE/dev/shallow/.git" "$FAKE/dev/x/shallow/.git" "$BIN"
+         "$FAKE/dev/two/dup/.git" "$FAKE/dev/shallow/.git" "$FAKE/dev/x/shallow/.git" "$FAKE/.claude-lab" "$BIN"
+# The launcher parses its contexts file with yq (v4); put the real one on the stub PATH.
+YQ_REAL="$(command -v yq || true)"
+[ -n "$YQ_REAL" ] && ln -s "$YQ_REAL" "$BIN/yq"
+# Tests read the repo's contexts file unless a case sets its own.
+REPO_CONTEXTS="$SRC_REPO/src/.config/claude-kickoff/contexts.toml"
+export CLAUDE_KICKOFF_CONTEXTS="$REPO_CONTEXTS"
 
 # Stub claude: records argc, each argv entry as arg<...> (the body spans lines),
 # the env it was given and its cwd.
@@ -190,6 +196,123 @@ done
 expect_rc "exxo-openrouter is a known context" 0 "$T/fixture.md" --account exxo-openrouter --dry-run
 has "config_dir: $FAKE/.claude-exxo-openrouter" && ok "  maps to its config dir" || bad "  wrong config dir: $out"
 
+# --- contexts from data: a file of our own, the new frontmatter keys, exits 8 and 9 ---
+# mkctx <file> <preconditions toml array> writes a two-context file: lab (our own) and exxo-personal.
+mkctx() {
+    cat >"$1" <<EOF
+account_bound = ["m365", "datadog"]
+
+[[context]]
+name = "lab"
+harness = "claude-code"
+config_dir = "~/.claude-lab"
+account = "labacct"
+provides = ["datadog"]
+env = { LAB_VAR = "from-table" }
+preconditions = $2
+
+[[context]]
+name = "exxo-personal"
+harness = "claude-code"
+config_dir = "~/.claude-exxo-personal"
+account = "personal"
+provides = []
+env = {}
+preconditions = []
+EOF
+}
+LAB="$T/contexts-lab.toml"; mkctx "$LAB" '[]'
+kick_with() { # kick_with <contexts file> <args...>
+    local f="$1"; shift
+    out=$(HOME="$FAKE" PATH="$BIN:/usr/bin:/bin:/usr/sbin:/sbin" REC="$REC" CLAUDE_KICKOFF_CONTEXTS="$f" "$KICK" "$@" 2>&1); rc=$?
+}
+kick_with "$LAB" "$T/fixture.md" --account lab --dry-run
+check "a context only in the file is accepted (exit 0)" [ "$rc" -eq 0 ]
+check "  prints context: lab" has "context: lab"
+check "  prints its account" has "account: labacct"
+check "  and its config dir under the fake home" has "config_dir: $FAKE/.claude-lab"
+kick_with "$LAB" "$T/fixture.md" --account exxo-openrouter --dry-run
+check "a context absent from the file is unknown (exit 2)" [ "$rc" -eq 2 ]
+expect_rc "--account nosuch" 2 "$T/fixture.md" --account nosuch --dry-run
+sed 's|^context: .*|context: nosuch|' "$T/fixture.md" >"$T/nosuch.md"
+expect_rc "an unknown frontmatter context is exit 5" 5 "$T/nosuch.md" --dry-run
+# preconditions: in order, stop at the first failure, output discarded
+mkdir -p "$T/pre"
+mkctx "$T/contexts-pre.toml" "[\"touch $T/pre/ran1\", \"false\", \"touch $T/pre/ran3\"]"
+kick_with "$T/contexts-pre.toml" "$T/fixture.md" --account lab --dry-run
+check "a failing precondition exits 8" [ "$rc" -eq 8 ]
+check "  stderr names the command" has "precondition failed: false"
+check "  earlier preconditions ran, later ones did not" bash -c '[ -e "$1/ran1" ] && [ ! -e "$1/ran3" ]' _ "$T/pre"
+mkctx "$T/contexts-quiet.toml" '["echo SECRETOUT; echo SECRETERR >&2"]'
+kick_with "$T/contexts-quiet.toml" "$T/fixture.md" --account lab --dry-run
+check "a passing precondition exits 0 and its output is discarded" bash -c '[ "$1" -eq 0 ] && ! printf "%s" "$2" | grep -q SECRET' _ "$rc" "$out"
+# account-bound needs, from the file
+withneeds "m365"
+expect_rc "needs m365 in exxo-personal (not provided)" 9 "$T/needs.md" --account exxo-personal --dry-run
+has "m365" && has "exxo-personal" && ok "  message names the need and the context" || bad "  message: $out"
+kick_with "$LAB" "$T/needs.md" --account lab --dry-run
+check "needs m365 is unmet in lab (exit 9)" [ "$rc" -eq 9 ]
+withneeds "datadog"
+kick_with "$LAB" "$T/needs.md" --account lab --dry-run
+check "needs datadog is provided by lab" [ "$rc" -eq 0 ]
+# harness
+sed 's|^model: .*|&\nharness: codex|' "$T/fixture.md" >"$T/codex.md"
+expect_rc "harness codex against a claude-code context" 5 "$T/codex.md" --account exxo --dry-run
+# new frontmatter keys and the extra dry-run lines
+sed '/^before launch:/d' "$T/fixture.md" >"$T/nokeys.md"
+kick "$T/nokeys.md" --dry-run
+check "defaults: harness claude-code" has "harness: claude-code"
+check "defaults: role client, lifetime task, before_launch none" bash -c 'printf "%s\n" "$1" | grep -qx "role: client" && printf "%s\n" "$1" | grep -qx "lifetime: task" && printf "%s\n" "$1" | grep -qx "before_launch: none"' _ "$out"
+check "defaults: capabilities none, env_pass none, provides from the table" bash -c 'printf "%s\n" "$1" | grep -qx "capabilities: none" && printf "%s\n" "$1" | grep -qx "env_pass: none" && printf "%s\n" "$1" | grep -q "^provides: .*m365"' _ "$out"
+check "the new lines follow the existing ones, in order" bash -c '
+    printf "%s\n" "$1" | grep -oE "^(secret_cache_ttl_seconds|harness|account|role|lifetime|needs|capabilities|provides|env_pass|before_launch):" | tr "\n" " " | grep -qx "secret_cache_ttl_seconds: harness: account: role: lifetime: needs: capabilities: provides: env_pass: before_launch: "' _ "$out"
+kick "$T/fixture.md" --dry-run
+has "before_launch: a key with a space, ignored" && ok "'before launch' (with a space) is read" || bad "no before_launch: $out"
+sed 's|^model: .*|&\nbefore-launch: pull first|' "$T/nokeys.md" >"$T/hyph.md"
+kick "$T/hyph.md" --dry-run
+check "before-launch (hyphen) is read" has "before_launch: pull first"
+sed 's|^model: .*|&\nenv-pass: SQUAD_MERGE_AUTHORITY\nrole: herder\ncapabilities: tmux, gh|' "$T/fixture.md" >"$T/keys.md"
+kick "$T/keys.md" --dry-run
+check "env-pass is echoed as env_pass" has "env_pass: SQUAD_MERGE_AUTHORITY"
+check "role herder defaults lifetime to run" bash -c 'printf "%s\n" "$1" | grep -qx "role: herder" && printf "%s\n" "$1" | grep -qx "lifetime: run"' _ "$out"
+check "capabilities are echoed" has "capabilities: tmux, gh"
+sed 's|^model: .*|&\nlifetime: task\nrole: infra|' "$T/fixture.md" >"$T/life.md"
+kick "$T/life.md" --dry-run
+check "an explicit lifetime wins over the role default" has "lifetime: task"
+sed 's|^model: .*|&\nrole: boss|' "$T/fixture.md" >"$T/badrole.md"
+expect_rc "an unknown role is exit 5" 5 "$T/badrole.md" --dry-run
+# add_dirs: passed in order as --add-dir, shown in --dry-run, must exist
+mkdir -p "$FAKE/briefs" "$FAKE/reports"
+sed 's|^model: .*|&\nadd_dirs: ~/briefs, '"$FAKE"'/reports|' "$T/fixture.md" >"$T/adddirs.md"
+kick "$T/adddirs.md" --dry-run
+check "add_dirs is echoed, ~ expanded, in order" has "add_dirs: $FAKE/briefs $FAKE/reports"
+kick "$T/nokeys.md" --dry-run
+check "add_dirs defaults to none" has "add_dirs: none"
+cat >"$BIN/claude" <<'EOF'
+#!/bin/bash
+for a in "$@"; do printf 'arg<%s>\n' "$a"; done >"$REC"
+EOF
+kick "$T/adddirs.md"
+check "add_dirs become --add-dir flags, in order, before --model" bash -c '[ "$(sed -n 1,6p "$1" | tr "\n" " ")" = "arg<--add-dir> arg<$2/briefs> arg<--add-dir> arg<$2/reports> arg<--model> arg<opus> " ]' _ "$REC" "$FAKE"
+kick "$T/adddirs.md" --resume s1
+check "add_dirs also apply on resume" bash -c 'grep -qx "arg<--add-dir>" "$1" && grep -qx "arg<--resume>" "$1"' _ "$REC"
+sed 's|^model: .*|&\nadd_dirs: ~/briefs ~/nowhere|' "$T/fixture.md" >"$T/baddirs.md"
+expect_rc "a missing add_dirs path" 3 "$T/baddirs.md" --dry-run
+has "nowhere" && ok "  message names the path" || bad "  message: $out"
+# context env: applied unless the caller set it
+cat >"$BIN/claude" <<'EOF'
+#!/bin/bash
+echo "LAB_VAR=${LAB_VAR-unset}" >"$REC"
+EOF
+HOME="$FAKE" PATH="$BIN:/usr/bin:/bin" REC="$REC" CLAUDE_KICKOFF_CONTEXTS="$LAB" "$KICK" "$T/fixture.md" --account lab >/dev/null 2>&1
+check "context env is applied to claude" grep -qx "LAB_VAR=from-table" "$REC"
+HOME="$FAKE" PATH="$BIN:/usr/bin:/bin" REC="$REC" LAB_VAR=caller CLAUDE_KICKOFF_CONTEXTS="$LAB" "$KICK" "$T/fixture.md" --account lab >/dev/null 2>&1
+check "a caller-set variable is not overwritten" grep -qx "LAB_VAR=caller" "$REC"
+# yq missing
+out=$(HOME="$FAKE" PATH="/usr/bin:/bin" "$KICK" "$T/fixture.md" --dry-run 2>&1); rc=$?
+check "yq missing is exit 7" [ "$rc" -eq 7 ]
+has "yq is not on PATH" && ok "  and says so" || bad "  message: $out"
+
 # --- OpenRouter routing env is scrubbed outside exxo-openrouter, as the wrappers do ---
 cat >"$BIN/claude" <<'EOF'
 #!/bin/bash
@@ -201,11 +324,13 @@ for c in exxo exxo-openrouter; do
     else check "exxo-openrouter launch keeps its env" bash -c 'grep -q "ANTHROPIC_BASE_URL" "$1"' _ "$REC"; fi
 done
 
-# --- drift guard: the launcher's context table must match the fish wrappers ---
+# --- drift guard: the contexts file must match the fish wrappers ---
 FISH="$SRC_REPO/src/.config/fish/common.fish"
-want_ctx() { grep -m1 '^CONTEXTS=' "$KICK" | sed 's/^CONTEXTS="\(.*\)"$/\1/' | tr ' ' '\n' | sort; }
+want_ctx() { yq -p toml -oy '.context[].name' "$REPO_CONTEXTS" | sort; }
+want_dirs() { yq -p toml -oy '.context[] | .name + " " + .config_dir' "$REPO_CONTEXTS" | sort; }
 fish_dirs() { grep -m1 'set -l ctx_dirs' "$FISH" | grep -o '\.claude-[a-z-]*' | sed 's/^\.claude-//' | sort; }
 fish_funcs() { grep -o '^function claude-[a-z-]* ' "$FISH" | sed 's/^function claude-//; s/ $//' | grep -v '^default$' | sort; }
+check "drift guard: every context's config_dir is ~/.claude-<name>" [ "$(want_dirs)" = "$(want_ctx | sed 's|.*|& ~/.claude-&|')" ]
 check "drift guard: CONTEXTS is non-empty" [ -n "$(want_ctx)" ]
 check "drift guard: CONTEXTS equals the ctx_dirs in __claude_ctx" [ "$(want_ctx)" = "$(fish_dirs)" ]
 check "drift guard: CONTEXTS equals the claude-<context> wrapper functions" [ "$(want_ctx)" = "$(fish_funcs)" ]
@@ -216,7 +341,8 @@ check "drift guard: OPENROUTER_ENV equals the scrub list in __claude_ctx" [ "$(w
 
 rmdir "$FAKE/.claude-personal"
 expect_rc "missing config dir" 6 "$T/yaml.md" --dry-run
-HOME="$FAKE" PATH="/usr/bin:/bin" "$KICK" "$T/fixture.md" --dry-run >/dev/null 2>&1; rc=$?
+mkdir -p "$T/yqbin"; ln -s "$YQ_REAL" "$T/yqbin/yq"
+HOME="$FAKE" PATH="$T/yqbin:/usr/bin:/bin" "$KICK" "$T/fixture.md" --dry-run >/dev/null 2>&1; rc=$?
 check "claude not on PATH (exit 7)" [ "$rc" -eq 7 ]
 
 # --- every kickoff prompt of the 261024 batch, real HOME, stub claude ---
@@ -231,6 +357,9 @@ if [ -d "$FIXTURES" ] && [ -d "$REAL_HOME/.claude-exxo" ] && [ -d "$REAL_HOME/de
                && ! printf '%s\n' "$out" | grep -q 'EXXO_SECRET\|CLAUDE_CODE'; then
                 ok "fixture $name: dry-run ok ($(printf '%s\n' "$out" | grep -E '^(context|model|effort):' | tr '\n' ' '))"
             else bad "fixture $name: exit $rc: $out"; fi
+            if [ "$name" = 02-ario-golive.md ]; then
+                check "fixture $name: before_launch is non-empty" bash -c 'printf "%s\n" "$1" | grep "^before_launch: ." | grep -qv "^before_launch: none"' _ "$out"
+            fi
         else
             if [ "$rc" -eq 3 ]; then ok "fixture $name: not a kickoff file, refused (exit 3)"
             else bad "fixture $name: expected exit 3, got $rc: $out"; fi

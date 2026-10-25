@@ -1,0 +1,64 @@
+# Contexts that scripts/claude-kickoff can launch a Claude session in (stowed to
+# ~/.config/claude-kickoff/contexts.toml; $CLAUDE_KICKOFF_CONTEXTS overrides the
+# path). This table is the launcher's source of truth. The fish wrappers
+# (src/.config/fish/common.fish) and claude-sync's CONTEXTS still list contexts in
+# code; tests/claude-kickoff.sh fails when the names drift apart.
+#
+# A new context is one [[context]] entry here, plus a precondition command if it
+# needs one. Keys:
+#   name           what --account and the frontmatter `context` take
+#   harness        the CLI the context runs; a prompt naming another harness exits 5
+#   config_dir     CLAUDE_CONFIG_DIR for the session; a leading ~ is expanded
+#   account        the squad account (quota) this context draws on
+#   provides       needs this login satisfies (see account_bound)
+#   env            non-secret variables set for the session unless the caller already
+#                  set them; keys come from helpers at run time, never from here
+#   preconditions  commands run in order before launch (output discarded); any
+#                  nonzero exit refuses the launch with exit 8
+#   openrouter     optional, true for a context routed through OpenRouter: it keeps
+#                  the ANTHROPIC_* routing variables every other context unsets
+
+# Needs that only a login with that connector satisfies; a member needing one
+# launches only in a context that `provides` it (exit 9 otherwise). A need not
+# listed here is ignored with a warning.
+#   m365 figma notion  claude.ai connectors, which follow the logged-in account
+#   agent-run          agent/run; exxo-openrouter's deny rules block it
+#   datadog boards     shared MCP servers; exxo-openrouter denies them
+account_bound = ["m365", "figma", "notion", "agent-run", "datadog", "boards"]
+
+[[context]]
+name = "exxo"
+harness = "claude-code"
+config_dir = "~/.claude-exxo"
+account = "exxo"
+provides = ["m365", "figma", "notion", "agent-run", "datadog", "boards"]
+env = { EXXO_SECRET_CACHE_TTL_SECONDS = "43200" }
+preconditions = []
+
+[[context]]
+name = "exxo-personal"
+harness = "claude-code"
+config_dir = "~/.claude-exxo-personal"
+account = "personal"
+provides = ["agent-run", "datadog", "boards"]
+env = { EXXO_SECRET_CACHE_TTL_SECONDS = "43200" }
+preconditions = []
+
+[[context]]
+name = "personal"
+harness = "claude-code"
+config_dir = "~/.claude-personal"
+account = "personal"
+provides = ["agent-run", "datadog", "boards"]
+env = {}
+preconditions = []
+
+[[context]]
+name = "exxo-openrouter"
+harness = "claude-code"
+config_dir = "~/.claude-exxo-openrouter"
+account = "openrouter"
+provides = []
+env = { EXXO_SECRET_CACHE_TTL_SECONDS = "43200" }
+preconditions = []
+openrouter = true

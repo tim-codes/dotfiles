@@ -21,18 +21,29 @@ fill it in and delete every comment. Launch with
 launcher, never a hand-built `claude` line.
 
 FRONTMATTER (key: value lines, ended by the first line that is exactly `---`;
-the body is everything after it). claude-kickoff reads the first four keys and `needs`; the
-rest are for the humans, the orchestrator and the herder, and are ignored by it.
+the body is everything after it). claude-kickoff reads the first four keys and the optional
+launch keys below (harness to before-launch, add_dirs); `join`, `launch`, `base`, `depends` and
+`tickets` are for the humans and the orchestrator, and are ignored by it.
 Values may run long. A comment after `context` is fine: only its first word counts.
 
   cwd           working directory: ~/dev/..., an absolute path, or the bare name of one
                 git checkout under ~/dev
-  context       personal | exxo | exxo-personal | exxo-openrouter: which account context runs it
+  context       a context name in ~/.config/claude-kickoff/contexts.toml (personal, exxo,
+                exxo-personal, exxo-openrouter): which account context runs it
                 (overridable with `--account`)
   model         passed as `--model`
   effort        passed as `--effort`
-  needs         optional: m365, figma, notion (exxo only), agent-run (not exxo-openrouter),
-                datadog, boards (not exxo-openrouter); an unmet one exits 9 before launch
+  needs         optional, state it as this key (the join line is not read): each need the
+                contexts file lists in `account_bound` (m365, figma, notion, agent-run,
+                datadog, boards) must be provided by the context; an unmet one exits 9
+  harness       optional, default claude-code; must equal the context's harness (else exit 5)
+  role          optional: client (default) | herder | concierge | orchestrator | infra
+  lifetime      optional: run | task; default task for a client, else run
+  capabilities  optional comma list, passed to the herder via --dry-run
+  env-pass      optional comma list of variable names the herder forwards from its environment
+  add_dirs      optional comma or space separated paths (~ expanded), each passed as
+                `--add-dir`, so the member can read and write brief and report files outside
+                its cwd without prompts; each must exist (else exit 3)
   join          the /squad-join line the member runs first (repeat it as the first
                 line of the body so the member sees it)
   launch        informational: how it is started; claude-kickoff is the launcher
@@ -40,7 +51,7 @@ Values may run long. A comment after `context` is fine: only its first word coun
   depends       other streams or PRs that must land before this one starts or merges
   tickets       the tickets in scope, in the order to take them
   before-launch the human steps that must happen first (a pull, a consent, a merge);
-                `none` if there are none
+                `none` if there are none (`before launch` with a space reads the same)
 -->
 
 <!--

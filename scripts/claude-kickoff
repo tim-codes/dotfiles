@@ -17,13 +17,19 @@
 # more robust than `fish -c`: no fish startup per launch, no second layer of
 # argument quoting around a multi-kilobyte prompt body, no dependence on fish
 # existing on the box, and exec replaces this process so the herder's pane runs
-# claude directly. The context table and scrub list below must stay in step with
-# those functions; tests/claude-kickoff.sh fails when they drift (the drift guard).
+# claude directly.
+#
+# The contexts come from data: ~/.config/claude-kickoff/contexts.toml
+# (src/.config/claude-kickoff/contexts.toml, $CLAUDE_KICKOFF_CONTEXTS overrides the
+# path), read with yq v4. That table is the launcher's source of truth: a new
+# context is one entry, plus a precondition command if it needs one. The fish
+# wrappers and claude-sync's CONTEXTS still list contexts in code, so the table's
+# names and the scrub list below must stay in step with them;
+# tests/claude-kickoff.sh fails when they drift (the drift guard).
 set -uo pipefail
 
-# Known contexts (config dir ~/.claude-<name>). Must equal the context dirs in
-# __claude_ctx and the claude-<name> wrappers in src/.config/fish/common.fish.
-CONTEXTS="personal exxo exxo-personal exxo-openrouter"
+CONTEXTS_FILE="${CLAUDE_KICKOFF_CONTEXTS:-$HOME/.config/claude-kickoff/contexts.toml}"
+ROLES="client herder concierge orchestrator infra"
 # Env the wrapper unsets for every context except exxo-openrouter, whose overlay
 # routes through OpenRouter; any other context must never inherit it.
 OPENROUTER_ENV="ANTHROPIC_BASE_URL ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_SONNET_MODEL ANTHROPIC_DEFAULT_HAIKU_MODEL ANTHROPIC_DEFAULT_FABLE_MODEL CLAUDE_CODE_SUBAGENT_MODEL"
@@ -46,37 +52,49 @@ effort is used):
   cwd      working directory; ~ is expanded. A bare name (no / or ~) is looked up as
            the git checkout of that name under ~/dev, at most three
            levels deep (the shallowest wins; a tie is an error).
-  context  personal | exxo | exxo-personal | exxo-openrouter  (a trailing comment is ignored)
+  context  a context `name` in the contexts file (a trailing comment is ignored)
   model    passed as --model
   effort   passed as --effort
-  needs    optional, comma or space separated; checked against the context (exit 9):
-             m365 figma notion  claude.ai connectors, exxo context only
-             agent-run          not in exxo-openrouter (its deny rules block agent/run)
-             datadog boards     shared MCP servers, every context except exxo-openrouter
-           other words are ignored
+  Optional keys, all echoed by --dry-run (the herder's only source of launch facts):
+  harness  must equal the context's harness (default claude-code; else exit 5)
+  role     client (default) | herder | concierge | orchestrator | infra
+  lifetime run | task; the default is task for a client, else run
+  needs    comma or space separated; each one the file lists in `account_bound` must
+           be in the context's `provides` (exit 9); other words are ignored with a
+           warning. Only this key is read, never the `join:` line.
+  capabilities, env-pass   comma lists, passed through to --dry-run for the herder
+  add_dirs        comma or space separated paths (~ expanded), each passed as
+                  --add-dir so the session may use them outside its cwd; each must
+                  exist (else exit 3)
+  before-launch   human steps first (`before launch` with a space is the same key)
 
 Options:
-  --account A     override the frontmatter context (any of the contexts above)
+  --account A     override the frontmatter context (any context name in the file)
   --resume ID     continue session ID (--resume ID --model M --effort E, no body)
   --dry-run       resolve and validate everything, print the plan (never the body,
                   only its size) and exit 0 without launching
   -h, --help      this text
 
-Environment set for claude: CLAUDE_CONFIG_DIR=<context dir>, and
-EXXO_SECRET_CACHE_TTL_SECONDS=43200 unless the caller already set it. Outside
-exxo-openrouter the OpenRouter routing variables are unset, as the wrappers do.
+Environment set for claude: CLAUDE_CONFIG_DIR=<context dir>, and the context's `env`
+table, each variable only where the caller has not set it. Outside an `openrouter`
+context the OpenRouter routing variables are unset, as the wrappers do.
+--dry-run prints, after the plan, harness, account, role, lifetime, needs,
+capabilities, provides, env_pass, before_launch and add_dirs (empty as `none`).
 
 Exit codes (stable):
   0   launched (never returns: claude is exec'd) / --dry-run succeeded
   2   usage error: bad or missing argument, unknown --account, malformed --resume id
-  3   prompt file unusable: missing, unreadable, no `---` terminator, or empty body
-      for a new session
+  3   prompt file unusable: missing, unreadable, no `---` terminator, empty body
+      for a new session, or an add_dirs path that is not a directory
   4   frontmatter lacks a required key (cwd, context, model or effort); the message
       names it
-  5   invalid value: unknown context, or cwd that does not resolve to one directory
-  6   the context's config dir does not exist (run scripts/claude-contexts)
-  7   the claude binary is not on PATH (nor ~/.local/bin)
-  9   a `needs` entry cannot be met by the context (8 is unused)
+  5   invalid value: unknown context, a harness other than the context's, an unknown
+      role or lifetime, or cwd that does not resolve to one directory
+  6   the context's config dir (run scripts/claude-contexts) or the contexts file
+      does not exist
+  7   the claude binary, or yq, is not on PATH
+  8   a context precondition failed (the message names the command, never its output)
+  9   an `account_bound` need is not provided by the context
 Nothing secret is ever printed; the prompt body is never printed.
 EOF
 }
@@ -108,6 +126,19 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$prompt" ] || { usage >&2; exit 2; }
+
+# --- contexts table (yq v4 reads the TOML) -------------------------------------
+command -v yq >/dev/null 2>&1 || die 7 "yq is not on PATH (brew install yq)"
+[ -r "$CONTEXTS_FILE" ] || die 6 "contexts file not found or unreadable: $CONTEXTS_FILE"
+ctx_get() { # ctx_get <name> <yq expression on the context>: scalar, or a list one per line
+    NAME="$1" yq -p toml -oy ".context[] | select(.name == strenv(NAME)) | $2" "$CONTEXTS_FILE" 2>/dev/null
+}
+CONTEXTS=$(yq -p toml -oy '.context[].name' "$CONTEXTS_FILE" 2>/dev/null | tr '\n' ' ')
+CONTEXTS="${CONTEXTS% }"
+[ -n "$CONTEXTS" ] || die 6 "no [[context]] entries in $CONTEXTS_FILE"
+expand_home() { # a leading ~ is the caller's $HOME
+    case "$1" in "~") printf '%s' "$HOME" ;; "~/"*) printf '%s' "$HOME/${1#"~/"}" ;; *) printf '%s' "$1" ;; esac
+}
 case "$account" in
     "") ;;
     *) case " $CONTEXTS " in *" $account "*) ;; *) die 2 "unknown --account '$account' (expected one of: $CONTEXTS)" ;; esac ;;
@@ -151,6 +182,14 @@ context_raw=$(fm_get context)
 model=$(fm_get model | first_word)
 effort=$(fm_get effort | first_word)
 needs_raw=$(fm_get needs)
+harness_raw=$(fm_get harness | first_word)
+role=$(fm_get role | first_word)
+lifetime=$(fm_get lifetime | first_word)
+capabilities_raw=$(fm_get capabilities)
+env_pass_raw=$(fm_get env-pass)
+add_dirs_raw=$(fm_get add_dirs)
+before_launch_raw=$(fm_get before-launch)
+[ -n "$before_launch_raw" ] || before_launch_raw=$(fm_get "before launch")
 
 [ -n "$cwd_raw" ] || die 4 "frontmatter key 'cwd' is missing or empty in $prompt"
 [ -n "$account" ] || [ -n "$context_raw" ] || die 4 "frontmatter key 'context' is missing or empty in $prompt (or pass --account)"
@@ -165,19 +204,36 @@ case " $CONTEXTS " in
     *) die 5 "unknown context '$ctx' (expected one of: $CONTEXTS)" ;;
 esac
 
+# --- harness, role, lifetime -------------------------------------------------
+ctx_harness=$(ctx_get "$ctx" .harness)
+ctx_account=$(ctx_get "$ctx" .account)
+ctx_provides=$(ctx_get "$ctx" '(.provides // []) | .[]' | tr '\n' ' ')
+harness="${harness_raw:-claude-code}"
+[ "$harness" = "$ctx_harness" ] || die 5 "harness '$harness' does not match context '$ctx' (harness '$ctx_harness')"
+role="${role:-client}"
+case " $ROLES " in *" $role "*) ;; *) die 5 "unknown role '$role' (expected one of: $ROLES)" ;; esac
+if [ -z "$lifetime" ]; then
+    if [ "$role" = client ]; then lifetime=task; else lifetime=run; fi
+fi
+case "$lifetime" in run|task) ;; *) die 5 "unknown lifetime '$lifetime' (expected run or task)" ;; esac
+
 # --- needs: what the context cannot provide -----------------------------------
-# claude.ai connectors follow the logged-in account, so only the exxo context has
-# them; exxo-openrouter denies agent/run and the datadog and boards servers (see
-# files/claude/settings.overlay.exxo-openrouter.json). Unknown words are ignored.
+# An account_bound need is satisfied only by a context that provides it (claude.ai
+# connectors follow the logged-in account; exxo-openrouter denies agent/run and the
+# datadog and boards servers). Words the file does not list are ignored.
+account_bound=$(yq -p toml -oy '(.account_bound // []) | .[]' "$CONTEXTS_FILE" 2>/dev/null | tr '\n' ' ')
 for need in $(printf '%s\n' "$needs_raw" | tr ',[:upper:]' ' [:lower:]'); do
-    case "$need" in
-        m365|figma|notion) [ "$ctx" = exxo ] || die 9 "needs '$need' (a claude.ai connector) is only available in the exxo context, not $ctx" ;;
-        agent-run|agent/run) [ "$ctx" != exxo-openrouter ] || die 9 "needs '$need' but exxo-openrouter denies agent/run" ;;
-        datadog|boards) [ "$ctx" != exxo-openrouter ] || die 9 "needs '$need' but exxo-openrouter denies that MCP server" ;;
+    [ "$need" = "agent/run" ] && need=agent-run
+    case " $account_bound " in
+        *" $need "*)
+            case " $ctx_provides " in
+                *" $need "*) ;;
+                *) die 9 "needs '$need' but context $ctx does not provide it" ;;
+            esac ;;
         *) printf 'claude-kickoff: warning: unknown need %s ignored\n' "'$need'" >&2 ;;
     esac
 done
-config_dir="$HOME/.claude-$ctx"
+config_dir=$(expand_home "$(ctx_get "$ctx" .config_dir)")
 [ -d "$config_dir" ] || die 6 "config dir $config_dir does not exist (run scripts/claude-contexts)"
 
 # --- cwd ---------------------------------------------------------------------
@@ -213,12 +269,23 @@ home_real=$(cd "$HOME" && pwd -P)
 redirect=0
 [ "$cwd" = "$home_real" ] && redirect=1
 for c in $CONTEXTS; do
-    [ "$cwd" = "$home_real/.claude-$c" ] && redirect=1
+    c_dir=$(expand_home "$(ctx_get "$c" .config_dir)")
+    [ "$cwd" = "$c_dir" ] || [ "$cwd" = "$(cd "$c_dir" 2>/dev/null && pwd -P)" ] && redirect=1
 done
 if [ "$redirect" -eq 1 ]; then
     mkdir -p "$home_real/claude" 2>/dev/null
     cwd="$home_real/claude"
 fi
+
+# --- add_dirs: each becomes --add-dir; they must exist ----------------------
+add_dirs=()
+for d in $(printf '%s\n' "$add_dirs_raw" | tr ',' ' '); do
+    d=$(expand_home "$d")
+    [ -d "$d" ] || die 3 "add_dirs path '$d' is not a directory (in $prompt)"
+    add_dirs+=("$d")
+done
+add_dir_args=()
+for d in "${add_dirs[@]+"${add_dirs[@]}"}"; do add_dir_args+=(--add-dir "$d"); done
 
 # --- claude binary -----------------------------------------------------------
 claude_bin=$(command -v claude 2>/dev/null || true)
@@ -236,6 +303,19 @@ else
     [ -n "$body" ] || die 3 "the prompt body (after the '---' line) is empty in $prompt"
 fi
 
+# --- preconditions: in order, output discarded, the first failure refuses -----
+while IFS= read -r cmd; do
+    [ -n "$cmd" ] || continue
+    sh -c "$cmd" >/dev/null 2>&1 || die 8 "precondition failed: $cmd (context $ctx)"
+done < <(ctx_get "$ctx" '(.preconditions // []) | .[]')
+
+# --- context env: set only where the caller has not -------------------------
+while IFS= read -r kv; do
+    [ -n "$kv" ] || continue
+    k="${kv%%=*}"
+    [ -n "${!k+x}" ] || export "$k=${kv#*=}"
+done < <(ctx_get "$ctx" '(.env // {}) | to_entries | .[] | .key + "=" + .value')
+
 if [ "$dry" -eq 1 ]; then
     printf 'mode: %s\n'       "$mode"
     printf 'context: %s\n'    "$ctx"
@@ -243,7 +323,6 @@ if [ "$dry" -eq 1 ]; then
     printf 'cwd: %s\n'        "$cwd"
     printf 'model: %s\n'      "$model"
     printf 'effort: %s\n'     "$effort"
-    printf 'needs: %s\n'      "${needs_raw:-none}"
     if [ "$mode" = resume ]; then
         printf 'session_id: %s\n' "$resume"
         printf 'body_bytes: 0 (not passed on resume)\n'
@@ -251,18 +330,30 @@ if [ "$dry" -eq 1 ]; then
         printf 'body_bytes: %s\n' "$(printf '%s' "$body" | wc -c | tr -d ' ')"
     fi
     printf 'claude: %s\n'     "$claude_bin"
-    printf 'secret_cache_ttl_seconds: %s\n' "${EXXO_SECRET_CACHE_TTL_SECONDS:-43200}"
+    printf 'secret_cache_ttl_seconds: %s\n' "${EXXO_SECRET_CACHE_TTL_SECONDS:-unset}"
+    printf 'harness: %s\n'       "$harness"
+    printf 'account: %s\n'       "$ctx_account"
+    printf 'role: %s\n'          "$role"
+    printf 'lifetime: %s\n'      "$lifetime"
+    printf 'needs: %s\n'         "${needs_raw:-none}"
+    printf 'capabilities: %s\n'  "${capabilities_raw:-none}"
+    provides_out=$(printf '%s' "${ctx_provides% }" | tr ' ' ',')
+    printf 'provides: %s\n'      "${provides_out:-none}"
+    printf 'env_pass: %s\n'      "${env_pass_raw:-none}"
+    printf 'before_launch: %s\n' "${before_launch_raw:-none}"
+    printf 'add_dirs: %s\n'      "${add_dirs[*]:-none}"
     exit 0
 fi
 
 cd "$cwd" || die 5 "cannot enter cwd '$cwd'"
 export CLAUDE_CONFIG_DIR="$config_dir"
-export EXXO_SECRET_CACHE_TTL_SECONDS="${EXXO_SECRET_CACHE_TTL_SECONDS:-43200}"
-if [ "$ctx" != exxo-openrouter ]; then
+if [ "$(ctx_get "$ctx" '.openrouter // false')" != true ]; then
     # shellcheck disable=SC2086
     unset $OPENROUTER_ENV
 fi
 if [ "$mode" = resume ]; then
-    exec "$claude_bin" --resume "$resume" --model "$model" --effort "$effort"
+    exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" --resume "$resume" --model "$model" --effort "$effort"
 fi
-exec "$claude_bin" --model "$model" --effort "$effort" "$body"
+# --add-dir is variadic in claude, so its flags go first: the next option ends the
+# list and the body stays a lone positional.
+exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" --model "$model" --effort "$effort" "$body"
