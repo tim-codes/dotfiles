@@ -215,7 +215,7 @@ Append each launch, close, relay and item presentation, in the same turn,
 only when capture is on (`squad debug dir` exits 1 when it is off; then log
 nothing):
 ```
-d=$(squad debug dir) && cat >> "$d/concierge.md" <<'LOG'
+d=$(squad debug dir) && mkdir -p "$d" && cat >> "$d/concierge.md" <<'LOG'
 ## <ISO ts> <launch|close|relay|item> <member or id>
 <what was run or said, one or two lines; outcome: joined/timeout/left/forced>
 LOG

@@ -519,7 +519,7 @@ At start-up, before §1 step 4, only when started with `--debug`:
    event (member, directive_id, age_s, action), in the same turn append to
    the run's decision log:
    ```
-   d=$(squad debug dir); cat >> "$d/orchestrator-decisions.md" <<'EOF'
+   d=$(squad debug dir) && mkdir -p "$d" && cat >> "$d/orchestrator-decisions.md" <<'EOF'
    ## <ISO ts> <directive> → <member>
    Why: <reasoning, with the quota / host numbers acted on>
    Triggered by: <squad-message> seq <n>[, <n>] (topic)
