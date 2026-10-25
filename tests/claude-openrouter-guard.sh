@@ -46,6 +46,9 @@ g -C "$T/upstream-clone" checkout -q -b job/y --track origin/main
 g -C "$T/upstream-clone" config push.default upstream
 g -C "$T/matching-clone" config push.default matching
 g -C "$T/alias-clone" config alias.p "push origin main"
+# glob-clone: files that make an unquoted glob expand to a merge word.
+g clone -q -b job/x "$T/origin.git" "$T/glob-clone"
+mkdir -p "$T/glob-clone/repos/o/r/pulls/1"; touch "$T/glob-clone/merge" "$T/glob-clone/repos/o/r/pulls/1/merge"
 [ "$(git -C "$T/main-clone" rev-parse --abbrev-ref HEAD)" = main ] || bad "fixture: main-clone not on main"
 [ "$(git -C "$T/job-clone" rev-parse --abbrev-ref HEAD)" = job/x ] || bad "fixture: job-clone not on job/x"
 
@@ -69,7 +72,8 @@ run_guard() {
 expect() {
     local want="$1" key="$2" cmd="$3" got
     got="$(run_guard "$T/$key-clone" "$cmd")"
-    if [ "$got" = "$want" ]; then ok "$want [$key] $cmd"; else bad "want $want, got $got [$key] $cmd"; fi
+    local shown="${cmd//$'\n'/\\n}"
+    if [ "$got" = "$want" ]; then ok "$want [$key] $shown"; else bad "want $want, got $got [$key] $shown"; fi
 }
 
 [ -x "$GUARD" ] || { bad "guard missing or not executable: $GUARD"; exit 1; }
@@ -203,6 +207,37 @@ job|alias g=git; g push origin main
 job|python3 -c 'import os; os.system("git push origin main")'
 TABLE
 
+# --- BLOCK: review round 2 findings ----------------------------------------
+while IFS='|' read -r key cmd; do
+    [ -z "$key" ] && continue
+    expect deny "$key" "$cmd"
+done <<'TABLE'
+job|true x#; git push origin HEAD:main
+job|git push origin job/x#; gh pr merge 1
+job|git push origin HEAD:{main,job/x}
+job|gh pr {merge,} 1
+job|gh pr {me,}rge 1
+job|gh api repos/o/r/pulls/1/{merge,}
+job|git pu{s,}h origin HEAD:main
+job|touch HEAD:main; git push origin HEAD:mai?
+job|gh api -X PATCH repos/{owner}/{repo}/git/refs/heads/{branch} -f sha=abc
+glob|gh api repos/o/r/pulls/1/mer?e
+glob|gh pr mer?e 1
+glob|gh pr [m]erge 1
+job|git push origin #job/x
+job|git push origin HEAD:main # comment
+job|git push origin HEAD:ma[i]n
+job|gh workflow run merge.yml
+job|gh workflow run deploy.yml --ref job/x
+job|gh run rerun 123
+job|gh api -X POST repos/o/r/actions/workflows/merge.yml/dispatches -f ref=job/x
+job|gh api repos/o/r/dispatches -f event_type=merge
+TABLE
+
+expect deny job "$(printf 'git push origin HEAD:ma\\\nin')"
+expect deny job "$(printf 'gh pr mer\\\nge 1')"
+expect deny job "$(printf 'git pu\\\nsh origin HEAD:main')"
+
 # --- ALLOW -----------------------------------------------------------------
 while IFS='|' read -r key cmd; do
     [ -z "$key" ] && continue
@@ -241,6 +276,15 @@ job|gh api -X PUT repos/o/r/contents/f.txt -f message=m -f content=eA== -f branc
 job|gh api repos/o/r/contents/README.md
 job|cargo test && git push origin job/x
 job|git rebase main
+job|gh run list --workflow ci.yml
+job|gh pr mer?e 1
+job|gh api repos/{owner}/{repo}/pulls
+job|gh api 'repos/o/r/pulls?state=all'
+job|{ git status; }
+job|git log --oneline # recent
+job|gh pr view 1 --json title -q '.title'
+job|gh workflow list
+job|git log --grep='[Ff]ix'
 TABLE
 
 # --- Non-Bash tool ---------------------------------------------------------

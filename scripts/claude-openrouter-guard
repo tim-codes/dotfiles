@@ -52,6 +52,7 @@ is opened non-blocking and must be a regular file, and a logging failure
 never changes the decision.
 """
 import datetime
+import glob
 import json
 import os
 import re
@@ -135,8 +136,35 @@ def has_expansion(word):
     return "$" in word or "`" in word
 
 
+# Characters bash expands or re-reads that the guard does not resolve. In a
+# risk-mentioning command any of them blocks outright (R-C9, review round 2);
+# '{'/'}' used as standalone group words are exempt.
+UNRESOLVED_CHARS = re.compile(r"[{}?\[\]#]")
+GROUP_BRACE = re.compile(r"(?:^|(?<=[\s;&|]))[{}](?=[\s;&|]|$)")
+BRACE_EXPANSION = re.compile(r"\{[^{}\s]*(?:,|\.\.)[^{}\s]*\}")
+GLOB_CHARS = re.compile(r"[?*\[]")
+
+
+def unresolved_word(word, cwd, strict):
+    """True when bash would not pass `word` through literally: expansion,
+    brace expansion, an embedded (backslash-)newline, or a glob that is
+    unresolved (strict) or matches a file (otherwise bash leaves it as is)."""
+    if has_expansion(word) or BRACE_EXPANSION.search(word) or "\n" in word:
+        return True
+    if GLOB_CHARS.search(word):
+        if strict:
+            return True
+        try:
+            return bool(glob.glob(word, root_dir=cwd))
+        except (OSError, ValueError):
+            return True
+    return False
+
+
 def dequote(text):
-    return re.sub(r"[\"'\\]", "", text)
+    """Bash's view of the words for risk matching: backslash-newline joins
+    lines, quotes and backslashes vanish."""
+    return re.sub(r"[\"'\\]", "", text.replace("\\\n", ""))
 
 
 def is_risky(text):
@@ -150,6 +178,10 @@ def tokens(text):
     lex = shlex.shlex(text, posix=True, punctuation_chars=PUNCT)
     lex.whitespace = " \t\r"
     lex.whitespace_split = True
+    # bash only starts a comment at the start of a word; shlex would drop the
+    # rest of the line at a mid-word '#'. Risk-mentioning commands with '#'
+    # are blocked before tokenising, so no comment handling is needed.
+    lex.commenters = ""
     return list(lex)
 
 
@@ -174,9 +206,12 @@ class Parsed:
     def __init__(self, toks):
         self.segments = []
         self.pipe = self.redirect = self.heredoc = False
-        seg, skip = [], False
+        seg, skip, comment = [], False, False
         for t in toks:
             if t and all(c in PUNCT for c in t):
+                if comment and "\n" not in t:
+                    continue
+                comment = False
                 for op in split_ops(t):
                     if "<" in op or ">" in op:
                         self.redirect = True
@@ -192,6 +227,11 @@ class Parsed:
                 continue
             if skip:
                 skip = False
+                continue
+            if comment:
+                continue
+            if t.startswith("#"):
+                comment = True  # bash: '#' at the start of a word comments to end of line
                 continue
             seg.append(t)
         if seg:
@@ -320,10 +360,10 @@ def check_git(args, assigns, cwd, form, strict, allowed):
     while i < len(args) and args[i].startswith("-"):
         a = args[i]
         nxt = args[i + 1] if i + 1 < len(args) else ""
-        if has_expansion(a):
+        if unresolved_word(a, cwd, strict):
             raise unresolved("unresolved git option", form)
         if a == "-C" and nxt:
-            if has_expansion(nxt):
+            if unresolved_word(nxt, cwd, strict):
                 raise unresolved("unresolved git -C directory", form)
             cwd = resolve(cwd, nxt)
             if form in ("plain", "other"):
@@ -331,7 +371,7 @@ def check_git(args, assigns, cwd, form, strict, allowed):
             i += 2
             continue
         if a == "-c" and nxt:
-            if has_expansion(nxt):
+            if unresolved_word(nxt, cwd, strict):
                 raise unresolved("unresolved git -c value", form)
             cfg_c.append(nxt)
             m = re.match(r"^alias\.([^=]+)=(.*)$", nxt, re.S | re.I)
@@ -349,7 +389,7 @@ def check_git(args, assigns, cwd, form, strict, allowed):
     if i >= len(args):
         return
     sub, rest = args[i], args[i + 1:]
-    if has_expansion(sub):
+    if unresolved_word(sub, cwd, strict):
         raise unresolved("unresolved git subcommand", form)
 
     if sub in GIT_PUSHERS:
@@ -396,7 +436,7 @@ def check_push(push, cwd, form, allowed):
     positional, j = [], 0
     while j < len(push):
         a = push[j]
-        if has_expansion(a):
+        if unresolved_word(a, cwd, True):
             raise unresolved("unresolved git push argument", form)
         if a == "--":
             positional += push[j + 1:]
@@ -481,7 +521,7 @@ def check_push(push, cwd, form, allowed):
 
 # ---- gh ----------------------------------------------------------------------------------
 
-def check_gh(args, assigns, cwd, form):
+def check_gh(args, assigns, cwd, form, strict):
     for a in assigns:
         if a.startswith("PATH="):
             raise unresolved("PATH override on gh", form)
@@ -490,7 +530,7 @@ def check_gh(args, assigns, cwd, form):
         if args[i] in ("-R", "--repo", "--hostname"):
             i += 1
         i += 1
-    if any(has_expansion(a) for a in args[:i + 1]):
+    if any(unresolved_word(a, cwd, strict) for a in args[:i + 1]):
         raise unresolved("unresolved gh option or subcommand", form)
     rest = args[i:]
     if not rest:
@@ -506,7 +546,7 @@ def check_gh(args, assigns, cwd, form):
             if rest[j] in ("-R", "--repo"):
                 j += 1
             j += 1
-        if any(has_expansion(a) for a in rest[1:j + 1]):
+        if any(unresolved_word(a, cwd, strict) for a in rest[1:j + 1]):
             raise unresolved("unresolved gh pr subcommand", form)
         if j < len(rest) and rest[j] == "merge":
             tail = rest[j + 1:]
@@ -516,11 +556,13 @@ def check_gh(args, assigns, cwd, form):
                 m = re.search(r"/pull/(\d+)", pos or "")
                 num = m.group(1) if m else pos
             raise Block(GH_MERGE, num, "gh pr merge is not allowed for workers", form)
+    if (top == "workflow" and "run" in rest[1:2]) or (top == "run" and "rerun" in rest[1:2]):
+        raise Block(GH_API, None, f"gh {top} {rest[1]} can start a workflow that merges; not allowed for workers", form)
     if top == "api":
-        check_gh_api(rest[1:], cwd, form)
+        check_gh_api(rest[1:], cwd, form, strict)
 
 
-def check_gh_api(args, cwd, form):
+def check_gh_api(args, cwd, form, strict):
     if any(has_expansion(a) for a in args):
         raise unresolved("unresolved gh api argument", form)
     method, fields, paths, has_input = None, [], [], False
@@ -567,6 +609,10 @@ def check_gh_api(args, cwd, form):
         for d in defaults:
             if re.search(r"heads/" + re.escape(d) + r"(?![\w./-])", a, re.I):
                 raise Block(GH_API, d, "gh api on the default branch ref is not allowed for workers", form)
+    if any(re.search(r"(^|/)dispatches\b", p) for p in paths):
+        raise Block(GH_API, None, "workflow/repository dispatch can start a merge; not allowed for workers", form)
+    if any(unresolved_word(p, cwd, strict) or "{branch}" in p for p in paths):
+        raise unresolved("unresolved gh api path (expansion, glob or {branch} placeholder)", form)
     if re.search(r"(^|/)merges\b", path):
         raise Block(GH_API, None, "the repository merges API is not allowed for workers", form)
     if path.strip("/") == "graphql":
@@ -604,6 +650,8 @@ def analyse(text, cwd, allowed):
     if risky:
         if "$" in text or "`" in text:
             raise unresolved("$ or backtick expansion", "compound" if compound else "other")
+        if UNRESOLVED_CHARS.search(GROUP_BRACE.sub("", text)) or "\\\n" in text:
+            raise unresolved("brace, glob, comment or line continuation", "compound" if compound else "other")
         if "<(" in text or ">(" in text or parsed.heredoc:
             raise unresolved("process substitution or here-document", "sh-c")
         if re.search(r"(^|[\s;&|(){}])function\s", text) or re.search(r"[\w.-]\s*\(\s*\)", text):
@@ -645,7 +693,7 @@ def analyse(text, cwd, allowed):
         elif tool == "git":
             check_git(argv[1:], assigns, cwd, form, risky, allowed)
         elif tool == "gh":
-            check_gh(argv[1:], assigns, cwd, form)
+            check_gh(argv[1:], assigns, cwd, form, risky)
 
 
 # ---- output ----------------------------------------------------------------------------------
