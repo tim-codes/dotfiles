@@ -35,6 +35,10 @@
       "Bash(pulumi stack output:*)",
       "Bash(agent-tooling:*)"
     ],
+    "ask": [
+      "Bash(agent-tooling mail send*)",
+      "Bash(agent-run -- agent-tooling mail send*)"
+    ],
     "deny": [
       "Bash(gcloud compute ssh*)",
       "Bash(* gcloud compute ssh*)"

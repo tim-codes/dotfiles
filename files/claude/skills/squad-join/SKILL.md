@@ -365,12 +365,27 @@ as the text's first word and a `kind` field in `data`.
   `PermissionRequest` and clears it on `PostToolUse`/`UserPromptSubmit`, so
   the broker holds all deliveries (even `now`) until Tim answers. Requires
   squad built from PR S5 (tim-codes/squad#34) or later; older brokers ignore it.
-- **Phantom classifier denials**: a tool result saying things like "user
-  doesn't want this action" when Tim typed nothing of the kind is the
-  permission classifier, not Tim. Retry once with a narrower command (one
-  path, no pipes or `&&`). If it denies again, raise an operator item (§6)
-  naming the command; never record it as Tim's ruling or abandon the work on
-  the strength of it.
+- **Denials (permission, classifier, guard or key helper)**: a tool result
+  saying things like "user doesn't want this action" when Tim typed nothing
+  of the kind is the permission classifier, not Tim; a "permission denied"
+  or "blocked by a deny rule" result is a settings rule. Either way, three
+  things, in order. **Never retry** the denied command, not even narrowed or
+  reworded. **Raise an operator item** (§6) with the exact command:
+  ```
+  squad operator raise --id denied-<name>-<n> --kind action --blocking now|later \
+    --title "denied (permission|classifier|guard|keyhelper): <what it was for>" \
+    --command '<the exact denied command>' --instructions-file <path|->
+  ```
+  `<n>` counts your denials, so the report can join items to transcript
+  denials. Put any long text in `--instructions-file`, never inline: a deny
+  glob matches command words in prose, so inline text that quotes a denied
+  command can itself be denied. Never ask for permissions or credentials in
+  the text; they go in `--command` for Tim. Then **carry on** with other
+  work, or wait if nothing else can proceed. A job blocked by a denial ends
+  `delegate-result --status failed --reason blocked-denial`. If the raise is
+  itself denied, send it to the orchestrator as an `operator_task` (§6).
+  Never record a denial as Tim's ruling or abandon the work on the strength
+  of it.
 - **A `<squad-message>` with `priority now` arrives mid-turn**: an urgent
   orchestrator directive or critical host pressure. Act on it before
   continuing.

@@ -248,6 +248,14 @@ changes by Tim or members.
 - **Every item carries copy-able `commands[]`** in the repo's CLI convention
   (`pulumi env set`, never `esc`), or a `url`; never "see the other pane".
   Refresh the text when facts change.
+- **Raise text never asks for permissions or credentials.** The classifier
+  denies a raise whose text requests a grant or a secret; put the command
+  Tim must run in `commands[]` instead. Long text goes through
+  `--instructions-file`, never inline.
+- **Denial items**: a member's denied command arrives as an item with id
+  `denied-<member>-<n>` and a title starting `denied (permission|classifier|
+  guard|keyhelper): `. Never tell the member to retry the command; Tim
+  decides, or you raise the missing rule for the dotfiles fragment.
 - **Draft links** (`draft_url`, `url`) are server-checked; a 422 means fix
   the draft, not the item. Never present an unresolved draft.
 - **Order and nudge**: blocking-now, then stream priority, then

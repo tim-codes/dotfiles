@@ -41,6 +41,9 @@ for ctx in personal exxo exxo-personal; do
     check "$ctx keeps defaultMode" \
         test "$(jq -r '.permissions.defaultMode' "$FAKE/.claude-$ctx/settings.json")" = auto
     check "$ctx has git status grant" has "$ctx" allow 'Bash(git status:*)'
+    for r in 'operator raise' 'operator set' 'operator decide' 'operator list' 'operator get' 'ack'; do
+        check "$ctx has squad $r grant" has "$ctx" allow "Bash(squad $r:*)"
+    done
 done
 for ctx in exxo exxo-personal; do
     check "$ctx gets the Exxo cloud grants" has "$ctx" allow 'Bash(agent-tooling:*)'
@@ -51,6 +54,8 @@ for ctx in exxo exxo-personal; do
     check "$ctx: gcloud grants are enumerated read-only commands" has "$ctx" allow 'Bash(gcloud compute instances list:*)'
     check "$ctx: no middle-wildcard gcloud grants" \
         test "$(jq '[.permissions.allow[] | select(test("^Bash\\(gcloud \\*"))] | length' "$FAKE/.claude-$ctx/settings.json")" -eq 0
+    check "$ctx: agent-tooling mail send asks" has "$ctx" ask 'Bash(agent-tooling mail send*)'
+    check "$ctx: wrapped agent-tooling mail send asks" has "$ctx" ask 'Bash(agent-run -- agent-tooling mail send*)'
     check "$ctx: gcloud compute ssh is denied" has "$ctx" deny 'Bash(gcloud compute ssh*)'
     check "$ctx: nested gcloud compute ssh is denied" has "$ctx" deny 'Bash(* gcloud compute ssh*)'
 done
