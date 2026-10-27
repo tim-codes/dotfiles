@@ -512,7 +512,8 @@ The plan lives in the broker, surviving your restarts:
 ```
 {"streams":[{"member":"…","priority":1-5,"phase":"…","notes":"…","prompt":"<kickoff prompt path>","deliverables":[…],
    "account":"<the account the member is currently on>","home_account":"<its launch account>",
-   "fanout":{"max_subagents":3,"model_ceiling":null,"set_at":"<ISO>"}}],
+   "fanout":{"max_subagents":3,"model_ceiling":null,"set_at":"<ISO>"},
+   "merge_grant":{"repos":[…],"date":"<YYYY-MM-DD>","tags":false,"words":"…"}|null}],
  "heavy_slots":1,"slots_reduced":false,"grants":[{"member","reason","granted_at","expires_at"}],
  "queue":[{"member","reason","est_minutes","requested_at"}],"paused":[…],
  "infra_authority":null,"pending_infra":[{"pr","repo","from","summary"}],
@@ -584,6 +585,23 @@ reports on `liaison.activity` and `squad get liaison.activity`, not closed
 by Tim's word) beside the open operator items, each with its client, ticket
 key and owner. An open one is `deferred` only with its ticket and an owner,
 else `missing`.
+
+**Kickoff files you write** (ad-hoc work §1b, a relaunch, any amended
+kickoff) carry two blocks besides the work:
+- **Merge authority**, per repo: the scope (`trunk` admissions and
+  `staging` merges to the default branch; production tags only where Tim's
+  words say so), his quoted words and their time, and `env-pass:
+  SQUAD_MERGE_AUTHORITY` in the frontmatter. Authority granted after launch
+  goes by a `grant` directive (§5), never by relaunching the member with
+  the variable set.
+- **Current state**, read live when you write the file, never copied from
+  the original brief: each open PR of the stream (`gh pr list -R
+  <owner/repo> --state open --json number,headRefName,baseRefName`,
+  filtered to its branches; CI by run id, §5), pushed branches without a
+  PR, and the next step. A kickoff that loses this makes the member redo
+  landed work.
+
+A relaunch is for account moves only (§2 rung 2).
 
 **Morning report:** a "Deliverables vs brief" table: stream, deliverable,
 client-facing, state, evidence or tracking item.
@@ -678,9 +696,10 @@ incapable one. The record keeps `assigned_by` (you or `broker`).
 
 On `pr_ready` with `repo` exxo-infra:
 1. **Check** with a PR-check subagent: the PR exists, is not a draft, and
-   checks are green (`gh pr view <n> -R Exxo-Labs/exxo-infra --json
-   state,isDraft,mergeable,statusCheckRollup`). Not green → tell the
-   originating client and Tim (`operator_update`); stop.
+   each expected CI job is green on the head sha by run id (`gh pr view <n>
+   -R Exxo-Labs/exxo-infra --json state,isDraft,mergeable,headRefOid`, then
+   as in "Merge grants" below), not the `statusCheckRollup` summary. Not
+   green → tell the originating client and Tim (`operator_update`); stop.
 2. **Authority gate.** exxo-infra is production-stage: merging needs human
    review. Send Tim a question via the concierge (`operator_update`, `--priority now`: PR
    number, title, summary); proceed only on the concierge relaying his
@@ -703,6 +722,23 @@ On `pr_ready` with `repo` exxo-infra:
    or `SQUAD_MERGE_AUTHORITY` set in the infra session by Tim); never ask a
    member to merge what this session was denied. GitOps is the default; infra
    may fix or unblock manually on Tim's authority (`manual: true`), not merge.
+
+**Merge grants to members** (staging and trunk merges, per repo; exxo-infra
+stays under steps 2 and 5). Only on Tim's quoted words relayed by the
+concierge, for the repos he names. At launch the grant is in the kickoff
+(§3a); after launch it is a directive, never a relaunch:
+```
+squad send <member> "grant: merge <owner/name>" --from orchestrator --ack-deadline-s 120 \
+  --data '{"directive":"grant","scope":"merge","repos":["<owner/name>"],"date":"<YYYY-MM-DD>","tags":false,"words":"Tim: <his words>","at":"<ISO>"}'
+```
+Record it as the stream's `merge_grant` (§3). `tags` is true only where his
+words cover production tags. **A `squad-pr-merge` refusal is final**: when a
+member reports one, never suggest a raw `gh pr merge`, a retry or another
+merge path; fix the cause (red or pending check, draft, wrong base) or hand
+it to Tim. Green means each expected CI job passed on the head sha, checked
+by run id (`gh run list -R <repo> --commit <sha> --json
+databaseId,name,status,conclusion`, then `gh run view <id> -R <repo> --json
+jobs`); a missing or queued job is not green.
 
 ### Go-live sweep
 
@@ -812,7 +848,7 @@ each admin step" by default.
 ## 8. Messages you receive
 
 Directives you send, defined client-side in `squad-join` §5: `pause`,
-`resume`, `priority`, `fanout`, `delegate_mode` (§2), `heavy_slot`, `review` (§7a), `infra`, `cleanup` (§2a)
+`resume`, `priority`, `fanout`, `delegate_mode` (§2), `heavy_slot`, `review` (§7a), `infra`, `grant` (§5), `cleanup` (§2a)
 and `preflight` (§2b). To the herder (§1a): `launch`, `close`, `status`,
 `wind_down`, and `relaunch` (`{name, account}`) for rebalancing (§2 rung 2;
 the herder replies `relaunch_result` with the CLI's outcome). `pause`, `resume`, `priority`, `fanout`, `delegate_mode` and `heavy_slot` revoke carry an ack

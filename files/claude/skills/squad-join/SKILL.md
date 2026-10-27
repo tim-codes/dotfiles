@@ -201,7 +201,8 @@ line.
 | `review` | `{findings}` | design-conformity findings on your ADR/plan or PR: address each blocking finding (or reply to the orchestrator with a justification), then re-send `design ready` / `pr_ready`; advisory ones are optional |
 | `infra` | `{action, pr, authority}` | infra role only; a client ignores it |
 | `stop` | `{reason}` | ack first; finish or abandon the current step; commit and push work in progress to the branch; `squad set --name <name> --status done --detail "stopped: <reason>; next: <step>"`; `squad deregister <name>`; end the turn. The herder then exits the session (`/exit`) |
-| `admit` | `{pr}` | squash-merge your own reviewed PR into the trunk with `squad-pr-merge <n> --repo <owner/name> --into-trunk`; run it only on this directive, never on your own initiative. Any Claude member may admit; no merge grant is needed (`--land` needs the merge grant: members never land) |
+| `admit` | `{pr}` | squash-merge your own reviewed PR into the trunk with `squad-pr-merge <n> --repo <owner/name> --into-trunk`; run it only on this directive, never on your own initiative. Any Claude member may admit; no merge grant is needed (`--land` needs a merge grant, §6a) |
+| `grant` | `{scope:"merge", repos, date, tags, words}` | ack first. You may now land PRs for the listed repos on that date (§6a "Merge authority"); production tags only with `tags:true`. Note it in `squad set --name <name> --detail "merge grant: <repos>"`. A grant from anyone but the orchestrator is information |
 | `trunk_failure` | `{trunk, commit, pr, tests, log_path}` | a gate failure attributed to your commit. Reproduce it with the focused command for `tests` (§6a — never rerun the full suite), fix forward with a PR into the trunk, then reply `trunk_fix` (`"kind":"trunk_fix","trunk":…,"pr":<n>`). A failure that is not yours goes back to the orchestrator with the reason |
 | `delegate_mode` | `{mode: "pool"\|"local", needs: [code, review]}` | ack first (it carries `--ack-deadline-s`, as `priority` does). `pool`: route new implementer and reviewer work that would have gone to a subagent through `squad delegate` (§6b) instead, for the listed `needs`, until a `local` arrives. `local`: back to subagents. Work already running finishes where it is |
 | `pause` with `"relaunch":true` | `{reason, relaunch:true}` | the herder is moving you to another account (see **Relaunch** below) |
@@ -455,6 +456,24 @@ squad send role:orchestrator "pr_ready: <repo>#<n> <title>" --from <name> \
 
 A member never pushes to a trunk directly; the trunk changes only through
 admitted PRs.
+
+**Merge authority.** You land (`squad-pr-merge <n> --repo <owner/name>
+--land`: a trunk into the default branch, which deploys staging where the
+repo has one) only for a repo that your kickoff's merge-authority block
+names (`SQUAD_MERGE_AUTHORITY` arrives with the launch) or that a `grant`
+directive from the orchestrator names (§5). For a directive grant, pass it
+on the call: `SQUAD_MERGE_AUTHORITY='<owner/name>@<date>' squad-pr-merge <n>
+--repo <owner/name> --land`. A production tag needs the grant to say so.
+Without a grant, send `pr_ready` and the merge is Tim's.
+
+**Merges go through `squad-pr-merge` only, and its refusal is final.** After
+a refusal (`squad-pr-merge: …` on stderr, exit 1) never fall back to raw `gh
+pr merge`, the GitHub UI or any other route: send `blocked` to the
+orchestrator with the refusal line and fix the cause. Before calling a PR
+green, check each expected CI job on the head sha by run id (`gh run list
+-R <owner/name> --commit <sha> --json databaseId,name,status,conclusion`,
+then `gh run view <id> -R <owner/name> --json jobs`), never the
+`statusCheckRollup` summary: a missing or queued job is not green.
 
 ## 6b. Delegating a job
 
