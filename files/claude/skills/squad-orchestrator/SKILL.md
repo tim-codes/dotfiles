@@ -215,14 +215,17 @@ every janitor sweep, at each §2 recheck and on any `squad.member` status
 transition to busy while `pct ≥ 70`, not only on threshold crossings. Idle
 members burn nothing: if none of `A`'s members is busy and `pct` is under 95,
 shed nothing. Projections are published for `seven_day` as well as
-`five_hour`: take 7d ETAs from the event (or `squad get quota.A.projection`),
-never compute them by hand.
+`five_hour` (over a 180-minute horizon): take 7d ETAs from the event's
+`eta_minutes_to_100` and `rate_pct_per_min` (or `squad get
+quota.A.projection`), never compute them by hand.
 
 **Name the burner.** Every wall warning to Tim (a threshold at 90 or more, a
 `walls_before_reset` projection at 70 or more, level 100) names the top
-burners from `squad get quota.A.sessions` (per-session tokens over the last
-15 minutes, with the member name when the session is bound): the member, or
-`session <id> (outside the squad)`, with tokens per minute.
+burners from `sessions[]` on the `squad get quota.A` gauge (per session
+over the last `sessions_window_minutes`: `session_id`, `cwd`, `name`,
+`member` when bound, `tokens`, `tokens_per_min`; `sessions_omitted` counts
+the rest): the member, or `session <id> (<cwd>, outside the squad)`, with
+tokens per minute.
 
 **Shed load before pausing: delegate to the pool.** When an exxo window's
 projection says a wall is coming (the test above) and pool members with
@@ -506,7 +509,8 @@ changes by Tim or members.
   only for work no stream waits on (a misfiled blocker cost Tim 80 minutes).
 - **Raise approvals with options.** An `approval` item carries one
   `--option <id>=<label>` per choice, suffixed `:operator` when Tim must
-  carry that choice out himself (`squad operator raise --option
+  carry that choice out himself (without `--option` an approval offers
+  `approve` and `deny`; `squad operator raise --option
   apply=Apply --option hold=Hold:operator`). An item stays open until Tim
   says done; a decision moves it to `ready`, it never closes it.
 - **Relay a decision.** On `operator.item` `change:"decided"`, send it to
@@ -536,8 +540,10 @@ changes by Tim or members.
   denied action stays with Tim for the round, and no member re-runs it from
   the new context.
 - **Prompt items are the broker's.** On `prompt_pending` the broker raises
-  `prompt-<member>` and resolves it when the prompt clears; never raise a
-  duplicate, only order it in the digest.
+  `prompt-<member>` (actor `agent:broker`; a later prompt for the same
+  member is `prompt-<member>-<unix seconds>`) and resolves it, as
+  `orchestrator`, when the prompt clears; never raise a duplicate, only
+  order it in the digest.
 - **Permission-grant UI is Tim's.** Never brief a browser subagent (yours or
   a member's) to save a permission-grant UI (access restrictions, role
   grants, consents): it goes on the stream's human-steps item (§2b). A
@@ -681,10 +687,13 @@ squad send <member> "heavy_slot deny" --from orchestrator --data '{"directive":"
 ```
 **Grants are broker-gated on calm.** The broker refuses a grant with
 `host_not_calm` unless the host level is `ok` with `calm_s` of 300 or more
-(`squad get host`): deny the requester with the calm time still needed as
-`retry_after_s` and keep it queued. On `warn` the broker revokes held slots
-itself: drop them from `grants`, keep their members queued. `--force`
-overrides the gate only for a P1 stream's build with evidence that the
+(`squad get host`; with no host gauge at all, grants go through): deny the
+requester with the calm time still needed as `retry_after_s` and keep it
+queued. On `warn` the broker revokes held slots
+itself: drop them from `grants`, keep their members queued. The override,
+`squad send <member> "heavy_slot grant" --from orchestrator --data
+'{"directive":"heavy_slot","decision":"grant"}' --force` (logged; the data
+gains `forced:true`), is only for a P1 stream's build with evidence that the
 pressure comes from outside the squad (the host gauge's `members[]` CPU low,
 the top process in no member's tree), quoted in the decision log (§9).
 Otherwise you never grant while the host is not calm.
@@ -718,8 +727,10 @@ the last stops, restore `heavy_slots` and tell waiting members to retry.
 **Runaway processes.** On `host.runaway` (a process in a member's tree
 that stayed hot or bloated), send that member a `cleanup` directive (§2a)
 with the pid and tell Tim one line (pid, command, cpu/rss, duration); never
-kill it yourself. Same pid: 30 min apart. Orphaned test workers are reaped
-by the host watcher (`host.orphans`): information, not a task.
+kill it yourself. Same pid: 30 min apart. The event carries `member`;
+`host.protected` carries `previous`. Orphaned test workers are reaped by
+the host watcher: `host.orphans {member, pids, cmds, rss_mb, reaped}` is
+information, not a task.
 
 ## 4a. Routing delegated jobs
 
@@ -759,8 +770,9 @@ incapable one. The record keeps `assigned_by` (you or `broker`).
   expected values to make code pass." Log the outcome (§9).
 - **Job lifecycle.** On `squad.job` `review_overdue` (finished, no verdict
   after 600 s), nudge the requester once (`squad send <requester> "<job>:
-  review overdue" --from orchestrator`). On `amended` (a second worker
-  result), expect a fresh review from the requester. A verdict comes after
+  review overdue" --from orchestrator`; it also shows in `squad job list`).
+  On `amended` (a second worker result; the requester gets a
+  `job_amended` turn), expect a fresh review from the requester. A verdict comes after
   the integrity check and any fixes, never before (`squad-join` §6b).
 - **Credentials, merges, `main`/`master` pushes: Claude members only.** The
   `credentials` tag makes the broker enforce it; if a brief obviously needs
@@ -958,22 +970,27 @@ orchestrator messages carry `data.kind`: `pr_ready`, `heavy_slot` (`action`
 request|release), `blocked`, `done`, `infra_ready`, `infra_result`,
 `preflight`, `operator_task` (§2c), plus your own timers (`sweep_due`, `heavy_slot_expired`, `rate_recheck`). On `blocked`, tell Tim
 if it needs him; on `done`, drop the stream from the plan. Watcher events
-are information. Never send a `now` turn for what can wait until a member
+are information, including `host.orphans {member, pids, cmds, rss_mb,
+reaped}`, `host.protected` (now with `previous`) and `host.runaway` (now
+with `member`, §4). Never send a `now` turn for what can wait until a member
 is idle. Job turns: `job_queued` and `job_worker_free` (route per §4a); the `squad.job`
 topic (events `queued`, `assigned`, `started`, `unacked`, `requeued`,
-`finished`, `amended`, `late_result`, `reviewed`, `review_overdue`; an escalation shows up as the operator
+`finished`, `amended`, `late_result`, `reviewed`, `review_overdue`; the requester's `amended` turn is `job_amended`; an escalation shows up as the operator
 item, not an event) is information for the decision log. From the herder: `launch_result`, `close_result` and `status_result` (reply to
 the matching directive, §1a), and the `herder.issue` topic (subscribed in §1).
 
 **Session liveness** (`squad.member`): `session_gone` means a member's bound
 session is dead and the broker holds its messages by name; `rebound` means a
 new session registered under the name and the queue was flushed;
-`undequeued` means a live session has left its inbox unread for 300 s. A
-`delivered` message is not read until it is dequeued. For a builder, ask the
+`undequeued` means a live session has left its inbox unread for 300 s
+(it can false-alarm on a session busy for over 5 minutes with a `now` turn
+queued). A `delivered` message is not read until it is dequeued; the
+`squad.delivery` outcome for a dead session is `session_gone`. For a builder, ask the
 herder for `status`, then decide relaunch, close or wait (§1a); on
 `rebound`, re-send its stored `fanout` as on a rejoin (§2). **On the
-concierge it is urgent**: Tim's only channel is dark. Ask the herder for
-`status` at once, then reach Tim without the concierge (the no-route
+concierge it is urgent**: Tim's only channel may be dark. Ask the herder
+for `status` at once (an `undequeued` alone may be a busy turn, so wait for
+its answer before treating the concierge as dead), then reach Tim without the concierge (the no-route
 exception in "Talking to Tim"): raise an operator item `concierge-down`
 with `--blocking now` (the dashboard reaches his phone), naming the dead
 session and the fix (the concierge re-registers in its window, or a

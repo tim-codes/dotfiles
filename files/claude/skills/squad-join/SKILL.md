@@ -118,8 +118,8 @@ transcript, perhaps in another context; a relaunch note; a new
 with the same name, then §3. While the old session was gone (`squad.member`
 `session_gone`) the broker held your messages by name; the register from the
 new session publishes `rebound` and flushes them. Until you re-register
-nothing reaches you, even where `squad.delivery` says `delivered`: that
-means enqueued, and a message is read only once your session dequeues it
+nothing reaches you (`squad.delivery` shows `session_gone`), and even a
+`delivered` only means enqueued, and a message is read only once your session dequeues it
 (the broker publishes `undequeued` when a live session leaves its inbox
 unread for 300 s).
 
@@ -572,7 +572,7 @@ sending back is `rework` now, with its reason; once the fix is in, run
 `squad job review` again with `accepted`: reviews can be repeated and the
 last one stands. The broker rejects `accepted` with a failing reason such as
 `failing_tests`. A worker's second result after `finished` marks the job
-`amended` and brings a new `job_result`: fetch the branch again and review
+`amended` and brings a `job_amended` turn: fetch the branch again and review
 it before any verdict. `review_overdue` (600 s after `finished` with no
 verdict) means record one now.
 
@@ -618,7 +618,8 @@ the first action (§5), then `squad set --name <name> --status working
 
    `--diff-summary` is filled from `git diff --shortstat` when omitted.
    `--test-command` and `--test-result` go together and are required with
-   `--branch` on an `ok` result; `not-run` carries `--test-reason`.
+   `--branch` on an `ok` result, except that `not-run` needs no
+   `--test-command` and carries `--test-reason`.
 
 **Job kinds.** A `test` job runs a credential-free gate (unit, lint,
 typecheck, build) against the given sha, usually a trunk, in your own
@@ -649,12 +650,12 @@ existing test is evidence of it, and your code is what must change.
 **When you may not run tests** (the orchestrator's no-tests ruling for K3
 workers, or the classifier denying a test run), the ruling covers gate
 recipes too: `just check`, `just ci`, `just verify` and anything else that
-spawns test workers. Run none of them and report `--test-command "<the
-command you would have run>" --test-result not-run --test-reason "<why>"`.
+spawns test workers. Run none of them and report `--test-result not-run
+--test-reason "<why>"`.
 The host watcher reaps orphaned test workers; never kill pids for them.
 
 **A fix after you have reported** is pushed to `job/<id>` and followed by a
-second `delegate-result` for the same job (the broker marks it `amended` and
+second `delegate-result` for the same job, or `squad job amend` (the broker marks it `amended` and
 tells the requester); never a silent push after `finished`.
 
 **Caching discipline** (K3; Tim, 25 Oct). Your kickoff and the skill text

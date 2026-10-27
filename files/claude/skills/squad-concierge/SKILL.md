@@ -122,9 +122,10 @@ squad operator present <id> --name concierge
 
 Tim's explicit choice of an option in chat (a bare "ok" is not a decision):
 ```
-squad operator decide <id> --decision "<the option he chose>" --ruling "Tim: <his words verbatim>" --name concierge
+squad operator decide <id> <option> --ruling "Tim: <his words verbatim>" [--note "<text>" | --note-file <path>] --name concierge
 ```
-The item stays open and the `operator.item` `decided` event drives the
+The positional `<option>` is recorded as the item's `decision` (an approval
+raised without options offers `approve` and `deny`). The item stays open and the `operator.item` `decided` event drives the
 orchestrator's relay, so send nothing more.
 
 Closing or reopening, only when Tim has said it, one item at a time, never
