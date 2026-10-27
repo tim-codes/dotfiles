@@ -235,9 +235,9 @@ check_gcloud_adc() {
     if gcloud auth application-default print-access-token >/dev/null 2>&1; then
         S=ok; N="application-default credentials valid"; return
     fi
-    S=needs-auth; N="no valid ADC (Pulumi's GCP provider uses it)"; FIX="gcloud auth application-default login"
+    S=needs-auth; N="no valid ADC (Pulumi's GCP provider uses it)"; FIX="gcloud auth application-default login --quiet"
 }
-fix_gcloud_adc() { gcloud auth application-default login; }
+fix_gcloud_adc() { gcloud auth application-default login --quiet; }
 
 # --- pulumi (+ ESC) -------------------------------------------------------------------
 check_pulumi() {
