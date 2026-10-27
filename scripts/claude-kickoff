@@ -7,7 +7,7 @@
 #
 #   claude-kickoff <prompt.md> [--account CONTEXT]
 #                              [--resume <session_id> --cwd <dir>] [--dry-run]
-#                              [--no-trust-check]
+#                              [--trust | --no-trust] [--no-trust-check]
 #   claude-kickoff --check-trust <cwd> --account CONTEXT
 #
 # The context wrappers (claude-personal, claude-exxo, claude-exxo-personal,
@@ -32,13 +32,28 @@
 # Folder trust: Claude Code stops a fresh session at a "trust this folder?" dialog
 # until a human accepts it, and it records the answer as `hasTrustDialogAccepted`
 # on the cwd's entry in the `projects` map of <config dir>/.claude.json (keys are
-# real paths). The launcher never accepts the dialog and never writes that file; it
-# only CHECKS, so a member that would sit at the dialog is refused up front (exit 3,
-# `trust: missing ...` on stderr) and the herder reports it rather than the member
-# silently failing to join. The check runs by default on every launch, --dry-run
-# included (the herder resolves with --dry-run, so that is where it sees the
-# refusal); --no-trust-check skips it, for an attended launch. --check-trust <cwd>
-# runs only the check, read-only, for the context --account names.
+# real paths; a trusted parent does not count). A squad member has no human to
+# answer, so by default (--trust) the launcher RECORDS that answer for the cwd
+# before the launch when it is missing: it merges {"hasTrustDialogAccepted": true}
+# into .projects[<real cwd>] with jq (every other key and project untouched), writes
+# a temp file in the same directory and renames it over the original, takes a
+# one-off backup .claude.json.bak-<YYYYmmddTHHMMSS> only when the file changes, and
+# prints `trust: recorded <path> in <context>` on stdout. A missing .claude.json is
+# created as a minimal {"projects": {...}}; an invalid one is never overwritten
+# (exit 2). Tim approved recording trust for squad members on 2026-10-27
+# (tim-codes/squad#102, item 5).
+# Defaults and precedence:
+#   --no-trust-check (or CLAUDE_KICKOFF_NO_TRUST_CHECK=1)  skip the whole step: no
+#                    check, no write (attended launch; the human answers the dialog)
+#   --no-trust       check only: refuse with exit 3 (`trust: missing ...` on stderr)
+#                    when the cwd is not trusted; the file is never modified
+#   --trust          record when missing (the default); of --trust and --no-trust the
+#                    last one given wins
+# --no-trust-check beats both. --dry-run never writes (the herder resolves with it
+# first, so it must stay side-effect free): it reports `trust: would-record <path>
+# in <context>` and exits 0 where a real launch would record, or refuses with exit 3
+# under --no-trust. --check-trust <cwd> is always the read-only check, for the
+# context --account names, whatever else is given.
 set -uo pipefail
 
 CONTEXTS_FILE="${CLAUDE_KICKOFF_CONTEXTS:-$HOME/.config/claude-kickoff/contexts.toml}"
@@ -51,7 +66,7 @@ usage() {
     cat <<'EOF'
 Usage: claude-kickoff <prompt.md> [--account CONTEXT]
                                   [--resume <session_id> --cwd <dir>] [--dry-run]
-                                  [--no-trust-check]
+                                  [--trust | --no-trust] [--no-trust-check]
        claude-kickoff --check-trust <cwd> --account CONTEXT
 
 Reads the frontmatter of <prompt.md>, changes to its cwd and execs claude in the
@@ -99,19 +114,28 @@ Options:
                   not carry one). Without --resume it has no effect.
   --dry-run       resolve and validate everything, print the plan (never the body,
                   only its size) and exit 0 without launching
+  --trust         record folder trust for the cwd before launching when it is missing
+                  (the default): merge hasTrustDialogAccepted=true into the cwd's
+                  entry of <config dir>/.claude.json (created when absent; other
+                  keys and projects untouched; atomic rename; a one-off backup
+                  .claude.json.bak-<YYYYmmddTHHMMSS> when the file changes) and print
+                  `trust: recorded <path> in <context>`. An invalid trust file is
+                  never overwritten (exit 2). Under --dry-run nothing is written:
+                  `trust: would-record <path> in <context>`, exit 0.
+  --no-trust      check only, as before --trust existed: refuse with exit 3 when the
+                  cwd is not trusted (`trust: missing <path> in <context>` and what
+                  to do, on stderr; nothing is launched, the file is never
+                  modified). Of --trust and --no-trust the last one given wins.
   --no-trust-check
-                  skip the folder-trust check (attended launch, where the human can
-                  answer the dialog). Without it the launch is refused, exit 3, when
-                  the cwd is not trusted in the context: `trust: missing <path> in
-                  <context>` and what to do, on stderr; nothing is launched and the
-                  trust file is never modified. Also honoured as
-                  CLAUDE_KICKOFF_NO_TRUST_CHECK=1.
+                  skip the folder-trust step altogether, check and record (attended
+                  launch, where the human can answer the dialog); beats --trust and
+                  --no-trust. Also honoured as CLAUDE_KICKOFF_NO_TRUST_CHECK=1.
   --check-trust DIR
                   only check whether DIR is trusted in the --account context; no
                   prompt file. Prints `trust: ok <path> in <context>` and exits 0, or
                   `trust: missing <path> in <context>` plus the human step and exits
                   3 (exit 2 when <config dir>/.claude.json is missing or invalid).
-                  ~ is expanded and the path resolved to a real path, as Claude Code
+                  Always read-only. ~ is expanded and the path resolved to a real path, as Claude Code
                   keys its projects map.
   -h, --help      this text
 
@@ -125,11 +149,12 @@ capabilities, provides, env_pass, before_launch and add_dirs (empty as `none`).
 Exit codes (stable):
   0   launched (never returns: claude is exec'd) / --dry-run succeeded
   2   usage error: bad or missing argument, unknown --account, malformed --resume id;
-      or the folder-trust check cannot read <config dir>/.claude.json (missing or
-      not a JSON object)
+      or the folder-trust step cannot use <config dir>/.claude.json: missing
+      (--check-trust and --no-trust only) or unreadable, not a JSON object, with a
+      projects map or cwd entry that is not an object, or not writable (--trust)
   3   prompt file unusable: missing, unreadable, no `---` terminator, empty body
       for a new session, or an add_dirs path that is not a directory; or the cwd is
-      not trusted in the context (folder-trust check; --check-trust uses this too)
+      not trusted in the context (--no-trust, and --check-trust)
   4   frontmatter lacks a required key (cwd, context, model or effort); the message
       names it
   5   invalid value: unknown context, a harness other than the context's, an unknown
@@ -155,7 +180,7 @@ die() { # die <code> <message...>
     exit "$code"
 }
 
-prompt="" account="" resume="" resume_cwd="" dry=0 check_trust="" trust_check=1
+prompt="" account="" resume="" resume_cwd="" dry=0 check_trust="" trust_check=1 trust_mode=record
 [ "${CLAUDE_KICKOFF_NO_TRUST_CHECK:-}" = 1 ] && trust_check=0
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -174,6 +199,8 @@ while [ $# -gt 0 ]; do
         --cwd=*) resume_cwd="${1#--cwd=}"; shift ;;
         --dry-run) dry=1; shift ;;
         --no-trust-check) trust_check=0; shift ;;
+        --trust) trust_mode=record; shift ;;
+        --no-trust) trust_mode=refuse; shift ;;
         --check-trust)
             [ $# -ge 2 ] || die 2 "--check-trust needs a directory"
             check_trust="$2"; shift 2 ;;
@@ -206,29 +233,74 @@ case "$account" in
     "") ;;
     *) case " $CONTEXTS " in *" $account "*) ;; *) die 2 "unknown --account '$account' (expected one of: $CONTEXTS)" ;; esac ;;
 esac
+# trust_probe <context> <config dir> <dir>: read-only. Sets TRUST_DIR (<dir> resolved
+# to a real path, as Claude Code keys `projects`) and TRUST_FILE, and returns 0 when
+# <dir> is trusted, 3 when it is not (a missing `projects` map or entry counts), 4
+# when <config dir>/.claude.json does not exist, or 2 (message on stderr) when it is
+# unreadable, not a JSON object, or has a projects map or <dir> entry that is not an
+# object.
+TRUST_DIR="" TRUST_FILE=""
+trust_probe() {
+    local c="$1" cdir="$2" dir
+    dir=$(expand_home "$3")
+    dir=$(cd "$dir" 2>/dev/null && pwd -P || printf '%s' "$dir")
+    TRUST_DIR="$dir" TRUST_FILE="$cdir/.claude.json"
+    [ -e "$TRUST_FILE" ] || return 4
+    [ -r "$TRUST_FILE" ] || { printf 'claude-kickoff: trust file %s is missing or unreadable (context %s)\n' "$TRUST_FILE" "$c" >&2; return 2; }
+    jq -e 'type == "object"' "$TRUST_FILE" >/dev/null 2>&1 \
+        || { printf 'claude-kickoff: trust file %s is not a valid JSON object (context %s)\n' "$TRUST_FILE" "$c" >&2; return 2; }
+    jq -e --arg p "$dir" '((.projects // {}) | type == "object") and (((.projects // {})[$p] // {}) | type == "object")' "$TRUST_FILE" >/dev/null 2>&1 \
+        || { printf 'claude-kickoff: trust file %s is not a valid JSON object: its projects map or the entry for %s is not an object (context %s)\n' "$TRUST_FILE" "$dir" "$c" >&2; return 2; }
+    [ "$(jq -r --arg p "$dir" '.projects // {} | .[$p].hasTrustDialogAccepted // false' "$TRUST_FILE" 2>/dev/null)" = true ] && return 0
+    return 3
+}
 # trust_check_dir <context> <config dir> <dir>: is <dir> trusted in the context?
 # Read-only. Prints `trust: ok ...` on stdout and returns 0; or `trust: missing ...`
 # plus the human step on stderr and returns 3; or a message on stderr and returns 2
-# when <config dir>/.claude.json is missing or not a JSON object. <dir> is resolved
-# to a real path first (Claude Code keys `projects` by real path); a missing
-# `projects` map or entry counts as not trusted.
+# when <config dir>/.claude.json is missing or unusable (see trust_probe).
 trust_check_dir() {
-    local c="$1" cdir="$2" dir tfile
-    dir=$(expand_home "$3")
-    dir=$(cd "$dir" 2>/dev/null && pwd -P || printf '%s' "$dir")
+    local c="$1" rc
+    trust_probe "$@"; rc=$?
+    case "$rc" in
+        0) printf 'trust: ok %s in %s\n' "$TRUST_DIR" "$c"; return 0 ;;
+        3) {
+               printf 'trust: missing %s in %s\n' "$TRUST_DIR" "$c"
+               printf 'open the folder once in %s and accept the trust dialog, or start the member attended\n' "$c"
+           } >&2
+           return 3 ;;
+        4) printf 'claude-kickoff: trust file %s is missing or unreadable (context %s)\n' "$TRUST_FILE" "$c" >&2; return 2 ;;
+        *) return "$rc" ;;
+    esac
+}
+# trust_record <context> <config dir> <dir>: merge hasTrustDialogAccepted=true into
+# .projects[<real dir>] of <config dir>/.claude.json and print `trust: recorded ...`.
+# Only for a file trust_probe found usable or absent. The new content goes to a temp
+# file in the same directory (mode copied from the original), is validated, then
+# renamed over the original; a timestamped backup is taken first, only because the
+# file is about to change. Returns 2 when anything fails; the original stays as it was.
+trust_record() {
+    local c="$1" cdir="$2" tfile tmp bak dir
     tfile="$cdir/.claude.json"
-    [ -r "$tfile" ] || { printf 'claude-kickoff: trust file %s is missing or unreadable (context %s)\n' "$tfile" "$c" >&2; return 2; }
-    jq -e 'type == "object"' "$tfile" >/dev/null 2>&1 \
-        || { printf 'claude-kickoff: trust file %s is not a valid JSON object (context %s)\n' "$tfile" "$c" >&2; return 2; }
-    if [ "$(jq -r --arg p "$dir" '.projects // {} | .[$p].hasTrustDialogAccepted // false' "$tfile" 2>/dev/null)" = true ]; then
-        printf 'trust: ok %s in %s\n' "$dir" "$c"
-        return 0
+    dir=$(cd "$3" 2>/dev/null && pwd -P || printf '%s' "$3")
+    tmp=$(mktemp "$cdir/.claude.json.tmp.XXXXXX") \
+        || { printf 'claude-kickoff: cannot write a temp file in %s (context %s)\n' "$cdir" "$c" >&2; return 2; }
+    if [ -e "$tfile" ]; then
+        cp -p "$tfile" "$tmp" 2>/dev/null || true
+        jq --arg p "$dir" '.projects = ((.projects // {}) | .[$p] = ((.[$p] // {}) + {hasTrustDialogAccepted: true}))' "$tfile" >"$tmp" 2>/dev/null
+    else
+        jq -n --arg p "$dir" '{projects: {($p): {hasTrustDialogAccepted: true}}}' >"$tmp" 2>/dev/null
+    fi || { rm -f "$tmp"; printf 'claude-kickoff: cannot update %s (context %s)\n' "$tfile" "$c" >&2; return 2; }
+    jq -e --arg p "$dir" '.projects[$p].hasTrustDialogAccepted == true' "$tmp" >/dev/null 2>&1 \
+        || { rm -f "$tmp"; printf 'claude-kickoff: cannot update %s (context %s)\n' "$tfile" "$c" >&2; return 2; }
+    if [ -e "$tfile" ]; then
+        bak="$tfile.bak-$(date +%Y%m%dT%H%M%S)"
+        [ ! -e "$bak" ] || bak="$bak.$$"
+        cp -p "$tfile" "$bak" 2>/dev/null \
+            || { rm -f "$tmp"; printf 'claude-kickoff: cannot back up %s (context %s)\n' "$tfile" "$c" >&2; return 2; }
     fi
-    {
-        printf 'trust: missing %s in %s\n' "$dir" "$c"
-        printf 'open the folder once in %s and accept the trust dialog, or start the member attended\n' "$c"
-    } >&2
-    return 3
+    mv -f "$tmp" "$tfile" 2>/dev/null \
+        || { rm -f "$tmp"; printf 'claude-kickoff: cannot replace %s (context %s)\n' "$tfile" "$c" >&2; return 2; }
+    printf 'trust: recorded %s in %s\n' "$dir" "$c"
 }
 if [ -n "$check_trust" ]; then
     check_dir=$(expand_home "$check_trust")
@@ -417,11 +489,20 @@ else
     [ -n "$body" ] || die 3 "the prompt body (after the '---' line) is empty in $prompt"
 fi
 
-# --- folder trust: check only, never accept; before anything with side effects --
-trust_line="skipped"
+# --- folder trust: check now (read-only); a real launch records after the preconditions
+trust_line="skipped" trust_pending=0
 if [ "$trust_check" -eq 1 ]; then
-    trust_line=$(trust_check_dir "$ctx" "$config_dir" "$cwd") || exit $?
-    trust_line="${trust_line#trust: }"
+    if [ "$trust_mode" = record ]; then
+        trust_probe "$ctx" "$config_dir" "$cwd"; rc=$?
+        case "$rc" in
+            0) trust_line="ok $TRUST_DIR in $ctx" ;;
+            3|4) trust_line="would-record $TRUST_DIR in $ctx"; trust_pending=1 ;;
+            *) exit "$rc" ;;
+        esac
+    else
+        trust_line=$(trust_check_dir "$ctx" "$config_dir" "$cwd") || exit $?
+        trust_line="${trust_line#trust: }"
+    fi
 fi
 
 # --- preconditions: in order, output discarded, the first failure refuses -----
@@ -500,6 +581,11 @@ if [ "$dry" -eq 1 ]; then
     exit 0
 fi
 
+if [ "$trust_pending" -eq 1 ]; then
+    trust_record "$ctx" "$config_dir" "$cwd" || exit $?
+elif [ "$trust_check" -eq 1 ]; then
+    printf 'trust: %s\n' "$trust_line"
+fi
 cd "$cwd" || die 5 "cannot enter cwd '$cwd'"
 export CLAUDE_CONFIG_DIR="$config_dir"
 if [ "$(ctx_get "$ctx" '.openrouter // false')" != true ]; then

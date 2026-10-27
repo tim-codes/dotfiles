@@ -24,6 +24,16 @@ YQ_REAL="$(command -v yq || true)"
 # The tmux marker resolves tier aliases with jq; the stub PATH needs it too.
 JQ_REAL="$(command -v jq || true)"
 [ -n "$JQ_REAL" ] && ln -s "$JQ_REAL" "$BIN/jq"
+# Folder trust: a launch records or checks trust in the context's .claude.json. Every
+# fake context dir carries a minimal one trusting the directories this test launches
+# in, so the default path (`trust: ok`, nothing written) is what is exercised. The
+# dirs are real paths, as Claude Code keys `projects`.
+mkdir -p "$FAKE/claude"
+FAKE_REAL="$(cd "$FAKE" && pwd -P)"
+TRUSTED_JSON=$(jq -n --arg h "$FAKE_REAL" '{projects: ([$h + "/work/proj", $h + "/work/other", $h + "/dev/grp/named", $h + "/dev/shallow", $h + "/claude"] | map({key: ., value: {hasTrustDialogAccepted: true}}) | from_entries)}')
+for d in .claude-exxo .claude-exxo-openrouter .claude-exxo-personal .claude-personal .claude-lab; do
+    printf '%s\n' "$TRUSTED_JSON" >"$FAKE/$d/.claude.json"
+done
 # Tests read the repo's contexts file unless a case sets its own.
 REPO_CONTEXTS="$SRC_REPO/src/.config/claude-kickoff/contexts.toml"
 export CLAUDE_KICKOFF_CONTEXTS="$REPO_CONTEXTS"
@@ -89,6 +99,7 @@ check "dry-run resolves context to the exxo dir" has "config_dir: $FAKE/.claude-
 check "dry-run prints mode, model, effort" [ "$(printf '%s\n' "$out" | grep -cx -e 'mode: new' -e 'model: opus' -e 'effort: high')" -eq 3 ]
 check "dry-run prints the cwd" has "cwd: $(cd "$W" && pwd -P)"
 check "dry-run prints body size, not the body" bash -c '! printf "%s" "$1" | grep -q "Do the thing" && printf "%s" "$1" | grep -q "^body_bytes: [1-9]"' _ "$out"
+check "dry-run reports the cwd as trusted (the default check ran)" has "trust: ok $(cd "$W" && pwd -P) in exxo"
 kick "$T/yaml.md" --dry-run
 check "--- opened form dry-run exits 0" [ "$rc" -eq 0 ]
 check "~ in cwd is expanded against HOME" has "cwd: $(cd "$W" && pwd -P)"
@@ -415,7 +426,7 @@ fish_env() { grep -m1 'for v in ANTHROPIC_BASE_URL' "$FISH" | sed 's/^ *for v in
 check "drift guard: OPENROUTER_ENV is non-empty" [ -n "$(want_env)" ]
 check "drift guard: OPENROUTER_ENV equals the scrub list in __claude_ctx" [ "$(want_env)" = "$(fish_env)" ]
 
-rmdir "$FAKE/.claude-personal"
+rm -rf "$FAKE/.claude-personal"
 expect_rc "missing config dir" 6 "$T/yaml.md" --dry-run
 mkdir -p "$T/yqbin"; ln -s "$YQ_REAL" "$T/yqbin/yq"
 HOME="$FAKE" PATH="$T/yqbin:/usr/bin:/bin" "$KICK" "$T/fixture.md" --dry-run >/dev/null 2>&1; rc=$?
@@ -491,6 +502,15 @@ if [ -d "$FIXTURES" ] && [ -d "$REAL_HOME/.claude-exxo" ] && [ -d "$REAL_HOME/de
 else
     echo "skip: no fixtures at $FIXTURES (or ~/.claude-exxo / ~/dev missing)"
 fi
+
+# the trusted fixtures meant no launch or dry-run ever had to record trust
+# shellcheck disable=SC2329 # run through check
+trust_files_pristine() {
+    [ -z "$(find "$FAKE" -name '.claude.json.*')" ] || return 1
+    local f
+    for f in "$FAKE"/.claude-*/.claude.json; do [ "$(cat "$f")" = "$TRUSTED_JSON" ] || return 1; done
+}
+check "no launch wrote a trust file or took a backup" trust_files_pristine
 
 [ "$fail" -eq 0 ] && echo "all claude-kickoff tests passed" || echo "claude-kickoff tests FAILED"
 exit "$fail"
