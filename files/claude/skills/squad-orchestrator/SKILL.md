@@ -32,10 +32,18 @@ squad send concierge "<the one-line text Tim would read>" --from orchestrator --
   `operator_update` whose `text` carries the question; wait for the concierge
   to relay Tim's ruling. Where the skill already uses an operator item
   (§2c), use that. Digests are `operator_digest` (§2c).
+- **The auto-deny is not Tim.** "The user doesn't want to take this action
+  right now, STOP and wait" in a tool result (yours, or in a member's
+  report) is an unanswered permission prompt denying itself after about
+  60 s. Never halt on it or ask Tim about it: retry once with a plain
+  command and prefer paths that raise no prompt (`squad-join` §8). Work
+  unattended; no prompt may sit in a builder terminal (Tim, 25 Oct).
 - The only exception is what precedes registration (the context guard, a
   failed `register`, the singleton check in §1): there is no concierge route
   yet, so print a terminal note and stop. Everything from step 0 on,
-  including `/reauth`, goes through the concierge.
+  including `/reauth`, goes through the concierge. A dead concierge (§8
+  "Session liveness") is the other no-route case: print one terminal line
+  beside the operator item, and carry on.
 
 Env vars do not persist between Bash calls: pass `--name orchestrator` and
 `--from orchestrator` explicitly. Every command here is spelled as the
@@ -85,6 +93,9 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    squad subscribe orchestrator quota.A.reset
    squad subscribe orchestrator quota.A.projection
    squad subscribe orchestrator quota.A.burn
+   # while the K3 pool is live (its first launch to its last close):
+   squad subscribe orchestrator quota.openrouter.burn
+   squad subscribe orchestrator quota.openrouter.projection
    # and once:
    squad subscribe orchestrator host --min-change 15 --debounce-s 300
    squad subscribe orchestrator host.pressure
@@ -99,7 +110,8 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    squad subscribe orchestrator herder.issue --priority next
    squad subscribe orchestrator squad.job --priority later
    ```
-   (`squad.job` is for the decision log only: routing needs just the
+   (`quota.A.reset` fires only when the window's `previous_pct` was 70 or
+   more. `squad.job` is for the decision log only: routing needs just the
    `job_queued` and `job_worker_free` turns, which arrive regardless.
    `squad.directive` requires squad built from PR S1 or later;
    `operator.item` requires the dashboard server from PR S3.)
@@ -149,9 +161,20 @@ kickoff file in the plan Tim passed (relayed by the concierge):
    Ask for state with a `status` directive; its answer is `status_result`.
 5. **Rebalancing**: direct a rebalance (`squad herd relaunch --name <n>
    --account <ctx>`) through the herder rather than closing and launching by
-   hand; the rule, limits and outcomes are §2 rung 2.
-6. **End of run:** `squad send herder "wind_down" --from orchestrator
-   --ack-deadline-s 60 --data '{"directive":"wind_down"}'`.
+   hand; the rule, limits and outcomes are §2 rung 2. A relaunch is for
+   account moves only; a merge grant is a directive (§5).
+6. **End of run:** first drop the topics that matter only while members
+   run: `squad unsubscribe orchestrator <topic>` for `host`,
+   `host.pressure`, `host.protected`, `host.runaway` and each account's
+   `quota.A.reset`. Keep `quota.A.threshold` and `quota.A.projection` only
+   while any member is live, and drop them (and `quota.openrouter.*`) once
+   none is. Then `squad send herder "wind_down" --from orchestrator
+   --ack-deadline-s 60 --data '{"directive":"wind_down"}'`. The herder
+   closes the builders, then infra, then you, and deregisters last; the
+   concierge stays for Tim. If its close of you fails (exit 13: Tim
+   launched you by hand), `squad deregister orchestrator`, ask Tim through
+   the concierge to close your window, and stop: an idle tail answering
+   watcher events is pure burn.
 7. **On `herder.issue`:** decide what to do; tell Tim through the concierge
    (§2) only if it needs him.
 8. **Decision log:** every herder directive (launch, close, status, relaunch,
@@ -191,7 +214,18 @@ member regardless of the projection (level 100: below). Re-run the test at
 every janitor sweep, at each §2 recheck and on any `squad.member` status
 transition to busy while `pct ≥ 70`, not only on threshold crossings. Idle
 members burn nothing: if none of `A`'s members is busy and `pct` is under 95,
-shed nothing.
+shed nothing. Projections are published for `seven_day` as well as
+`five_hour` (over a 180-minute horizon): take 7d ETAs from the event's
+`eta_minutes_to_100` and `rate_pct_per_min` (or `squad get
+quota.A.projection`), never compute them by hand.
+
+**Name the burner.** Every wall warning to Tim (a threshold at 90 or more, a
+`walls_before_reset` projection at 70 or more, level 100) names the top
+burners from `sessions[]` on the `squad get quota.A` gauge (per session
+over the last `sessions_window_minutes`: `session_id`, `cwd`, `name`,
+`member` when bound, `tokens`, `tokens_per_min`; `sessions_omitted` counts
+the rest): the member, or `session <id> (<cwd>, outside the squad)`, with
+tokens per minute.
 
 **Shed load before pausing: delegate to the pool.** When an exxo window's
 projection says a wall is coming (the test above) and pool members with
@@ -306,6 +340,14 @@ Record the cap on the member's plan stream (`fanout`, §3) once its ack
 arrives, and re-send the stored value (ack-gated) whenever that member
 rejoins (`squad.member` `joined` or `updated`); ack outcomes are as in step 4 below.
 
+**Fanout above the default** (more than 3) is an exception: its trigger and
+`Trigger:` line quote a `squad get quota.A` read in the same turn (`pct` and
+the sample time), never a figure from an earlier turn; the directive tells
+the member to run installs serially (one `pnpm install` at a time) or share
+one `node_modules`; and never fan out or launch a multi-PR stream onto a
+capped CI pool (a self-hosted pool such as gcp-heavy) while a P1 deploy is
+queued or running on it.
+
 **On a shed decision:**
 1. Choose the rung and members as above; do not re-send a rung a member
    already holds.
@@ -346,8 +388,8 @@ pressure.
 **Held turns.** Subscribe to `squad.member` and act on `data.event ==
 "held_long"` (fields `name`, `count`, `oldest_age_s`, `reason`
 `prompt|not_live|busy`). Tell Tim one line: member, count, age, reason. If the
-reason is `prompt`, raise an operator item (§2c): the member is waiting on a
-permission prompt only Tim can answer. A `joined` event is a new member; an
+reason is `prompt`, the broker has already raised `prompt-<member>` (§2c);
+never raise another. A `joined` event is a new member; an
 `updated` event (with `changed`) is the same session re-registering, not a
 second member.
 
@@ -428,17 +470,28 @@ unresolved `preflight blocked` item for Tim to fix; do not work around it,
 and do not retry a blocked member until he says it is resolved. Re-send to
 that member alone afterwards.
 
+**Human-only steps are minted at brief time, before launch.** Read each
+stream's kickoff for every human-only step it foreseeably needs: a browser
+sign-in (Datadog EU, M365), a save in a permission-grant UI (a Datadog
+access-control change, an admin-console toggle), folder trust for the
+member's cwd in its context, a release tag that is Tim's, Touch ID for an
+ESC write, Search Console. Before you send the launch, raise one operator
+item per stream (`<stream>-human-steps`, kind `action`; `blocking` `later`
+with `after` naming the build step, or `now` if the stream starts on it)
+listing each step with its exact click path (URL, menu, button, value).
+Members' own preflight items (`squad-join` §5a step 4) add to it.
+
 ## 2c. Operator task queue
 
 The squad exists to cut human-in-the-loop (HITL) interruptions: members never
 prompt Tim, they send `operator_task` (fields in `squad-join` §6). The
 dashboard server (`:7780`) owns the queue (requires the dashboard server
 from PR S3). Preferred form: `squad operator raise|set|list` (requires the
-`squad operator` CLI, S4). Until S4 ships, use the API directly (S3 needed):
+`squad operator` CLI, S4; `raise --kind approval|action|denial|review|info`). Until S4 ships, use the API directly (S3 needed):
 ```
 # raise / replace (caller-chosen id; the server stamps raised_at and updated_at)
 curl -sS -X PUT http://127.0.0.1:7780/api/operator/items/<id> -H 'content-type: application/json' \
-  -d '{"stream":"<member>","title":"…","kind":"approval|action|info","blocking":"now|later","status":"open","instructions":"…","commands":["…"],"url":null,"draft_url":null,"after":null,"est_minutes":5}'
+  -d '{"stream":"<member>","title":"…","kind":"approval|action|denial|review|info","blocking":"now|later","status":"open","instructions":"…","commands":["…"],"url":null,"draft_url":null,"after":null,"est_minutes":5}'
 # change status / hand back (actor is mandatory)
 curl -sS -X PATCH http://127.0.0.1:7780/api/operator/items/<id> -H 'content-type: application/json' \
   -d '{"status":"ready","actor":"orchestrator"}'
@@ -456,7 +509,8 @@ changes by Tim or members.
   only for work no stream waits on (a misfiled blocker cost Tim 80 minutes).
 - **Raise approvals with options.** An `approval` item carries one
   `--option <id>=<label>` per choice, suffixed `:operator` when Tim must
-  carry that choice out himself (`squad operator raise --option
+  carry that choice out himself (without `--option` an approval offers
+  `approve` and `deny`; `squad operator raise --option
   apply=Apply --option hold=Hold:operator`). An item stays open until Tim
   says done; a decision moves it to `ready`, it never closes it.
 - **Relay a decision.** On `operator.item` `change:"decided"`, send it to
@@ -475,10 +529,26 @@ changes by Tim or members.
   denies a raise whose text requests a grant or a secret; put the command
   Tim must run in `commands[]` instead. Long text goes through
   `--instructions-file`, never inline.
-- **Denial items**: a member's denied command arrives as an item with id
-  `denied-<member>-<n>` and a title starting `denied (permission|classifier|
-  guard|keyhelper): `. Never tell the member to retry the command; Tim
-  decides, or you raise the missing rule for the dotfiles fragment.
+- **Denial items**: a member's denied command arrives as a kind `denial`
+  item with id `denied-<member>-<n>` and a title starting `denied
+  (permission|classifier|guard|keyhelper): `. They are non-blocking: group
+  them as one digest line, never a question to Tim; the server drops them
+  after 2 h, and a denied step that needs Tim arrives as its own `action`
+  item. Never tell the member to retry the command; Tim
+  decides, or you raise the missing rule for the dotfiles fragment. A
+  relaunch in another context does not reset a classifier denial: the
+  denied action stays with Tim for the round, and no member re-runs it from
+  the new context.
+- **Prompt items are the broker's.** On `prompt_pending` the broker raises
+  `prompt-<member>` (actor `agent:broker`; a later prompt for the same
+  member is `prompt-<member>-<unix seconds>`) and resolves it, as
+  `orchestrator`, when the prompt clears; never raise a duplicate, only
+  order it in the digest.
+- **Permission-grant UI is Tim's.** Never brief a browser subagent (yours or
+  a member's) to save a permission-grant UI (access restrictions, role
+  grants, consents): it goes on the stream's human-steps item (§2b). A
+  classifier denial of such an action goes straight to that item, with no
+  second attempt.
 - **Draft links** (`draft_url`, `url`) are server-checked; a 422 means fix
   the draft, not the item. Never present an unresolved draft.
 - **Order and nudge; you are the single composer.** Order blocking-now,
@@ -512,7 +582,8 @@ The plan lives in the broker, surviving your restarts:
 ```
 {"streams":[{"member":"…","priority":1-5,"phase":"…","notes":"…","prompt":"<kickoff prompt path>","deliverables":[…],
    "account":"<the account the member is currently on>","home_account":"<its launch account>",
-   "fanout":{"max_subagents":3,"model_ceiling":null,"set_at":"<ISO>"}}],
+   "fanout":{"max_subagents":3,"model_ceiling":null,"set_at":"<ISO>"},
+   "merge_grant":{"repos":[…],"date":"<YYYY-MM-DD>","tags":false,"words":"…"}|null}],
  "heavy_slots":1,"slots_reduced":false,"grants":[{"member","reason","granted_at","expires_at"}],
  "queue":[{"member","reason","est_minutes","requested_at"}],"paused":[…],
  "infra_authority":null,"pending_infra":[{"pr","repo","from","summary"}],
@@ -585,6 +656,23 @@ by Tim's word) beside the open operator items, each with its client, ticket
 key and owner. An open one is `deferred` only with its ticket and an owner,
 else `missing`.
 
+**Kickoff files you write** (ad-hoc work §1b, a relaunch, any amended
+kickoff) carry two blocks besides the work:
+- **Merge authority**, per repo: the scope (`trunk` admissions and
+  `staging` merges to the default branch; production tags only where Tim's
+  words say so), his quoted words and their time, and `env-pass:
+  SQUAD_MERGE_AUTHORITY` in the frontmatter. Authority granted after launch
+  goes by a `grant` directive (§5), never by relaunching the member with
+  the variable set.
+- **Current state**, read live when you write the file, never copied from
+  the original brief: each open PR of the stream (`gh pr list -R
+  <owner/repo> --state open --json number,headRefName,baseRefName`,
+  filtered to its branches; CI by run id, §5), pushed branches without a
+  PR, and the next step. A kickoff that loses this makes the member redo
+  landed work.
+
+A relaunch is for account moves only (§2 rung 2).
+
 **Morning report:** a "Deliverables vs brief" table: stream, deliverable,
 client-facing, state, evidence or tracking item.
 
@@ -597,6 +685,18 @@ highest-priority requester in `queue`; else deny with a retry time.
 squad send <member> "heavy_slot grant" --from orchestrator --data '{"directive":"heavy_slot","decision":"grant"}'
 squad send <member> "heavy_slot deny" --from orchestrator --data '{"directive":"heavy_slot","decision":"deny","retry_after_s":<s>}'
 ```
+**Grants are broker-gated on calm.** The broker refuses a grant with
+`host_not_calm` unless the host level is `ok` with `calm_s` of 300 or more
+(`squad get host`; with no host gauge at all, grants go through): deny the
+requester with the calm time still needed as `retry_after_s` and keep it
+queued. On `warn` the broker revokes held slots
+itself: drop them from `grants`, keep their members queued. The override,
+`squad send <member> "heavy_slot grant" --from orchestrator --data
+'{"directive":"heavy_slot","decision":"grant"}' --force` (logged; the data
+gains `forced:true`), is only for a P1 stream's build with evidence that the
+pressure comes from outside the squad (the host gauge's `members[]` CPU low,
+the top process in no member's tree), quoted in the decision log (§9).
+Otherwise you never grant while the host is not calm.
 A revoke is a control directive, so it is ack-gated (§2, §8):
 ```
 squad send <member> "heavy_slot revoke" --from orchestrator --ack-deadline-s 120 \
@@ -610,10 +710,11 @@ squad send orchestrator "heavy_slot expired: <member>" --from cli --data
   publish `grants` on every change (§3 already requires the plan to be
   republished after each one).
 - Paused members get no `host.pressure`: expect no ack; judge from the gauge.
-- `host.pressure` `critical`: revoke the lowest-priority grant
+- `host.pressure` `critical`: revoke any grant the broker has not
   (`"decision":"revoke"`); that client stops its job and releases.
-- `warn`: reduce `heavy_slots` by one (minimum 0, set `slots_reduced`)
-  until `ok` has held for 5 minutes, then restore it.
+- `warn`: the broker has revoked held slots and refuses grants until `ok`
+  has held 300 s (above); set `slots_reduced` meanwhile and clear it once a
+  grant goes through again.
 - A member above 60% of the host (`members[].cpu_pct`) for 2 minutes
   without a grant is told (plain `squad send`) to request a slot or stop.
 
@@ -623,9 +724,13 @@ While any is running: hold `heavy_slots` at 0 (deny with `retry_after_s:
 600`), treat `host.pressure` `warn` as `critical`, and tell Tim once. When
 the last stops, restore `heavy_slots` and tell waiting members to retry.
 
-**Runaway processes.** On `host.runaway` (a process outside any member's
-tree that stayed hot or bloated), tell Tim (pid, command, cpu/rss,
-duration) and suggest terminating it; never kill it. Same pid: 30 min apart.
+**Runaway processes.** On `host.runaway` (a process in a member's tree
+that stayed hot or bloated), send that member a `cleanup` directive (§2a)
+with the pid and tell Tim one line (pid, command, cpu/rss, duration); never
+kill it yourself. Same pid: 30 min apart. The event carries `member`;
+`host.protected` carries `previous`. Orphaned test workers are reaped by
+the host watcher: `host.orphans {member, pids, cmds, rss_mb, reaped}` is
+information, not a task.
 
 ## 4a. Routing delegated jobs
 
@@ -645,6 +750,30 @@ incapable one. The record keeps `assigned_by` (you or `broker`).
 - **Model policy.** `code`, `review` and `test` go to the cheapest healthy
   pool model first (K3 once live; read each candidate's `.req.model` in `squad roster`); Claude members only for work that needs
   Anthropic-only tools. `integration` goes to the integration assistant.
+  Trunk gate runs go to K3 as `test` jobs where the gate is
+  credential-free (unit, lint, typecheck, build).
+- **K3 caching discipline** (Tim, 25 Oct). Keep briefs' prefixes stable and
+  long (kickoff and skill text first, job specifics last), keep briefs
+  terse, and reuse warm workers between jobs rather than closing and
+  relaunching them.
+- **K3 code is never reviewed by K3 alone** (Tim, 25 Oct; the requester
+  side is `squad-join` §6b). For every K3 `code` result, before anything
+  from it is admitted to a trunk, have a subagent (§7): (1) check the
+  summary's **Test integrity** section exists (`squad-join` §6c), then run
+  `git -C <repo> diff -U0 <base>...origin/job/<id> | grep -E
+  '^-[^-].*(assert|expect|toBe|toEqual|should|== )'` and `git -C <repo>
+  diff --name-only --diff-filter=M <base>...origin/job/<id>` filtered to
+  test paths; (2) if either shows an existing test changed, or the section
+  is missing, the review goes to a **Claude** reviewer (a Claude pool
+  member or a local `reviewer` subagent), never to K3; (3) a K3 fix round's
+  brief restates "the brief is the authority; never adjust test inputs or
+  expected values to make code pass." Log the outcome (§9).
+- **Job lifecycle.** On `squad.job` `review_overdue` (finished, no verdict
+  after 600 s), nudge the requester once (`squad send <requester> "<job>:
+  review overdue" --from orchestrator`; it also shows in `squad job list`).
+  On `amended` (a second worker result; the requester gets a
+  `job_amended` turn), expect a fresh review from the requester. A verdict comes after
+  the integrity check and any fixes, never before (`squad-join` §6b).
 - **Credentials, merges, `main`/`master` pushes: Claude members only.** The
   `credentials` tag makes the broker enforce it; if a brief obviously needs
   them and lacks the tag, refuse it: `squad job refuse <id> --reason
@@ -678,9 +807,10 @@ incapable one. The record keeps `assigned_by` (you or `broker`).
 
 On `pr_ready` with `repo` exxo-infra:
 1. **Check** with a PR-check subagent: the PR exists, is not a draft, and
-   checks are green (`gh pr view <n> -R Exxo-Labs/exxo-infra --json
-   state,isDraft,mergeable,statusCheckRollup`). Not green → tell the
-   originating client and Tim (`operator_update`); stop.
+   each expected CI job is green on the head sha by run id (`gh pr view <n>
+   -R Exxo-Labs/exxo-infra --json state,isDraft,mergeable,headRefOid`, then
+   as in "Merge grants" below), not the `statusCheckRollup` summary. Not
+   green → tell the originating client and Tim (`operator_update`); stop.
 2. **Authority gate.** exxo-infra is production-stage: merging needs human
    review. Send Tim a question via the concierge (`operator_update`, `--priority now`: PR
    number, title, summary); proceed only on the concierge relaying his
@@ -703,6 +833,23 @@ On `pr_ready` with `repo` exxo-infra:
    or `SQUAD_MERGE_AUTHORITY` set in the infra session by Tim); never ask a
    member to merge what this session was denied. GitOps is the default; infra
    may fix or unblock manually on Tim's authority (`manual: true`), not merge.
+
+**Merge grants to members** (staging and trunk merges, per repo; exxo-infra
+stays under steps 2 and 5). Only on Tim's quoted words relayed by the
+concierge, for the repos he names. At launch the grant is in the kickoff
+(§3a); after launch it is a directive, never a relaunch:
+```
+squad send <member> "grant: merge <owner/name>" --from orchestrator --ack-deadline-s 120 \
+  --data '{"directive":"grant","scope":"merge","repos":["<owner/name>"],"date":"<YYYY-MM-DD>","tags":false,"words":"Tim: <his words>","at":"<ISO>"}'
+```
+Record it as the stream's `merge_grant` (§3). `tags` is true only where his
+words cover production tags. **A `squad-pr-merge` refusal is final**: when a
+member reports one, never suggest a raw `gh pr merge`, a retry or another
+merge path; fix the cause (red or pending check, draft, wrong base) or hand
+it to Tim. Green means each expected CI job passed on the head sha, checked
+by run id (`gh run list -R <repo> --commit <sha> --json
+databaseId,name,status,conclusion`, then `gh run view <id> -R <repo> --json
+jobs`); a missing or queued job is not green.
 
 ### Go-live sweep
 
@@ -812,7 +959,7 @@ each admin step" by default.
 ## 8. Messages you receive
 
 Directives you send, defined client-side in `squad-join` §5: `pause`,
-`resume`, `priority`, `fanout`, `delegate_mode` (§2), `heavy_slot`, `review` (§7a), `infra`, `cleanup` (§2a)
+`resume`, `priority`, `fanout`, `delegate_mode` (§2), `heavy_slot`, `review` (§7a), `infra`, `grant` (§5), `cleanup` (§2a)
 and `preflight` (§2b). To the herder (§1a): `launch`, `close`, `status`,
 `wind_down`, and `relaunch` (`{name, account}`) for rebalancing (§2 rung 2;
 the herder replies `relaunch_result` with the CLI's outcome). `pause`, `resume`, `priority`, `fanout`, `delegate_mode` and `heavy_slot` revoke carry an ack
@@ -823,12 +970,35 @@ orchestrator messages carry `data.kind`: `pr_ready`, `heavy_slot` (`action`
 request|release), `blocked`, `done`, `infra_ready`, `infra_result`,
 `preflight`, `operator_task` (§2c), plus your own timers (`sweep_due`, `heavy_slot_expired`, `rate_recheck`). On `blocked`, tell Tim
 if it needs him; on `done`, drop the stream from the plan. Watcher events
-are information. Never send a `now` turn for what can wait until a member
+are information, including `host.orphans {member, pids, cmds, rss_mb,
+reaped}`, `host.protected` (now with `previous`) and `host.runaway` (now
+with `member`, §4). Never send a `now` turn for what can wait until a member
 is idle. Job turns: `job_queued` and `job_worker_free` (route per §4a); the `squad.job`
 topic (events `queued`, `assigned`, `started`, `unacked`, `requeued`,
-`finished`, `late_result`, `reviewed`; an escalation shows up as the operator
+`finished`, `amended`, `late_result`, `reviewed`, `review_overdue`; the requester's `amended` turn is `job_amended`; an escalation shows up as the operator
 item, not an event) is information for the decision log. From the herder: `launch_result`, `close_result` and `status_result` (reply to
 the matching directive, §1a), and the `herder.issue` topic (subscribed in §1).
+
+**Session liveness** (`squad.member`): `session_gone` means a member's bound
+session is dead and the broker holds its messages by name; `rebound` means a
+new session registered under the name and the queue was flushed;
+`undequeued` means a live session has left its inbox unread for 300 s
+(it can false-alarm on a session busy for over 5 minutes with a `now` turn
+queued). A `delivered` message is not read until it is dequeued; the
+`squad.delivery` outcome for a dead session is `session_gone`. For a builder, ask the
+herder for `status`, then decide relaunch, close or wait (§1a); on
+`rebound`, re-send its stored `fanout` as on a rejoin (§2). **On the
+concierge it is urgent**: Tim's only channel may be dark. Ask the herder
+for `status` at once (an `undequeued` alone may be a busy turn, so wait for
+its answer before treating the concierge as dead), then reach Tim without the concierge (the no-route
+exception in "Talking to Tim"): raise an operator item `concierge-down`
+with `--blocking now` (the dashboard reaches his phone), naming the dead
+session and the fix (the concierge re-registers in its window, or a
+relaunch), and print one terminal line. A member reporting a peer's event
+gets the same handling. After your own resume, restart or context switch,
+re-run §1 step 2 first; your old row is `session_gone`, not live, so the
+singleton check passes.
+
 At session end: `squad deregister orchestrator`.
 
 ## 9. Debug mode (`--debug`)
@@ -852,9 +1022,13 @@ At start-up, before §1 step 4, only when started with `--debug`:
    d=$(squad debug dir) && mkdir -p "$d" && cat >> "$d/orchestrator-decisions.md" <<'EOF'
    ## <ISO ts> <directive> → <member>
    Why: <reasoning, with the quota / host numbers acted on>
+   Trigger: <the data.trigger JSON exactly as sent>
    Triggered by: <squad-message> seq <n>[, <n>] (topic)
    EOF
    ```
+   The `Trigger:` line is mandatory on every pause, resume, fanout,
+   delegate_mode, heavy_slot and relaunch block; omit it only for
+   directives that carry no trigger (launch, close, status, infra).
    Every `squad job assign` and `squad job refuse` gets a block too, with an
    extra `Candidates:` line naming each member of the `job_queued`
    `candidates` considered and why it was taken or passed over. Any
@@ -862,6 +1036,10 @@ At start-up, before §1 step 4, only when started with `--debug`:
    budget floor, a job needing credentials) also carries a `k3:` line saying
    how, e.g. `k3: no capable member; only K3 held review and the job needs
    credentials, so Claude-only`.
+   Every K3 `code` result gets a line `k3-integrity: clean <job>` or
+   `k3-integrity: flagged <job> <files>` (§4a), and a flagged one a
+   follow-up block naming the Claude reviewer and its verdict, so
+   `/squad-debug-review` can count them.
    Every rebalance proposal, move and outcome (§2 rung 2) gets a block whose
    `Why:` line starts `rebalance:`: an advisory `would-rebalance`, the
    `relaunch` directive, and the `relaunch_result` each log one, quoting both

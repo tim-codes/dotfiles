@@ -141,11 +141,14 @@ race the member's own git; and running commands in a member's repo is task
 work, which neither you nor the concierge does. `before-launch` lists only
 human steps (a consent, a merge, a device code).
 
-**`wind_down`.** Close every live `client` member, lowest priority first
-(`squad roster`), then infra, the orchestrator and the concierge, one
-`close` each, sending `close_result` as each completes. Send the
-orchestrator's own `close_result` just before running its close (best effort:
-it cannot be delivered after). Then `squad deregister herder` and stop. Tim closes your own window.
+**`wind_down`.** One `close` each, in this order, sending `close_result`
+as each completes: every live `client` member, lowest priority first
+(`squad roster`); then infra; then the orchestrator (send its own
+`close_result` just before running its close, best effort: it cannot be
+delivered after). A failed close is reported and the order carries on. The
+concierge stays: Tim talks to it, so never close it in a `wind_down`. Only
+after every close has returned, `squad deregister herder` last and stop;
+once you have gone nothing can carry out a `close`. Tim closes your own window.
 
 ## 3. Sweep
 
@@ -173,6 +176,8 @@ failed","exit":<N>}'` and keep looping.
 - No `--force` unless the directive says `force:true`.
 - No `squad herd relaunch` without a `relaunch` directive, and never
   `--dry-run` on your own initiative.
+- No `squad deregister herder` before the last `wind_down` close has
+  returned, and no close of the concierge in a `wind_down`.
 - No decisions: you never launch a builder unprompted, never pick an
   account, never relay to Tim, and never edit a kickoff file.
 

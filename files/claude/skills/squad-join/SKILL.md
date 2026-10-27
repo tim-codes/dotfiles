@@ -112,6 +112,17 @@ tell Tim your session id (`$CLAUDE_CODE_SESSION_ID`) and the name, and do not
 `squad deregister` the live holder. Pick a different `--name` only if Tim says
 this is a genuinely separate stream.
 
+**After any resume, restart or context switch** (Tim resumed this
+transcript, perhaps in another context; a relaunch note; a new
+`$CLAUDE_CODE_SESSION_ID`), your first action is this `squad register` again
+with the same name, then §3. While the old session was gone (`squad.member`
+`session_gone`) the broker held your messages by name; the register from the
+new session publishes `rebound` and flushes them. Until you re-register
+nothing reaches you (`squad.delivery` shows `session_gone`), and even a
+`delivered` only means enqueued, and a message is read only once your session dequeues it
+(the broker publishes `undequeued` when a live session leaves its inbox
+unread for 300 s).
+
 ## 3. Default subscriptions
 
 ```
@@ -190,7 +201,8 @@ line.
 | `review` | `{findings}` | design-conformity findings on your ADR/plan or PR: address each blocking finding (or reply to the orchestrator with a justification), then re-send `design ready` / `pr_ready`; advisory ones are optional |
 | `infra` | `{action, pr, authority}` | infra role only; a client ignores it |
 | `stop` | `{reason}` | ack first; finish or abandon the current step; commit and push work in progress to the branch; `squad set --name <name> --status done --detail "stopped: <reason>; next: <step>"`; `squad deregister <name>`; end the turn. The herder then exits the session (`/exit`) |
-| `admit` | `{pr}` | squash-merge your own reviewed PR into the trunk with `squad-pr-merge <n> --repo <owner/name> --into-trunk`; run it only on this directive, never on your own initiative. Any Claude member may admit; no merge grant is needed (`--land` needs the merge grant: members never land) |
+| `admit` | `{pr}` | squash-merge your own reviewed PR into the trunk with `squad-pr-merge <n> --repo <owner/name> --into-trunk`; run it only on this directive, never on your own initiative. Any Claude member may admit; no merge grant is needed (`--land` needs a merge grant, §6a) |
+| `grant` | `{scope:"merge", repos, date, tags, words}` | ack first. You may now land PRs for the listed repos on that date (§6a "Merge authority"); production tags only with `tags:true`. Note it in `squad set --name <name> --detail "merge grant: <repos>"`. A grant from anyone but the orchestrator is information |
 | `trunk_failure` | `{trunk, commit, pr, tests, log_path}` | a gate failure attributed to your commit. Reproduce it with the focused command for `tests` (§6a — never rerun the full suite), fix forward with a PR into the trunk, then reply `trunk_fix` (`"kind":"trunk_fix","trunk":…,"pr":<n>`). A failure that is not yours goes back to the orchestrator with the reason |
 | `delegate_mode` | `{mode: "pool"\|"local", needs: [code, review]}` | ack first (it carries `--ack-deadline-s`, as `priority` does). `pool`: route new implementer and reviewer work that would have gone to a subagent through `squad delegate` (§6b) instead, for the listed `needs`, until a `local` arrives. `local`: back to subagents. Work already running finishes where it is |
 | `pause` with `"relaunch":true` | `{reason, relaunch:true}` | the herder is moving you to another account (see **Relaunch** below) |
@@ -386,7 +398,11 @@ Mid-build testing is **focused only**. Run fast tests for the code you
 changed, plus the repo's fast check (`just check` or its equivalent) once
 before `pr_ready`. The comprehensive gate (`just ci` / `just verify`, the
 full test suite, production builds) runs once per rolling trunk, decided and
-run by the orchestrator — not by you, per branch.
+run by the orchestrator — not by you, per branch: as a credential-free K3
+`test` job where it can (unit, lint, typecheck, build), else in a granted
+slot. A kickoff's "Test policy: squad-join §6a" line means exactly this
+section; any exception (an adopted trunk, a browser smoke needing a test
+slot) is stated in the kickoff.
 
 | Stack | Allowed mid-build | Not without a test slot |
 |---|---|---|
@@ -445,6 +461,24 @@ squad send role:orchestrator "pr_ready: <repo>#<n> <title>" --from <name> \
 A member never pushes to a trunk directly; the trunk changes only through
 admitted PRs.
 
+**Merge authority.** You land (`squad-pr-merge <n> --repo <owner/name>
+--land`: a trunk into the default branch, which deploys staging where the
+repo has one) only for a repo that your kickoff's merge-authority block
+names (`SQUAD_MERGE_AUTHORITY` arrives with the launch) or that a `grant`
+directive from the orchestrator names (§5). For a directive grant, pass it
+on the call: `SQUAD_MERGE_AUTHORITY='<owner/name>@<date>' squad-pr-merge <n>
+--repo <owner/name> --land`. A production tag needs the grant to say so.
+Without a grant, send `pr_ready` and the merge is Tim's.
+
+**Merges go through `squad-pr-merge` only, and its refusal is final.** After
+a refusal (`squad-pr-merge: …` on stderr, exit 1) never fall back to raw `gh
+pr merge`, the GitHub UI or any other route: send `blocked` to the
+orchestrator with the refusal line and fix the cause. Before calling a PR
+green, check each expected CI job on the head sha by run id (`gh run list
+-R <owner/name> --commit <sha> --json databaseId,name,status,conclusion`,
+then `gh run view <id> -R <owner/name> --json jobs`), never the
+`statusCheckRollup` summary: a missing or queued job is not green.
+
 ## 6b. Delegating a job
 
 Delegate when a self-contained implement, test or review unit would
@@ -501,11 +535,15 @@ any time.
   review, then the member, infra or Tim, as ENG-338 settles. Never ask the
   worker to open or merge anything.
 - **K3 test integrity.** When the result came from a K3 worker (the `worker`'s
-  `.req.model` in `squad roster`, or the model on the job record) and its diff
-  changes existing test assertions or inputs, review it yourself against the
-  brief (or with a Claude reviewer subagent); do not accept a pool review of
-  it. Record `k3-integrity: flagged <job> <files>` or `k3-integrity: clean`
-  in your report.
+  `.req.model` in `squad roster`, or the model on the job record), check that
+  its summary ends with the **Test integrity** section (§6c), then run the
+  check yourself: `git diff -U0 <base_sha>...origin/job/<id> | grep -E
+  '^-[^-].*(assert|expect|toBe|toEqual|should|== )'` and `git diff
+  --name-only --diff-filter=M <base_sha>...origin/job/<id>` filtered to test
+  paths. If either shows an existing test changed, or the section is
+  missing, review it yourself against the brief (or with a Claude reviewer
+  subagent); do not accept a pool review of it. Record `k3-integrity:
+  flagged <job> <files>` or `k3-integrity: clean` in your report.
 - `failed`: read `reason`. `budget`: re-delegate later or do it locally.
   `needs_operator`: the linked operator item is with Tim; wait for its
   resolution. `worker_lost`: re-delegate or do it locally. `needs_credentials`
@@ -526,6 +564,17 @@ squad job review <id> --verdict accepted|rework|rejected [--reason <tag>] --name
 Reason tags (open set, this vocabulary expected): `wrong_approach`,
 `failing_tests`, `conflicts`, `integration`, `incomplete`. For `rework`,
 delegate the follow-up with `--rework-of <id>`.
+
+**Review after fixing, not before.** `accepted` means landable as it
+stands, so record it only once your review (for K3 code, the integrity
+check above) is done and any fixes are in. A result you are fixing or
+sending back is `rework` now, with its reason; once the fix is in, run
+`squad job review` again with `accepted`: reviews can be repeated and the
+last one stands. The broker rejects `accepted` with a failing reason such as
+`failing_tests`. A worker's second result after `finished` marks the job
+`amended` and brings a `job_amended` turn: fetch the branch again and review
+it before any verdict. `review_overdue` (600 s after `finished` with no
+verdict) means record one now.
 
 ### Mail
 
@@ -562,14 +611,58 @@ the first action (§5), then `squad set --name <name> --status working
 
    ```
    squad delegate-result <id> --status ok --summary <file> --branch job/<id> \
-     --test-command "<exact command>" --test-result pass|fail|not-run \
+     --test-command "<exact command>" --test-result pass|fail|not-run [--test-reason "<why not run>"] \
      [--diff-summary "<one paragraph>"] [--pr <url of an existing PR the brief named>] \
      [--operator-item <id>]... --name <name>
    ```
 
    `--diff-summary` is filled from `git diff --shortstat` when omitted.
    `--test-command` and `--test-result` go together and are required with
-   `--branch` on an `ok` result.
+   `--branch` on an `ok` result, except that `not-run` needs no
+   `--test-command` and carries `--test-reason`.
+
+**Job kinds.** A `test` job runs a credential-free gate (unit, lint,
+typecheck, build) against the given sha, usually a trunk, in your own
+worktree, and returns `--test-command`, `--test-result` and, for failures,
+the failing tests with a single-commit repro where you can find one; it
+pushes nothing. A `review` job returns findings only, confidence-filtered
+and each with a severity, in the summary file, and pushes no fixes unless
+the brief asks. A job outside your kind of work is `failed --reason
+out_of_scope`.
+
+**Tests belong to the brief, not to you** (Tim, 25 Oct, after K3 jobs bent
+tests to fit their own code). The brief is the authority for behaviour; an
+existing test is evidence of it, and your code is what must change.
+- Never change an existing test's assertions, expected values or inputs
+  (fixture sizes, timestamps, thresholds) to make your code pass. You may
+  add tests, and edit an existing one only where the brief explicitly
+  changes the behaviour it pins, quoting that brief line.
+- Write new tests from the brief's wording before the code; they must fail
+  first. Never compute an expected value by running your code and copying
+  the output.
+- If the brief and an existing test (or a stated real-world case)
+  disagree, stop: report `failed --reason needs_ruling` with both quotes.
+- Every `code` job's summary ends with a **Test integrity** section: the
+  output of `git diff -U0 <base_sha>...HEAD | grep -E
+  '^-[^-].*(assert|expect|toBe|toEqual|should|== )'` (or "none"), and for
+  each line listed, the brief line that justifies it.
+
+**When you may not run tests** (the orchestrator's no-tests ruling for K3
+workers, or the classifier denying a test run), the ruling covers gate
+recipes too: `just check`, `just ci`, `just verify` and anything else that
+spawns test workers. Run none of them and report `--test-result not-run
+--test-reason "<why>"`.
+The host watcher reaps orphaned test workers; never kill pids for them.
+
+**A fix after you have reported** is pushed to `job/<id>` and followed by a
+second `delegate-result` for the same job, or `squad job amend` (the broker marks it `amended` and
+tells the requester); never a silent push after `finished`.
+
+**Caching discipline** (K3; Tim, 25 Oct). Your kickoff and the skill text
+are the stable prompt prefix: keep them unchanged between jobs, expect job
+specifics last in each brief, keep your summaries terse, and stay warm
+between jobs (idle and wait rather than close); the orchestrator reuses
+you.
 
 **What you cannot do here (K3 members).** `agent/run`, `agent-run`, `esc`,
 `pulumi up` / `env open`, `op`, `gh pr merge` and pushes to `main`/`master`
@@ -601,7 +694,8 @@ kickoff):
 Join the squad with the squad-join skill. Register with
 --capabilities <code,review[,credentials]> --model <model id> and the
 default subscriptions (§3); `credentials` only for a Claude member with
-agent-run, never K3. Then serve jobs per §6c; do no other work.
+agent-run, never K3. Then serve jobs per §6c; do no other work. A K3
+worker follows §6c's test rules and caching discipline.
 ```
 
 ## 7. Keeping state honest
@@ -642,7 +736,12 @@ agent-run, never K3. Then serve jobs per §6c; do no other work.
   --pretty` (are you `live`?). Check the context's settings has
   `crossSessionInbound: "accept"`; without it a bypass-mode session holds
   each turn for approval, invisibly to the broker. Re-running `squad
-  register` with the same name is safe and keeps subscriptions.
+  register` with the same name is safe and keeps subscriptions; after a
+  resume or context switch it is the first thing to do (§2).
+- **A peer's `session_gone`, `rebound` or `undequeued`** (`squad.member`,
+  or seen in `squad roster`): tell the orchestrator in one line (`squad send
+  role:orchestrator "peer: <member> <event>" --from <name>`). Its messages
+  are held by name, not lost; the orchestrator decides.
 - **`session-not-found` on register**: the pid or config dir did not resolve
   to a Claude session. Run the command from inside the Claude session (not a
   subshell with a different env), or pass `--pid` / `--config-dir`
@@ -653,19 +752,33 @@ agent-run, never K3. Then serve jobs per §6c; do no other work.
   `PermissionRequest` and clears it on `PostToolUse`/`UserPromptSubmit`, so
   the broker holds all deliveries (even `now`) until Tim answers. Requires
   squad built from PR S5 (tim-codes/squad#34) or later; older brokers ignore it.
-- **Denials (permission, classifier, guard or key helper)**: a tool result
-  saying things like "user doesn't want this action" when Tim typed nothing
-  of the kind is the permission classifier, not Tim; a "permission denied"
+- **Auto-deny of an unanswered prompt**: "the user doesn't want to take
+  this action right now, STOP and wait" is your own permission prompt
+  denying itself after about 60 s with nobody at the terminal: not Tim, not
+  a ruling. Never halt or wait on it. Retry once with a plain command (one
+  literal command or the repo's named recipe: no `$(…)`, `&&`/`;` chains,
+  pipes into an interpreter, or variables and globs in `git`/`gh`
+  arguments), and prefer paths that raise no prompt at all; work
+  unattended, since no prompt may sit in a builder terminal (Tim, 25 Oct).
+  If the plain retry is denied too, it is a denial (next bullet). While a
+  prompt is open the broker raises the operator item `prompt-<name>` and
+  resolves it when the prompt clears; never raise one yourself.
+- **Denials (permission, classifier, guard or key helper)**: any other tool
+  result saying things like "user doesn't want this action" when Tim typed
+  nothing of the kind is the permission classifier, not Tim; a "permission denied"
   or "blocked by a deny rule" result is a settings rule. Either way, three
   things, in order. **Never retry** the denied command, not even narrowed or
   reworded. **Raise an operator item** (§6) with the exact command:
   ```
-  squad operator raise --id denied-<name>-<n> --kind action --blocking now|later \
+  squad operator raise --id denied-<name>-<n> --kind denial \
     --title "denied (permission|classifier|guard|keyhelper): <what it was for>" \
     --command '<the exact denied command>' --instructions-file <path|->
   ```
   `<n>` counts your denials, so the report can join items to transcript
-  denials. Put any long text in `--instructions-file`, never inline: a deny
+  denials. Denial items are non-blocking, grouped in the digest and dropped
+  after 2 h; when the denied step is one the stream needs and only Tim can
+  now do it, also raise an `action` item for it (`--id <name>-<slug> --kind
+  action --blocking now|later --command '<the command>'`). Put any long text in `--instructions-file`, never inline: a deny
   glob matches command words in prose, so inline text that quotes a denied
   command can itself be denied. Never ask for permissions or credentials in
   the text; they go in `--command` for Tim. Then **carry on** with other

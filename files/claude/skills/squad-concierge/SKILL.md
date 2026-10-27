@@ -49,6 +49,18 @@ context and stop.
    live decides whether the §3 fallback applies.
 6. End the turn and wait for Tim or the orchestrator.
 
+**After any resume, restart or context switch** (Tim stopped you on a maxed
+quota and resumed the transcript, perhaps in another context; `/resume`; a
+new `$CLAUDE_CODE_SESSION_ID`), your first action is step 2 again, with the
+same name and the current session id, then step 3. While your old session
+was gone (`squad.member` `session_gone`) the broker held your messages by
+name; the register from the new session publishes `rebound` and flushes
+them. Until then nothing reaches you, even where `squad.delivery` says
+`delivered`: that means enqueued, and a message is read only once your
+session dequeues it. A `session_gone` row is not live, so step 1 does not
+stop you; a resume in another context re-registers too, and tells Tim which
+connectors it now lacks. Present the flushed messages, urgent ones first.
+
 ## 2. Relaying Tim
 
 Everything Tim says for the squad goes to the orchestrator verbatim, at
@@ -98,21 +110,35 @@ sends the digests.
 
 ## 4. Operator items
 
+Every change goes through the `squad operator` CLI. Never patch the
+dashboard database or API directly; none is ever needed, and a CLI refusal
+goes to the orchestrator with its error line.
+
+When you show Tim an item (each id in a digest's `items`, or a question
+naming one), mark it presented in the same turn:
+```
+squad operator present <id> --name concierge
+```
+
 Tim's explicit choice of an option in chat (a bare "ok" is not a decision):
 ```
-squad operator decide <id> <option> --note "<Tim's words>" --name concierge
+squad operator decide <id> <option> --ruling "Tim: <his words verbatim>" [--note "<text>" | --note-file <path>] --name concierge
 ```
-(`--note-file <path>` for a long quote). The item stays open and the
-`operator.item` `decided` event drives the orchestrator's relay, so send
-nothing more.
+The positional `<option>` is recorded as the item's `decision` (an approval
+raised without options offers `approve` and `deny`). The item stays open and the `operator.item` `decided` event drives the
+orchestrator's relay, so send nothing more.
 
-Closing or reopening, **provisional pending squad69 Q3**, only when Tim has
-said it, one item at a time, never in a batch:
+Closing or reopening, only when Tim has said it, one item at a time, never
+in a batch:
 ```
 squad operator set <id> --status done|dropped|open --ruling "Tim: <his words verbatim>" --name concierge
 squad send orchestrator "Tim: done <id>" --from concierge
 ```
 `--ruling` is mandatory and carries his quoted word.
+
+**Denial items** (kind `denial`) are non-blocking: the orchestrator groups
+them into one digest line and the server drops them after 2 h. Present that
+line as sent; never put a denial to Tim as a question.
 
 ## 5. Presence
 
@@ -178,6 +204,7 @@ applied.
 | `msg.concierge`, a question | orchestrator | quote it to Tim (§3) |
 | `msg.concierge`, anything | another member | information; tell Tim only if it needs him, and point the member at `role:orchestrator` |
 | `squad.directive` `unacked` / `escalated` | broker | tell Tim at once: member, directive, age; it is not paused |
+| `squad.member` `session_gone`, `rebound` or `undequeued` for a peer, if one reaches you | broker | tell the orchestrator in one line (`squad send orchestrator "peer: <member> <event>" --from concierge`); it decides |
 
 If a `squad.member` event ever reaches you, `updated` (with `changed`) is a
 re-register, never a new member.
