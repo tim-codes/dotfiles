@@ -7,6 +7,8 @@
 #
 #   claude-kickoff <prompt.md> [--account CONTEXT]
 #                              [--resume <session_id> --cwd <dir>] [--dry-run]
+#                              [--no-trust-check]
+#   claude-kickoff --check-trust <cwd> --account CONTEXT
 #
 # The context wrappers (claude-personal, claude-exxo, claude-exxo-personal,
 # claude-exxo-openrouter) are
@@ -26,6 +28,17 @@
 # wrappers and claude-sync's CONTEXTS still list contexts in code, so the table's
 # names and the scrub list below must stay in step with them;
 # tests/claude-kickoff.sh fails when they drift (the drift guard).
+#
+# Folder trust: Claude Code stops a fresh session at a "trust this folder?" dialog
+# until a human accepts it, and it records the answer as `hasTrustDialogAccepted`
+# on the cwd's entry in the `projects` map of <config dir>/.claude.json (keys are
+# real paths). The launcher never accepts the dialog and never writes that file; it
+# only CHECKS, so a member that would sit at the dialog is refused up front (exit 3,
+# `trust: missing ...` on stderr) and the herder reports it rather than the member
+# silently failing to join. The check runs by default on every launch, --dry-run
+# included (the herder resolves with --dry-run, so that is where it sees the
+# refusal); --no-trust-check skips it, for an attended launch. --check-trust <cwd>
+# runs only the check, read-only, for the context --account names.
 set -uo pipefail
 
 CONTEXTS_FILE="${CLAUDE_KICKOFF_CONTEXTS:-$HOME/.config/claude-kickoff/contexts.toml}"
@@ -38,6 +51,8 @@ usage() {
     cat <<'EOF'
 Usage: claude-kickoff <prompt.md> [--account CONTEXT]
                                   [--resume <session_id> --cwd <dir>] [--dry-run]
+                                  [--no-trust-check]
+       claude-kickoff --check-trust <cwd> --account CONTEXT
 
 Reads the frontmatter of <prompt.md>, changes to its cwd and execs claude in the
 matching account context with --model and --effort from the file. A new session
@@ -84,6 +99,20 @@ Options:
                   not carry one). Without --resume it has no effect.
   --dry-run       resolve and validate everything, print the plan (never the body,
                   only its size) and exit 0 without launching
+  --no-trust-check
+                  skip the folder-trust check (attended launch, where the human can
+                  answer the dialog). Without it the launch is refused, exit 3, when
+                  the cwd is not trusted in the context: `trust: missing <path> in
+                  <context>` and what to do, on stderr; nothing is launched and the
+                  trust file is never modified. Also honoured as
+                  CLAUDE_KICKOFF_NO_TRUST_CHECK=1.
+  --check-trust DIR
+                  only check whether DIR is trusted in the --account context; no
+                  prompt file. Prints `trust: ok <path> in <context>` and exits 0, or
+                  `trust: missing <path> in <context>` plus the human step and exits
+                  3 (exit 2 when <config dir>/.claude.json is missing or invalid).
+                  ~ is expanded and the path resolved to a real path, as Claude Code
+                  keys its projects map.
   -h, --help      this text
 
 Environment set for claude: CLAUDE_CONFIG_DIR=<context dir>, and the context's `env`
@@ -95,9 +124,12 @@ capabilities, provides, env_pass, before_launch and add_dirs (empty as `none`).
 
 Exit codes (stable):
   0   launched (never returns: claude is exec'd) / --dry-run succeeded
-  2   usage error: bad or missing argument, unknown --account, malformed --resume id
+  2   usage error: bad or missing argument, unknown --account, malformed --resume id;
+      or the folder-trust check cannot read <config dir>/.claude.json (missing or
+      not a JSON object)
   3   prompt file unusable: missing, unreadable, no `---` terminator, empty body
-      for a new session, or an add_dirs path that is not a directory
+      for a new session, or an add_dirs path that is not a directory; or the cwd is
+      not trusted in the context (folder-trust check; --check-trust uses this too)
   4   frontmatter lacks a required key (cwd, context, model or effort); the message
       names it
   5   invalid value: unknown context, a harness other than the context's, an unknown
@@ -123,7 +155,8 @@ die() { # die <code> <message...>
     exit "$code"
 }
 
-prompt="" account="" resume="" resume_cwd="" dry=0
+prompt="" account="" resume="" resume_cwd="" dry=0 check_trust="" trust_check=1
+[ "${CLAUDE_KICKOFF_NO_TRUST_CHECK:-}" = 1 ] && trust_check=0
 while [ $# -gt 0 ]; do
     case "$1" in
         -h|--help) usage; exit 0 ;;
@@ -140,6 +173,11 @@ while [ $# -gt 0 ]; do
             resume_cwd="$2"; shift 2 ;;
         --cwd=*) resume_cwd="${1#--cwd=}"; shift ;;
         --dry-run) dry=1; shift ;;
+        --no-trust-check) trust_check=0; shift ;;
+        --check-trust)
+            [ $# -ge 2 ] || die 2 "--check-trust needs a directory"
+            check_trust="$2"; shift 2 ;;
+        --check-trust=*) check_trust="${1#--check-trust=}"; shift ;;
         -*) die 2 "unknown option: $1 (see --help)" ;;
         *)
             [ -z "$prompt" ] || die 2 "only one prompt file is accepted (got '$prompt' and '$1')"
@@ -147,7 +185,9 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-[ -n "$prompt" ] || { usage >&2; exit 2; }
+[ -n "$prompt" ] || [ -n "$check_trust" ] || { usage >&2; exit 2; }
+[ -z "$check_trust" ] || [ -z "$prompt" ] || die 2 "--check-trust takes no prompt file (got '$prompt')"
+[ -z "$check_trust" ] || [ -n "$account" ] || die 2 "--check-trust needs --account (the context whose trust file to read)"
 
 # --- contexts table (yq v4 reads the TOML) -------------------------------------
 command -v yq >/dev/null 2>&1 || die 7 "yq is not on PATH (brew install yq)"
@@ -166,6 +206,36 @@ case "$account" in
     "") ;;
     *) case " $CONTEXTS " in *" $account "*) ;; *) die 2 "unknown --account '$account' (expected one of: $CONTEXTS)" ;; esac ;;
 esac
+# trust_check_dir <context> <config dir> <dir>: is <dir> trusted in the context?
+# Read-only. Prints `trust: ok ...` on stdout and returns 0; or `trust: missing ...`
+# plus the human step on stderr and returns 3; or a message on stderr and returns 2
+# when <config dir>/.claude.json is missing or not a JSON object. <dir> is resolved
+# to a real path first (Claude Code keys `projects` by real path); a missing
+# `projects` map or entry counts as not trusted.
+trust_check_dir() {
+    local c="$1" cdir="$2" dir tfile
+    dir=$(expand_home "$3")
+    dir=$(cd "$dir" 2>/dev/null && pwd -P || printf '%s' "$dir")
+    tfile="$cdir/.claude.json"
+    [ -r "$tfile" ] || { printf 'claude-kickoff: trust file %s is missing or unreadable (context %s)\n' "$tfile" "$c" >&2; return 2; }
+    jq -e 'type == "object"' "$tfile" >/dev/null 2>&1 \
+        || { printf 'claude-kickoff: trust file %s is not a valid JSON object (context %s)\n' "$tfile" "$c" >&2; return 2; }
+    if [ "$(jq -r --arg p "$dir" '.projects // {} | .[$p].hasTrustDialogAccepted // false' "$tfile" 2>/dev/null)" = true ]; then
+        printf 'trust: ok %s in %s\n' "$dir" "$c"
+        return 0
+    fi
+    {
+        printf 'trust: missing %s in %s\n' "$dir" "$c"
+        printf 'open the folder once in %s and accept the trust dialog, or start the member attended\n' "$c"
+    } >&2
+    return 3
+}
+if [ -n "$check_trust" ]; then
+    check_dir=$(expand_home "$check_trust")
+    check_cfg=$(expand_home "$(ctx_get "$account" .config_dir)")
+    trust_check_dir "$account" "$check_cfg" "$check_dir"
+    exit $?
+fi
 if [ -n "$resume" ]; then
     case "$resume" in
         *[!A-Za-z0-9_-]*) die 2 "--resume id may only contain letters, digits, '-' and '_'" ;;
@@ -347,6 +417,13 @@ else
     [ -n "$body" ] || die 3 "the prompt body (after the '---' line) is empty in $prompt"
 fi
 
+# --- folder trust: check only, never accept; before anything with side effects --
+trust_line="skipped"
+if [ "$trust_check" -eq 1 ]; then
+    trust_line=$(trust_check_dir "$ctx" "$config_dir" "$cwd") || exit $?
+    trust_line="${trust_line#trust: }"
+fi
+
 # --- preconditions: in order, output discarded, the first failure refuses -----
 preconds=$(ctx_get "$ctx" '(.preconditions // []) | .[]') || die 6 "cannot read the preconditions of $ctx from $CONTEXTS_FILE"
 while IFS= read -r cmd; do
@@ -418,6 +495,7 @@ if [ "$dry" -eq 1 ]; then
     printf 'before_launch: %s\n' "${before_launch_raw:-none}"
     printf 'add_dirs: %s\n'      "${add_dirs[*]:-none}"
     printf 'deny: %s\n'          "${deny_raw:-none}"
+    printf 'trust: %s\n'         "$trust_line"
     mark_pane --dry-run
     exit 0
 fi
