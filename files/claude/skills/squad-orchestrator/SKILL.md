@@ -91,6 +91,9 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    squad subscribe orchestrator quota.A.reset
    squad subscribe orchestrator quota.A.projection
    squad subscribe orchestrator quota.A.burn
+   # while the K3 pool is live (its first launch to its last close):
+   squad subscribe orchestrator quota.openrouter.burn
+   squad subscribe orchestrator quota.openrouter.projection
    # and once:
    squad subscribe orchestrator host --min-change 15 --debounce-s 300
    squad subscribe orchestrator host.pressure
@@ -105,7 +108,8 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    squad subscribe orchestrator herder.issue --priority next
    squad subscribe orchestrator squad.job --priority later
    ```
-   (`squad.job` is for the decision log only: routing needs just the
+   (`quota.A.reset` fires only when the window's `previous_pct` was 70 or
+   more. `squad.job` is for the decision log only: routing needs just the
    `job_queued` and `job_worker_free` turns, which arrive regardless.
    `squad.directive` requires squad built from PR S1 or later;
    `operator.item` requires the dashboard server from PR S3.)
@@ -207,7 +211,15 @@ member regardless of the projection (level 100: below). Re-run the test at
 every janitor sweep, at each §2 recheck and on any `squad.member` status
 transition to busy while `pct ≥ 70`, not only on threshold crossings. Idle
 members burn nothing: if none of `A`'s members is busy and `pct` is under 95,
-shed nothing.
+shed nothing. Projections are published for `seven_day` as well as
+`five_hour`: take 7d ETAs from the event (or `squad get quota.A.projection`),
+never compute them by hand.
+
+**Name the burner.** Every wall warning to Tim (a threshold at 90 or more, a
+`walls_before_reset` projection at 70 or more, level 100) names the top
+burners from `squad get quota.A.sessions` (per-session tokens over the last
+15 minutes, with the member name when the session is bound): the member, or
+`session <id> (outside the squad)`, with tokens per minute.
 
 **Shed load before pausing: delegate to the pool.** When an exxo window's
 projection says a wall is coming (the test above) and pool members with
@@ -321,6 +333,14 @@ squad send <member> "fanout: max 1, sonnet, <A> <window> at <pct>%" --from orche
 Record the cap on the member's plan stream (`fanout`, §3) once its ack
 arrives, and re-send the stored value (ack-gated) whenever that member
 rejoins (`squad.member` `joined` or `updated`); ack outcomes are as in step 4 below.
+
+**Fanout above the default** (more than 3) is an exception: its trigger and
+`Trigger:` line quote a `squad get quota.A` read in the same turn (`pct` and
+the sample time), never a figure from an earlier turn; the directive tells
+the member to run installs serially (one `pnpm install` at a time) or share
+one `node_modules`; and never fan out or launch a multi-PR stream onto a
+capped CI pool (a self-hosted pool such as gcp-heavy) while a P1 deploy is
+queued or running on it.
 
 **On a shed decision:**
 1. Choose the rung and members as above; do not re-send a rung a member
@@ -653,6 +673,15 @@ highest-priority requester in `queue`; else deny with a retry time.
 squad send <member> "heavy_slot grant" --from orchestrator --data '{"directive":"heavy_slot","decision":"grant"}'
 squad send <member> "heavy_slot deny" --from orchestrator --data '{"directive":"heavy_slot","decision":"deny","retry_after_s":<s>}'
 ```
+**Grants are broker-gated on calm.** The broker refuses a grant with
+`host_not_calm` unless the host level is `ok` with `calm_s` of 300 or more
+(`squad get host`): deny the requester with the calm time still needed as
+`retry_after_s` and keep it queued. On `warn` the broker revokes held slots
+itself: drop them from `grants`, keep their members queued. `--force`
+overrides the gate only for a P1 stream's build with evidence that the
+pressure comes from outside the squad (the host gauge's `members[]` CPU low,
+the top process in no member's tree), quoted in the decision log (§9).
+Otherwise you never grant while the host is not calm.
 A revoke is a control directive, so it is ack-gated (§2, §8):
 ```
 squad send <member> "heavy_slot revoke" --from orchestrator --ack-deadline-s 120 \
@@ -666,10 +695,11 @@ squad send orchestrator "heavy_slot expired: <member>" --from cli --data
   publish `grants` on every change (§3 already requires the plan to be
   republished after each one).
 - Paused members get no `host.pressure`: expect no ack; judge from the gauge.
-- `host.pressure` `critical`: revoke the lowest-priority grant
+- `host.pressure` `critical`: revoke any grant the broker has not
   (`"decision":"revoke"`); that client stops its job and releases.
-- `warn`: reduce `heavy_slots` by one (minimum 0, set `slots_reduced`)
-  until `ok` has held for 5 minutes, then restore it.
+- `warn`: the broker has revoked held slots and refuses grants until `ok`
+  has held 300 s (above); set `slots_reduced` meanwhile and clear it once a
+  grant goes through again.
 - A member above 60% of the host (`members[].cpu_pct`) for 2 minutes
   without a grant is told (plain `squad send`) to request a slot or stop.
 
@@ -679,9 +709,11 @@ While any is running: hold `heavy_slots` at 0 (deny with `retry_after_s:
 600`), treat `host.pressure` `warn` as `critical`, and tell Tim once. When
 the last stops, restore `heavy_slots` and tell waiting members to retry.
 
-**Runaway processes.** On `host.runaway` (a process outside any member's
-tree that stayed hot or bloated), tell Tim (pid, command, cpu/rss,
-duration) and suggest terminating it; never kill it. Same pid: 30 min apart.
+**Runaway processes.** On `host.runaway` (a process in a member's tree
+that stayed hot or bloated), send that member a `cleanup` directive (§2a)
+with the pid and tell Tim one line (pid, command, cpu/rss, duration); never
+kill it yourself. Same pid: 30 min apart. Orphaned test workers are reaped
+by the host watcher (`host.orphans`): information, not a task.
 
 ## 4a. Routing delegated jobs
 
@@ -944,9 +976,13 @@ At start-up, before §1 step 4, only when started with `--debug`:
    d=$(squad debug dir) && mkdir -p "$d" && cat >> "$d/orchestrator-decisions.md" <<'EOF'
    ## <ISO ts> <directive> → <member>
    Why: <reasoning, with the quota / host numbers acted on>
+   Trigger: <the data.trigger JSON exactly as sent>
    Triggered by: <squad-message> seq <n>[, <n>] (topic)
    EOF
    ```
+   The `Trigger:` line is mandatory on every pause, resume, fanout,
+   delegate_mode, heavy_slot and relaunch block; omit it only for
+   directives that carry no trigger (launch, close, status, infra).
    Every `squad job assign` and `squad job refuse` gets a block too, with an
    extra `Candidates:` line naming each member of the `job_queued`
    `candidates` considered and why it was taken or passed over. Any
