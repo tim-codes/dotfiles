@@ -733,6 +733,29 @@ incapable one. The record keeps `assigned_by` (you or `broker`).
 - **Model policy.** `code`, `review` and `test` go to the cheapest healthy
   pool model first (K3 once live; read each candidate's `.req.model` in `squad roster`); Claude members only for work that needs
   Anthropic-only tools. `integration` goes to the integration assistant.
+  Trunk gate runs go to K3 as `test` jobs where the gate is
+  credential-free (unit, lint, typecheck, build).
+- **K3 caching discipline** (Tim, 25 Oct). Keep briefs' prefixes stable and
+  long (kickoff and skill text first, job specifics last), keep briefs
+  terse, and reuse warm workers between jobs rather than closing and
+  relaunching them.
+- **K3 code is never reviewed by K3 alone** (Tim, 25 Oct; the requester
+  side is `squad-join` §6b). For every K3 `code` result, before anything
+  from it is admitted to a trunk, have a subagent (§7): (1) check the
+  summary's **Test integrity** section exists (`squad-join` §6c), then run
+  `git -C <repo> diff -U0 <base>...origin/job/<id> | grep -E
+  '^-[^-].*(assert|expect|toBe|toEqual|should|== )'` and `git -C <repo>
+  diff --name-only --diff-filter=M <base>...origin/job/<id>` filtered to
+  test paths; (2) if either shows an existing test changed, or the section
+  is missing, the review goes to a **Claude** reviewer (a Claude pool
+  member or a local `reviewer` subagent), never to K3; (3) a K3 fix round's
+  brief restates "the brief is the authority; never adjust test inputs or
+  expected values to make code pass." Log the outcome (§9).
+- **Job lifecycle.** On `squad.job` `review_overdue` (finished, no verdict
+  after 600 s), nudge the requester once (`squad send <requester> "<job>:
+  review overdue" --from orchestrator`). On `amended` (a second worker
+  result), expect a fresh review from the requester. A verdict comes after
+  the integrity check and any fixes, never before (`squad-join` §6b).
 - **Credentials, merges, `main`/`master` pushes: Claude members only.** The
   `credentials` tag makes the broker enforce it; if a brief obviously needs
   them and lacks the tag, refuse it: `squad job refuse <id> --reason
@@ -932,7 +955,7 @@ if it needs him; on `done`, drop the stream from the plan. Watcher events
 are information. Never send a `now` turn for what can wait until a member
 is idle. Job turns: `job_queued` and `job_worker_free` (route per §4a); the `squad.job`
 topic (events `queued`, `assigned`, `started`, `unacked`, `requeued`,
-`finished`, `late_result`, `reviewed`; an escalation shows up as the operator
+`finished`, `amended`, `late_result`, `reviewed`, `review_overdue`; an escalation shows up as the operator
 item, not an event) is information for the decision log. From the herder: `launch_result`, `close_result` and `status_result` (reply to
 the matching directive, §1a), and the `herder.issue` topic (subscribed in §1).
 
@@ -990,6 +1013,10 @@ At start-up, before §1 step 4, only when started with `--debug`:
    budget floor, a job needing credentials) also carries a `k3:` line saying
    how, e.g. `k3: no capable member; only K3 held review and the job needs
    credentials, so Claude-only`.
+   Every K3 `code` result gets a line `k3-integrity: clean <job>` or
+   `k3-integrity: flagged <job> <files>` (§4a), and a flagged one a
+   follow-up block naming the Claude reviewer and its verdict, so
+   `/squad-debug-review` can count them.
    Every rebalance proposal, move and outcome (§2 rung 2) gets a block whose
    `Why:` line starts `rebalance:`: an advisory `would-rebalance`, the
    `relaunch` directive, and the `relaunch_result` each log one, quoting both

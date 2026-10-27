@@ -398,7 +398,11 @@ Mid-build testing is **focused only**. Run fast tests for the code you
 changed, plus the repo's fast check (`just check` or its equivalent) once
 before `pr_ready`. The comprehensive gate (`just ci` / `just verify`, the
 full test suite, production builds) runs once per rolling trunk, decided and
-run by the orchestrator — not by you, per branch.
+run by the orchestrator — not by you, per branch: as a credential-free K3
+`test` job where it can (unit, lint, typecheck, build), else in a granted
+slot. A kickoff's "Test policy: squad-join §6a" line means exactly this
+section; any exception (an adopted trunk, a browser smoke needing a test
+slot) is stated in the kickoff.
 
 | Stack | Allowed mid-build | Not without a test slot |
 |---|---|---|
@@ -531,11 +535,15 @@ any time.
   review, then the member, infra or Tim, as ENG-338 settles. Never ask the
   worker to open or merge anything.
 - **K3 test integrity.** When the result came from a K3 worker (the `worker`'s
-  `.req.model` in `squad roster`, or the model on the job record) and its diff
-  changes existing test assertions or inputs, review it yourself against the
-  brief (or with a Claude reviewer subagent); do not accept a pool review of
-  it. Record `k3-integrity: flagged <job> <files>` or `k3-integrity: clean`
-  in your report.
+  `.req.model` in `squad roster`, or the model on the job record), check that
+  its summary ends with the **Test integrity** section (§6c), then run the
+  check yourself: `git diff -U0 <base_sha>...origin/job/<id> | grep -E
+  '^-[^-].*(assert|expect|toBe|toEqual|should|== )'` and `git diff
+  --name-only --diff-filter=M <base_sha>...origin/job/<id>` filtered to test
+  paths. If either shows an existing test changed, or the section is
+  missing, review it yourself against the brief (or with a Claude reviewer
+  subagent); do not accept a pool review of it. Record `k3-integrity:
+  flagged <job> <files>` or `k3-integrity: clean` in your report.
 - `failed`: read `reason`. `budget`: re-delegate later or do it locally.
   `needs_operator`: the linked operator item is with Tim; wait for its
   resolution. `worker_lost`: re-delegate or do it locally. `needs_credentials`
@@ -556,6 +564,17 @@ squad job review <id> --verdict accepted|rework|rejected [--reason <tag>] --name
 Reason tags (open set, this vocabulary expected): `wrong_approach`,
 `failing_tests`, `conflicts`, `integration`, `incomplete`. For `rework`,
 delegate the follow-up with `--rework-of <id>`.
+
+**Review after fixing, not before.** `accepted` means landable as it
+stands, so record it only once your review (for K3 code, the integrity
+check above) is done and any fixes are in. A result you are fixing or
+sending back is `rework` now, with its reason; once the fix is in, run
+`squad job review` again with `accepted`: reviews can be repeated and the
+last one stands. The broker rejects `accepted` with a failing reason such as
+`failing_tests`. A worker's second result after `finished` marks the job
+`amended` and brings a new `job_result`: fetch the branch again and review
+it before any verdict. `review_overdue` (600 s after `finished` with no
+verdict) means record one now.
 
 ### Mail
 
@@ -592,14 +611,57 @@ the first action (§5), then `squad set --name <name> --status working
 
    ```
    squad delegate-result <id> --status ok --summary <file> --branch job/<id> \
-     --test-command "<exact command>" --test-result pass|fail|not-run \
+     --test-command "<exact command>" --test-result pass|fail|not-run [--test-reason "<why not run>"] \
      [--diff-summary "<one paragraph>"] [--pr <url of an existing PR the brief named>] \
      [--operator-item <id>]... --name <name>
    ```
 
    `--diff-summary` is filled from `git diff --shortstat` when omitted.
    `--test-command` and `--test-result` go together and are required with
-   `--branch` on an `ok` result.
+   `--branch` on an `ok` result; `not-run` carries `--test-reason`.
+
+**Job kinds.** A `test` job runs a credential-free gate (unit, lint,
+typecheck, build) against the given sha, usually a trunk, in your own
+worktree, and returns `--test-command`, `--test-result` and, for failures,
+the failing tests with a single-commit repro where you can find one; it
+pushes nothing. A `review` job returns findings only, confidence-filtered
+and each with a severity, in the summary file, and pushes no fixes unless
+the brief asks. A job outside your kind of work is `failed --reason
+out_of_scope`.
+
+**Tests belong to the brief, not to you** (Tim, 25 Oct, after K3 jobs bent
+tests to fit their own code). The brief is the authority for behaviour; an
+existing test is evidence of it, and your code is what must change.
+- Never change an existing test's assertions, expected values or inputs
+  (fixture sizes, timestamps, thresholds) to make your code pass. You may
+  add tests, and edit an existing one only where the brief explicitly
+  changes the behaviour it pins, quoting that brief line.
+- Write new tests from the brief's wording before the code; they must fail
+  first. Never compute an expected value by running your code and copying
+  the output.
+- If the brief and an existing test (or a stated real-world case)
+  disagree, stop: report `failed --reason needs_ruling` with both quotes.
+- Every `code` job's summary ends with a **Test integrity** section: the
+  output of `git diff -U0 <base_sha>...HEAD | grep -E
+  '^-[^-].*(assert|expect|toBe|toEqual|should|== )'` (or "none"), and for
+  each line listed, the brief line that justifies it.
+
+**When you may not run tests** (the orchestrator's no-tests ruling for K3
+workers, or the classifier denying a test run), the ruling covers gate
+recipes too: `just check`, `just ci`, `just verify` and anything else that
+spawns test workers. Run none of them and report `--test-command "<the
+command you would have run>" --test-result not-run --test-reason "<why>"`.
+The host watcher reaps orphaned test workers; never kill pids for them.
+
+**A fix after you have reported** is pushed to `job/<id>` and followed by a
+second `delegate-result` for the same job (the broker marks it `amended` and
+tells the requester); never a silent push after `finished`.
+
+**Caching discipline** (K3; Tim, 25 Oct). Your kickoff and the skill text
+are the stable prompt prefix: keep them unchanged between jobs, expect job
+specifics last in each brief, keep your summaries terse, and stay warm
+between jobs (idle and wait rather than close); the orchestrator reuses
+you.
 
 **What you cannot do here (K3 members).** `agent/run`, `agent-run`, `esc`,
 `pulumi up` / `env open`, `op`, `gh pr merge` and pushes to `main`/`master`
@@ -631,7 +693,8 @@ kickoff):
 Join the squad with the squad-join skill. Register with
 --capabilities <code,review[,credentials]> --model <model id> and the
 default subscriptions (§3); `credentials` only for a Claude member with
-agent-run, never K3. Then serve jobs per §6c; do no other work.
+agent-run, never K3. Then serve jobs per §6c; do no other work. A K3
+worker follows §6c's test rules and caching discipline.
 ```
 
 ## 7. Keeping state honest
