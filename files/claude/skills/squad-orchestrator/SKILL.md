@@ -147,8 +147,9 @@ kickoff file in the plan Tim passed (relayed by the concierge):
    check): `squad send herder "close <name>" --from orchestrator
    --ack-deadline-s 60 --data '{"directive":"close","name":"<n>","reason":"<why>"}'`.
    Ask for state with a `status` directive; its answer is `status_result`.
-5. **Rebalancing** (when the herder supports it): direct `squad herd relaunch`
-   through the herder rather than closing and launching by hand.
+5. **Rebalancing**: direct a rebalance (`squad herd relaunch --name <n>
+   --account <ctx>`) through the herder rather than closing and launching by
+   hand; the rule, limits and outcomes are §2 rung 2.
 6. **End of run:** `squad send herder "wind_down" --from orchestrator
    --ack-deadline-s 60 --data '{"directive":"wind_down"}'`.
 7. **On `herder.issue`:** decide what to do; tell Tim through the concierge
@@ -218,17 +219,62 @@ host`). The member with the top priority is never taken below `fanout 1`
 unless level 100.
 1. **`fanout 1`, `model_ceiling sonnet`**: one parallel subagent, none above
    sonnet.
-2. **Rebalance** to the other account, but only if it has headroom
-   (`squad get quota.B`: five-hour `pct ≤ 50` and seven-day `pct < 80`)
-   and only for a member not mandated to the exxo account (exxo repos,
-   exxo-infra and any brief that needs exxo credentials). Prefer moving
-   non-exxo-mandated members off exxo. The mover is the herder's relaunch,
-   `squad herd relaunch <member> --account <B>`: **the herder command is
-   pending (Plans A and G) and `squad --help` does not list it yet** and the `--account` flag is
-   pending too; it takes no `--data`, so log the `trigger` in the decision
-   log (`d=$(squad debug dir) && cat >> "$d/orchestrator-decisions.md"`,
-   §9) until the herder defines a payload; until
-   it lands, skip this rung and say so in the decision log.
+2. **Rebalance** a member to the other context B in A's `resume_group`,
+   but only when B has headroom. Rebalance sits after the free rung and
+   before anything that cuts a member's throughput, because a move keeps
+   the member working at the price of one uncached re-read of its
+   context. The mover is the herder's relaunch: send the directive
+   ```
+   squad send herder "rebalance <member> to <B>" --from orchestrator --ack-deadline-s 60 \
+     --data '{"directive":"relaunch","name":"<member>","account":"<B>","trigger":{…}}'
+   ```
+   and the herder runs `squad herd relaunch --name <member> --account
+   <B>` (merged; the flag is `--name`, never a positional argument) and
+   replies `relaunch_result` with the CLI's JSON (`status`
+   `relaunched|deferred|refused|rolled_back|failed|dry_run`; exit codes
+   14 not relocatable, 15 not ready, 16 did not exit, 17 rolled back, 18
+   rollback failed). **The CLI enforces eligibility only; the move limits
+   are yours**: at most one move in flight squad-wide, one move per 10
+   minutes, and never a member moved in the last 60 minutes (read
+   `rebalance.moves` in the plan gauge, §3). The checks, in order:
+   - **Headroom on B** (`squad get quota.B`): every window below 50%,
+     seven-day below 80%, no rule of this ladder active on B, and B's
+     projection with the candidate's `tokens_per_min` added still reaches
+     reset before cap.
+   - **Candidate**: an eligible member of A (role `client`, `lifetime:
+     task`, herder state file, context in a `resume_group`; never the
+     orchestrator, infra, herder, concierge, liaison, the dashboard agent
+     or any K3 worker) with no `needs` that B's context lacks (the
+     herder's dry run refuses those too), and not moved in the last 60
+     minutes. Preference order: members not mandated to A's account first
+     (no `needs` of connectors or account-bound credentials, so builders
+     before anything tied to `exxo`), then lowest priority, then highest
+     `tokens_per_min`. Take one per step, then re-check after 5 minutes.
+   - **Mode** (plan gauge `rebalance.mode`; the round 3 default is
+     `act`; only Tim changes it):
+     - `off`: skip this rung.
+     - `advisory`: ask the herder for `squad herd relaunch --name <m>
+       --account <B> --dry-run`, log a `would-rebalance` block (§9),
+       record the proposal in `rebalance.proposals`, and fall through to
+       rung 3.
+     - `attended`: act only while `operator.presence` says Tim is
+       attending (without that gauge, only on his quoted word via the
+       concierge).
+     - `act`: act unattended.
+   - **Outcomes** (`relaunch_result`):
+     - `relaunched`: record the move in `rebalance.moves`, set the
+       stream's `account` to B, and tell Tim one line. A member being
+       relaunched counts as paused in this section's projection; a
+       `held_long` with reason `not_live` for it is expected, not raised.
+     - `deferred`: retry at the next check, at most 3 times, then fall
+       through to rung 3.
+     - `rolled_back`: no further moves this hour; tell Tim through the
+       concierge.
+     - `failed`: raise an operator item `relaunch-<member>` with
+       `--blocking now` (§2c).
+     - `refused`: the member is not relocatable (exit 14) or B rejected
+       its `needs`; pick the next candidate, and if none is eligible fall
+       through to rung 3.
 3. **Revoke heavy slots** (§4), lowest priority grant first.
 4. **`fanout 0`**: no subagents, work inline.
 5. **Pause** (below).
@@ -321,8 +367,10 @@ Resume every `paused` entry for `A` with `by: "orchestrator"`, 60s apart, in
 one `run_in_background` command (a foreground `sleep` is refused); then
 re-grant slots and send `fanout` with `max_subagents` 3 and no ceiling to
 each member you lowered. Each of these carries `data.trigger`, quoting the
-reset or ETA state that cleared it. A rebalanced member is not moved back;
-tell Tim where it is.
+reset or ETA state that cleared it. There is no automatic return home: a
+rebalanced member stays on B until B's own wall triggers the symmetric rule
+and A has headroom (its stream keeps `home_account`, §3); tell Tim where it
+is.
 ```
 for m in <top> <next> …; do squad send "$m" "resume" --from orchestrator \
   --ack-deadline-s 120 --data '{"directive":"resume","trigger":{…}}'; sleep 60; done
@@ -463,13 +511,23 @@ changes by Tim or members.
 The plan lives in the broker, surviving your restarts:
 ```
 {"streams":[{"member":"…","priority":1-5,"phase":"…","notes":"…","prompt":"<kickoff prompt path>","deliverables":[…],
+   "account":"<the account the member is currently on>","home_account":"<its launch account>",
    "fanout":{"max_subagents":3,"model_ceiling":null,"set_at":"<ISO>"}}],
  "heavy_slots":1,"slots_reduced":false,"grants":[{"member","reason","granted_at","expires_at"}],
  "queue":[{"member","reason","est_minutes","requested_at"}],"paused":[…],
  "infra_authority":null,"pending_infra":[{"pr","repo","from","summary"}],
+ "rebalance":{"mode":"act","in_flight":null,"last_move_at":null,
+   "moves":[{"member","from","to","at","outcome"}],"proposals":[…]},
  "updated_by":"orchestrator","updated_at":"<ISO>"}
 ```
 `fanout` is the cap last sent to that member (default 3, no ceiling).
+`rebalance` is the §2 rung 2 bookkeeping: `mode` (`advisory`|`attended`|`act`|`off`;
+the round 3 default is `act`; only Tim changes it), `in_flight` (the member
+mid-move, enforcing one move squad-wide), `last_move_at` (enforcing one move
+per 10 minutes), `moves` (a member moved in the last 60 minutes is not moved
+again) and `proposals` (advisory `would-rebalance` records). A stream's
+`account` tracks where the member actually is after a move; `home_account`
+never changes (no automatic return home, §2 Restore).
 Read with `squad get plan | jq .data`; publish the whole object with `squad
 publish plan --kind gauge '<json>'` after every change.
 
@@ -756,7 +814,8 @@ each admin step" by default.
 Directives you send, defined client-side in `squad-join` §5: `pause`,
 `resume`, `priority`, `fanout`, `delegate_mode` (§2), `heavy_slot`, `review` (§7a), `infra`, `cleanup` (§2a)
 and `preflight` (§2b). To the herder (§1a): `launch`, `close`, `status`,
-`wind_down` (and `relaunch` for rebalancing where supported). `pause`, `resume`, `priority`, `fanout`, `delegate_mode` and `heavy_slot` revoke carry an ack
+`wind_down`, and `relaunch` (`{name, account}`) for rebalancing (§2 rung 2;
+the herder replies `relaunch_result` with the CLI's outcome). `pause`, `resume`, `priority`, `fanout`, `delegate_mode` and `heavy_slot` revoke carry an ack
 deadline (§2).
 
 A message turn's JSON is `{"from":…,"text":…,"data":{…}}`; client →
@@ -803,3 +862,8 @@ At start-up, before §1 step 4, only when started with `--debug`:
    budget floor, a job needing credentials) also carries a `k3:` line saying
    how, e.g. `k3: no capable member; only K3 held review and the job needs
    credentials, so Claude-only`.
+   Every rebalance proposal, move and outcome (§2 rung 2) gets a block whose
+   `Why:` line starts `rebalance:`: an advisory `would-rebalance`, the
+   `relaunch` directive, and the `relaunch_result` each log one, quoting both
+   accounts' window numbers, the candidates considered and why each was
+   passed over.
