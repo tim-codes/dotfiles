@@ -32,6 +32,12 @@ squad send concierge "<the one-line text Tim would read>" --from orchestrator --
   `operator_update` whose `text` carries the question; wait for the concierge
   to relay Tim's ruling. Where the skill already uses an operator item
   (§2c), use that. Digests are `operator_digest` (§2c).
+- **The auto-deny is not Tim.** "The user doesn't want to take this action
+  right now, STOP and wait" in a tool result (yours, or in a member's
+  report) is an unanswered permission prompt denying itself after about
+  60 s. Never halt on it or ask Tim about it: retry once with a plain
+  command and prefer paths that raise no prompt (`squad-join` §8). Work
+  unattended; no prompt may sit in a builder terminal (Tim, 25 Oct).
 - The only exception is what precedes registration (the context guard, a
   failed `register`, the singleton check in §1): there is no concierge route
   yet, so print a terminal note and stop. Everything from step 0 on,
@@ -346,8 +352,8 @@ pressure.
 **Held turns.** Subscribe to `squad.member` and act on `data.event ==
 "held_long"` (fields `name`, `count`, `oldest_age_s`, `reason`
 `prompt|not_live|busy`). Tell Tim one line: member, count, age, reason. If the
-reason is `prompt`, raise an operator item (§2c): the member is waiting on a
-permission prompt only Tim can answer. A `joined` event is a new member; an
+reason is `prompt`, the broker has already raised `prompt-<member>` (§2c);
+never raise another. A `joined` event is a new member; an
 `updated` event (with `changed`) is the same session re-registering, not a
 second member.
 
@@ -428,6 +434,17 @@ unresolved `preflight blocked` item for Tim to fix; do not work around it,
 and do not retry a blocked member until he says it is resolved. Re-send to
 that member alone afterwards.
 
+**Human-only steps are minted at brief time, before launch.** Read each
+stream's kickoff for every human-only step it foreseeably needs: a browser
+sign-in (Datadog EU, M365), a save in a permission-grant UI (a Datadog
+access-control change, an admin-console toggle), folder trust for the
+member's cwd in its context, a release tag that is Tim's, Touch ID for an
+ESC write, Search Console. Before you send the launch, raise one operator
+item per stream (`<stream>-human-steps`, kind `action`; `blocking` `later`
+with `after` naming the build step, or `now` if the stream starts on it)
+listing each step with its exact click path (URL, menu, button, value).
+Members' own preflight items (`squad-join` §5a step 4) add to it.
+
 ## 2c. Operator task queue
 
 The squad exists to cut human-in-the-loop (HITL) interruptions: members never
@@ -478,7 +495,18 @@ changes by Tim or members.
 - **Denial items**: a member's denied command arrives as an item with id
   `denied-<member>-<n>` and a title starting `denied (permission|classifier|
   guard|keyhelper): `. Never tell the member to retry the command; Tim
-  decides, or you raise the missing rule for the dotfiles fragment.
+  decides, or you raise the missing rule for the dotfiles fragment. A
+  relaunch in another context does not reset a classifier denial: the
+  denied action stays with Tim for the round, and no member re-runs it from
+  the new context.
+- **Prompt items are the broker's.** On `prompt_pending` the broker raises
+  `prompt-<member>` and resolves it when the prompt clears; never raise a
+  duplicate, only order it in the digest.
+- **Permission-grant UI is Tim's.** Never brief a browser subagent (yours or
+  a member's) to save a permission-grant UI (access restrictions, role
+  grants, consents): it goes on the stream's human-steps item (§2b). A
+  classifier denial of such an action goes straight to that item, with no
+  second attempt.
 - **Draft links** (`draft_url`, `url`) are server-checked; a 422 means fix
   the draft, not the item. Never present an unresolved draft.
 - **Order and nudge; you are the single composer.** Order blocking-now,

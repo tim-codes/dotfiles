@@ -688,9 +688,20 @@ agent-run, never K3. Then serve jobs per §6c; do no other work.
   `PermissionRequest` and clears it on `PostToolUse`/`UserPromptSubmit`, so
   the broker holds all deliveries (even `now`) until Tim answers. Requires
   squad built from PR S5 (tim-codes/squad#34) or later; older brokers ignore it.
-- **Denials (permission, classifier, guard or key helper)**: a tool result
-  saying things like "user doesn't want this action" when Tim typed nothing
-  of the kind is the permission classifier, not Tim; a "permission denied"
+- **Auto-deny of an unanswered prompt**: "the user doesn't want to take
+  this action right now, STOP and wait" is your own permission prompt
+  denying itself after about 60 s with nobody at the terminal: not Tim, not
+  a ruling. Never halt or wait on it. Retry once with a plain command (one
+  literal command or the repo's named recipe: no `$(…)`, `&&`/`;` chains,
+  pipes into an interpreter, or variables and globs in `git`/`gh`
+  arguments), and prefer paths that raise no prompt at all; work
+  unattended, since no prompt may sit in a builder terminal (Tim, 25 Oct).
+  If the plain retry is denied too, it is a denial (next bullet). While a
+  prompt is open the broker raises the operator item `prompt-<name>` and
+  resolves it when the prompt clears; never raise one yourself.
+- **Denials (permission, classifier, guard or key helper)**: any other tool
+  result saying things like "user doesn't want this action" when Tim typed
+  nothing of the kind is the permission classifier, not Tim; a "permission denied"
   or "blocked by a deny rule" result is a settings rule. Either way, three
   things, in order. **Never retry** the denied command, not even narrowed or
   reworded. **Raise an operator item** (§6) with the exact command:
