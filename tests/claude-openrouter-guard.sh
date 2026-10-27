@@ -425,6 +425,58 @@ job|squad set --detail 'pushed'; git push origin main
 job|git push origin job/x --force-with-lease=$X
 TABLE
 
+# Command words built at run time (brace expansion, quote-splitting, live
+# $/backtick) reach the shell as git/gh/... but never contain the literal
+# word the risk check looks for, so any such command word is unparseable.
+while IFS='|' read -r key cmd; do
+    [ -z "$key" ] && continue
+    expect deny "$key" "$cmd"
+done <<'TABLE'
+job|g{it,} push origin main
+job|gi{t} push origin main
+job|{git,true} push origin main
+job|g''it push origin main
+job|"gi"t push origin main
+job|'g'"it" push origin main
+job|true && g{it,} push origin main
+job|nohup g{it,} push origin main
+job|env g{it,} push origin main
+job|exec g{it,} push origin main
+job|xargs -n1 g{it,} push
+job|"$tool" push origin main
+job|$tool push origin main
+job|${tool} push origin main
+job|`echo git` push origin main
+job|r{m,} -rf /
+job|c{url,} -X PUT https://example.invalid
+job|/usr/bin/gi[t] push origin main
+job|/usr/bin/gi? push origin main
+TABLE
+
+# ...while braces and globs as ARGUMENTS to a read-only git/gh, a bare test
+# command and { cmd; } grouping are not command words and stay as they were.
+while IFS='|' read -r key cmd; do
+    [ -z "$key" ] && continue
+    expect allow "$key" "$cmd"
+done <<'TABLE'
+job|git log --format='{%h}'
+job|git diff -- 'src/{a,b}.ts'
+job|{ git status; }
+job|[ -f README.md ] && git status
+job|[[ -f README.md ]] && git status
+job|echo {a,b}
+job|"git" status
+job|\git status
+TABLE
+
+# The reason names the construct.
+reason="$(jq -n --arg d "$T/job-clone" '{cwd:$d, tool_name:"Bash", tool_input:{command:"g{it,} push origin main"}}' \
+    | "$GUARD" 2>/dev/null | jq -r '.hookSpecificOutput.permissionDecisionReason // empty')"
+if grep -q 'brace expansion' <<<"$reason"; then ok "brace-built command word: reason names the construct"; else bad "brace reason: '$reason'"; fi
+reason="$(jq -n --arg d "$T/job-clone" '{cwd:$d, tool_name:"Bash", tool_input:{command:"g\u0027\u0027it push origin main"}}' \
+    | "$GUARD" 2>/dev/null | jq -r '.hookSpecificOutput.permissionDecisionReason // empty')"
+if grep -q 'quote-splitting' <<<"$reason"; then ok "quote-split command word: reason names the construct"; else bad "quote reason: '$reason'"; fi
+
 # --- Non-Bash tool ---------------------------------------------------------
 got="$(run_guard "$T/job-clone" "gh pr merge 1" Write)"
 if [ "$got" = allow ]; then ok "non-Bash tool passes"; else bad "non-Bash tool: got $got"; fi

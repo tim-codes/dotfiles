@@ -32,6 +32,15 @@ Model (controller rulings R-C9, R-C10): allow only what is fully resolved.
   * `git -C <dir>` whose directory is spelled with $, a glob or a brace
     cannot be resolved, so it is allowed only for a read-only git subcommand;
     a push or an unknown subcommand there is unresolved.
+  * The command word of every simple command (and the word after env, exec,
+    builtin, sudo, doas, xargs) is checked whether or not the command
+    mentions a risk word, because brace expansion, quote-splitting and
+    expansions build git, gh, pulumi, curl, ssh, rm, squad, kill ... at run
+    time (g{it,} push, g''it push, "gi"t push, {git,true} push). A command
+    word with an unquoted brace, an unquoted glob character (except the bare
+    test commands [ and [[ ), a live $ or backtick, or quote-splitting (two
+    quoted parts, or a quoted part next to unquoted text) is unparseable.
+    Standalone grouping braces ({ cmd; }) are reserved words and unaffected.
   * A command that is neither git/gh nor a known wrapper is classified by its
     first word: squad and grep are data-only, so a risk word in their
     arguments does not make them a git/gh call (unless piped onwards or
@@ -179,6 +188,46 @@ def opaque_command_word(word):
     return globby(word) or bool(re.search(r"[{}\]]", masked))
 
 
+COMMAND_FOLLOWERS = {"env", "exec", "builtin", "sudo", "doas", "xargs"}
+
+
+def built_command_word(word):
+    """Why a command word cannot be trusted to be what it reads as, or None.
+    Brace expansion, quote-splitting and expansions can assemble git, gh,
+    pulumi, curl, ssh, rm, squad ... at run time, so the guard's literal
+    word matching would never see them."""
+    masked = getattr(word, "masked", word)
+    if getattr(word, "split", False):
+        return "quote-splitting"
+    if re.search(r"[{}]", masked):
+        return "brace expansion"
+    if "$" in getattr(word, "live", word) or "`" in getattr(word, "live", word):
+        return "$ or backtick expansion"
+    if globby(word) and masked not in ("[", "[["):
+        return "a glob"
+    return None
+
+
+def check_command_words(segs):
+    """Block a command word (or the word after env/exec/xargs ...) that
+    something other than its literal text decides."""
+    compound = len(segs) > 1
+    for seg in segs:
+        argv, _assigns, _wrapped = strip_wrappers(seg)
+        if not argv:
+            continue
+        words = [argv[0]]
+        if os.path.basename(argv[0]) in COMMAND_FOLLOWERS:
+            words += [w for w in argv[1:] if not w.startswith("-") and not ASSIGN.match(w)][:1]
+        for w in words:
+            why = built_command_word(w)
+            if why:
+                raise Block(UNPARSEABLE, None,
+                            f"the command word uses {why}, which can build git, gh, pulumi, curl, ssh, "
+                            "rm, squad or kill at run time - write the command name literally",
+                            "compound" if compound else "other")
+
+
 def unresolved_word(word):
     return has_expansion(word) or globby(word) or "\n" in word
 
@@ -199,8 +248,12 @@ def is_risky(text):
 class Word(str):
     """A shell word after quote removal. `masked` is the same text with every
     quoted or escaped character replaced by NUL, so the unquoted (expandable)
-    characters can be examined."""
+    characters can be examined. `live` keeps double-quoted characters too
+    (bash still expands them); `split` is True when the word is built from
+    several quoted parts or a quoted part next to unquoted text."""
     masked = ""
+    live = ""
+    split = False
 
 
 class Op(str):
@@ -221,20 +274,27 @@ def tokens(text):
     (as bash does), '#' comments only at the start of a word, and runs of
     ;&|<>() as operators. Raises ValueError on unbalanced quotes."""
     out, val, mask, started = Toks(), [], [], False
+    wlive, nquote, plain = [], 0, False
     unq, live = [], []
     i, n = 0, len(text)
 
-    def add(ch, quoted):
+    def add(ch, quoted, lv):
+        nonlocal plain
         val.append(ch)
         mask.append("\0" if quoted else ch)
+        wlive.append(lv)
+        plain |= not quoted
 
     def flush():
-        nonlocal val, mask, started
+        nonlocal val, mask, started, wlive, nquote, plain
         if started:
             w = Word("".join(val))
             w.masked = "".join(mask)
+            w.live = "".join(wlive)
+            w.split = nquote >= 2 or (nquote == 1 and plain)
             out.append(w)
         val, mask, started = [], [], False
+        wlive, nquote, plain = [], 0, False
 
     while i < n:
         c = text[i]
@@ -262,7 +322,7 @@ def tokens(text):
                 continue
             started = True
             if i + 1 < n:
-                add(text[i + 1], True)
+                add(text[i + 1], True, "\0")
             unq.append("\0" * min(2, n - i))
             live.append("\0" * min(2, n - i))
             i += 2
@@ -271,13 +331,15 @@ def tokens(text):
             if j < 0:
                 raise ValueError("unbalanced single quote")
             started = True
+            nquote += 1
             for ch in text[i + 1:j]:
-                add(ch, True)
+                add(ch, True, "\0")
             unq.append("\0" * (j + 1 - i))
             live.append("\0" * (j + 1 - i))  # nothing expands in single quotes
             i = j + 1
         elif c == '"':
             started = True
+            nquote += 1
             j = i + 1
             unq.append("\0")
             live.append("\0")
@@ -287,7 +349,7 @@ def tokens(text):
                 ch = text[j]
                 if ch == "\\" and j + 1 < n and text[j + 1] in '$`"\\\n':
                     if text[j + 1] != "\n":
-                        add(text[j + 1], True)
+                        add(text[j + 1], True, "\0")
                     unq.append("\0\0")
                     live.append("\0\0")
                     j += 2
@@ -296,7 +358,7 @@ def tokens(text):
                     live.append("\0")
                     break
                 else:
-                    add(ch, True)
+                    add(ch, True, ch)
                     unq.append("\0")
                     live.append(ch)
                     j += 1
@@ -317,13 +379,13 @@ def tokens(text):
                 raise ValueError("unbalanced extglob group")
             started = True
             for ch in text[i:j + 1]:
-                add(ch, False)
+                add(ch, False, ch)
             unq.append(text[i:j + 1])
             live.append(text[i:j + 1])
             i = j + 1
         else:
             started = True
-            add(c, False)
+            add(c, False, c)
             unq.append(c)
             live.append(c)
             i += 1
@@ -799,8 +861,6 @@ def check_gh_api(args, cwd, form, strict):
 
 def analyse(text, cwd, allowed):
     risky = is_risky(text)
-    if not risky and not re.search(r"git|gh", dequote(text)):
-        return
     try:
         toks = tokens(text)
     except ValueError:
@@ -810,6 +870,9 @@ def analyse(text, cwd, allowed):
     parsed = Parsed(toks)
     segs = parsed.segments
     compound = len(segs) > 1
+    check_command_words(segs)
+    if not risky and not re.search(r"git|gh", dequote(text)):
+        return
 
     if risky:
         # Quote-aware: single-quoted text is inert, double-quoted text still
