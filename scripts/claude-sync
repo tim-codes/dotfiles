@@ -748,12 +748,13 @@ sync_overlay() {
 
         # Make sure the share target exists in the base context, so the link
         # is never dangling (Claude Code should always land writes in exxo).
-        if [ ! -e "$src" ]; then
-            case " ${OVERLAY_DIRS[*]} " in
-                *" $entry "*) mkdir -p "$src" ;;
-                *) : > "$src" ;;
-            esac
-        fi
+        # Claude Code creates these dirs lazily and its cleanup can remove
+        # them once empty; through a dangling link the lazy mkdir then fails
+        # (ENOENT on tasks/<id>/.lock), so a .keep marker keeps them non-empty.
+        case " ${OVERLAY_DIRS[*]} " in
+            *" $entry "*) mkdir -p "$src" && touch "$src/.keep" ;;
+            *) [ -e "$src" ] || : > "$src" ;;
+        esac
 
         if [ -L "$dst" ]; then
             if [ "$(readlink "$dst")" = "$src" ]; then
