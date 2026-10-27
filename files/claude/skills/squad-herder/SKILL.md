@@ -89,7 +89,7 @@ a plain `error: ...` line on stderr. So the reply payload is always
 
 | directive | run | reply kind |
 |---|---|---|
-| `launch {name, prompt, account?, before_launch_cleared?}` | `squad herd launch --name <name> --prompt <prompt> [--account <a>] [--before-launch-cleared]` | `launch_result` |
+| `launch {name, prompt, account?, before_launch_cleared?, attended?}` | `squad herd launch --name <name> --prompt <prompt> [--account <a>] [--before-launch-cleared]` | `launch_result` |
 | `close {name, reason?, force?}` | `squad herd close --name <name> [--reason "<reason>"] [--timeout-s 120] [--force] --from herder` (blocks up to 120 s plus 30 s: Bash `timeout` 300000, one at a time) | `close_result` |
 | `status` | `squad herd status --publish --json` (result: `{members, issues, checked_at}`) | `status_result` |
 | `wind_down` | one `close` per member, in the order below | `close_result` each |
@@ -121,8 +121,21 @@ orchestrator decide. Exits:
   retry.
 - **19** (close): close mismatch (window or roster entry survived the kill);
   herd has published `herder.issue` itself. Report, do not retry.
-- **3, 5, 1**: kickoff dry-run failed, unknown harness, other error; report
-  the stderr text.
+- **3** with `trust: missing <path> in <ctx>` on stderr, or **2** (the
+  context's `.claude.json` is missing or invalid): folder trust, below.
+- **3** (other), **5**, **1**: kickoff dry-run failed, unknown harness, other
+  error; report the stderr text.
+
+**Folder trust and the deny overlay.** `claude-kickoff` records folder trust
+for the member's cwd by default (`trust: recorded <path> in <ctx>`, or
+`trust: ok …` when already trusted) and the dry-run reports it
+(`trust: would-record …`), so a launch needs no human step. On exit 3
+(`trust: missing`) or exit 2, do not retry or work round it: publish
+`herder.issue` with the `trust:` line verbatim, the context and the member
+name, so the orchestrator can mint the item (`squad-orchestrator` §1a).
+Use `--no-trust` only when the orchestrator's directive says `attended: true`. Members launch with the member deny overlay (raw `gh pr
+merge` denied); pass `--no-member-deny` only for an attended launch the
+directive asks for.
 
 **Relaunch.** Run it only on the orchestrator's `relaunch` directive, with
 exactly the `name` and `account` it gives; never on your own initiative and
@@ -178,6 +191,8 @@ failed","exit":<N>}'` and keep looping.
   `--dry-run` on your own initiative.
 - No `squad deregister herder` before the last `wind_down` close has
   returned, and no close of the concierge in a `wind_down`.
+- Never edit a `.claude.json` yourself and never pass `--no-trust-check`;
+  trust is recorded by `claude-kickoff` alone.
 - No decisions: you never launch a builder unprompted, never pick an
   account, never relay to Tim, and never edit a kickoff file.
 

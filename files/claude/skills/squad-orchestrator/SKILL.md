@@ -176,7 +176,13 @@ kickoff file in the plan Tim passed (relayed by the concierge):
    the concierge to close your window, and stop: an idle tail answering
    watcher events is pure burn.
 7. **On `herder.issue`:** decide what to do; tell Tim through the concierge
-   (§2) only if it needs him.
+   (§2) only if it needs him. One carrying `trust: missing` or exit 2 (the
+   herder's dry-run refused on folder trust) becomes the operator item
+   `trust-<member>` (§2c, kind `action`), with the `trust:` line verbatim
+   and the click path "open the folder once in <ctx>, accept the dialog";
+   re-send the launch after it is done. `claude-kickoff` records trust itself
+   by default, so this is rare; mark `attended: true` in the launch
+   directive only for a launch Tim is present for.
 8. **Decision log:** every herder directive (launch, close, status, relaunch,
    wind_down) is logged in the guarded decision log like any other (§9).
 
@@ -473,9 +479,12 @@ that member alone afterwards.
 **Human-only steps are minted at brief time, before launch.** Read each
 stream's kickoff for every human-only step it foreseeably needs: a browser
 sign-in (Datadog EU, M365), a save in a permission-grant UI (a Datadog
-access-control change, an admin-console toggle), folder trust for the
-member's cwd in its context, a release tag that is Tim's, Touch ID for an
-ESC write, Search Console. Before you send the launch, raise one operator
+access-control change, an admin-console toggle), a release tag that is
+Tim's, Touch ID for an ESC write, Search Console. Folder trust is not one:
+`claude-kickoff` records it at launch. The exception is a context whose
+`.claude.json` is missing or invalid (kickoff exit 2): that stays an operator
+item, `<ctx>-claude-json`, for Tim to start the context once and fix the
+file. Before you send the launch, raise one operator
 item per stream (`<stream>-human-steps`, kind `action`; `blocking` `later`
 with `after` naming the build step, or `now` if the stream starts on it)
 listing each step with its exact click path (URL, menu, button, value).
@@ -846,7 +855,9 @@ Record it as the stream's `merge_grant` (§3). `tags` is true only where his
 words cover production tags. **A `squad-pr-merge` refusal is final**: when a
 member reports one, never suggest a raw `gh pr merge`, a retry or another
 merge path; fix the cause (red or pending check, draft, wrong base) or hand
-it to Tim. Green means each expected CI job passed on the head sha, checked
+it to Tim. Members launch with a deny overlay on raw `gh pr merge`, so a merge
+they cannot do through `squad-pr-merge` is always an operator item or a grant
+(above), never a retry. Green means each expected CI job passed on the head sha, checked
 by run id (`gh run list -R <repo> --commit <sha> --json
 databaseId,name,status,conclusion`, then `gh run view <id> -R <repo> --json
 jobs`); a missing or queued job is not green.
