@@ -41,7 +41,9 @@ squad send concierge "<the one-line text Tim would read>" --from orchestrator --
 - The only exception is what precedes registration (the context guard, a
   failed `register`, the singleton check in §1): there is no concierge route
   yet, so print a terminal note and stop. Everything from step 0 on,
-  including `/reauth`, goes through the concierge.
+  including `/reauth`, goes through the concierge. A dead concierge (§8
+  "Session liveness") is the other no-route case: print one terminal line
+  beside the operator item, and carry on.
 
 Env vars do not persist between Bash calls: pass `--name orchestrator` and
 `--from orchestrator` explicitly. Every command here is spelled as the
@@ -159,7 +161,8 @@ kickoff file in the plan Tim passed (relayed by the concierge):
    Ask for state with a `status` directive; its answer is `status_result`.
 5. **Rebalancing**: direct a rebalance (`squad herd relaunch --name <n>
    --account <ctx>`) through the herder rather than closing and launching by
-   hand; the rule, limits and outcomes are §2 rung 2.
+   hand; the rule, limits and outcomes are §2 rung 2. A relaunch is for
+   account moves only; a merge grant is a directive (§5).
 6. **End of run:** first drop the topics that matter only while members
    run: `squad unsubscribe orchestrator <topic>` for `host`,
    `host.pressure`, `host.protected`, `host.runaway` and each account's

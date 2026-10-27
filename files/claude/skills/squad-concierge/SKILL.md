@@ -58,7 +58,8 @@ name; the register from the new session publishes `rebound` and flushes
 them. Until then nothing reaches you, even where `squad.delivery` says
 `delivered`: that means enqueued, and a message is read only once your
 session dequeues it. A `session_gone` row is not live, so step 1 does not
-stop you. Present the flushed messages, urgent ones first.
+stop you; a resume in another context re-registers too, and tells Tim which
+connectors it now lacks. Present the flushed messages, urgent ones first.
 
 ## 2. Relaying Tim
 
