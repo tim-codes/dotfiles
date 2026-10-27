@@ -156,8 +156,18 @@ kickoff file in the plan Tim passed (relayed by the concierge):
 5. **Rebalancing**: direct a rebalance (`squad herd relaunch --name <n>
    --account <ctx>`) through the herder rather than closing and launching by
    hand; the rule, limits and outcomes are §2 rung 2.
-6. **End of run:** `squad send herder "wind_down" --from orchestrator
-   --ack-deadline-s 60 --data '{"directive":"wind_down"}'`.
+6. **End of run:** first drop the topics that matter only while members
+   run: `squad unsubscribe orchestrator <topic>` for `host`,
+   `host.pressure`, `host.protected`, `host.runaway` and each account's
+   `quota.A.reset`. Keep `quota.A.threshold` and `quota.A.projection` only
+   while any member is live, and drop them (and `quota.openrouter.*`) once
+   none is. Then `squad send herder "wind_down" --from orchestrator
+   --ack-deadline-s 60 --data '{"directive":"wind_down"}'`. The herder
+   closes the builders, then infra, then you, and deregisters last; the
+   concierge stays for Tim. If its close of you fails (exit 13: Tim
+   launched you by hand), `squad deregister orchestrator`, ask Tim through
+   the concierge to close your window, and stop: an idle tail answering
+   watcher events is pure burn.
 7. **On `herder.issue`:** decide what to do; tell Tim through the concierge
    (§2) only if it needs him.
 8. **Decision log:** every herder directive (launch, close, status, relaunch,
