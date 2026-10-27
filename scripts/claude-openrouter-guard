@@ -20,10 +20,31 @@ Model (controller rulings R-C9, R-C10): allow only what is fully resolved.
   * Literal git/gh segments are always analysed, risk words or not.
   * In a git/gh command that can push, merge or trigger a workflow (git
     push/plumbing/aliases; gh pr except view/list/diff/checks/status, gh api,
-    gh workflow, gh run), any word with an unquoted ?, * or [ or an unquoted
-    brace group bash would expand ({a,b}, {a..b}) is unresolved. This is
-    decided from the quoting alone, never the filesystem. gh's {owner},
-    {repo} and {branch} placeholders are literal to bash and stay allowed.
+    gh workflow, gh run), any word with an unquoted ?, * or [ , an unquoted
+    extglob group (@(..), +(..), ?(..), *(..), !(..)) or an unquoted brace
+    group bash would expand ({a,b}, {a..b}) is unresolved. This is decided
+    from the quoting alone, never the filesystem. gh's {owner}, {repo} and
+    {branch} placeholders are literal to bash and stay allowed. Anywhere else
+    (a read-only git/gh, a command argument) such a word is an opaque
+    argument, and quoted $, #, braces, brackets and ? are plain text (a quoted
+    grep regex is not a glob); only a glob or brace in the command word is
+    unresolved.
+  * `git -C <dir>` whose directory is spelled with $, a glob or a brace
+    cannot be resolved, so it is allowed only for a read-only git subcommand;
+    a push or an unknown subcommand there is unresolved.
+  * The command word of every simple command (and the word after env, exec,
+    builtin, sudo, doas, xargs) is checked whether or not the command
+    mentions a risk word, because brace expansion, quote-splitting and
+    expansions build git, gh, pulumi, curl, ssh, rm, squad, kill ... at run
+    time (g{it,} push, g''it push, "gi"t push, {git,true} push). A command
+    word with an unquoted brace, an unquoted glob character (except the bare
+    test commands [ and [[ ), a live $ or backtick, or quote-splitting (two
+    quoted parts, or a quoted part next to unquoted text) is unparseable.
+    Standalone grouping braces ({ cmd; }) are reserved words and unaffected.
+  * A command that is neither git/gh nor a known wrapper is classified by its
+    first word: squad and grep are data-only, so a risk word in their
+    arguments does not make them a git/gh call (unless piped onwards or
+    redirected); anything else that mentions a risk word is still unresolved.
 
 Rule ids (also the log's `rule`):
   gh-pr-merge          gh pr merge
@@ -89,6 +110,11 @@ HIDERS = {"eval", "source", ".", "exec", "xargs", "find", "export", "declare", "
           "function", "sudo", "su", "doas", "ssh", "parallel", "watch", "script", "env", "command",
           "coproc", "fc", "mapfile", "readarray", "read"}
 INERT = {"echo", "printf"}
+# Commands whose arguments are data, never run as commands (so a risk word in
+# them is not a git/gh call). Unlike INERT these are judged per segment: only
+# when their own output is not piped onwards and they have no redirection, and
+# only when run by name from PATH with no assignments.
+DATA_ONLY = {"squad", "grep", "egrep", "fgrep"}
 
 GIT_TRUSTED = {"/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git",
                "/Library/Developer/CommandLineTools/usr/bin/git",
@@ -141,21 +167,65 @@ def has_expansion(word):
     return "$" in word or "`" in word
 
 
-# Characters bash expands or re-reads that the guard does not resolve. In a
-# risk-mentioning command any of them blocks outright (R-C9, review round 2);
-# '{'/'}' used as standalone group words are exempt.
-UNRESOLVED_CHARS = re.compile(r"[{}?\[\]#]")
-GROUP_BRACE = re.compile(r"(?:^|(?<=[\s;&|]))[{}](?=[\s;&|]|$)")
 BRACE_EXPANSION = re.compile(r"\{[^{}\s]*(?:,|\.\.)[^{}\s]*\}")
 GLOB_CHARS = re.compile(r"[?*\[]")
+EXTGLOB = re.compile(r"[@+?*!]\(")
 
 
 def globby(word):
-    """Unquoted ?, * or [, or an unquoted brace group bash would expand (one
-    with ',' or '..'). Decided from the text alone, never the filesystem
-    (ruling R-C10: a glob can be made to match in the same command)."""
+    """Unquoted ?, * or [, an unquoted extglob group, or an unquoted brace
+    group bash would expand (one with ',' or '..'). Decided from the text
+    alone, never the filesystem (ruling R-C10: a glob can be made to match in
+    the same command)."""
     masked = getattr(word, "masked", word)
-    return bool(GLOB_CHARS.search(masked) or BRACE_EXPANSION.search(masked))
+    return bool(GLOB_CHARS.search(masked) or BRACE_EXPANSION.search(masked) or EXTGLOB.search(masked))
+
+
+def opaque_command_word(word):
+    """A command word bash would expand or complete unseen: it cannot be
+    classified. Quoted characters do not count."""
+    masked = getattr(word, "masked", word)
+    return globby(word) or bool(re.search(r"[{}\]]", masked))
+
+
+COMMAND_FOLLOWERS = {"env", "exec", "builtin", "sudo", "doas", "xargs"}
+
+
+def built_command_word(word):
+    """Why a command word cannot be trusted to be what it reads as, or None.
+    Brace expansion, quote-splitting and expansions can assemble git, gh,
+    pulumi, curl, ssh, rm, squad ... at run time, so the guard's literal
+    word matching would never see them."""
+    masked = getattr(word, "masked", word)
+    if getattr(word, "split", False):
+        return "quote-splitting"
+    if re.search(r"[{}]", masked):
+        return "brace expansion"
+    if "$" in getattr(word, "live", word) or "`" in getattr(word, "live", word):
+        return "$ or backtick expansion"
+    if globby(word) and masked not in ("[", "[["):
+        return "a glob"
+    return None
+
+
+def check_command_words(segs):
+    """Block a command word (or the word after env/exec/xargs ...) that
+    something other than its literal text decides."""
+    compound = len(segs) > 1
+    for seg in segs:
+        argv, _assigns, _wrapped = strip_wrappers(seg)
+        if not argv:
+            continue
+        words = [argv[0]]
+        if os.path.basename(argv[0]) in COMMAND_FOLLOWERS:
+            words += [w for w in argv[1:] if not w.startswith("-") and not ASSIGN.match(w)][:1]
+        for w in words:
+            why = built_command_word(w)
+            if why:
+                raise Block(UNPARSEABLE, None,
+                            f"the command word uses {why}, which can build git, gh, pulumi, curl, ssh, "
+                            "rm, squad or kill at run time - write the command name literally",
+                            "compound" if compound else "other")
 
 
 def unresolved_word(word):
@@ -178,39 +248,63 @@ def is_risky(text):
 class Word(str):
     """A shell word after quote removal. `masked` is the same text with every
     quoted or escaped character replaced by NUL, so the unquoted (expandable)
-    characters can be examined."""
+    characters can be examined. `live` keeps double-quoted characters too
+    (bash still expands them); `split` is True when the word is built from
+    several quoted parts or a quoted part next to unquoted text."""
     masked = ""
+    live = ""
+    split = False
 
 
 class Op(str):
     """A run of unquoted operator characters."""
 
 
+class Toks(list):
+    """The tokens plus two views of the whole text, same length as the input
+    minus comments and line continuations: `unquoted` has every quoted or
+    escaped character replaced by NUL (a comment keeps only its '#'); `live`
+    additionally keeps double-quoted characters, which bash still expands."""
+    unquoted = ""
+    live = ""
+
+
 def tokens(text):
     """POSIX-ish lexer: quotes, backslash escapes, backslash-newline joins
     (as bash does), '#' comments only at the start of a word, and runs of
     ;&|<>() as operators. Raises ValueError on unbalanced quotes."""
-    out, val, mask, started = [], [], [], False
+    out, val, mask, started = Toks(), [], [], False
+    wlive, nquote, plain = [], 0, False
+    unq, live = [], []
     i, n = 0, len(text)
 
-    def add(ch, quoted):
+    def add(ch, quoted, lv):
+        nonlocal plain
         val.append(ch)
         mask.append("\0" if quoted else ch)
+        wlive.append(lv)
+        plain |= not quoted
 
     def flush():
-        nonlocal val, mask, started
+        nonlocal val, mask, started, wlive, nquote, plain
         if started:
             w = Word("".join(val))
             w.masked = "".join(mask)
+            w.live = "".join(wlive)
+            w.split = nquote >= 2 or (nquote == 1 and plain)
             out.append(w)
         val, mask, started = [], [], False
+        wlive, nquote, plain = [], 0, False
 
     while i < n:
         c = text[i]
         if c in " \t\r":
             flush()
+            unq.append(c)
+            live.append(c)
             i += 1
         elif c == "#" and not started:
+            unq.append("#")
             while i < n and text[i] != "\n":
                 i += 1
         elif c in PUNCT:
@@ -219,6 +313,8 @@ def tokens(text):
             while j < n and text[j] in PUNCT:
                 j += 1
             out.append(Op(text[i:j]))
+            unq.append(text[i:j])
+            live.append(text[i:j])
             i = j
         elif c == "\\":
             if i + 1 < n and text[i + 1] == "\n":
@@ -226,38 +322,75 @@ def tokens(text):
                 continue
             started = True
             if i + 1 < n:
-                add(text[i + 1], True)
+                add(text[i + 1], True, "\0")
+            unq.append("\0" * min(2, n - i))
+            live.append("\0" * min(2, n - i))
             i += 2
         elif c == "'":
             j = text.find("'", i + 1)
             if j < 0:
                 raise ValueError("unbalanced single quote")
             started = True
+            nquote += 1
             for ch in text[i + 1:j]:
-                add(ch, True)
+                add(ch, True, "\0")
+            unq.append("\0" * (j + 1 - i))
+            live.append("\0" * (j + 1 - i))  # nothing expands in single quotes
             i = j + 1
         elif c == '"':
             started = True
+            nquote += 1
             j = i + 1
+            unq.append("\0")
+            live.append("\0")
             while True:
                 if j >= n:
                     raise ValueError("unbalanced double quote")
                 ch = text[j]
                 if ch == "\\" and j + 1 < n and text[j + 1] in '$`"\\\n':
                     if text[j + 1] != "\n":
-                        add(text[j + 1], True)
+                        add(text[j + 1], True, "\0")
+                    unq.append("\0\0")
+                    live.append("\0\0")
                     j += 2
                 elif ch == '"':
+                    unq.append("\0")
+                    live.append("\0")
                     break
                 else:
-                    add(ch, True)
+                    add(ch, True, ch)
+                    unq.append("\0")
+                    live.append(ch)
                     j += 1
+            i = j + 1
+        elif c in "@+?*!" and text[i + 1:i + 2] == "(":
+            # extglob group: one opaque word, so its '|' and ')' are not
+            # read as operators (it is unquoted, so globby() sees it).
+            depth, j = 0, i + 1
+            while j < n:
+                if text[j] == "(":
+                    depth += 1
+                elif text[j] == ")":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                j += 1
+            if j >= n:
+                raise ValueError("unbalanced extglob group")
+            started = True
+            for ch in text[i:j + 1]:
+                add(ch, False, ch)
+            unq.append(text[i:j + 1])
+            live.append(text[i:j + 1])
             i = j + 1
         else:
             started = True
-            add(c, False)
+            add(c, False, c)
+            unq.append(c)
+            live.append(c)
             i += 1
     flush()
+    out.unquoted, out.live = "".join(unq), "".join(live)
     return out
 
 
@@ -282,21 +415,25 @@ class Parsed:
     def __init__(self, toks):
         self.segments = []
         self.pipe = self.redirect = self.heredoc = False
-        seg, skip = [], False
+        # Per segment: (its output is piped onwards, it has a redirection).
+        self.flow = []
+        seg, skip, seg_redirect = [], False, False
         for t in toks:
             if isinstance(t, Op):
                 for op in split_ops(t):
                     if "<" in op or ">" in op:
-                        self.redirect = True
+                        self.redirect = seg_redirect = True
                         self.heredoc |= op in HEREDOC_OPS
                         if seg and seg[-1].isdigit():
                             seg.pop()
                         skip = True
                         continue
-                    self.pipe |= op in ("|", "|&")
+                    piped = op in ("|", "|&")
+                    self.pipe |= piped
                     if seg:
                         self.segments.append(seg)
-                    seg = []
+                        self.flow.append((piped, seg_redirect))
+                    seg, seg_redirect = [], False
                 continue
             if skip:
                 skip = False
@@ -304,6 +441,7 @@ class Parsed:
             seg.append(t)
         if seg:
             self.segments.append(seg)
+            self.flow.append((False, seg_redirect))
 
 
 ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
@@ -423,7 +561,7 @@ def check_git(args, assigns, cwd, form, strict, allowed):
     for a in assigns:
         if a.startswith(("GIT_", "PATH=")):
             raise Block(PUSH, None, "GIT_*/PATH environment overrides on git are not allowed for workers", form)
-    cfg_c, aliases_c, bad_globals = [], {}, False
+    cfg_c, aliases_c, bad_globals, cwd_unknown = [], {}, False, False
     i = 0
     while i < len(args) and args[i].startswith("-"):
         a = args[i]
@@ -431,9 +569,12 @@ def check_git(args, assigns, cwd, form, strict, allowed):
         if has_expansion(a):
             raise unresolved("unresolved git option", form)
         if a == "-C" and nxt:
-            if has_expansion(nxt):
-                raise unresolved("unresolved git -C directory", form)
-            cwd = resolve(cwd, nxt)
+            # $VAR, `cmd`, a glob or a brace group: the directory is not
+            # known here, which only matters to a push or an alias lookup.
+            if has_expansion(nxt) or globby(nxt):
+                cwd_unknown = True
+            else:
+                cwd = resolve(cwd, nxt)
             if form in ("plain", "other"):
                 form = "git-C"
             i += 2
@@ -466,6 +607,8 @@ def check_git(args, assigns, cwd, form, strict, allowed):
 
     if sub in GIT_PUSHERS:
         raise Block(PUSH, None, f"git {sub} can push and is not allowed for workers", form)
+    if cwd_unknown and (sub == "push" or (sub not in GIT_SAFE and sub not in aliases_c)):
+        raise unresolved(f"git {sub} in an unresolved git -C directory", form)
     if sub not in GIT_SAFE:
         alias = aliases_c.get(sub)
         if alias is None:
@@ -674,6 +817,9 @@ def check_gh_api(args, cwd, form, strict):
         i += 1
     path = paths[0] if paths else ""
     write = method in ("POST", "PUT", "PATCH", "DELETE") or (method is None and (fields or has_input))
+    # gh fills {branch} with the current branch, which may be the default one.
+    if write and any("{branch}" in a for a in args):
+        raise unresolved("gh api write with the {branch} placeholder (it may be the default branch)", form)
     defaults = default_branches(cwd)
     fkv = {}
     for f in fields:
@@ -694,6 +840,8 @@ def check_gh_api(args, cwd, form, strict):
     if re.search(r"(^|/)merges\b", path):
         raise Block(GH_API, None, "the repository merges API is not allowed for workers", form)
     if path.strip("/") == "graphql":
+        if re.search(r"\bmutation\b", " ".join(fields), re.I):
+            raise Block(GH_API, None, "graphql mutations are not allowed for workers", form)
         if has_input or any(v.startswith("@") for v in fkv.values()):
             raise Block(GH_API, None, "a graphql body from a file is not allowed for workers", form)
         if GH_GRAPHQL_MUTATIONS.search(" ".join(fields)):
@@ -713,32 +861,33 @@ def check_gh_api(args, cwd, form, strict):
 
 def analyse(text, cwd, allowed):
     risky = is_risky(text)
-    if not risky and not re.search(r"git|gh", dequote(text)):
-        return
     try:
         toks = tokens(text)
     except ValueError:
         if risky:
             raise unresolved("unparseable git/gh command")
         return
-    if re.search(r"[@+?*!]\(", text):
-        # extglob pattern syntax: unresolvable whatever the shell options are
-        raise unresolved("extglob pattern in a git/gh command")
     parsed = Parsed(toks)
     segs = parsed.segments
     compound = len(segs) > 1
+    check_command_words(segs)
+    if not risky and not re.search(r"git|gh", dequote(text)):
+        return
 
     if risky:
-        if "$" in text or "`" in text:
+        # Quote-aware: single-quoted text is inert, double-quoted text still
+        # expands $ and backticks; quoted '#', '(' and the like are plain text.
+        if "$" in toks.live or "`" in toks.live:
             raise unresolved("$ or backtick expansion", "compound" if compound else "other")
-        if UNRESOLVED_CHARS.search(GROUP_BRACE.sub("", text)) or "\\\n" in text:
-            raise unresolved("brace, glob, comment or line continuation", "compound" if compound else "other")
-        if "<(" in text or ">(" in text or parsed.heredoc:
+        if "#" in toks.unquoted or "\\\n" in text:
+            raise unresolved("comment or line continuation", "compound" if compound else "other")
+        if "<(" in toks.unquoted or ">(" in toks.unquoted or parsed.heredoc:
             raise unresolved("process substitution or here-document", "sh-c")
-        if re.search(r"(^|[\s;&|(){}])function\s", text) or re.search(r"[\w.-]\s*\(\s*\)", text):
+        if (re.search(r"(^|[\s;&|(){}])function\s", toks.unquoted)
+                or re.search(r"[\w.-]\s*\(\s*\)", toks.unquoted)):
             raise unresolved("function definition", "sh-c")
 
-    for seg in segs:
+    for n, seg in enumerate(segs):
         argv, assigns, wrapped = strip_wrappers(seg)
         if not argv:
             if risky and any(a.startswith(("GIT_", "PATH=")) for a in assigns):
@@ -759,14 +908,18 @@ def analyse(text, cwd, allowed):
                 raise unresolved(f"'{base}' in a command that pushes or merges", "sh-c")
             if tool is None and base in ("git", "gh"):
                 raise unresolved(f"untrusted {base} path", form)
+            if opaque_command_word(argv0):
+                raise unresolved("a glob or brace expansion in the command word", form)
             if tool is None and RISK_WORDS.search(dequote(" ".join(seg))):
                 inert = base in INERT and not parsed.pipe and not parsed.redirect
-                if not inert and base not in ("cd", "pushd"):
+                piped, redirected = parsed.flow[n]
+                data_only = (argv0 in DATA_ONLY and not assigns and not piped and not redirected)
+                if not inert and not data_only and base not in ("cd", "pushd"):
                     raise unresolved(f"'{base}' mentions push/merge and is not a plain git/gh command", form)
 
         if tool is None and base in ("cd", "pushd"):
             target = next((a for a in argv[1:] if not a.startswith("-")), "~")
-            if has_expansion(target):
+            if has_expansion(target) or globby(target):
                 if risky:
                     raise unresolved("unresolved cd target")
                 continue

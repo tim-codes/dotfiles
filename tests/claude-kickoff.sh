@@ -24,6 +24,16 @@ YQ_REAL="$(command -v yq || true)"
 # The tmux marker resolves tier aliases with jq; the stub PATH needs it too.
 JQ_REAL="$(command -v jq || true)"
 [ -n "$JQ_REAL" ] && ln -s "$JQ_REAL" "$BIN/jq"
+# Folder trust: a launch records or checks trust in the context's .claude.json. Every
+# fake context dir carries a minimal one trusting the directories this test launches
+# in, so the default path (`trust: ok`, nothing written) is what is exercised. The
+# dirs are real paths, as Claude Code keys `projects`.
+mkdir -p "$FAKE/claude"
+FAKE_REAL="$(cd "$FAKE" && pwd -P)"
+TRUSTED_JSON=$(jq -n --arg h "$FAKE_REAL" '{projects: ([$h + "/work/proj", $h + "/work/other", $h + "/dev/grp/named", $h + "/dev/shallow", $h + "/claude"] | map({key: ., value: {hasTrustDialogAccepted: true}}) | from_entries)}')
+for d in .claude-exxo .claude-exxo-openrouter .claude-exxo-personal .claude-personal .claude-lab; do
+    printf '%s\n' "$TRUSTED_JSON" >"$FAKE/$d/.claude.json"
+done
 # Tests read the repo's contexts file unless a case sets its own.
 REPO_CONTEXTS="$SRC_REPO/src/.config/claude-kickoff/contexts.toml"
 export CLAUDE_KICKOFF_CONTEXTS="$REPO_CONTEXTS"
@@ -89,6 +99,7 @@ check "dry-run resolves context to the exxo dir" has "config_dir: $FAKE/.claude-
 check "dry-run prints mode, model, effort" [ "$(printf '%s\n' "$out" | grep -cx -e 'mode: new' -e 'model: opus' -e 'effort: high')" -eq 3 ]
 check "dry-run prints the cwd" has "cwd: $(cd "$W" && pwd -P)"
 check "dry-run prints body size, not the body" bash -c '! printf "%s" "$1" | grep -q "Do the thing" && printf "%s" "$1" | grep -q "^body_bytes: [1-9]"' _ "$out"
+check "dry-run reports the cwd as trusted (the default check ran)" has "trust: ok $(cd "$W" && pwd -P) in exxo"
 kick "$T/yaml.md" --dry-run
 check "--- opened form dry-run exits 0" [ "$rc" -eq 0 ]
 check "~ in cwd is expanded against HOME" has "cwd: $(cd "$W" && pwd -P)"
@@ -106,7 +117,7 @@ kick "$T/fixture.md" --resume abc --account exxo-personal --cwd "$W" --dry-run
 check "--resume with --account targets that dir" has "config_dir: $FAKE/.claude-exxo-personal"
 
 # --- real exec of the stub ---
-kick "$T/fixture.md"
+kick "$T/fixture.md" --no-member-deny
 check "new launch exits 0 (stub)" [ "$rc" -eq 0 ]
 rec=$(cat "$REC" 2>/dev/null)
 check "new launch argv is --model M --effort E <body> in that order" \
@@ -120,7 +131,7 @@ check "claude started in the prompt cwd" bash -c 'printf "%s\n" "$1" | grep -qx 
 out=$(HOME="$FAKE" PATH="$BIN:/usr/bin:/bin" REC="$REC" EXXO_SECRET_CACHE_TTL_SECONDS=60 "$KICK" "$T/fixture.md" 2>&1)
 check "a caller-set TTL is respected" bash -c 'grep -qx "TTL=60" "$1"' _ "$REC"
 
-kick "$T/fixture.md" --resume sess-1 --account exxo-personal --cwd "$W"
+kick "$T/fixture.md" --resume sess-1 --account exxo-personal --cwd "$W" --no-member-deny
 check "resume launch exits 0 (stub)" [ "$rc" -eq 0 ]
 rec=$(cat "$REC")
 check "resume argv is --resume ID --model M --effort E, then the relaunch note" \
@@ -298,7 +309,7 @@ cat >"$BIN/claude" <<'EOF'
 #!/bin/bash
 for a in "$@"; do printf 'arg<%s>\n' "$a"; done >"$REC"
 EOF
-kick "$T/adddirs.md"
+kick "$T/adddirs.md" --no-member-deny
 check "add_dirs become --add-dir flags, in order, before --model" bash -c '[ "$(sed -n 1,6p "$1" | tr "\n" " ")" = "arg<--add-dir> arg<$2/briefs> arg<--add-dir> arg<$2/reports> arg<--model> arg<opus> " ]' _ "$REC" "$FAKE"
 kick "$T/adddirs.md" --resume s1 --account exxo --cwd "$W"
 check "add_dirs also apply on resume" bash -c 'grep -qx "arg<--add-dir>" "$1" && grep -qx "arg<--resume>" "$1"' _ "$REC"
@@ -309,7 +320,7 @@ has "nowhere" && ok "  message names the path" || bad "  message: $out"
 sed 's|^model: .*|&\ndeny: Bash(curl:*), WebFetch(domain:localhost)|' "$T/fixture.md" >"$T/deny.md"
 kick "$T/deny.md" --dry-run
 check "deny is echoed" has "deny: Bash(curl:*), WebFetch(domain:localhost)"
-kick "$T/deny.md"
+kick "$T/deny.md" --no-member-deny
 check "deny rules become --disallowedTools flags, before --model" bash -c '[ "$(sed -n 1,5p "$1" | tr "\n" " ")" = "arg<--disallowedTools> arg<Bash(curl:*)> arg<--disallowedTools> arg<WebFetch(domain:localhost)> arg<--model> " ]' _ "$REC"
 kick "$T/nokeys.md" --dry-run
 check "deny defaults to none" has "deny: none"
@@ -385,7 +396,7 @@ cat >"$BIN/claude" <<'EOF'
   echo "PWD=$(pwd -P)"
 } >"$REC"
 EOF
-kick "$T/rcwd.md" --resume sess-9 --cwd "$FAKE/work/other" --account exxo
+kick "$T/rcwd.md" --resume sess-9 --cwd "$FAKE/work/other" --account exxo --no-member-deny
 check "resume launch exits 0 with explicit cwd (stub)" [ "$rc" -eq 0 ]
 rec=$(cat "$REC")
 check "resume argv is --resume ID --model M --effort E <note>" bash -c '
@@ -415,7 +426,7 @@ fish_env() { grep -m1 'for v in ANTHROPIC_BASE_URL' "$FISH" | sed 's/^ *for v in
 check "drift guard: OPENROUTER_ENV is non-empty" [ -n "$(want_env)" ]
 check "drift guard: OPENROUTER_ENV equals the scrub list in __claude_ctx" [ "$(want_env)" = "$(fish_env)" ]
 
-rmdir "$FAKE/.claude-personal"
+rm -rf "$FAKE/.claude-personal"
 expect_rc "missing config dir" 6 "$T/yaml.md" --dry-run
 mkdir -p "$T/yqbin"; ln -s "$YQ_REAL" "$T/yqbin/yq"
 HOME="$FAKE" PATH="$T/yqbin:/usr/bin:/bin" "$KICK" "$T/fixture.md" --dry-run >/dev/null 2>&1; rc=$?
@@ -491,6 +502,15 @@ if [ -d "$FIXTURES" ] && [ -d "$REAL_HOME/.claude-exxo" ] && [ -d "$REAL_HOME/de
 else
     echo "skip: no fixtures at $FIXTURES (or ~/.claude-exxo / ~/dev missing)"
 fi
+
+# the trusted fixtures meant no launch or dry-run ever had to record trust
+# shellcheck disable=SC2329 # run through check
+trust_files_pristine() {
+    [ -z "$(find "$FAKE" -name '.claude.json.*')" ] || return 1
+    local f
+    for f in "$FAKE"/.claude-*/.claude.json; do [ "$(cat "$f")" = "$TRUSTED_JSON" ] || return 1; done
+}
+check "no launch wrote a trust file or took a backup" trust_files_pristine
 
 [ "$fail" -eq 0 ] && echo "all claude-kickoff tests passed" || echo "claude-kickoff tests FAILED"
 exit "$fail"

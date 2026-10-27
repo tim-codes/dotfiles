@@ -304,6 +304,179 @@ job|gh workflow list
 job|git log --grep='[Ff]ix'
 TABLE
 
+# --- guard.jsonl 2026-10-25: commands blocked as `unparseable` that were fine ---
+# The twelve real commands K3 workers ran (09:48Z-12:32Z), with paths, hashes
+# and worktree names replaced by placeholders. The causes: quoted regex and
+# glob characters in a grep/git argument, a variable git -C directory, braces
+# in a commit message, and a risk word inside the data of a non-git command.
+expect allow job "cd . && git push -u origin job/j4 2>&1 | tail -3; git diff -U0 abc1234...HEAD | grep -E '^-[^-].*(assert|expect|toBe|toEqual|should|== )' || echo NONE"
+expect allow job "git -C . diff -U0 abc1234...HEAD | grep -E '^-[^-].*(assert|expect|toBe|toEqual|should|== )' || echo NONE"
+expect allow job 'wt=/tmp/placeholder-wt; git -C $wt rev-parse HEAD; ls $wt/node_modules 2>/dev/null | head -2 || echo "node_modules missing"'
+expect allow job 'cd . && cat tsconfig.json | head -30; echo "=== runner in workspace but needed? ==="; grep -rn "runner" backend.Dockerfile build-backend-docker.mjs .dockerignore 2>/dev/null | head -5; echo "=== comment wording check ==="; git show 80afd803 | grep -E "^\+.*(color|ize\b|behavior)" || echo "spelling ok"'
+expect allow job 'cd . && cat tsconfig.json | head -30; echo "=== runner needed? ==="; grep -n "runner" backend.Dockerfile build-backend-docker.mjs .dockerignore; echo "=== spelling ==="; git show 80afd803 | grep -E "^\+.*(color|behavior|normalize|initialize)" || echo "spelling ok"'
+expect allow job "cd . && git diff -U0 abc1234...HEAD | grep -E '^-[^-].*(assert|expect|toBe|toEqual|should|== )' ; echo \"grep exit: \$?\""
+expect allow job "git -C . diff -U0 abc1234 HEAD -- '*test*' | grep -E '^-[^-].*(assert|expect|toBe|toEqual|toMatchObject|rejects)' || echo NONE"
+expect allow job "cd . && git diff -U0 abc1234...HEAD > /tmp/placeholder.diff && grep -E '^-[^-].*(assert|expect|toBe|toEqual|should|== )' /tmp/placeholder.diff; echo \"exit: \$?\""
+J14_MSG="$(cat <<'MSG'
+cd . && git commit --amend -m "fix(api): harden migration claims and the backfill (ENG-000)
+
+A stale claim taken over by another boot could still be finished or
+released by the slow original instance: claim now returns the claim's
+startedAt, and both writes filter on {_id, startedAt}; an unmatched
+finish logs a warn and does not mark applied.
+
+New appendOnce(scope, event, {contactId, type, source}) appends only
+when no matching row exists.
+
+Co-Authored-By: Claude Code <noreply@example.invalid>" && git push -u origin job/j14 2>&1 | tail -3
+MSG
+)"
+expect allow job "$J14_MSG"
+expect allow job "git -C . diff -U0 abc1234...HEAD | grep -E '^-[^-].*(assert|expect|toBe|toEqual|should|== )' || echo \"NO_REMOVED_ASSERTIONS\""
+expect allow job 'squad set --name k3-w3 --status done --detail "stopped: K3 pool retired for round 3 (herder, 12:31Z); j4/j8 all reported ok with branches pushed; nothing in flight"'
+expect allow job 'squad set --name k3-w3 --status done --detail "stopped: K3 pool retired for round 3; j4 j8 all reported ok, branches pushed; nothing in flight"'
+
+# git -C with a directory that is spelled, not resolved: quoted, $VAR, ~, glob.
+while IFS='|' read -r key cmd; do
+    [ -z "$key" ] && continue
+    expect allow "$key" "$cmd"
+done <<'TABLE'
+job|git -C "$dir" status
+job|git -C $dir log --oneline -5
+job|git -C "$dir/sub" diff --stat
+job|git -C ~ status
+job|git -C ~/placeholder-dir status
+job|git -C 'sub' status
+job|git -C "$dir" fetch origin main
+job|git -C "$dir" log --grep=fix -- 'src/*.ts'
+job|dir=sub; git -C "$dir" status && gh pr view 1
+job|git -C src/* status
+TABLE
+
+# Brace, glob and extglob tokens are opaque arguments to a read-only git/gh,
+# also in a command that mentions push/merge; they stay unresolved wherever
+# the command can push, merge or start a workflow.
+while IFS='|' read -r key cmd; do
+    [ -z "$key" ] && continue
+    expect allow "$key" "$cmd"
+done <<'TABLE'
+job|git log --grep=push -- src/*.ts
+job|git log --grep=merge -- src/{a,b}.ts
+job|git diff main...HEAD -- !(vendor)
+job|git log --grep=merge --format=%h -- ?.md
+job|git log --oneline -- [ab].md && git push origin job/x
+job|gh api graphql -f query='{ repository(owner:"o", name:"r") { pullRequests(first:5) { nodes { title } } } }'
+job|gh pr view 1 --json title,number -q '.[] | select(.title|test("merge"))'
+job|gh pr list --search 'merge in:title' --json number,title
+job|git log --grep='merge' -- 'src/{a,b}.ts'
+job|git status; git log --grep=push -- *.md; git push origin job/x
+job|git push origin job/x 2>&1 | grep -E 'ok$'
+TABLE
+
+# A plain command classified by its first word: a risk word in the data of
+# squad or grep (not piped onwards, not redirected) is not a git/gh call.
+while IFS='|' read -r key cmd; do
+    [ -z "$key" ] && continue
+    expect allow "$key" "$cmd"
+done <<'TABLE'
+job|squad set --name w --status done --detail "git pushed job/x; merge main later"
+job|git push origin job/x 2>&1 | tail -3; squad set --name w --detail "pushed"
+job|git log --oneline | grep -i merge
+job|git log --oneline | grep -iE "push|merge" ; echo done
+job|grep -rn "git push" scripts
+TABLE
+
+# ...and none of that is a way past the rules.
+while IFS='|' read -r key cmd; do
+    [ -z "$key" ] && continue
+    expect deny "$key" "$cmd"
+done <<'TABLE'
+job|git -C "$dir" push origin main
+job|git -C "$dir" log --grep=push
+job|gh api -X PUT repos/o/r/contents/f.txt -f message=m -f content=eA== -f branch={branch}
+job|gh api graphql -f query='mutation { closeIssue(input:{issueId:"x"}) { clientMutationId } }'
+job|git -C "$dir" push origin job/x
+job|git -C $dir push
+job|git -C "$dir" p
+job|git -C "$dir" push origin HEAD:main
+job|git -C {a,b} push origin job/x
+job|{git,push} origin main
+job|git {push,} origin main
+job|cd {a,b} && git push origin job/x
+job|cd src/* && git push origin job/x
+job|git push origin !(main)
+job|git push origin job/@(x|y)
+job|git push origin HEAD:ma*
+job|git log | grep merge | bash
+job|git log | grep merge | ./run.sh
+job|grep merge f > out; git push origin main
+job|squad set --detail "git pushed" | ./run.sh
+job|squad set --detail "git pushed" > out
+job|PATH=/tmp squad set --detail "git pushed"
+job|./squad set --detail "git pushed"
+job|/tmp/squad set --detail "git pushed"
+job|make git-push
+job|echo y | git push origin main
+job|git push origin job/x "$(echo main)"
+job|git push origin HEAD:'main' # job/x
+job|git log -- 'a#b'; git push origin HEAD:main
+job|git push origin job/x 2>&1 | grep -E 'ok$' ; git push origin main
+job|squad set --detail 'pushed'; git push origin main
+job|git push origin job/x --force-with-lease=$X
+TABLE
+
+# Command words built at run time (brace expansion, quote-splitting, live
+# $/backtick) reach the shell as git/gh/... but never contain the literal
+# word the risk check looks for, so any such command word is unparseable.
+while IFS='|' read -r key cmd; do
+    [ -z "$key" ] && continue
+    expect deny "$key" "$cmd"
+done <<'TABLE'
+job|g{it,} push origin main
+job|gi{t} push origin main
+job|{git,true} push origin main
+job|g''it push origin main
+job|"gi"t push origin main
+job|'g'"it" push origin main
+job|true && g{it,} push origin main
+job|nohup g{it,} push origin main
+job|env g{it,} push origin main
+job|exec g{it,} push origin main
+job|xargs -n1 g{it,} push
+job|"$tool" push origin main
+job|$tool push origin main
+job|${tool} push origin main
+job|`echo git` push origin main
+job|r{m,} -rf /
+job|c{url,} -X PUT https://example.invalid
+job|/usr/bin/gi[t] push origin main
+job|/usr/bin/gi? push origin main
+TABLE
+
+# ...while braces and globs as ARGUMENTS to a read-only git/gh, a bare test
+# command and { cmd; } grouping are not command words and stay as they were.
+while IFS='|' read -r key cmd; do
+    [ -z "$key" ] && continue
+    expect allow "$key" "$cmd"
+done <<'TABLE'
+job|git log --format='{%h}'
+job|git diff -- 'src/{a,b}.ts'
+job|{ git status; }
+job|[ -f README.md ] && git status
+job|[[ -f README.md ]] && git status
+job|echo {a,b}
+job|"git" status
+job|\git status
+TABLE
+
+# The reason names the construct.
+reason="$(jq -n --arg d "$T/job-clone" '{cwd:$d, tool_name:"Bash", tool_input:{command:"g{it,} push origin main"}}' \
+    | "$GUARD" 2>/dev/null | jq -r '.hookSpecificOutput.permissionDecisionReason // empty')"
+if grep -q 'brace expansion' <<<"$reason"; then ok "brace-built command word: reason names the construct"; else bad "brace reason: '$reason'"; fi
+reason="$(jq -n --arg d "$T/job-clone" '{cwd:$d, tool_name:"Bash", tool_input:{command:"g\u0027\u0027it push origin main"}}' \
+    | "$GUARD" 2>/dev/null | jq -r '.hookSpecificOutput.permissionDecisionReason // empty')"
+if grep -q 'quote-splitting' <<<"$reason"; then ok "quote-split command word: reason names the construct"; else bad "quote reason: '$reason'"; fi
+
 # --- Non-Bash tool ---------------------------------------------------------
 got="$(run_guard "$T/job-clone" "gh pr merge 1" Write)"
 if [ "$got" = allow ]; then ok "non-Bash tool passes"; else bad "non-Bash tool: got $got"; fi
