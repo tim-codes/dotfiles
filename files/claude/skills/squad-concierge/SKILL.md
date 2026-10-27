@@ -109,21 +109,34 @@ sends the digests.
 
 ## 4. Operator items
 
+Every change goes through the `squad operator` CLI. Never patch the
+dashboard database or API directly; none is ever needed, and a CLI refusal
+goes to the orchestrator with its error line.
+
+When you show Tim an item (each id in a digest's `items`, or a question
+naming one), mark it presented in the same turn:
+```
+squad operator present <id> --name concierge
+```
+
 Tim's explicit choice of an option in chat (a bare "ok" is not a decision):
 ```
-squad operator decide <id> <option> --note "<Tim's words>" --name concierge
+squad operator decide <id> --decision "<the option he chose>" --ruling "Tim: <his words verbatim>" --name concierge
 ```
-(`--note-file <path>` for a long quote). The item stays open and the
-`operator.item` `decided` event drives the orchestrator's relay, so send
-nothing more.
+The item stays open and the `operator.item` `decided` event drives the
+orchestrator's relay, so send nothing more.
 
-Closing or reopening, **provisional pending squad69 Q3**, only when Tim has
-said it, one item at a time, never in a batch:
+Closing or reopening, only when Tim has said it, one item at a time, never
+in a batch:
 ```
 squad operator set <id> --status done|dropped|open --ruling "Tim: <his words verbatim>" --name concierge
 squad send orchestrator "Tim: done <id>" --from concierge
 ```
 `--ruling` is mandatory and carries his quoted word.
+
+**Denial items** (kind `denial`) are non-blocking: the orchestrator groups
+them into one digest line and the server drops them after 2 h. Present that
+line as sent; never put a denial to Tim as a question.
 
 ## 5. Presence
 

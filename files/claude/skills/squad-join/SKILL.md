@@ -769,12 +769,15 @@ worker follows §6c's test rules and caching discipline.
   things, in order. **Never retry** the denied command, not even narrowed or
   reworded. **Raise an operator item** (§6) with the exact command:
   ```
-  squad operator raise --id denied-<name>-<n> --kind action --blocking now|later \
+  squad operator raise --id denied-<name>-<n> --kind denial \
     --title "denied (permission|classifier|guard|keyhelper): <what it was for>" \
     --command '<the exact denied command>' --instructions-file <path|->
   ```
   `<n>` counts your denials, so the report can join items to transcript
-  denials. Put any long text in `--instructions-file`, never inline: a deny
+  denials. Denial items are non-blocking, grouped in the digest and dropped
+  after 2 h; when the denied step is one the stream needs and only Tim can
+  now do it, also raise an `action` item for it (`--id <name>-<slug> --kind
+  action --blocking now|later --command '<the command>'`). Put any long text in `--instructions-file`, never inline: a deny
   glob matches command words in prose, so inline text that quotes a denied
   command can itself be denied. Never ask for permissions or credentials in
   the text; they go in `--command` for Tim. Then **carry on** with other

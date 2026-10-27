@@ -481,11 +481,11 @@ The squad exists to cut human-in-the-loop (HITL) interruptions: members never
 prompt Tim, they send `operator_task` (fields in `squad-join` §6). The
 dashboard server (`:7780`) owns the queue (requires the dashboard server
 from PR S3). Preferred form: `squad operator raise|set|list` (requires the
-`squad operator` CLI, S4). Until S4 ships, use the API directly (S3 needed):
+`squad operator` CLI, S4; `raise --kind approval|action|denial|review|info`). Until S4 ships, use the API directly (S3 needed):
 ```
 # raise / replace (caller-chosen id; the server stamps raised_at and updated_at)
 curl -sS -X PUT http://127.0.0.1:7780/api/operator/items/<id> -H 'content-type: application/json' \
-  -d '{"stream":"<member>","title":"…","kind":"approval|action|info","blocking":"now|later","status":"open","instructions":"…","commands":["…"],"url":null,"draft_url":null,"after":null,"est_minutes":5}'
+  -d '{"stream":"<member>","title":"…","kind":"approval|action|denial|review|info","blocking":"now|later","status":"open","instructions":"…","commands":["…"],"url":null,"draft_url":null,"after":null,"est_minutes":5}'
 # change status / hand back (actor is mandatory)
 curl -sS -X PATCH http://127.0.0.1:7780/api/operator/items/<id> -H 'content-type: application/json' \
   -d '{"status":"ready","actor":"orchestrator"}'
@@ -522,9 +522,12 @@ changes by Tim or members.
   denies a raise whose text requests a grant or a secret; put the command
   Tim must run in `commands[]` instead. Long text goes through
   `--instructions-file`, never inline.
-- **Denial items**: a member's denied command arrives as an item with id
-  `denied-<member>-<n>` and a title starting `denied (permission|classifier|
-  guard|keyhelper): `. Never tell the member to retry the command; Tim
+- **Denial items**: a member's denied command arrives as a kind `denial`
+  item with id `denied-<member>-<n>` and a title starting `denied
+  (permission|classifier|guard|keyhelper): `. They are non-blocking: group
+  them as one digest line, never a question to Tim; the server drops them
+  after 2 h, and a denied step that needs Tim arrives as its own `action`
+  item. Never tell the member to retry the command; Tim
   decides, or you raise the missing rule for the dotfiles fragment. A
   relaunch in another context does not reset a classifier denial: the
   denied action stays with Tim for the round, and no member re-runs it from
