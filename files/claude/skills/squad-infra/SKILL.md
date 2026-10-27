@@ -222,7 +222,29 @@ his broad permission scope to fix or unblock a work stream), always with
 explicit targets. Record the action (worklog line, plus a CHANGELOG Impact
 entry when it touches state) and report `infra_result` with `manual: true`
 and the reason. Never wait for Tim where this authority covers the fix, and
-never use it to merge without `pr-merge`'s gate.
+never use it to merge without `pr-merge`'s gate. The one exception is
+the operator-only `exxo/gitops-bootstrap/main` stack (below): this authority
+does not reach it.
+
+**Operator-only stack: `exxo/gitops-bootstrap/main`** (`projects/gitops-bootstrap`
+in exxo-infra, listed in `OPERATOR_ONLY` in `scripts/affected-stacks.mjs`, so CI
+never applies it). It is the single home for the GitOps identities
+(`exxo-infra-deployer` / `exxo-infra-previewer` service accounts, the
+exxo-internal `github-actions` WIF pool) and all their grants. Tim applies it
+manually.
+- Never run `pulumi up`, `preview`, `state`, `import` or `refresh` against it
+  from a directive, whatever the PR or the manual authority above says.
+- A workload PR that needs a new deployer permission gets a bootstrap PR first,
+  which Tim applies before the workload PR merges.
+- When a workload PR's apply fails, or is expected to fail, because the deployer
+  lacks a permission, do not grant it or work around it (no direct `gcloud` or
+  IAM grant, no widening a workload stack). Send `infra_result` `blocked` with a
+  finding that the PR is blocked on a bootstrap change, naming the missing
+  role or permission if known, so the orchestrator escalates to Tim:
+  ```
+  squad send role:orchestrator "infra_result: blocked #<n>" --from infra \
+    --data '{"kind":"infra_result","status":"blocked","pr":<n>,"findings":["blocked on gitops-bootstrap change: deployer lacks <role/permission>"]}'
+  ```
 
 Self-cleanup: after each directive, and before pausing or ending, `TaskStop`
 finished subagents (the reviewer) and end any background shells you started. A `cleanup` directive means the
