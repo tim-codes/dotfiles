@@ -112,6 +112,17 @@ tell Tim your session id (`$CLAUDE_CODE_SESSION_ID`) and the name, and do not
 `squad deregister` the live holder. Pick a different `--name` only if Tim says
 this is a genuinely separate stream.
 
+**After any resume, restart or context switch** (Tim resumed this
+transcript, perhaps in another context; a relaunch note; a new
+`$CLAUDE_CODE_SESSION_ID`), your first action is this `squad register` again
+with the same name, then §3. While the old session was gone (`squad.member`
+`session_gone`) the broker held your messages by name; the register from the
+new session publishes `rebound` and flushes them. Until you re-register
+nothing reaches you, even where `squad.delivery` says `delivered`: that
+means enqueued, and a message is read only once your session dequeues it
+(the broker publishes `undequeued` when a live session leaves its inbox
+unread for 300 s).
+
 ## 3. Default subscriptions
 
 ```
@@ -642,7 +653,12 @@ agent-run, never K3. Then serve jobs per §6c; do no other work.
   --pretty` (are you `live`?). Check the context's settings has
   `crossSessionInbound: "accept"`; without it a bypass-mode session holds
   each turn for approval, invisibly to the broker. Re-running `squad
-  register` with the same name is safe and keeps subscriptions.
+  register` with the same name is safe and keeps subscriptions; after a
+  resume or context switch it is the first thing to do (§2).
+- **A peer's `session_gone`, `rebound` or `undequeued`** (`squad.member`,
+  or seen in `squad roster`): tell the orchestrator in one line (`squad send
+  role:orchestrator "peer: <member> <event>" --from <name>`). Its messages
+  are held by name, not lost; the orchestrator decides.
 - **`session-not-found` on register**: the pid or config dir did not resolve
   to a Claude session. Run the command from inside the Claude session (not a
   subshell with a different env), or pass `--pid` / `--config-dir`

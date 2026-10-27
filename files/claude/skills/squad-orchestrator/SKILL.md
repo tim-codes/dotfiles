@@ -829,6 +829,24 @@ topic (events `queued`, `assigned`, `started`, `unacked`, `requeued`,
 `finished`, `late_result`, `reviewed`; an escalation shows up as the operator
 item, not an event) is information for the decision log. From the herder: `launch_result`, `close_result` and `status_result` (reply to
 the matching directive, §1a), and the `herder.issue` topic (subscribed in §1).
+
+**Session liveness** (`squad.member`): `session_gone` means a member's bound
+session is dead and the broker holds its messages by name; `rebound` means a
+new session registered under the name and the queue was flushed;
+`undequeued` means a live session has left its inbox unread for 300 s. A
+`delivered` message is not read until it is dequeued. For a builder, ask the
+herder for `status`, then decide relaunch, close or wait (§1a); on
+`rebound`, re-send its stored `fanout` as on a rejoin (§2). **On the
+concierge it is urgent**: Tim's only channel is dark. Ask the herder for
+`status` at once, then reach Tim without the concierge (the no-route
+exception in "Talking to Tim"): raise an operator item `concierge-down`
+with `--blocking now` (the dashboard reaches his phone), naming the dead
+session and the fix (the concierge re-registers in its window, or a
+relaunch), and print one terminal line. A member reporting a peer's event
+gets the same handling. After your own resume, restart or context switch,
+re-run §1 step 2 first; your old row is `session_gone`, not live, so the
+singleton check passes.
+
 At session end: `squad deregister orchestrator`.
 
 ## 9. Debug mode (`--debug`)

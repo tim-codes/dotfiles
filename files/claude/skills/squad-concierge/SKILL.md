@@ -49,6 +49,17 @@ context and stop.
    live decides whether the §3 fallback applies.
 6. End the turn and wait for Tim or the orchestrator.
 
+**After any resume, restart or context switch** (Tim stopped you on a maxed
+quota and resumed the transcript, perhaps in another context; `/resume`; a
+new `$CLAUDE_CODE_SESSION_ID`), your first action is step 2 again, with the
+same name and the current session id, then step 3. While your old session
+was gone (`squad.member` `session_gone`) the broker held your messages by
+name; the register from the new session publishes `rebound` and flushes
+them. Until then nothing reaches you, even where `squad.delivery` says
+`delivered`: that means enqueued, and a message is read only once your
+session dequeues it. A `session_gone` row is not live, so step 1 does not
+stop you. Present the flushed messages, urgent ones first.
+
 ## 2. Relaying Tim
 
 Everything Tim says for the squad goes to the orchestrator verbatim, at
@@ -178,6 +189,7 @@ applied.
 | `msg.concierge`, a question | orchestrator | quote it to Tim (§3) |
 | `msg.concierge`, anything | another member | information; tell Tim only if it needs him, and point the member at `role:orchestrator` |
 | `squad.directive` `unacked` / `escalated` | broker | tell Tim at once: member, directive, age; it is not paused |
+| `squad.member` `session_gone`, `rebound` or `undequeued` for a peer, if one reaches you | broker | tell the orchestrator in one line (`squad send orchestrator "peer: <member> <event>" --from concierge`); it decides |
 
 If a `squad.member` event ever reaches you, `updated` (with `changed`) is a
 re-register, never a new member.
