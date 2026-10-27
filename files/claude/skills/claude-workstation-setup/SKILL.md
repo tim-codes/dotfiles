@@ -152,6 +152,22 @@ K3 facts (as of build): 1,048,576 context, $0.239 per M input, $10.80 per M
 output; K3.1-pro is a later trial. Model ids carry no `[1m]` suffix yet
 (ruling R-C7), and a smoke row tests that.
 
+### The member deny overlay (`claude-kickoff`)
+
+Squad members launched by `scripts/claude-kickoff` (the herder's only launcher)
+get `--settings files/claude/settings.member-deny.json` on every launch, new or
+`--resume`, any role: a deny-only file (`permissions.deny`) that adds raw
+`gh pr merge` and `gh api ... merge` rules (`Bash(gh pr merge*)`, `Bash(* gh pr
+merge*)`, `Bash(gh * pr merge*)`, `Bash(* gh * pr merge*)`, `Bash(gh api
+*merge*)`, `Bash(* gh api *merge*)`) to the context's merged deny set, so members
+merge only through `squad-pr-merge` (tim-codes/squad#102, fix 8b). It is not a
+context overlay: claude-sync never merges it, it is read from the repo at launch
+(the path is resolved through the `src/bin` symlink), and Tim's own sessions
+through the fish wrappers never get it. `claude-kickoff --no-member-deny` skips
+it for an attended launch; a missing or invalid file refuses the launch (exit
+6). `tests/claude-kickoff-member-deny.sh` covers it. The K3 workers keep their
+own rule and guard above.
+
 ## Repo config: conventions skill, audit script, SessionStart hook
 
 Three artefacts keep every repo's own Claude config in line with the global

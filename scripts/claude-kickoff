@@ -8,6 +8,7 @@
 #   claude-kickoff <prompt.md> [--account CONTEXT]
 #                              [--resume <session_id> --cwd <dir>] [--dry-run]
 #                              [--trust | --no-trust] [--no-trust-check]
+#                              [--no-member-deny]
 #   claude-kickoff --check-trust <cwd> --account CONTEXT
 #
 # The context wrappers (claude-personal, claude-exxo, claude-exxo-personal,
@@ -67,6 +68,7 @@ usage() {
 Usage: claude-kickoff <prompt.md> [--account CONTEXT]
                                   [--resume <session_id> --cwd <dir>] [--dry-run]
                                   [--trust | --no-trust] [--no-trust-check]
+                                  [--no-member-deny]
        claude-kickoff --check-trust <cwd> --account CONTEXT
 
 Reads the frontmatter of <prompt.md>, changes to its cwd and execs claude in the
@@ -130,6 +132,13 @@ Options:
                   skip the folder-trust step altogether, check and record (attended
                   launch, where the human can answer the dialog); beats --trust and
                   --no-trust. Also honoured as CLAUDE_KICKOFF_NO_TRUST_CHECK=1.
+  --no-member-deny
+                  skip the member deny overlay. By default every launch passes
+                  `--settings <repo>/files/claude/settings.member-deny.json`, which
+                  denies raw `gh pr merge` (and `gh api ... merge`) for the session,
+                  so members merge only through squad-pr-merge. Use it for an
+                  attended launch. --dry-run prints `member_deny: <path>` and
+                  `member_deny_rules: <rules>`, or `member_deny: off`.
   --check-trust DIR
                   only check whether DIR is trusted in the --account context; no
                   prompt file. Prints `trust: ok <path> in <context>` and exits 0, or
@@ -160,7 +169,8 @@ Exit codes (stable):
   5   invalid value: unknown context, a harness other than the context's, an unknown
       role or lifetime, or cwd that does not resolve to one directory
   6   the context's config dir (run scripts/claude-contexts) or the contexts file
-      does not exist
+      does not exist; or the member deny overlay is missing or not valid JSON
+      (pass --no-member-deny to launch without it)
   7   the claude binary, or yq, is not on PATH
   8   a context precondition failed (the message names the command, never its output)
   9   an `account_bound` need is not provided by the context
@@ -180,7 +190,7 @@ die() { # die <code> <message...>
     exit "$code"
 }
 
-prompt="" account="" resume="" resume_cwd="" dry=0 check_trust="" trust_check=1 trust_mode=record
+prompt="" account="" resume="" resume_cwd="" dry=0 check_trust="" trust_check=1 trust_mode=record member_deny=1
 [ "${CLAUDE_KICKOFF_NO_TRUST_CHECK:-}" = 1 ] && trust_check=0
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -201,6 +211,7 @@ while [ $# -gt 0 ]; do
         --no-trust-check) trust_check=0; shift ;;
         --trust) trust_mode=record; shift ;;
         --no-trust) trust_mode=refuse; shift ;;
+        --no-member-deny) member_deny=0; shift ;;
         --check-trust)
             [ $# -ge 2 ] || die 2 "--check-trust needs a directory"
             check_trust="$2"; shift 2 ;;
@@ -474,6 +485,21 @@ claude_bin=$(command -v claude 2>/dev/null || true)
 if [ -z "$claude_bin" ] && [ -x "$HOME/.local/bin/claude" ]; then claude_bin="$HOME/.local/bin/claude"; fi
 [ -n "$claude_bin" ] || die 7 "claude is not on PATH (nor in ~/.local/bin)"
 
+# --- member deny overlay: committed in this repo, found through the real script path
+member_deny_file="" member_deny_rules="" member_deny_args=()
+if [ "$member_deny" -eq 1 ]; then
+    self="${BASH_SOURCE[0]}"
+    while [ -L "$self" ]; do # src/bin/claude-kickoff is a symlink: follow it to scripts/
+        link=$(readlink "$self")
+        case "$link" in /*) self="$link" ;; *) self="$(dirname "$self")/$link" ;; esac
+    done
+    member_deny_file="$(cd "$(dirname "$self")/.." && pwd -P)/files/claude/settings.member-deny.json"
+    [ -r "$member_deny_file" ] || die 6 "member deny overlay not found or unreadable: $member_deny_file (--no-member-deny skips it)"
+    member_deny_rules=$(jq -er '.permissions.deny | if type == "array" and length > 0 and all(type == "string") then join(" ") else error("no deny rules") end' "$member_deny_file" 2>/dev/null) \
+        || die 6 "member deny overlay is not valid JSON with a permissions.deny list: $member_deny_file (--no-member-deny skips it)"
+    member_deny_args=(--settings "$member_deny_file")
+fi
+
 # --- body --------------------------------------------------------------------
 mode=new body=""
 if [ -n "$resume" ]; then
@@ -577,6 +603,12 @@ if [ "$dry" -eq 1 ]; then
     printf 'add_dirs: %s\n'      "${add_dirs[*]:-none}"
     printf 'deny: %s\n'          "${deny_raw:-none}"
     printf 'trust: %s\n'         "$trust_line"
+    if [ "$member_deny" -eq 1 ]; then
+        printf 'member_deny: %s\n'       "$member_deny_file"
+        printf 'member_deny_rules: %s\n' "$member_deny_rules"
+    else
+        printf 'member_deny: off\n'
+    fi
     mark_pane --dry-run
     exit 0
 fi
@@ -594,8 +626,8 @@ if [ "$(ctx_get "$ctx" '.openrouter // false')" != true ]; then
 fi
 mark_pane
 if [ "$mode" = resume ]; then
-    exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" "${deny_args[@]+"${deny_args[@]}"}" --resume "$resume" --model "$model" --effort "$effort" "$body"
+    exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" "${member_deny_args[@]+"${member_deny_args[@]}"}" "${deny_args[@]+"${deny_args[@]}"}" --resume "$resume" --model "$model" --effort "$effort" "$body"
 fi
 # --add-dir is variadic in claude, so its flags go first: the next option ends the
 # list and the body stays a lone positional.
-exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" "${deny_args[@]+"${deny_args[@]}"}" --model "$model" --effort "$effort" "$body"
+exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" "${member_deny_args[@]+"${member_deny_args[@]}"}" "${deny_args[@]+"${deny_args[@]}"}" --model "$model" --effort "$effort" "$body"

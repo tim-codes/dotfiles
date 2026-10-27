@@ -117,7 +117,7 @@ kick "$T/fixture.md" --resume abc --account exxo-personal --cwd "$W" --dry-run
 check "--resume with --account targets that dir" has "config_dir: $FAKE/.claude-exxo-personal"
 
 # --- real exec of the stub ---
-kick "$T/fixture.md"
+kick "$T/fixture.md" --no-member-deny
 check "new launch exits 0 (stub)" [ "$rc" -eq 0 ]
 rec=$(cat "$REC" 2>/dev/null)
 check "new launch argv is --model M --effort E <body> in that order" \
@@ -131,7 +131,7 @@ check "claude started in the prompt cwd" bash -c 'printf "%s\n" "$1" | grep -qx 
 out=$(HOME="$FAKE" PATH="$BIN:/usr/bin:/bin" REC="$REC" EXXO_SECRET_CACHE_TTL_SECONDS=60 "$KICK" "$T/fixture.md" 2>&1)
 check "a caller-set TTL is respected" bash -c 'grep -qx "TTL=60" "$1"' _ "$REC"
 
-kick "$T/fixture.md" --resume sess-1 --account exxo-personal --cwd "$W"
+kick "$T/fixture.md" --resume sess-1 --account exxo-personal --cwd "$W" --no-member-deny
 check "resume launch exits 0 (stub)" [ "$rc" -eq 0 ]
 rec=$(cat "$REC")
 check "resume argv is --resume ID --model M --effort E, then the relaunch note" \
@@ -309,7 +309,7 @@ cat >"$BIN/claude" <<'EOF'
 #!/bin/bash
 for a in "$@"; do printf 'arg<%s>\n' "$a"; done >"$REC"
 EOF
-kick "$T/adddirs.md"
+kick "$T/adddirs.md" --no-member-deny
 check "add_dirs become --add-dir flags, in order, before --model" bash -c '[ "$(sed -n 1,6p "$1" | tr "\n" " ")" = "arg<--add-dir> arg<$2/briefs> arg<--add-dir> arg<$2/reports> arg<--model> arg<opus> " ]' _ "$REC" "$FAKE"
 kick "$T/adddirs.md" --resume s1 --account exxo --cwd "$W"
 check "add_dirs also apply on resume" bash -c 'grep -qx "arg<--add-dir>" "$1" && grep -qx "arg<--resume>" "$1"' _ "$REC"
@@ -320,7 +320,7 @@ has "nowhere" && ok "  message names the path" || bad "  message: $out"
 sed 's|^model: .*|&\ndeny: Bash(curl:*), WebFetch(domain:localhost)|' "$T/fixture.md" >"$T/deny.md"
 kick "$T/deny.md" --dry-run
 check "deny is echoed" has "deny: Bash(curl:*), WebFetch(domain:localhost)"
-kick "$T/deny.md"
+kick "$T/deny.md" --no-member-deny
 check "deny rules become --disallowedTools flags, before --model" bash -c '[ "$(sed -n 1,5p "$1" | tr "\n" " ")" = "arg<--disallowedTools> arg<Bash(curl:*)> arg<--disallowedTools> arg<WebFetch(domain:localhost)> arg<--model> " ]' _ "$REC"
 kick "$T/nokeys.md" --dry-run
 check "deny defaults to none" has "deny: none"
@@ -396,7 +396,7 @@ cat >"$BIN/claude" <<'EOF'
   echo "PWD=$(pwd -P)"
 } >"$REC"
 EOF
-kick "$T/rcwd.md" --resume sess-9 --cwd "$FAKE/work/other" --account exxo
+kick "$T/rcwd.md" --resume sess-9 --cwd "$FAKE/work/other" --account exxo --no-member-deny
 check "resume launch exits 0 with explicit cwd (stub)" [ "$rc" -eq 0 ]
 rec=$(cat "$REC")
 check "resume argv is --resume ID --model M --effort E <note>" bash -c '
