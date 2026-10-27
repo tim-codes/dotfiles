@@ -21,6 +21,12 @@ name = "exxo"
 email = "tim@exxo.io"
 config_dirs = ["~/.claude-exxo"]
 
+[[accounts]]
+name = "openrouter"
+kind = "metered"
+provider = "openrouter"
+key_file = "~/keys/openrouter.key"
+
 [quota]
 levels = [50, 75, 85, 90, 95, 100]
 projection_horizon_minutes = 60
