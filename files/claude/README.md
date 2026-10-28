@@ -250,7 +250,7 @@ Two caveats from the [docs](https://code.claude.com/docs/en/model-config):
 One script checks every credential an unattended run leans on and, without
 `--check`, walks through the missing interactive logins one at a time:
 OrbStack/Docker (started if down), the `exxo-1p-cache` and `homelab-1p-cache`
-containers (started, never stopped), the 1Password CLI, gcloud + ADC, gh,
+containers (started, never stopped), the 1Password CLI, gcloud + ADC, gh, glab,
 pulumi + ESC, az, and each context's MCP servers. It prints an
 ok / needs-auth / failed / skipped table and exits 1 while anything still
 needs auth; no tool's raw output reaches the terminal. The `reauth` skill
