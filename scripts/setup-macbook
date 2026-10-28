@@ -122,6 +122,7 @@ $DOTFILES_ROOT/scripts/cargo-update
 # which gcloud installs into the virtualenv itself)
 $DOTFILES_ROOT/scripts/gcloud-setup
 $DOTFILES_ROOT/scripts/pwsh-modules
+$DOTFILES_ROOT/scripts/pipx-packages
 
 # add fonts
 $DOTFILES_ROOT/scripts/install-fonts-mac

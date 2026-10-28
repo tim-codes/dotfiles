@@ -63,8 +63,10 @@ brewDeps=(
   # pdftoppm for rasterising PDF pages — Claude Code needs it to visually
   # inspect PDFs (e.g. verifying generated Exxo report renders)
   poppler
-  # pinned interpreter for the gcloud CLI (see scripts/gcloud-setup); Python
-  # 3.14 breaks gcloud storage with ssl.PROTOCOL_TLSv1
+  # pinned interpreter for the gcloud CLI (see scripts/gcloud-setup) and the
+  # pipx venvs (see scripts/pipx-packages); Python 3.14 breaks gcloud storage
+  # with ssl.PROTOCOL_TLSv1 and ansible-core does not run on 3.15. Keeping it
+  # listed stops a cleanup from removing the interpreter under those venvs.
   "python@3.12"
   # from pulumi's own tap (its homebrew/core formula conflicts with the tap one
   # and brew refuses to upgrade across taps)

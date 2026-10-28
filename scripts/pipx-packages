@@ -1,0 +1,53 @@
+#!/bin/zsh
+# Idempotent pipx package install, pinned to python@3.12. Safe to re-run;
+# changes nothing on a machine where every package's venv already runs 3.12.
+#
+# pipx venvs bind to the interpreter that created them. Homebrew removing that
+# python (3.14 went away) leaves the venv dangling, and a fresh install on
+# Homebrew's current default (3.15) fails: ansible-core does not support it
+# yet. So every package here is installed with --python at the python@3.12
+# keg (brew-update installs both pipx and python@3.12, and keeps the keg
+# around because it is in brewDeps). Same pin as gcloud-setup.
+#
+# Packages with a venv on the wrong or a missing interpreter are reinstalled
+# on 3.12; a package already on 3.12 is left alone.
+
+set -e
+
+pipxPackages=(
+  # Ansible for ~/dev/homelab playbooks (zima, ragnar, odin). Installed via
+  # pipx rather than brew so it is not tied to Homebrew's default python
+  ansible
+)
+
+if ! command -v pipx >/dev/null; then
+  echo "pipx-packages: pipx not installed (brew-update installs the pipx formula), skipping"
+  exit 0
+fi
+
+py312="$(brew --prefix python@3.12)/bin/python3.12"
+if [[ ! -x $py312 ]]; then
+  echo "pipx-packages: $py312 missing (brew-update installs python@3.12)" >&2
+  exit 1
+fi
+
+want="$($py312 -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+venvs="$(pipx environment --value PIPX_LOCAL_VENVS)"
+
+for package in $pipxPackages; do
+  venv="$venvs/$package"
+  if [[ ! -d $venv ]]; then
+    echo "$package: installing on python $want"
+    pipx install --python "$py312" "$package"
+    continue
+  fi
+
+  # Ask the venv's own interpreter; empty when it is dangling.
+  have="$("$venv/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || true)"
+  if [[ $have == $want ]]; then
+    echo "$package: already on python $want"
+  else
+    echo "$package: venv python is '${have:-missing}', want $want; reinstalling"
+    pipx reinstall --python "$py312" "$package"
+  fi
+done
