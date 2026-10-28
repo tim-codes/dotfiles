@@ -75,3 +75,18 @@ if ! grep -q "successfully authenticated" <<<"$out"; then
   exit 1
 fi
 echo "ssh-prereq: github.com SSH auth OK"
+
+# gitlab.com is optional: warn-only, never fails setup (GitHub above is the
+# hard prerequisite). Same approach - pre-seed the host key, then match the
+# greeting (`ssh -T` to gitlab exits non-zero on success too).
+if ! grep -q "^gitlab.com" "$HOME/.ssh/known_hosts"; then
+  ssh-keyscan gitlab.com >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
+fi
+out="$(ssh -T -o ConnectTimeout=15 git@gitlab.com 2>&1 || true)"
+if grep -q "Welcome to GitLab" <<<"$out"; then
+  echo "ssh-prereq: gitlab.com SSH auth OK"
+else
+  echo "ssh-prereq: warning: SSH auth to gitlab.com failed (optional, continuing):" >&2
+  echo "  $out" >&2
+  echo "Check the 1Password SSH agent offers the 'GitLab' key (Development vault) and it is registered with GitLab." >&2
+fi
