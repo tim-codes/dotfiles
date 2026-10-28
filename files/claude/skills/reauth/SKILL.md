@@ -1,6 +1,6 @@
 ---
 name: reauth
-description: Re-authenticate Tim's workstation in one pass — OrbStack/Docker, the exxo and homelab secret caches, 1Password CLI, gcloud (+ADC), gh, pulumi (+ESC), az, and the MCP servers each Claude context needs — by running `scripts/claude-reauth` and relaying its table. Use before an unattended or overnight run, after a laptop reboot, when a squad `preflight blocked` comes back, when a session hits an expired login, or when Tim says "/reauth".
+description: Re-authenticate Tim's workstation in one pass — OrbStack/Docker, the exxo and homelab secret caches, 1Password CLI, gcloud (+ADC), gh, glab, pulumi (+ESC), az, and the MCP servers each Claude context needs — by running `scripts/claude-reauth` and relaying its table. Use before an unattended or overnight run, after a laptop reboot, when a squad `preflight blocked` comes back, when a session hits an expired login, or when Tim says "/reauth".
 ---
 
 # Re-auth the workstation
@@ -19,7 +19,7 @@ unattended run should start with. Exit 0 all ok, 1 something still needs
 auth, 2 usage error. The script never prints a token, secret or id — only the
 email / account name the tools themselves show on status. Don't run the
 underlying status commands by hand to "double-check"; several print tokens or
-ids (`gh auth status`, `az account show`, `op whoami`).
+ids (`gh auth status`, `glab auth status`, `az account show`, `op whoami`).
 
 ## Procedure
 
@@ -34,7 +34,7 @@ ids (`gh auth status`, `az account show`, `op whoami`).
    wait for it — at least 10 minutes; never kill it because it looks hung, it
    is waiting on Tim. It runs one login at a time, re-checks, and prints a
    final Summary; relay that.
-3. Rows whose hint says **needs a terminal** (`gh auth login`, `pulumi login`,
+3. Rows whose hint says **needs a terminal** (`gh auth login`, `glab auth login`, `pulumi login`,
    `op signin` with no account configured) cannot run from a session: give
    Tim the exact command to run in his own terminal — or have him run the
    whole script there (`~/dev/dotfiles/scripts/claude-reauth`), which handles

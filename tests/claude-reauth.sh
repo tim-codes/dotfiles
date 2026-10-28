@@ -63,6 +63,12 @@ case "$*" in
       echo "You are not logged into any GitHub hosts. SECRETLEAK" >&2; exit 1 ;;
   "auth login"*) touch "$STATE/gh"; exit 0 ;;
 esac'
+stub glab '
+case "$*" in
+  "auth status"*) up glab && { printf "gitlab.com\n  ✓ Logged in to gitlab.com as tim-test (keyring)\n  ✓ Token found in operating system keyring: glpat-SECRETLEAK\n"; exit 0; }
+      echo "x gitlab.com: authentication failed SECRETLEAK" >&2; exit 1 ;;
+  "auth login"*) touch "$STATE/glab"; exit 0 ;;
+esac'
 stub pulumi '
 case "$1" in
   whoami) up pulumi && { echo "tim-test"; exit 0; }
@@ -126,7 +132,7 @@ check "--help exits 0" test "$rc" -eq 0
 # --- everything ok ---------------------------------------------------------------
 reset; go --check
 check "all ok: exit 0" test "$rc" -eq 0
-for r in docker exxo-secret-cache homelab-secret-cache 1password gh gcloud gcloud-adc pulumi az \
+for r in docker exxo-secret-cache homelab-secret-cache 1password gh glab gcloud gcloud-adc pulumi az \
          'mcp:personal:Sanity' 'mcp:personal:mantine' 'mcp:personal:playwright' \
          'mcp:exxo:datadog' 'mcp:exxo:workos' 'mcp:exxo:claude.ai Microsoft 365' \
          'mcp:exxo:claude.ai Datadog' 'mcp:exxo-personal:datadog'; do
@@ -142,7 +148,7 @@ reset; go --check --ttl-hours 4
 check "--ttl-hours 4 → 14400s" grep -q 'EXXO_SECRET_CACHE_TTL_SECONDS=14400' <<<"$out"
 
 # --- each CLI missing, one at a time (--check) ---------------------------------
-for t in gcloud gh pulumi az; do
+for t in gcloud gh glab pulumi az; do
     reset; STUBENV=("STUB_$t=missing"); go --check
     check "$t missing: exit 1" test "$rc" -eq 1
     check "$t missing: row needs-auth" row "$t" needs-auth
@@ -214,10 +220,12 @@ check "run: prints a report before the summary" grep -q '^== Report' <<<"$out"
 check "run: no secret-like output" noleak
 
 # Logins that need a terminal are not attempted without one (stdin is /dev/null).
-reset; STUBENV=(STUB_gh=missing STUB_pulumi=missing); go
+reset; STUBENV=(STUB_gh=missing STUB_glab=missing STUB_pulumi=missing); go
 check "run, no tty: gh login not attempted" bash -c '! grep -q "^gh auth login" "$1"' _ "$STATE/calls.log"
 check "run, no tty: pulumi login not attempted" bash -c '! grep -q "^pulumi login" "$1"' _ "$STATE/calls.log"
 check "run, no tty: gh still needs-auth" row gh needs-auth
+check "run, no tty: glab still needs-auth" row glab needs-auth
+check "run, no tty: glab login not attempted" bash -c '! grep -q "^glab auth login" "$1"' _ "$STATE/calls.log"
 check "run, no tty: hint says a terminal is needed" grep -q 'needs a terminal' <<<"$summary"
 check "run, no tty: exit 1" test "$rc" -eq 1
 
@@ -225,6 +233,11 @@ check "run, no tty: exit 1" test "$rc" -eq 1
 reset; STUBENV=(STUB_op=missing); go
 check "run: op signin refreshes an idle session" grep -q '^op signin' "$STATE/calls.log"
 check "run: op ok afterwards" row 1password ok
+
+# glab not installed: skipped, never blocks (last: removes the stub).
+reset; rm -f "$BIN/glab"; go --check
+check "glab absent: row skipped" row glab skipped
+check "glab absent: exit 0" test "$rc" -eq 0
 
 [ "$fail" = 0 ] && echo "all claude-reauth tests passed"
 exit "$fail"

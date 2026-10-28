@@ -16,7 +16,7 @@
 # only the account name/email the tool itself shows on status, and sends token
 # output (print-access-token, `claude mcp list` targets, ids) to /dev/null.
 #
-# Scope by --context: Docker, 1Password and gh are machine-wide and always
+# Scope by --context: Docker, 1Password, gh and glab are machine-wide and always
 # checked; the exxo secret cache, gcloud (+ADC, which the Pulumi GCP provider
 # uses), pulumi (+ESC) and az belong to exxo/exxo-personal; the homelab secret
 # cache to personal; MCP servers are checked per context against
@@ -42,6 +42,9 @@
 #   gh auth status   ok: "  ✓ Logged in to github.com account <login> (keyring)"
 #                    and a "  - Token: gho_****" line we never print; none: "You
 #                    are not logged into any GitHub hosts." rc 1 (expected).
+#   glab auth status ok: "  ✓ Logged in to gitlab.com as <login> (keyring)" plus a
+#                    token line we never print; checked 2026-10-28 (glab on PATH).
+#                    Not logged in: nonzero rc (expected).
 #   pulumi whoami    ok: the user name on one line; logged out: "error:
 #                    PULUMI_ACCESS_TOKEN must be set for login during
 #                    non-interactive CLI sessions" (expected). ESC: `pulumi env ls`.
@@ -217,6 +220,20 @@ check_gh() {
 }
 fix_gh() { gh auth login --hostname github.com --git-protocol ssh --web; }
 
+# --- glab ---------------------------------------------------------------------------
+# Skipped (not needs-auth) when glab is absent, so a machine without GitLab is not blocked.
+check_glab() {
+    if ! have glab; then S=skipped; N="glab not installed"; return; fi
+    local out login
+    if out="$(glab auth status --hostname gitlab.com 2>&1)"; then
+        login="$(printf '%s\n' "$out" | sed -n 's/.*Logged in to gitlab\.com as \([^ ]*\).*/\1/p' | head -n 1)"
+        S=ok; N="gitlab.com as ${login:-?}"; return
+    fi
+    S=needs-auth; N="not logged in to gitlab.com"
+    FIX="glab auth login --hostname gitlab.com --git-protocol ssh --web"; TTY=1
+}
+fix_glab() { glab auth login --hostname gitlab.com --git-protocol ssh --web; }
+
 # --- gcloud (+ application-default credentials) --------------------------------------
 gcloud_account() { gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1; }
 check_gcloud() {
@@ -340,6 +357,7 @@ add_row docker docker
 [ "$want_personal" = 1 ] && add_row homelab-secret-cache homelab_cache
 add_row 1password op
 add_row gh gh
+add_row glab glab
 if [ "$want_exxo" = 1 ]; then
     add_row gcloud gcloud
     add_row gcloud-adc gcloud_adc
