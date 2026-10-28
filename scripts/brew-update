@@ -25,6 +25,7 @@ brewDeps=(
   fish-lsp
   fzf
   gh
+  glab
   glances
   # markdown rendering in the terminal: glow for prose, mdcat for table-heavy
   # docs (see the `md` fish function in src/.config/fish/common.fish)
