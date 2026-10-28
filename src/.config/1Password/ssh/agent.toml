@@ -3,3 +3,8 @@ vault = "Personal"
 
 [[ssh-keys]]
 vault = "HomeLab"
+
+# GitLab (gitlab.com) key: one item from the Development vault, not the whole vault
+[[ssh-keys]]
+item = "GitLab"
+vault = "Development"
