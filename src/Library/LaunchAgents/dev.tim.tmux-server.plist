@@ -20,7 +20,13 @@
        launchd's bare one. From ~, not launchd's cwd of /: the server and every
        session it creates or restores inherit it as the start directory of new
        panes and windows. The tmux-home daemon needs no agent of its own: its
-       plugin starts one per server when TPM loads, so it comes up with this. -->
+       plugin starts one per server when TPM loads, so it comes up with this.
+
+       Privacy: because zsh `exec`s tmux, the server is the process macOS
+       TCC holds responsible for everything a pane runs, and its Full Disk
+       Access / Local Network grants lapse on every `brew upgrade tmux`
+       (ad-hoc signed, versioned path). `macos-privacy-check` tests it and
+       guides the re-grant; see docs/macos-privacy-tmux.md. -->
   <key>ProgramArguments</key>
   <array>
     <string>/bin/zsh</string>
