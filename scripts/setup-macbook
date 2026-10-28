@@ -88,8 +88,9 @@ fi
 # grant is TCC-protected and cannot be scripted without MDM; approve it once
 open -a LinearMouse
 
-# install poetry
-pipx install poetry && pipx ensurepath
+# put pipx's bin dir on PATH; the packages themselves (ansible, poetry) come
+# from scripts/pipx-packages below, pinned to python@3.12
+pipx ensurepath
 
 # install nvm + node - skipped once $NODE_VERSION resolves to an installed node.
 # Checked on disk, not with `command -v nvm`: nvm is a shell function, never

@@ -18,6 +18,9 @@ pipxPackages=(
   # Ansible for ~/dev/homelab playbooks (zima, ragnar, odin). Installed via
   # pipx rather than brew so it is not tied to Homebrew's default python
   ansible
+  # Python dependency manager. pipx rather than brew so it is not tied to
+  # Homebrew's default python (its 3.14 venv dangled when that python went)
+  poetry
 )
 
 if ! command -v pipx >/dev/null; then
