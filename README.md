@@ -72,6 +72,11 @@ Host github.com
   identityfile ~/.ssh/github.pub
   identitiesonly yes
 
+Host gitlab.com
+  hostname gitlab.com
+  identityfile ~/.ssh/gitlab.pub
+  identitiesonly yes
+
 Host skygit
   hostname github.com
   identityfile ~/.ssh/github_sky.pub
@@ -80,6 +85,8 @@ Host skygit
 Host *
     IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
 ```
+For gitlab.com the key is the 1Password item "GitLab" in the Development vault (listed per-item in `src/.config/1Password/ssh/agent.toml`); save its public key as `~/.ssh/gitlab.pub`.
+
 --> then use e.g. `gcl git@skygit:<workspace>/<repo>.git` for the origin remote
 
 ## references
