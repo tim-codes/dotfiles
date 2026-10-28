@@ -42,6 +42,10 @@ font-size = 15
 # (src/bin/ghostty-fit) fits it to screen-minus-gutter capped at 1440 wide -
 # which config can't express (no min/max) - once per monitor.
 quick-terminal-position = center
+# Movable with Ctrl+Cmd+drag (NSWindowShouldDragOnGesture, set for Ghostty
+# alone in scripts/setup-macbook) - there is no titlebar to grab. The move holds
+# only while it stays open: 1.3.1 remembers the size per display but re-centres
+# on every show (and on resize), so centre stays the default.
 quick-terminal-size = 1440px,90%
 # No slide: centred, it should just appear, like an iTerm2 hotkey window.
 quick-terminal-animation-duration = 0

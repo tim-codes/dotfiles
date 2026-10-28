@@ -88,6 +88,12 @@ fi
 # grant is TCC-protected and cannot be scripted without MDM; approve it once
 open -a LinearMouse
 
+# Ghostty's quick terminal (the dropdown, src/.config/ghostty/config) has no
+# titlebar to drag. This AppKit default makes Ctrl+Cmd+drag anywhere in a window
+# move it - scoped to Ghostty's own domain, not -g, so no other app changes.
+# Read at app launch: quit and reopen Ghostty after changing it.
+defaults write com.mitchellh.ghostty NSWindowShouldDragOnGesture -bool true
+
 # install poetry
 pipx install poetry && pipx ensurepath
 
