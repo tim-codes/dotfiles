@@ -4,6 +4,7 @@ $DOTFILES_ROOT/scripts/brew-update
 $DOTFILES_ROOT/scripts/cargo-update
 $DOTFILES_ROOT/scripts/gcloud-setup
 $DOTFILES_ROOT/scripts/pwsh-modules
+$DOTFILES_ROOT/scripts/pipx-packages
 
 # tmux plugins: converge on .tmux.conf (install new, drop removed), pull
 # everything to latest, and rebuild tmux-home against the new source.
