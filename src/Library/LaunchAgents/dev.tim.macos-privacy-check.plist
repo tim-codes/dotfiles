@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.tim.macos-privacy-check</string>
+
+  <!-- Daily check that tmux panes still hold their macOS privacy grants
+       (Full Disk Access, Local Network), which lapse after every
+       `brew upgrade tmux`. The script probes through `tmux run-shell`, so
+       what it tests is what panes experience, whatever context this job
+       runs in. It only notifies on drift; `macos-privacy-check -fix` then
+       guides the re-grant. See docs/macos-privacy-tmux.md.
+
+       Through a login shell so $HOME expands (launchd substitutes nothing in
+       ProgramArguments). -wait covers the login race with
+       dev.tim.tmux-server: with no server after two minutes the run logs
+       that and exits 0. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>exec "$HOME/bin/macos-privacy-check" --notify --wait 120</string>
+  </array>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>9</integer>
+    <key>Minute</key>
+    <integer>30</integer>
+  </dict>
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <!-- The script keeps its own log at ~/Library/Logs/macos-privacy-check.log;
+       these catch anything that fails before it gets that far. -->
+  <key>StandardOutPath</key>
+  <string>/tmp/macos-privacy-check.out</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/macos-privacy-check.err</string>
+</dict>
+</plist>
