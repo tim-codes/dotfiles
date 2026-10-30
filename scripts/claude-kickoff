@@ -507,7 +507,7 @@ if [ -n "$resume" ]; then
     # `claude --resume <id> <prompt>` takes a positional prompt in interactive mode
     # (claude --help: "Usage: claude [options] [command] [prompt]"), so the relaunch
     # note travels with the resume and the member sees it as its first message.
-    body="squad relaunch: you are now on context $ctx. Re-register under the same name (squad-join §2, same session), then follow squad-join §5 \`relaunch\`."
+    body="squad relaunch: you are now on context $ctx. The SessionStart hook rebinds this session; do not call mcp__squad__register. Follow /squad-member."
 else
     # Same as `$(sed '1,/^---$/d' file)`: everything after the terminator, trailing
     # newlines trimmed by the command substitution.
