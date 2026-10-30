@@ -61,6 +61,12 @@ loaded skills did not come with you. These are the rules that matter here.
 5. Make no edits unless the brief explicitly asks for fixes. If it does,
    keep fixes to the findings you report and commit them separately.
 
+**Large diffs and review packages.** Never read a review package or diff
+over about 100 KB whole. Use `git diff <base> <head> --stat`, then
+`--diff-filter=AM` and read added/modified files in full, and audit deletions
+with `--diff-filter=D --name-only` against the brief's delete list. Report
+which parts were read by name only.
+
 ## Report
 
 Verdict first (approve / approve with nits / changes needed). Then findings,
