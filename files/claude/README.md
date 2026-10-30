@@ -103,8 +103,9 @@ Four properties of the merge, all deliberate:
   managing it; it does not delete it from a context. Retire one with
   `claude mcp remove -s user <name>` under that `CLAUDE_CONFIG_DIR`.
 
-Skills follow the same split. `~/.claude-personal/skills` stays a
-whole-directory symlink to `files/claude/skills`. `~/.claude-exxo/skills` is
+Skills follow the same split. `~/.claude-personal/skills` (and
+`~/.claude-reserve/skills`: the choice keys on the fragment account, not the
+context name) stays a whole-directory symlink to `files/claude/skills`. `~/.claude-exxo/skills` is
 a real directory of per-skill symlinks maintained by `claude-sync`, built
 from an allow list: a `shared_skills()` list in `scripts/claude-sync` names
 the repo skills that are cross-account — currently `claude-workstation-setup`,
@@ -130,8 +131,8 @@ skills are managed on claude.ai, never vendored here.
 Subagent definitions take the same two shapes. `agents/<name>.md` holds the
 dedicated agents (frontmatter `name`, `description`, `model`; the body is the
 procedure, including the environment mechanics a fresh subagent context does
-not inherit). `~/.claude-personal/agents` is a whole-directory symlink to
-`files/claude/agents`; the curated contexts get a real `agents/` directory of
+not inherit). `~/.claude-personal/agents` (and `~/.claude-reserve/agents`) is a
+whole-directory symlink to `files/claude/agents`; the curated contexts get a real `agents/` directory of
 per-file symlinks for the names in `shared_agents()` in `scripts/claude-sync`
 — currently all six round-one agents (`implementer`, `reviewer`,
 `git-pr-ops`, `investigator`, `sanity-cms`, `notion-ops`), because 92% of the
@@ -165,7 +166,7 @@ claude.ai account-synced `design` plugin (`plugins/synced/`), which these
 fragments do not manage.
 
 Contexts are created by `scripts/claude-contexts`; the `claude`,
-`claude-personal`, `claude-exxo` and `claude-exxo-personal` shell wrappers
+`claude-personal`, `claude-reserve`, `claude-exxo` and `claude-exxo-personal` shell wrappers
 select them via `CLAUDE_CONFIG_DIR` (see `src/.config/fish/common.fish`,
 `src/.zshrc`).
 
@@ -224,6 +225,21 @@ artifacts, ultrareview billing) follow the logged-in account, not the config
 dir — Exxo-org-scoped connectors aren't reachable under the personal login,
 so connector-heavy sessions belong on real exxo quota. Desktop session
 pickers are per user-data dir; resume across the two profiles via the CLI.
+
+## The reserve context
+
+`~/.claude-reserve` (wrapper `claude-reserve`, desktop `claude-d-reserve`,
+squad/kickoff account `reserve`) is a second personal Claude Max subscription
+as its own first-class context. `claude-sync` builds it from the **personal**
+fragments (`reserve:personal` in `CONTEXTS`) and gives it the same
+whole-directory skills and agents symlinks as personal, plus the merged MCP
+servers. Unlike `exxo-personal` there is no overlay: nothing is symlinked into
+`~/.claude-personal`, so its transcripts, history, plugins, plans, tasks and
+todos are its own and `--resume` does not cross between the two. That is
+deliberate: no conflation of the subscriptions on the Anthropic backend side
+(desktop/mobile apps); joining them up is the job of our tooling (the kickoff
+`resume_group` for reserve is its own). First use needs a one-time `/login`
+with the reserve account.
 
 ## Changing model / effort — use the flags, not the slash commands
 

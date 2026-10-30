@@ -13,7 +13,7 @@ $HOME/dev/dotfiles/scripts/claude-reauth                         # report, then 
 $HOME/dev/dotfiles/scripts/claude-reauth --context exxo --ttl-hours 16
 ```
 
-`--context personal|exxo|exxo-personal|all` (default `all`) limits the
+`--context personal|reserve|exxo|exxo-personal|all` (default `all`) limits the
 context-specific checks; `--ttl-hours N` (default 12) sets the cache TTL the
 unattended run should start with. Exit 0 all ok, 1 something still needs
 auth, 2 usage error. The script never prints a token, secret or id — only the
@@ -43,7 +43,7 @@ ids (`gh auth status`, `glab auth status`, `az account show`, `op whoami`).
    an MCP server still needs auth (normally `claude mcp login` handles it from
    the CLI; this is the fallback, and the only path for `pending approval`).
    Tell Tim exactly, per context: launch the context's wrapper (`claude`,
-   `claude-exxo`, `claude-exxo-personal`), type `/mcp`, select the named
+   `claude-reserve`, `claude-exxo`, `claude-exxo-personal`), type `/mcp`, select the named
    server, press Enter, approve in the browser. One pass per context.
 5. Relay the "Unattended run" TTL lines: the secret caches have no warm
    command, so the run itself must carry `EXXO_SECRET_CACHE_TTL_SECONDS` (and
