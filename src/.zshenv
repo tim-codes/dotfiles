@@ -9,9 +9,9 @@
 # one with no shared config at all.
 #
 # The shared minimal set (variables + PATH) lives in one file sourced by both
-# bash and zsh so the two cannot drift apart again. Aliases, prompt and
-# completions are deliberately NOT included: zsh is the fallback for machines
-# and contexts without fish, not a second fish.
+# bash and zsh so the two cannot drift apart again. Aliases, the Claude context
+# wrappers and nvm live in .zshrc (interactive only); prompt and completions are
+# deliberately NOT included: zsh is the fallback, not a second fish.
 #
 # Keep this file silent — output here corrupts scp/sftp and captured ssh output.
 

@@ -1,6 +1,6 @@
 # Shared POSIX-shell config for bash and zsh — the MINIMAL working set:
-# environment variables and PATH. Not feature parity with the fish config;
-# aliases, prompt and completions stay shell-specific (see .bashrc).
+# environment variables and PATH. Aliases, prompt and completions stay
+# shell-specific (see .bashrc, .zshrc).
 #
 # fish does not read this file (different syntax) — it reads local.sh directly
 # and builds its own PATH. local.sh is the one source of truth all three share.
@@ -48,6 +48,9 @@ if [ -f "$HOME/keys/openai.key" ]; then
     export OPENAI_KEY
     export OPENAI_API_KEY="$OPENAI_KEY"
 fi
+
+# Make the blue colour for directories more readable (BSD ls)
+export LSCOLORS=Exfxcxdxbxegedabagacad
 
 # ~~~ PATH ~~~ #
 # Built AFTER local.sh so $GOROOT/$GOPATH/$PNPM_HOME are available.
@@ -120,6 +123,16 @@ add_to_path \
     "/Applications/Alacritty.app/Contents/MacOS" \
     "/Applications/Sublime Text.app/Contents/SharedSupport/bin" \
     "$HOME/Library/Application Support/Jetbrains/Toolbox/scripts"
+
+# gcloud SDK bin, anchored on brew's share/ symlink (survives the cask rename);
+# first prefix that exists wins, covering Apple Silicon and Intel (see mac.fish)
+for _gc_sdk in /opt/homebrew/share/google-cloud-sdk /usr/local/share/google-cloud-sdk; do
+    if [ -d "$_gc_sdk/bin" ]; then
+        add_to_path "$_gc_sdk/bin"
+        break
+    fi
+done
+unset _gc_sdk
 
 # Cargo/Rust (a plain PATH export — cheap enough for every shell, unlike nvm,
 # which stays in the interactive-only sections of .bashrc/.zshrc)
