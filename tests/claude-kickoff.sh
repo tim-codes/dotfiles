@@ -419,16 +419,18 @@ check "--cwd without --resume is ignored: frontmatter cwd still wins" has "cwd: 
 
 # --- drift guard: the contexts file must match the fish wrappers ---
 FISH="$SRC_REPO/src/.config/fish/common.fish"
+# __claude_ctx is autoloaded from functions/, so its lists are read there.
+FISH_CTX="$SRC_REPO/src/.config/fish/functions/__claude_ctx.fish"
 want_ctx() { yq -p toml -oy '.context[].name' "$REPO_CONTEXTS" | sort; }
 want_dirs() { yq -p toml -oy '.context[] | .name + " " + .config_dir' "$REPO_CONTEXTS" | sort; }
-fish_dirs() { grep -m1 'set -l ctx_dirs' "$FISH" | grep -o '\.claude-[a-z-]*' | sed 's/^\.claude-//' | sort; }
+fish_dirs() { grep -m1 'set -l ctx_dirs' "$FISH_CTX" | grep -o '\.claude-[a-z-]*' | sed 's/^\.claude-//' | sort; }
 fish_funcs() { grep -o '^function claude-[a-z-]* ' "$FISH" | sed 's/^function claude-//; s/ $//' | grep -v '^default$' | sort; }
 check "drift guard: every context's config_dir is ~/.claude-<name>" [ "$(want_dirs)" = "$(want_ctx | sed 's|.*|& ~/.claude-&|')" ]
 check "drift guard: CONTEXTS is non-empty" [ -n "$(want_ctx)" ]
 check "drift guard: CONTEXTS equals the ctx_dirs in __claude_ctx" [ "$(want_ctx)" = "$(fish_dirs)" ]
 check "drift guard: CONTEXTS equals the claude-<context> wrapper functions" [ "$(want_ctx)" = "$(fish_funcs)" ]
 want_env() { grep -m1 '^OPENROUTER_ENV=' "$KICK" | sed 's/^OPENROUTER_ENV="\(.*\)"$/\1/' | tr ' ' '\n' | sort; }
-fish_env() { grep -m1 'for v in ANTHROPIC_BASE_URL' "$FISH" | sed 's/^ *for v in //' | tr ' ' '\n' | sort; }
+fish_env() { grep -m1 'for v in ANTHROPIC_BASE_URL' "$FISH_CTX" | sed 's/^ *for v in //' | tr ' ' '\n' | sort; }
 check "drift guard: OPENROUTER_ENV is non-empty" [ -n "$(want_env)" ]
 check "drift guard: OPENROUTER_ENV equals the scrub list in __claude_ctx" [ "$(want_env)" = "$(fish_env)" ]
 

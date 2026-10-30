@@ -76,27 +76,29 @@ else
 fi
 
 FISHF="$SRC_REPO/src/.config/fish/common.fish"
+# Mirror how fish loads it: common.fish sourced, its functions/ autoloaded.
+FISHFN="$SRC_REPO/src/.config/fish/functions"
 if command -v fish >/dev/null; then
     fish -n "$FISHF" && ok "fish -n common.fish" || bad "fish -n common.fish"
-    out="$(env HOME="$FH" fish -c "source '$FISHF' 2>/dev/null; functions -q claude-exxo-openrouter; and echo defined" 2>&1)"
+    out="$(env HOME="$FH" fish -c "set -p fish_function_path '$FISHFN'; source '$FISHF' 2>/dev/null; functions -q claude-exxo-openrouter; and echo defined" 2>&1)"
     has "$out" "defined" "fish: claude-exxo-openrouter defined"
-    out="$(env HOME="$FH" PATH="$T/bin:$PATH" fish -c "source '$FISHF' 2>/dev/null; set -gx PATH '$T/bin' \$PATH; cd '$FH'; claude-exxo-openrouter --model x -p y" 2>&1)"
+    out="$(env HOME="$FH" PATH="$T/bin:$PATH" fish -c "set -p fish_function_path '$FISHFN'; source '$FISHF' 2>/dev/null; set -gx PATH '$T/bin' \$PATH; cd '$FH'; claude-exxo-openrouter --model x -p y" 2>&1)"
     has "$out" "cfg=$FH/.claude-exxo-openrouter" "fish: CLAUDE_CONFIG_DIR is the openrouter context"
     has "$out" "tok=UNSET" "fish: no ANTHROPIC_AUTH_TOKEN"
     has "$out" "cwd=$HP/claude" "fish: from \$HOME starts in ~/claude"
     has "$out" "args=--model x -p y" "fish: args pass through"
     mkdir -p "$FH/.claude-reserve"
-    out="$(env HOME="$FH" PATH="$T/bin:$PATH" fish -c "source '$FISHF' 2>/dev/null; set -gx PATH '$T/bin' \$PATH; cd '$FH/.claude-reserve'; claude-reserve -p y" 2>&1)"
+    out="$(env HOME="$FH" PATH="$T/bin:$PATH" fish -c "set -p fish_function_path '$FISHFN'; source '$FISHF' 2>/dev/null; set -gx PATH '$T/bin' \$PATH; cd '$FH/.claude-reserve'; claude-reserve -p y" 2>&1)"
     has "$out" "cfg=$FH/.claude-reserve" "fish: claude-reserve pins the reserve dir"
     has "$out" "cwd=$HP/claude" "fish: claude-reserve from its own dir starts in ~/claude"
     for fn in claude-exxo claude-default claude-personal claude-reserve; do
         out="$(env HOME="$FH" PATH="$T/bin:$PATH" ANTHROPIC_BASE_URL=x ANTHROPIC_API_KEY=x ANTHROPIC_AUTH_TOKEN=x ANTHROPIC_DEFAULT_OPUS_MODEL=x ANTHROPIC_DEFAULT_SONNET_MODEL=x ANTHROPIC_DEFAULT_HAIKU_MODEL=x ANTHROPIC_DEFAULT_FABLE_MODEL=x CLAUDE_CODE_SUBAGENT_MODEL=x \
-            fish -c "source '$FISHF' 2>/dev/null; set -gx PATH '$T/bin' \$PATH; cd '$FH/proj'; $fn -p y" 2>&1)"
+            fish -c "set -p fish_function_path '$FISHFN'; source '$FISHF' 2>/dev/null; set -gx PATH '$T/bin' \$PATH; cd '$FH/proj'; $fn -p y" 2>&1)"
         has "$out" "leak=
 " "fish: $fn sees none of the OpenRouter env"
     done
     out="$(env HOME="$FH" PATH="$T/bin:$PATH" ANTHROPIC_BASE_URL=x CLAUDE_CODE_SUBAGENT_MODEL=x \
-        fish -c "source '$FISHF' 2>/dev/null; set -gx PATH '$T/bin' \$PATH; cd '$FH/proj'; claude-exxo-openrouter -p y" 2>&1)"
+        fish -c "set -p fish_function_path '$FISHFN'; source '$FISHF' 2>/dev/null; set -gx PATH '$T/bin' \$PATH; cd '$FH/proj'; claude-exxo-openrouter -p y" 2>&1)"
     has "$out" "ANTHROPIC_BASE_URL=x" "fish: openrouter wrapper leaves env untouched"
 else
     echo "note: fish absent, skipping fish checks"
