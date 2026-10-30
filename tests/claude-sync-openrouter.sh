@@ -115,10 +115,10 @@ for cmd in 'cat ~/keys/openrouter.key' 'cat -n $HOME/keys/x' 'echo a | grep k /U
 done
 
 # Hooks: PreToolUse arrays concatenate across layers. exxo-openrouter keeps
-# every shared PreToolUse entry, then the exxo fragment's (the squad heavy
-# gate, which it inherits as a squad member context), then the guard; the
-# exxo contexts get shared + the exxo fragment's PreToolUse; personal's hooks
-# equal the plain shared merge.
+# every shared PreToolUse entry (the squad hooks among them), then the exxo
+# fragment's (none today: it carries no hooks), then the guard; the exxo
+# contexts get shared + the exxo fragment's PreToolUse; personal's hooks equal
+# the plain shared merge.
 GUARD_CMD="$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$C/settings.overlay.exxo-openrouter.json")"
 check "guard hook command names the guard and ends with its marker" \
     bash -c 'case "$1" in *scripts/claude-openrouter-guard*"# claude-openrouter-guard") exit 0;; *) exit 1;; esac' _ "$GUARD_CMD"

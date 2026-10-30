@@ -41,8 +41,8 @@ for ctx in personal exxo exxo-personal; do
     check "$ctx keeps defaultMode" \
         test "$(jq -r '.permissions.defaultMode' "$FAKE/.claude-$ctx/settings.json")" = auto
     check "$ctx has git status grant" has "$ctx" allow 'Bash(git status:*)'
-    for r in 'operator raise' 'operator set' 'operator decide' 'operator list' 'operator get' 'ack'; do
-        check "$ctx has squad $r grant" has "$ctx" allow "Bash(squad $r:*)"
+    for r in mcp__squad__set mcp__squad__ack mcp__squad__raise mcp__squad__land; do
+        check "$ctx has $r grant" has "$ctx" allow "$r"
     done
 done
 for ctx in exxo exxo-personal; do
