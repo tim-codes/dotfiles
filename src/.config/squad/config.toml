@@ -3,7 +3,6 @@
 # config.example.toml for the knobs.
 
 [broker]
-grace_minutes = 10
 
 # Personal and exxo-personal are the same account; listing both dirs lets the
 # watcher dedupe their caches. The first dir is the one whose keychain token
