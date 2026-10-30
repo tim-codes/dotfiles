@@ -797,3 +797,95 @@ function claude-default --wraps claude --description 'claude in the retired defa
     __claude_ctx "" $argv
 end
 
+
+# Delete the branches of merged GitHub PRs, locally and on origin, in one or
+# more git repos. Squash merges leave branches looking unmerged to git, so a
+# ref qualifies only when:
+#   - its PR is merged and its tip is exactly the PR's merged head commit
+#     (nothing added since),
+#   - no open PR uses the branch name,
+#   - no worktree has it checked out,
+#   - it is not main/master.
+# Candidates are listed and confirmed per repo before anything is deleted.
+#
+# Interactive fish only (kept out of Claude Code sessions: it needs your
+# per-repo confirmation). Usage: doctor-merged-branches [--dry-run] [--limit N] [repo-dir ...]
+#   repo-dir   defaults to the current repo; the GitHub repo is taken from
+#              each dir's origin remote
+#   --dry-run  list candidates, delete nothing
+#   --limit N  how many recent merged PRs to consider per repo (default 300)
+function doctor-merged-branches --description 'Delete merged-PR branches (local + origin), confirmed per repo'
+    set -l dry 0
+    set -l limit 300
+    set -l dirs
+    while set -q argv[1]
+        switch $argv[1]
+            case --dry-run
+                set dry 1
+            case --limit
+                set -e argv[1]
+                set limit $argv[1]
+            case -h --help
+                echo 'Usage: doctor-merged-branches [--dry-run] [--limit N] [repo-dir ...]'
+                return 0
+            case '-*'
+                echo "doctor-merged-branches: unknown option $argv[1]" >&2
+                return 2
+            case '*'
+                set -a dirs $argv[1]
+        end
+        set -e argv[1]
+    end
+    test (count $dirs) -eq 0; and set dirs .
+
+    for dir in $dirs
+        set -l top (git -C $dir rev-parse --show-toplevel 2>/dev/null)
+        if test -z "$top"
+            echo "skip $dir: not a git repo" >&2
+            continue
+        end
+        set -l gh_repo (gh repo view (git -C $top remote get-url origin) --json nameWithOwner -q .nameWithOwner 2>/dev/null)
+        if test -z "$gh_repo"
+            echo "skip $top: origin is not a GitHub repo gh can read" >&2
+            continue
+        end
+        git -C $top fetch -q --prune origin
+        set -l open (gh pr list -R $gh_repo --state open --limit $limit --json headRefName -q '.[].headRefName')
+        set -l inuse (git -C $top worktree list --porcelain | string replace -rf '^branch refs/heads/' '')
+        set -l doomed_local
+        set -l doomed_remote
+        for row in (gh pr list -R $gh_repo --state merged --limit $limit --json headRefName,headRefOid -q '.[] | "\(.headRefName) \(.headRefOid)"')
+            set -l b (string split -f1 ' ' $row)
+            set -l oid (string split -f2 ' ' $row)
+            contains -- $b main master; and continue
+            contains -- $b $open; and continue
+            contains -- $b $inuse; and continue
+            set -l ltip (git -C $top rev-parse -q --verify refs/heads/$b 2>/dev/null)
+            set -l rtip (git -C $top rev-parse -q --verify refs/remotes/origin/$b 2>/dev/null)
+            test "$ltip" = "$oid"; and set -a doomed_local $b
+            test "$rtip" = "$oid"; and set -a doomed_remote $b
+        end
+        set -l n (math (count $doomed_local) + (count $doomed_remote))
+        if test $n -eq 0
+            echo "== $gh_repo: nothing to delete"
+            continue
+        end
+        echo "== $gh_repo"
+        for b in $doomed_local
+            echo "  local   $b"
+        end
+        for b in $doomed_remote
+            echo "  origin  $b"
+        end
+        test $dry -eq 1; and continue
+        read -P "Delete these $n merged branch refs in $gh_repo? [y/N] " -l ok
+        if test "$ok" = y
+            for b in $doomed_local
+                git -C $top branch -D $b
+            end
+            for b in $doomed_remote
+                git -C $top push -q origin --delete $b
+            end
+        end
+    end
+end
