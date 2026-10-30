@@ -286,7 +286,7 @@ carried no MCP servers at all while `~/.claude-exxo` had four.
    `scripts/claude-sync` get linked in (currently `claude-workstation-setup`,
    `worktree-closedown`, `dotfiles-repo`, `claude-repo-config`, `squad-infra`, `squad-join`,
    `squad-orchestrator`, `squad-debug-review`, `reauth`, `workstation-sync`,
-   `workstation-setup`). Every other repo skill is
+   `workstation-setup`, `dev-disk-doctor`). Every other repo skill is
    personal-only by default and must be explicitly promoted — add its name to
    `shared_skills()` to make it cross-account.
    Authoring asymmetry (verified against claude-sync): author new skills in
