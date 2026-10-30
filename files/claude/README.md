@@ -142,6 +142,14 @@ Rationale and the measurement baseline:
 re-measure with `scripts/claude-usage-scan --compare
 docs/superpowers/specs/2026-10-23-usage-baseline.json`.
 
+A shared PreToolUse hook (matcher `Agent`, `# claude-agent-model-guard` in
+`settings.shared.json`) runs `scripts/claude-agent-model-guard`, which denies a
+`general-purpose` launch (or one with no `subagent_type`) that names no
+`model`: an omitted model inherits the orchestrator's own, which in a Fable
+session means Fable. It is exempt when `CLAUDE_CODE_SUBAGENT_MODEL` is set (the
+exxo-openrouter overlay pins every subagent that way) and fails open on any
+error. Tests: `python3 -I tests/test_claude_agent_model_guard.py`.
+
 Plugins that are off by default: `notion@claude-plugins-official` and
 `vercel@claude-plugins-official` are set to `false` in `settings.shared.json`
 (not deleted — the merged settings file is copied over the live one, and an

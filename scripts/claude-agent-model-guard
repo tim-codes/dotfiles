@@ -1,0 +1,51 @@
+#!/usr/bin/env -S python3 -I
+"""PreToolUse hook (Agent): reject a general-purpose subagent launched without
+an explicit model.
+
+An omitted model inherits the orchestrator's own model, so a Fable session ran
+every general-purpose subagent on Fable. The Agent tool defaults to
+general-purpose when subagent_type is absent, so that counts too. Exempt:
+a launch that names a model, a dedicated agent (its definition pins the
+model), and any session with CLAUDE_CODE_SUBAGENT_MODEL set (the
+exxo-openrouter context pins every subagent that way).
+
+Reads the hook JSON on stdin. A deny is printed as
+hookSpecificOutput.permissionDecision "deny" and exits 0; anything else exits 0
+silently. Fails open on any error: this is a cost guard, not a security guard.
+"""
+import json
+import os
+import sys
+
+REASON = ("general-purpose subagent launched without an explicit model; "
+          "pass model (sonnet by default) or use a dedicated agent")
+
+
+def should_deny(payload):
+    if not isinstance(payload, dict):
+        return False
+    tool_input = payload.get("tool_input")
+    if not isinstance(tool_input, dict):
+        return False
+    if os.environ.get("CLAUDE_CODE_SUBAGENT_MODEL"):
+        return False
+    subagent_type = tool_input.get("subagent_type")
+    if subagent_type and subagent_type != "general-purpose":
+        return False
+    return not tool_input.get("model")
+
+
+def main():
+    try:
+        if should_deny(json.loads(sys.stdin.read())):
+            sys.stdout.write(json.dumps({"hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": REASON,
+            }}) + "\n")
+    except Exception:  # fail open
+        pass
+
+
+if __name__ == "__main__":
+    main()
