@@ -383,10 +383,11 @@ ones like althemer and worktrunk), consumed mainly by his two MacBooks. The
 `workstation-sync` skill's list is the canonical inventory. Setup repos:
 
 - `~/dev/dotfiles` (tim-codes/dotfiles)
-- `~/dev/squad` (tim-codes/squad)
 - `~/dev/homelab` (tim-codes/homelab)
 - `~/dev/exxo/skills` (Exxo-Labs/skills, also the exxo-skills plugin marketplace)
 - `~/dev/exxo/agent-tooling` (Exxo-Labs/agent-tooling)
+
+squad (~/dev/squad) is deliberately excluded while under active development; it is managed by its own sessions. Re-add it to this list to include it.
 
 Authored open-source tools (local checkouts): `~/dev/tmux-home`
 (tim-codes/tmux-home) and `~/dev/oss/stray` (tim-codes/stray).

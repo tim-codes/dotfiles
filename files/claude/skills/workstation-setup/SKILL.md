@@ -1,14 +1,14 @@
 ---
 name: workstation-setup
-description: Lightweight start-of-day check that makes this machine ready to work — read-only dev-stack status, claude-sync drift, container runtime, logins via claude-reauth, optional squad/worktree checks, ending in "ready" or "needs X". Minutes, not hours. Not claude-workstation-setup (which explains how the Claude setup works) and not workstation-sync (the heavy pull/merge/install update). Use when Tim says "start of day", "get ready to work", "set up this machine for work", "/workstation-setup".
+description: Lightweight start-of-day check that makes this machine ready to work — read-only dev-stack status, claude-sync drift, container runtime, logins via claude-reauth, optional worktree check, ending in "ready" or "needs X". Minutes, not hours. Not claude-workstation-setup (which explains how the Claude setup works) and not workstation-sync (the heavy pull/merge/install update). Use when Tim says "start of day", "get ready to work", "set up this machine for work", "/workstation-setup".
 ---
 
 # Workstation setup: ready to work
 
 A short checklist. It reports and fixes auth; it never pulls, merges or installs
-(that is `workstation-sync`). Dev stack checkouts: `~/dev/dotfiles`, `~/dev/squad`,
+(that is `workstation-sync`). Dev stack checkouts: `~/dev/dotfiles`,
 `~/dev/homelab`, `~/dev/exxo/skills`, `~/dev/exxo/agent-tooling`, `~/dev/tmux-home`,
-`~/dev/oss/stray` (`workstation-sync` holds the canonical inventory).
+`~/dev/oss/stray` (`workstation-sync` holds the canonical inventory). squad (~/dev/squad) is deliberately excluded while under active development; it is managed by its own sessions. Re-add it to this list to include it.
 
 ## Output rule (governs the whole run)
 
@@ -39,18 +39,16 @@ Use `git -C <dir>` and absolute paths.
    wait. Follow the `reauth` skill for the details: rows needing a terminal (`gh auth login`,
    `pulumi login`, ...) go to Tim as exact commands, and MCP steps are per-context `/mcp`.
 
-## c. Optional quick checks (report only)
+## c. Optional quick check (report only)
 
-- Squad broker reachable: `squad doctor` WITHOUT `--fix` (read-only). Never restart anything.
 - Stale worktrees: count from `git -C <dir> worktree list` per dev-stack repo (merged or
   clean ones are candidates for `worktree-closedown`). Do not touch them.
 
 ## d. Summary
 
-ONE table: dev stack, claude-sync, containers, logins, squad, worktrees. Then **ready** or
+ONE table: dev stack, claude-sync, containers, logins, worktrees. Then **ready** or
 **needs X**. Then **Follow-up for you**, derived from what was found (omit when empty):
 
 - run `workstation-sync` when a checkout is behind, dirty or off main, or claude-sync drifted;
 - logins still pending from reauth (exact commands);
 - restart running Claude sessions after claude-sync changes;
-- squad broker restart if `squad doctor` says it is stale.

@@ -1,17 +1,17 @@
 ---
 name: workstation-sync
-description: Bring this MacBook's whole dev stack (dotfiles, squad, homelab, exxo skills, agent-tooling, plus Claude plugins in every context) fully up to date — survey, branch/push local work, merge Tim-approved PRs, pull, reinstall what changed. The heavy update, interactive, machine-agnostic. For a quick start-of-day readiness check use workstation-setup instead; for how the Claude setup works use claude-workstation-setup. Use when Tim says "sync my dev stack", "update everything", "bring this machine up to date", "/workstation-sync".
+description: Bring this MacBook's whole dev stack (dotfiles, homelab, exxo skills, agent-tooling, plus Claude plugins in every context) fully up to date — survey, branch/push local work, merge Tim-approved PRs, pull, reinstall what changed. The heavy update, interactive, machine-agnostic. For a quick start-of-day readiness check use workstation-setup instead; for how the Claude setup works use claude-workstation-setup. Use when Tim says "sync my dev stack", "update everything", "bring this machine up to date", "/workstation-sync".
 ---
 
 # Workstation sync: bring the dev stack up to date
 
-Dev stack = primary checkouts of `~/dev/dotfiles`, `~/dev/squad`, `~/dev/homelab`,
+Dev stack = primary checkouts of `~/dev/dotfiles`, `~/dev/homelab`,
 `~/dev/exxo/skills`, `~/dev/exxo/agent-tooling` (setup repos), `~/dev/tmux-home` and
 `~/dev/oss/stray` (authored open-source, tim-codes, public), plus Claude plugins per
 context. Incorporated upstream tools with no checkout, althemer (fork of xdagiz/althemer)
 and worktrunk, are refreshed only through the dotfiles manifests (cargo-update,
 brew-update, plugin refresh); odin-awake is a Windows tool and out of scope. This list is
-the canonical inventory of the stack.
+the canonical inventory of the stack. squad (~/dev/squad) is deliberately excluded while under active development; it is managed by its own sessions. Re-add it to this list to include it.
 Tim is present. Runs on either MacBook, so use `~`-relative paths, never a hostname.
 
 ## Output rule (governs the whole run)
@@ -34,7 +34,7 @@ conclusion reaches you. Finish with ONE concise checklist (step g).
 
 ## a. Survey (silent)
 
-Per repo (`dotfiles`, `squad`, `homelab`, `tmux-home`, `stray` are tim-codes; `exxo/skills` and
+Per repo (`dotfiles`, `homelab`, `tmux-home`, `stray` are tim-codes; `exxo/skills` and
 `exxo/agent-tooling` are Exxo-Labs), with `git -C <dir> fetch --prune`, collect: current branch
 (should be main), dirty tree (`status --porcelain`), unpushed commits
 (`log @{u}..`), ahead/behind `origin/main`, and `git worktree list` (plus `wt list` where
@@ -58,7 +58,7 @@ where a decision is needed.
 ## c. Merges
 
 `gh pr list -R <repo> --author @me --json number,title,isDraft,mergeable,statusCheckRollup,url`
-for each of the seven repos. Ask Tim which, if any, to merge (draft/ready, CI, mergeable).
+for each of the six repos. Ask Tim which, if any, to merge (draft/ready, CI, mergeable).
 Merge nothing without his explicit per-PR approval; squash-merge approved ones
 (`gh pr merge -R <repo> <n> --squash`).
 
@@ -84,10 +84,6 @@ Driven by `git -C <dir> diff --name-only old..new`.
     `scripts/tmux-plugins` — or offer full `src/bin/deps-up` if several changed or Tim asks.
     Warn Tim before anything that may raise a sudo or GUI prompt (brew casks) and run it
     on its own, not in a compound command.
-- **squad** changed: `cargo install --path . --locked` in `~/dev/squad` (installs
-  `~/.cargo/bin/squad`). Do NOT restart the broker or any squad launchd agent; report that a
-  restart is needed (`launchctl kickstart -k gui/$(id -u)/dev.tim.squad-broker`, per the squad
-  README) and leave timing to Tim or the squad owner session.
 - **Exxo-Labs/agent-tooling** changed: read its README and package.json for the install step.
   The binary is on PATH via pnpm global (`~/Library/pnpm/bin/agent-tooling`); the README says a
   global install is refreshed with `pnpm i -g @exxo-labs/agent-tooling` (the same package that
@@ -99,7 +95,9 @@ Driven by `git -C <dir> diff --name-only old..new`.
 - **stray** changed: `scripts/cargo-update` installs it with
   `cargo install --git ssh://git@github.com/tim-codes/stray` (remote, not the local
   checkout), so the binary tracks pushed main. Re-run `~/dev/dotfiles/scripts/cargo-update`
-  (it reinstalls every cargoGitDeps entry, which also refreshes althemer) once stray's
+  (it reinstalls every cargoGitDeps entry, which also refreshes althemer; that list still
+  contains squad, so tell Tim it was reinstalled from its remote despite the exclusion, and
+  restart nothing) once stray's
   main moved, e.g. after a merge.
 - **althemer, worktrunk** (no checkout): updated only when `scripts/cargo-update` /
   `scripts/brew-update` run and the plugin refresh below covers the worktrunk marketplace.
@@ -132,7 +130,6 @@ actually changed; omit the section when there are none. Candidates:
 - `rf` in any open fish shell (or `exec zsh`) when stowed shell config
   (`src/.config/fish`, `src/.zshrc`, `src/.config/shell`) changed;
 - restart running Claude sessions after a claude-sync, plugin or skill change;
-- squad broker / launchd restart after a squad reinstall;
 - a new terminal or app relaunch after brew cask updates;
 - `tmux source-file ~/.tmux.conf` in a running tmux server (and reopen the tmux-home popup)
   after tmux-plugins or tmux config changed;
