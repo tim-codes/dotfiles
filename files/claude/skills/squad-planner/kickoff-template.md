@@ -27,4 +27,4 @@ Repo: <owner/name>   Base: <base branch or trunk>   Priority (suggested): <1-5>
 <task ids this waits on, and infra tasks; "none">
 
 ## Notes
-<anything the member must know that the deliverables do not say>
+<anything the member must know that the deliverables do not say; where a plan PR or OpenSpec change exists, its URL and change id, and "Run the staleness pass first (squad-member, Starting from a plan PR), rebasing onto the base above.">
