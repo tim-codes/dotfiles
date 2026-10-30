@@ -17,12 +17,12 @@
 servers = ["playwright"]
 
 [personal]
-servers = ["Sanity", "mantine"]
+servers = ["Sanity", "mantine", "workos"]
 
 # Second personal subscription, built from the personal fragments: same
 # expected servers as [personal].
 [reserve]
-servers = ["Sanity", "mantine"]
+servers = ["Sanity", "mantine", "workos"]
 
 # Datadog is the user-scope `datadog` server from mcp.shared.json (EU site,
 # mcp.datadoghq.eu/v1/mcp), not the engineering plugin's US-site

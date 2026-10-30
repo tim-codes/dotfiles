@@ -11,10 +11,14 @@
   },
   "apiKeyHelper": "$HOME/dev/dotfiles/scripts/claude-openrouter-key",
   "model": "sonnet",
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": false
+  },
   "deniedMcpServers": [
     { "serverName": "datadog" },
     { "serverName": "boards" },
-    { "serverName": "playwright" }
+    { "serverName": "playwright" },
+    { "serverName": "workos" }
   ],
   "permissions": {
     "deny": [
