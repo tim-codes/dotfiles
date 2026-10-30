@@ -1,7 +1,7 @@
 ---
 name: squad-planner
 description: Plan one squad task into a TaskPlan and submit it to the squad orchestrator with submit_task — headless over a task file when the broker launches a planner, or interactively with Tim. Reads the squad context brief for the repo, drives brainstorming and plan-writing, composes the task markdown with its plan frontmatter, and handles validation problems, resubmission and scope changes. Use for "/squad-planner", "plan this for the squad", or a headless launch carrying --headless --task-id.
-argument-hint: "[--headless --task-id N --repo owner/name --task-file PATH] | [--draft] [task file or description]"
+argument-hint: "[--headless --task-id N --repo owner/name --task-file PATH] | [task file or description]"
 ---
 
 # Squad planner
@@ -16,27 +16,32 @@ orchestrator never needs to know which way a plan was made.
 | Form | Session | Arguments |
 |---|---|---|
 | Headless | `planner` kind, launched by the broker, nobody watching | `/squad-planner --headless --task-id <int> --repo <owner/name> --task-file <abs path>` |
-| Interactive | Tim's own session (`operator` kind) | `/squad-planner [--draft] [<task file path> \| <description>]` |
+| Interactive | Tim's own session (`operator` kind) | `/squad-planner [<task file path> \| <description>]` |
 
 - `--headless` selects the headless form; all three of its other arguments
   are required. A headless session **never asks anyone anything**: no
   `AskUserQuestion`, and no turn ends with a question. Every assumption and
   every unresolved question goes under `## Open questions` in the content.
-- Interactive disambiguation: drop a leading `--draft`. If what remains names
-  an existing readable file (after `~` expansion), it is the task file;
-  otherwise the whole remaining text is a description of the work. Nothing
-  left: ask Tim what to plan. The interactive form may ask Tim questions, one
-  at a time.
-- `--draft` is the opt-out from approval. Without it, an interactive
-  submission counts as Tim's design approval (spec §6.2) and the task enters
-  preflight.
+- Interactive disambiguation: if the argument names an
+  existing readable file (after `~` expansion), it is the task file;
+  otherwise the whole argument is a description of the work. Nothing given: ask Tim what to
+  plan. The interactive form may ask Tim questions, one at a time.
+- Interactive posture is drafting, with no flag. The planner iterates the
+  plan with Tim in the session and keeps its artefacts (plan documents, a
+  draft PR, Linear tickets) in the open as it goes, but submits nothing to
+  the squad until Tim says in his own words that the plan is accepted or
+  finalised (step 5). The submission is then his design approval (spec
+  §6.2) and the task enters preflight.
 
 ## What a planner does
 
-- It plans only: no worktrees of its own, no launches, no messages to
-  members, no commits, no file writes. The task markdown is composed in
-  context and passed as `content`: compose, do not save. The only exception
-  is the interim file drop in step 5 when no orchestrator is reachable.
+- The headless planner plans only: no worktrees, no PRs, no launches, no
+  messages to members, no commits, no file writes. Its task markdown is
+  composed in context and passed as `content`: compose, do not save. The
+  only exception is the interim file drop in step 5 when no orchestrator is
+  reachable. The interactive planner also keeps the plan documents, draft
+  PR and Linear tickets of step 2 and the claim file of `## Sibling
+  planners`; it still makes no launches and sends no messages to members.
 - It never calls `ExitPlanMode`: the plan goes to `submit_task`, not to a
   mode switch. The broker launches planners in plan mode (contracts README
   rule 7), but the skill relies on no permission mode and works read-only in
@@ -45,7 +50,7 @@ orchestrator never needs to know which way a plan was made.
   only (`squad://context-brief/...`, `squad://me`).
 - Its own delegation: dedicated agents first (`Explore` for read-only
   sweeps of the repo, `notion-ops` for every Notion read or write,
-  `implementer` for an interactive draft PR); `general-purpose` only with an
+  `implementer` for the interactive plan documents); `general-purpose` only with an
   explicit `model` (a PreToolUse guard rejects it otherwise); no forks. A
   subagent brief restates what it needs, since skills do not travel.
 
@@ -70,6 +75,7 @@ orchestrator never needs to know which way a plan was made.
   unreadable `--task-file`, `mcp__squad__submit_task` absent, the brief
   unreadable) ends the turn with the `failed` hand-back, code
   `no_submission`, never with prose alone.
+- Interactive: read the sibling claims (`## Sibling planners`) before step 2.
 - No orchestrator yet (interactive only): if `mcp__squad__submit_task` is
   absent, the squad is not reachable from here at all; skip the read.
   Tell Tim, write "context brief unavailable" under `## Context`, and carry on;
@@ -81,26 +87,44 @@ orchestrator never needs to know which way a plan was made.
 question at a time, two or three approaches with a recommendation) and
 `superpowers:writing-plans` for decomposition (deliverables sized so each has
 its own check). Skip both skills' "write a doc under docs/ and commit" and
-"execution handoff" steps: the task markdown is the artifact and
-`submit_task` is the hand-off. If the argument was a file, `Read` it first and
-plan from it. Then apply Tim's planning guidance:
+"execution handoff" steps: the plan documents below and the task markdown are
+the artefacts, and `submit_task` is the hand-off. If the argument was a file,
+`Read` it first and plan from it.
 
-- **Linear, without sprawl.** Look for an existing ticket first. Prefer one
-  ticket with sub-issues (one per deliverable only where that helps); a
-  Linear project only for very large works. Propose the shape to Tim, create
-  or update the tickets once he agrees, and list their ids and URLs under
-  `## Tickets`.
-- **OpenSpec draft PR (optional).** When the work is spec-shaped, or the repo
-  already uses `openspec/`, offer a draft PR carrying the OpenSpec change,
-  written to `exxo-common:openspec-changes` conventions and tied to the
-  tickets. On Tim's yes, an `implementer` subagent produces it in its own
-  worktree (the brief restates the worktree rule and that the PR stays a
-  draft); the planner itself still writes nothing. Reference it under
-  `## Decisions`.
-- **ADR.** When the plan makes an architectural choice, propose a repo ADR
-  following that repo's ADR conventions (its `docs/adr/` or equivalent),
-  produced the same way, ideally in the same draft PR. Reference it under
-  `## Decisions`.
+From the settled point, the planner keeps the following current. The settled
+point is when the brief is clear enough: the repo, the scope and an outline of
+the deliverables agreed with Tim, after the sibling check. At that point the
+planner also writes its claim file and labels its tickets (`## Sibling
+planners`). Each time the plan changes materially, it updates the plan
+documents, the draft PR and Linear in the same step.
+
+- **Plan documents and draft PR.** In the target repo's worktree, which the
+  planner creates with `wt -C <repo> switch --create plan/<slug> --base
+  <base> --no-cd -y` (`<base>` is the brief's base or the repo's default
+  branch), write the plan documents: an OpenSpec change written to
+  `exxo-common:openspec-changes` conventions where the repo uses
+  `openspec/`, otherwise the repo's own plan convention (its CLAUDE.md or
+  docs say where; ask Tim if there is none); and an ADR following the repo's
+  ADR conventions whenever the plan makes an architectural choice. Open a
+  DRAFT PR carrying them against the base and keep updating it as the plan
+  iterates, pushing at checkpoints rather than on every edit. An
+  `implementer` subagent does the writing in that worktree (its brief
+  restates the worktree rule, the commit trailer, that the PR stays a draft
+  and is never merged, and what to write); the planner writes inline instead
+  when the plan documents are one short file, such as a single ADR. Reference
+  the PR and documents under `## Decisions`.
+- **Linear, mirrored.** Look for an existing ticket first, excluding
+  siblings' (`## Sibling planners`). Keep to one parent ticket with
+  sub-issues; a Linear project only for very large works. At the settled
+  point create or take the parent ticket and label it `squad:planning`. From
+  then on the parent's description mirrors the current plan summary (goal,
+  approach, a link to the draft PR) and the sub-issues mirror the
+  deliverables, one each. When the plan changes materially, update the parent
+  and add, retitle or close sub-issues in the same step as the draft PR. While
+  drafting, the parent sits in the team's planning or backlog state; on
+  acceptance it moves to the team's ready or todo state (step 5). List ids
+  and URLs under `## Tickets`. If the session has no Linear tools, tell Tim
+  which tickets and updates the planner would make, and carry on.
 - **Notion docs estate.** Have `notion-ops` find the Notion pages the work
   touches and report what they say. Where the plan diverges from them or
   leaves them stale, propose the amendment or addition to Tim in the session;
@@ -182,9 +206,11 @@ are missing. Otherwise it is new text. Body headings, in this order:
 - `## Approach`
 - `## Deliverables`: each with its check.
 - `## Tickets`: Linear ids and URLs (see step 2).
-- `## Decisions`: ADR and OpenSpec references.
+- `## Decisions`: ADR and OpenSpec references, and the plan PR.
 - `## Docs amendments`: Notion amendments proposed or applied.
 - `## Recommended model and effort`
+- `## Approval`: interactive only; Tim's words accepting the plan, quoted
+  verbatim, with the date (step 5).
 - `## Open questions`: headless only; may be empty.
 - `## Scope change`: only for a resubmission to a running task (step 7).
 
@@ -195,30 +221,47 @@ Call `mcp__squad__submit_task` with `content`, `plan`, and:
 - `task_id`: headless, always the `--task-id`; interactive, only when
   revising an existing task.
 - `draft`: headless (a `planner` session), always `true`. Interactive (an
-  `operator` session): omit it, because the submission is Tim's design
-  approval (spec §6.2); `true` only when he invoked `/squad-planner --draft`
-  or asks in the session for GUI approval instead.
+  `operator` session): never send it, because the submission is Tim's design
+  approval (spec §6.2).
 - No hash field: the orchestrator computes the content hash itself.
-
-Before an interactive submission without `--draft`, show Tim the composed
-markdown and tell him that submitting approves it; submit on his go-ahead.
 
 The answer is `{task_id, state}` (plus the orchestrator's hash of the
 content, which needs no action).
 
+**Interactive: the acceptance gate.** Until Tim says in his own words that the
+plan is accepted or finalised, the planner neither calls `submit_task` nor
+does the file drop below. Agreement to a step ("yes, create the tickets") is
+not acceptance of the plan; when unsure, ask whether he accepts it. Show him
+the composed markdown as the current draft before asking. When he accepts,
+in this order:
+
+1. Quote his words verbatim, with the date, under `## Approval`, then submit
+   (or do the interim drop below). If the call is refused, fix it per step 6;
+   nothing after this step happens until a submission has succeeded.
+2. Mark the plan PR ready with `gh pr ready`. Never merge it.
+3. Move the parent ticket to the team's ready or todo state and replace
+   `squad:planning` with `squad:planned` on every ticket of the plan.
+4. Delete the claim file.
+
+If Tim ends the session without accepting, nothing is submitted, and the
+planner says so. The draft PR and the `squad:planning` labels stay for him to
+resume or clean up, and the planner tells him which they are; it deletes its
+claim file.
+
 **Interim, no orchestrator (interactive only).** When
 `mcp__squad__submit_task` is absent (step 1's check), never drop the
-plan. Write the composed `content` (frontmatter and body, exactly what would
-have been passed to `submit_task`) to `<kickoff dir>/<task-slug>.md`, where
+plan before Tim's acceptance. After it, write the composed `content`
+(frontmatter and body, exactly what would have been passed to `submit_task`)
+to `<kickoff dir>/<task-slug>.md`, where
 `<task-slug>` is the title in lower-case kebab case (at most 60 characters;
 add `-2`, `-3` … rather than overwrite an existing file). The kickoff dir is
 `kickoff_dir` under `[orchestrator]` in `~/.config/squad/config.toml` when
 set, else `~/squad/kickoff` (the config schema's default); create it if
 missing. Tell Tim the path, and that the orchestrator picks the file up from
 the kickoff directory at the cut-over, where it goes through intake and
-approval like any dropped file (so this is not an approval, whatever
-`--draft` said). With the tool present, the MCP path is authoritative and
-nothing is written to disk.
+approval like any dropped file. Steps 2 to 4 above then apply as for a
+submission. With the tool present, the MCP path is authoritative and nothing
+is written to the kickoff directory.
 
 ## 6. Problems
 
@@ -243,7 +286,9 @@ interactive shows Tim the problems and asks how to proceed.
 
 - An amendment (a `plan_amended` turn, or any later turn in the same session
   asking for changes) is applied and resubmitted with the same `task_id`,
-  replacing the pending plan. A headless turn ends with a fresh hand-back
+  replacing the pending plan. Interactive, a change updates the plan
+  documents, the PR and the tickets first, and is resubmitted when Tim says
+  it is accepted again (his new words, quoted under `## Approval`). A headless turn ends with a fresh hand-back
   line under the rule in step 8.
 - From Tim's interactive session, a resubmission for a `running` task becomes
   a scope-change directive to the member (spec §6.2–§6.3). Do it only when
@@ -266,6 +311,39 @@ lines and parses the last line as JSON with a `squad_planner` key; anything
 else counts as no hand-back. Summary prose may come before it. Then end the
 turn. The `submit_task` call itself is the authoritative record of the plan.
 
-**Interactive.** Tell Tim the task id and state: a `--draft` plan waits on
-the GUI's task screen, an approved one goes to preflight. For an interim file
-drop, the path instead.
+**Interactive.** Tell Tim the task id and state (an approved plan goes to
+preflight), that the plan PR is ready and which tickets are `squad:planned`.
+For an interim file drop, the path instead of the task id. If he ended
+without accepting, say what stays (step 5).
+
+## Sibling planners
+
+Interactive form. Several planner sessions may run at once, including ones
+sweeping a backlog; there is no sweep mode or flag, so a backlog sweep is an
+ordinary planner session with that description. What siblings are tackling is
+recorded in shared state, never in chat.
+
+- **Tickets, in Linear.** Taking a ticket into a plan applies the label
+  `squad:planning`; acceptance replaces it with `squad:planned` (step 5).
+  Before proposing work, exclude tickets labelled `squad:planning` or
+  `squad:planned` and tickets in an in-progress state. Labels go through the
+  Linear tools of the session; with none, tell Tim which tickets the planner
+  would label, and carry on. A `squad:planning` ticket that no live claim file
+  lists (its planner ended without accepting) is reported to Tim, and taken
+  only with his say-so.
+- **Scope, and the interim path: the claims directory.** Work with no ticket
+  yet is claimed in `<kickoff_dir>/../planning/` (`kickoff_dir` as in step 5;
+  default `~/squad/planning/`; create it if missing), one JSON file per
+  planner session named `<session-id>.json`, holding `{repo, tickets, scope,
+  started_at, updated_at}` (timestamps ISO 8601 UTC). The session id is
+  `session_id` from `squad://me`; with no squad, `planner-` plus eight random
+  hex characters, chosen once. Write the file at the settled point, refresh it
+  when the scope changes, and delete it at acceptance or when Tim abandons the
+  plan. A file whose `updated_at` is over 24 hours old is stale and ignored.
+- **Reading.** At the start, and before taking any ticket, read every claim
+  file and the TaskPlan frontmatter of the files in the kickoff directory;
+  tell Tim what siblings hold, and keep clear of it.
+- **Messages** between planner sessions are a tie-break only, never the
+  record.
+- At slice 2 the orchestrator takes over claims (the context brief carries
+  them) and the claims directory goes.

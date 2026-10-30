@@ -120,7 +120,7 @@ check "squad-planner names every TaskPlan field" contains "$P" \
     '`title`' '`deliverables`' '`depends_on`' '`resources`' '`operator_steps`' '`infra`' '`kickoff_brief`' \
     '`merge_authority`' '`test_policy`' '`priority_suggestion`' '`blocks_launch`' '`blocks_step`' '`trunk_service`'
 check "squad-planner carries the submit contract" contains "$P" \
-    mcp__squad__submit_task --draft squad://context-brief/ '--headless --task-id' \
+    mcp__squad__submit_task squad://context-brief/ '--headless --task-id' \
     '"squad_planner":"submitted"' '"squad_planner":"failed"' 'last non-empty line' 'code fence' ExitPlanMode
 check "squad-planner sends no content hash" sh -c '! grep -nE "sha256|shasum" "$1"' _ "$P"
 check "squad-planner composes and never saves" contains "$P" 'compose, do not save' 'existing readable file'
