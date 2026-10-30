@@ -3,7 +3,7 @@ context: exxo
 model: opus
 effort: high
 needs: none
-join: /squad-join --name <member> --priority 3 --needs <connectors> --branch squad/<member>
+join: /squad-member
 launch: claude-kickoff ~/claude/prompts/<date>/<NN>-<member>.md
 base: main
 depends: none
@@ -11,7 +11,7 @@ tickets: <KEY-1>, <KEY-2>
 before-launch: none
 ---
 
-/squad-join --name <member> --priority 3 --needs <connectors> --branch squad/<member>
+/squad-member
 
 <!--
 Kickoff prompt template. Copy to ~/claude/prompts/<yymmdd>/<NN>-<member>.md,
@@ -55,7 +55,7 @@ Values may run long. A comment after `context` is fine: only its first word coun
   add_dirs      optional comma or space separated paths (~ expanded), each passed as
                 `--add-dir`, so the member can read and write brief and report files outside
                 its cwd without prompts; each must exist (else exit 3)
-  join          the /squad-join line the member runs first (repeat it as the first
+  join          the /squad-member line the member runs first (repeat it as the first
                 line of the body so the member sees it)
   launch        informational: how it is started; claude-kickoff is the launcher
   base          base branch the work starts from (and PRs target), if not main
