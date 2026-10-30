@@ -87,10 +87,10 @@ Consequence: never hand-edit `~/.claude-*/settings.json` for anything meant
 to last — it reverts on the next sync. Put it in the right fragment instead.
 Account-specific keys (the exxo-skills marketplace, its plugin) live only in
 `settings.exxo.json`; `~/.claude-personal` must never receive Exxo config.
-The one carve-out is OAuth-only MCP servers (`datadog`, `boards`, `workos`):
+The one carve-out is OAuth-only MCP servers (`datadog`, `boards`, `workos`, `vercel`):
 they hold no credential and access is gated by the provider's own login, so
 they live in `mcp.shared.json` and reach every context, as does the stdio
-`playwright`. `exxo-openrouter` denies all four via `deniedMcpServers` in its
+`playwright`. `exxo-openrouter` denies all five via `deniedMcpServers` in its
 overlay: workers cannot authenticate, and get no browser automation. The same
 overlay sets `superpowers@claude-plugins-official` to `false`, because its
 process skills stop and ask the user questions, which an unattended K3 worker
@@ -434,8 +434,8 @@ plugin (`<context>/plugins/synced/`), which the fragments don't manage.
   `files/claude/mcp.shared.json` (this now includes `Sanity`, OAuth-only
   since 2026-09-28 and no longer token-bearing; `datadog` and `boards`,
   OAuth-only and moved here on 2026-10-25 so exxo-personal gets them; and
-  `playwright` and `workos`, moved here on 2026-10-30 after the reserve
-  context was found without them) and reach every context on the next
+  `playwright`, `workos` and `vercel`, moved here on 2026-10-30 after the
+  reserve context was found without them) and reach every context on the next
   `claude-sync`. Notion is the claude.ai account connector, not a server
   here. Genuinely token-bearing ones are
   hand-added per context by design and simply haven't been added there yet —

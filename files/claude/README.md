@@ -336,11 +336,13 @@ entries, with a `.bak`).
   (noted 2026-10-23).
 
 - No context carries a hand-added MCP server any more (checked 2026-10-30).
-  The two that were hand-added once both turned out to be credential-free and
+  The three that were hand-added once all turned out to be credential-free and
   moved into `mcp.shared.json` on 2026-10-30, after the reserve context was
   found without them. They were `playwright`, a stdio server (`playwright-mcp`,
-  from `scripts/pnpm-globals`), and `workos`, which is OAuth-only HTTP and so
-  needs a per-context login. `exxo-openrouter` denies both in its overlay: the
+  from `scripts/pnpm-globals`), and `workos` and `vercel`
+  (`https://mcp.vercel.com`), which are OAuth-only HTTP and so need a
+  per-context login. The separate `vercel@claude-plugins-official` plugin
+  stays `false`. `exxo-openrouter` denies all three in its overlay: the
   unattended K3 workers get no browser automation and cannot complete an
   OAuth login. The legacy user-scope `notion` server is retired everywhere.
   Notion reaches a context through the claude.ai `Notion` connector, which

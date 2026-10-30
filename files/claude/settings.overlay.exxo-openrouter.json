@@ -18,7 +18,8 @@
     { "serverName": "datadog" },
     { "serverName": "boards" },
     { "serverName": "playwright" },
-    { "serverName": "workos" }
+    { "serverName": "workos" },
+    { "serverName": "vercel" }
   ],
   "permissions": {
     "deny": [
