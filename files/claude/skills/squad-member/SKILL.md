@@ -203,21 +203,24 @@ while) goes stale against its base. When the kickoff names a plan PR or an
 OpenSpec change, your first step, before building anything, is a staleness
 pass:
 
-1. Fetch, then rebase the plan branch
-   onto the kickoff's base (main or the active trunk, e.g. `trunk/<name>`);
-   resolve conflicts in the plan documents only.
-2. Re-validate the plan against the rebased base: `openspec validate` on the
-   change (or the repo's equivalent); the files, modules and APIs the plan
-   cites still exist and look as described; the specs it amends have not
-   moved.
+1. In your own lane worktree, fetch. Create the lane branch from the plan PR
+   branch (`origin/<plan-branch>`), so the OpenSpec change directory travels in
+   the implementing PR, as `exxo-common:openspec-changes` has it. Then rebase
+   the lane onto the kickoff's base (main or the active trunk), that is
+   `origin/<base>`; resolve conflicts in the plan documents only. Never push
+   to, and never force-push, the plan branch.
+2. Re-validate the plan against the rebased base: `openspec validate <id>
+   --strict` on the change (or the repo's equivalent); the files, modules and
+   APIs the plan cites still exist and look as described; the specs it
+   amends have not moved.
 3. Check that the Linear tickets it references are still open and unchanged
    in scope.
 4. Record the drift in one `mcp__squad__set` `detail` line. If the drift
    changes the approach, `mcp__squad__raise` a `review` before building;
    never re-plan silently.
 
-Create the lane branch for the build from the rebased base. The plan documents
-land with the work, or in the plan PR, whichever the repo's convention is.
+The plan documents land with the work, in the lane PR. When it opens, close
+the plan PR as superseded, with a comment linking the lane PR.
 
 ## Infra helpers
 

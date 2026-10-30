@@ -44,8 +44,8 @@ orchestrator never needs to know which way a plan was made.
   planners`; it still makes no launches and sends no messages to members.
 - It never calls `ExitPlanMode`: the plan goes to `submit_task`, not to a
   mode switch. The broker launches planners in plan mode (contracts README
-  rule 7), but the skill relies on no permission mode and works read-only in
-  all of them.
+  rule 7), but the skill relies on no permission mode: headless works
+  read-only in all of them.
 - Of the squad's tools it uses `mcp__squad__submit_task` and the resources
   only (`squad://context-brief/...`, `squad://me`).
 - Its own delegation: dedicated agents first (`Explore` for read-only
@@ -108,19 +108,25 @@ documents, the draft PR and Linear in the same step.
   ADR conventions whenever the plan makes an architectural choice. Open a
   DRAFT PR carrying them against the base and keep updating it as the plan
   iterates, pushing at checkpoints rather than on every edit. An
-  `implementer` subagent does the writing in that worktree (its brief
-  restates the worktree rule, the commit trailer, that the PR stays a draft
-  and is never merged, and what to write); the planner writes inline instead
-  when the plan documents are one short file, such as a single ADR. Reference
-  the PR and documents under `## Decisions`.
+  `implementer` subagent does the writing in that worktree; the planner
+  writes inline instead when the plan documents are one short file, such as
+  a single ADR. The subagent brief restates, since skills do not travel:
+  the absolute worktree path (the `wt ... --no-cd` output) and that it works
+  only there; `exxo-common:openspec-changes`, and that `openspec validate
+  <id> --strict` passes before it hands back; the base as `origin/<base>`
+  after a fetch; the exact commit trailer lines and PR body footer, passed
+  verbatim from this session's attribution instructions; and that it opens
+  the PR, as a DRAFT, with `-R <owner/name>` over the SSH remote, and never
+  merges it. Reference the PR and documents under `## Decisions`.
 - **Linear, mirrored.** Look for an existing ticket first, excluding
   siblings' (`## Sibling planners`). Keep to one parent ticket with
   sub-issues; a Linear project only for very large works. At the settled
   point create or take the parent ticket and label it `squad:planning`. From
   then on the parent's description mirrors the current plan summary (goal,
   approach, a link to the draft PR) and the sub-issues mirror the
-  deliverables, one each. When the plan changes materially, update the parent
-  and add, retitle or close sub-issues in the same step as the draft PR. While
+  deliverables, one each, each labelled `squad:planning` when created. When the
+  plan changes materially, update the parent and add, retitle or close
+  sub-issues in the same step as the draft PR. While
   drafting, the parent sits in the team's planning or backlog state; on
   acceptance it moves to the team's ready or todo state (step 5). List ids
   and URLs under `## Tickets`. If the session has no Linear tools, tell Tim
@@ -243,9 +249,10 @@ in this order:
 1. Quote his words verbatim, with the date, under `## Approval`, then submit
    (or do the interim drop below). If the call is refused, fix it per step 6;
    nothing after this step happens until a submission has succeeded.
-2. Mark the plan PR ready with `gh pr ready`. Never merge it.
+2. Mark the plan PR ready with `gh pr ready <n> -R <owner/name>`. Never
+   merge it.
 3. Move the parent ticket to the team's ready or todo state and replace
-   `squad:planning` with `squad:planned` on every ticket of the plan.
+   `squad:planning` with `squad:planned` on the parent and every sub-issue.
 4. Delete the claim file.
 
 If Tim ends the session without accepting, nothing is submitted, and the
@@ -263,9 +270,9 @@ add `-2`, `-3` … rather than overwrite an existing file). The kickoff dir is
 `kickoff_dir` under `[orchestrator]` in `~/.config/squad/config.toml` when
 set, else `~/squad/kickoff` (the config schema's default); create it if
 missing. Tell Tim the path, and that the orchestrator picks the file up from
-the kickoff directory at the cut-over, where it goes through intake and
-approval like any dropped file. Steps 2 to 4 above then apply as for a
-submission. With the tool present, the MCP path is authoritative and nothing
+the kickoff directory at the cut-over, through intake, as an already-approved
+plan: Tim's acceptance is the approval. Steps 2 to 4 above therefore apply
+at acceptance, as for a submission. With the tool present, the MCP path is authoritative and nothing
 is written to the kickoff directory.
 
 ## 6. Problems
@@ -291,10 +298,14 @@ interactive shows Tim the problems and asks how to proceed.
 
 - An amendment (a `plan_amended` turn, or any later turn in the same session
   asking for changes) is applied and resubmitted with the same `task_id`,
-  replacing the pending plan. Interactive, a change updates the plan
-  documents, the PR and the tickets first, and is resubmitted when Tim says
-  it is accepted again (his new words, quoted under `## Approval`). A headless turn ends with a fresh hand-back
-  line under the rule in step 8.
+  replacing the pending plan. Interactive, an amendment after acceptance
+  first reverts the plan to drafting: `gh pr ready --undo <n> -R
+  <owner/name>`, the labels back to `squad:planning` on every ticket, the
+  parent back in the planning state, and the claim file rewritten. Then it
+  updates the plan documents, the PR and the tickets, and resubmits when Tim
+  says it is accepted again (his new words, quoted under `## Approval`),
+  when the acceptance steps of step 5 run again. A headless turn ends with
+  a fresh hand-back line under the rule in step 8.
 - From Tim's interactive session, a resubmission for a `running` task becomes
   a scope-change directive to the member (spec §6.2–§6.3). Do it only when
   Tim asks for it, and quote his words verbatim, with the date, under
@@ -342,8 +353,9 @@ recorded in shared state, never in chat.
   planner session named `<session-id>.json`, holding `{repo, tickets, scope,
   started_at, updated_at}` (timestamps ISO 8601 UTC). The session id is
   `session_id` from `squad://me`; with no squad, `planner-` plus eight random
-  hex characters, chosen once. Write the file at the settled point, refresh it
-  when the scope changes, and delete it at acceptance or when Tim abandons the
+  hex characters, chosen once. Write the file at the settled point, refresh
+  it (and `updated_at`) at every material plan update, in the same step as the
+  PR and Linear update, and delete it at acceptance or when Tim abandons the
   plan. A file whose `updated_at` is over 24 hours old is stale and ignored.
 - **Reading.** At the start, and before taking any ticket, read every claim
   file and the TaskPlan frontmatter of the files in the kickoff directory;
