@@ -65,7 +65,7 @@ bash:  .bashrc > common.sh > local.sh, then interactive-only aliases/prompt
 - zsh is the redundant fallback, brought **toward** fish parity for the cheap
   parts only. Variables and PATH (including the gcloud SDK bin and
   `LSCOLORS`) live in `common.sh`; `.zshrc` (interactive only) carries nvm,
-  the Claude context wrappers (`claude`, `claude-personal`, `claude-exxo`,
+  the Claude context wrappers (`claude`, `claude-personal`, `claude-reserve`, `claude-exxo`,
   `claude-exxo-personal`, `claude-exxo-openrouter`, `claude-default`, one
   `_claude_ctx` helper and one context-dir list, mirroring fish's
   `__claude_ctx`) and the plain one-line aliases shared with fish and
