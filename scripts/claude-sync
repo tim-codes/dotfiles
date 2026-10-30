@@ -391,6 +391,20 @@ mcp_status_lines() {
     ' 2>/dev/null || echo "  (unreadable .claude.json — skipped)"
 }
 
+# A context-level settings.local.json is per-context config that bypasses the
+# fragments, so it is drift: retired on apply (backed up first), reported in
+# --diff. Rule COUNTS only — the rules themselves never reach the terminal.
+local_settings_status() {
+    local f="$1/settings.local.json"
+    [ -f "$f" ] || return 0
+    local counts
+    counts="$(jq -r '[.permissions.allow, .permissions.deny, .permissions.ask]
+        | map(if type == "array" then length else 0 end)
+        | "\(.[0]) allow / \(.[1]) deny / \(.[2]) ask"' "$f" 2>/dev/null)" \
+        || counts="unreadable"
+    echo "  settings.local.json: present ($counts rules) — would be retired"
+}
+
 if [ "$diff_only" = 1 ]; then
     for mapping in "${CONTEXTS[@]}"; do
         name="${mapping%%:*}"
@@ -422,6 +436,11 @@ if [ "$diff_only" = 1 ]; then
 
         info "${ctx/#$HOME/~}/agents vs repo (files/claude/agents, shared_agents() for curated contexts)"
         agents_status_lines "$account" "$ctx"
+
+        if [ -f "$ctx/settings.local.json" ]; then
+            info "${ctx/#$HOME/~}/settings.local.json (unmanaged per-context config)"
+            local_settings_status "$ctx"
+        fi
     done
     exit 0
 fi
@@ -450,6 +469,20 @@ sync_settings() {
     fi
     cp "$MERGE_TMP" "$ctx/settings.json"
     echo "  settings.json: written from settings.shared.json + settings.$account.json"
+}
+
+# ---- settings.local.json: retire it (context-level local settings are drift) ----
+# Claude Code reads <context>/settings.local.json as extra user-scope config,
+# which would let a context diverge from the fragments. Back it up, remove it,
+# and leave promotion to the operator — same shape as the settings.json drift.
+sync_local_settings() {
+    local account="$1" ctx="$2"
+    [ -f "$ctx/settings.local.json" ] || return 0
+    local backup="$ctx/settings.local.json.bak-$(date +%Y%m%d-%H%M%S)"
+    cp -p "$ctx/settings.local.json" "$backup"
+    rm "$ctx/settings.local.json"
+    echo "  settings.local.json: present — backed up to ${backup/#$HOME/~} and removed"
+    echo "  (promote anything worth keeping into settings.shared.json / settings.$account.json, then re-run)"
 }
 
 # ---- CLAUDE.md: shared baseline + optional account fragment, write if changed ----
@@ -794,6 +827,7 @@ for mapping in "${CONTEXTS[@]}"; do
     info "${ctx/#$HOME/~}"
 
     sync_settings "$name" "$account" "$ctx"
+    sync_local_settings "$account" "$ctx"
     sync_claude_md "$account" "$ctx"
     sync_mcp_servers "$account" "$ctx"
     sync_skills "$name" "$account" "$ctx"

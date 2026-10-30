@@ -71,6 +71,16 @@ other argument prints the usage to stderr and exits 2 *without syncing* (before
 this, an unrecognised flag such as `--help` fell through to a real sync).
 `tests/claude-sync-args.sh` covers it.
 
+A context-level `<context>/settings.local.json` is drift too: Claude Code reads
+it as extra user-scope config, so it would let one context diverge from the
+fragments. `claude-sync --diff` reports it as `settings.local.json: present (N
+allow / N deny / N ask rules) — would be retired` (counts only, never rules),
+and apply copies it to `settings.local.json.bak-<timestamp>`, removes it and
+prints the promote hint. Promote anything worth keeping into
+`settings.shared.json` / `settings.<account>.json`. (This is not the per-repo
+`.claude/settings.local.json`, which holds permission approvals and is left
+alone.) `tests/claude-sync-local-settings.sh` covers it.
+
 MCP servers are the same shared+fragment family, but they are the one piece of
 repo-managed config that is not a `settings.json` key at all: Claude Code keeps
 user-scope servers in `<context>/.claude.json`, alongside login state and

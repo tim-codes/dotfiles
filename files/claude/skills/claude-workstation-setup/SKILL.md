@@ -394,6 +394,10 @@ plugin (`<context>/plugins/synced/`), which the fragments don't manage.
 
 ## What is deliberately NOT shared or synced
 
+- **A context-level `settings.local.json`** — not allowed: claude-sync backs
+  it up as `settings.local.json.bak-<ts>` and removes it (`--diff` reports it
+  by rule counts only). Promote anything worth keeping into
+  `settings.shared.json` / `settings.<account>.json`.
 - **Permission approvals** — per repository, in `.claude/settings.local.json`
   at the repo root, untouched by claude-sync. (The audit's `--fix-local`
   prunes them on request; nothing does so automatically.)
@@ -428,6 +432,9 @@ plugin (`<context>/plugins/synced/`), which the fragments don't manage.
   OpenRouter worker context; empty means the legacy default context (fine if
   launched deliberately via `claude-default` or an unpinned tool, wrong if
   an account wrapper was intended).
+- `settings.local.json` vanished from a context → claude-sync retires it as
+  drift (backup `settings.local.json.bak-<ts>` alongside); promote what you
+  need into the fragments.
 - A settings or CLAUDE.md change vanished → it was hand-written into a
   context file; promote it into the matching fragment (`settings.<account>.json`
   or `CLAUDE.md.shared`/`CLAUDE.md.<account>`) and re-run `claude-sync`.
