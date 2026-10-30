@@ -349,7 +349,7 @@ entries, with a `.bak`).
 
 ## Deferred follow-ups
 
-- **claude.ai account settings are clickops (backlogged 2026-10-30).** Checked
+- **claude.ai account settings are clickops (backlogged 2026-10-30, [#238](https://github.com/tim-codes/dotfiles/issues/238)).** Checked
   against current Anthropic docs: these settings have no CLI, settings.json key,
   consumer API or export, so they are web-UI only:
   - profile and About-me text;
@@ -386,13 +386,13 @@ entries, with a `.bak`).
   strings. Accepted trade-off (Grep/Write tools still work); revisit if it
   bites a recurring task, with a narrower floor entry rather than an allow
   (noted 2026-10-23).
-- `claude-config-audit`'s mutating-recipe and research-domain checks are
+- ([#239](https://github.com/tim-codes/dotfiles/issues/239)) `claude-config-audit`'s mutating-recipe and research-domain checks are
   name/pattern heuristics (`deploy|revoke|destroy|reset|restore|env-set|-prod`,
   writes to `.env`). A recipe that mutates
   under an innocuous name (h2gc-portal's `e2e-auth-state`) is not caught —
   extend the patterns when one turns up rather than trusting a clean run
   as proof (noted 2026-10-23).
-- The audit's skill-link duplicate check knows the exxo-mantine plugin's
+- ([#239](https://github.com/tim-codes/dotfiles/issues/239)) The audit's skill-link duplicate check knows the exxo-mantine plugin's
   `mantine-*` names by prefix, not by reading the plugin snapshot; another
   plugin that ships a skill also linked in a repo would go unflagged
   (noted 2026-10-23).

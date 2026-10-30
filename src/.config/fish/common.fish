@@ -319,7 +319,7 @@ alias gsw='git switch'
 alias gsw-='git switch -'
 function gswp
     git pull origin $argv[1]:$argv[1]
-    # todo: why is this line disabled?
+    # todo (#243): why is this line disabled?
     # git switch $argv[1]
 end
 
