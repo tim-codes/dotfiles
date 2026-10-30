@@ -1,6 +1,6 @@
 ---
 name: workstation-sync
-description: Bring this MacBook's whole dev stack (dotfiles, homelab, exxo skills, agent-tooling, plus Claude plugins in every context) fully up to date — survey, branch/push local work, merge Tim-approved PRs, pull, reinstall what changed. The heavy update, interactive, machine-agnostic. For a quick start-of-day readiness check use workstation-setup instead; for how the Claude setup works use claude-workstation-setup. Use when Tim says "sync my dev stack", "update everything", "bring this machine up to date", "/workstation-sync".
+description: Bring this MacBook's whole dev stack (dotfiles, homelab, exxo skills, agent-tooling, tmux-home, stray, the upstream tools in the manifests, plus Claude plugins in every context) fully up to date — survey, branch/push local work, merge Tim-approved PRs, pull, reinstall what changed. The heavy update, interactive, machine-agnostic. For a quick start-of-day readiness check use workstation-setup instead; for how the Claude setup works use claude-workstation-setup. Use when Tim says "sync my dev stack", "update everything", "bring this machine up to date", "/workstation-sync".
 ---
 
 # Workstation sync: bring the dev stack up to date
