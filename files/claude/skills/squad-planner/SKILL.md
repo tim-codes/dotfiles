@@ -37,9 +37,8 @@ orchestrator never needs to know which way a plan was made.
 
 - The headless planner plans only: no worktrees, no PRs, no launches, no
   messages to members, no commits, no file writes. Its task markdown is
-  composed in context and passed as `content`: compose, do not save. The
-  only exception is the interim file drop in step 5 when no orchestrator is
-  reachable. The interactive planner also keeps the plan documents, draft
+  composed in context and passed as `content`: compose, do not save,
+  for the interactive planner too. The interactive planner also keeps the plan documents, draft
   PR and Linear tickets of step 2 and its planning claim in the
   orchestrator (`## Sibling planners`); it still makes no launches and sends
   no messages to members.
@@ -85,8 +84,9 @@ orchestrator never needs to know which way a plan was made.
 - No orchestrator reachable (interactive only): if `mcp__squad__submit_task`
   is absent, the squad is not reachable from here at all; skip the read and
   the claim. Tell Tim, write "context brief unavailable" under `## Context`,
-  and carry on; step 5 then uses the interim file drop. With nothing to hold
-  a claim, the sibling check falls back to the Linear labels alone.
+  and carry on as far as step 2: plan documents, draft PR and Linear ticket,
+  with the sibling check on the Linear labels alone. Nothing more is
+  possible, so the planner stops there (step 5, "No orchestrator").
 
 ## 2. Shape the work
 
@@ -247,14 +247,14 @@ The answer is `{task_id, state}` (plus the orchestrator's hash of the
 content, which needs no action).
 
 **Interactive: the acceptance gate.** Until Tim says in his own words that the
-plan is accepted or finalised, the planner neither calls `submit_task` nor
-does the file drop below. Agreement to a step ("yes, create the tickets") is
+plan is accepted or finalised, the planner does not call `submit_task`.
+Agreement to a step ("yes, create the tickets") is
 not acceptance of the plan; when unsure, ask whether he accepts it. Show him
 the composed markdown as the current draft before asking. When he accepts,
 in this order:
 
-1. Quote his words verbatim, with the date, under `## Approval`, then submit
-   (or do the interim drop below). If the call is refused, fix it per step 6;
+1. Quote his words verbatim, with the date, under `## Approval`, then submit.
+   If the call is refused, fix it per step 6;
    nothing after this step happens until a submission has succeeded.
 2. Mark the plan PR ready with `gh pr ready <n> -R <owner/name>`. Never
    merge it.
@@ -267,21 +267,13 @@ planner says so. The draft PR and the `squad:planning` labels stay for him to
 resume or clean up, and the planner tells him which they are; it releases its
 planning claim.
 
-**Interim, no orchestrator (interactive only).** When
-`mcp__squad__submit_task` is absent (step 1's check), never drop the
-plan before Tim's acceptance. After it, write the composed `content`
-(frontmatter and body, exactly what would have been passed to `submit_task`)
-to `<kickoff dir>/<task-slug>.md`, where
-`<task-slug>` is the title in lower-case kebab case (at most 60 characters;
-add `-2`, `-3` … rather than overwrite an existing file). The kickoff dir is
-`kickoff_dir` under `[orchestrator]` in `~/.config/squad/config.toml` when
-set, else `~/squad/kickoff` (the config schema's default); create it if
-missing. Tell Tim the path, and that the orchestrator picks the file up from
-the kickoff directory through intake, as an already-approved
-plan: Tim's acceptance is the approval. Steps 2 to 4 above therefore apply
-at acceptance, as for a submission (with no orchestrator there is no claim to
-release). With the tool present, the MCP path is authoritative and nothing
-is written to the kickoff directory.
+**No orchestrator (interactive only).** When `mcp__squad__submit_task` is
+absent (step 1's check), the planner tells Tim the squad is unreachable and
+stops at the plan documents, the draft PR and the Linear ticket of step 2.
+It submits nothing, and writes nothing to any directory the orchestrator
+watches: the composed task markdown is shown to Tim in the session, not saved
+as a task file. Plans reach the squad only through `submit_task`; when the
+squad is reachable again, Tim re-runs `/squad-planner` on the same work.
 
 ## 6. Problems
 
@@ -337,7 +329,8 @@ turn. The `submit_task` call itself is the authoritative record of the plan.
 
 **Interactive.** Tell Tim the task id and state (an approved plan goes to
 preflight), that the plan PR is ready and which tickets are `squad:planned`.
-For an interim file drop, the path instead of the task id. If he ended
+If the squad was unreachable, say that nothing was submitted and what stands
+(plan documents, draft PR, ticket). If he ended
 without accepting, say what stays (step 5).
 
 ## Sibling planners
