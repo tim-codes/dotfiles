@@ -1,0 +1,217 @@
+#!/bin/zsh
+# macos-privacy-check — verify that processes in tmux panes still hold the
+# macOS privacy (TCC) grants they need, and guide the re-grant when not.
+#
+#   macos-privacy-check [--notify] [--fix | --dry-run] [--target HOST[:PORT]]
+#                       [--wait SECS] [--quiet]
+#
+# Why: Homebrew's tmux is ad-hoc signed, so every `brew upgrade tmux` is a new
+# application to TCC and the server's Full Disk Access / Local Network / app
+# data grants lapse for every pane. The server is the *responsible process*
+# for everything a pane runs, so the probes here are run through
+# `tmux run-shell`: they test exactly what panes experience, not what this
+# script's own context can do. Background and details:
+# docs/macos-privacy-tmux.md.
+#
+# Checks (PASS/FAIL/SKIP each, with a reason):
+#   server-binary     the running server is the installed tmux binary; after
+#                     an upgrade it is not, and no grant can reach the panes
+#                     until the server restarts.
+#   full-disk-access  /bin/ls of an FDA-gated path. FDA is deny-silent, so
+#                     this never raises a dialog.
+#   local-network     a non-Apple binary connects to a LAN host. EHOSTUNREACH
+#                     means the grant is missing; refused/connected means it
+#                     is there. An Apple-signed /usr/bin/nc tries first as a
+#                     control: if it fails the host is down, not the grant.
+# Deliberately no app-data probe: that raises the very prompt this exists to
+# avoid. TCC.db is never read: reading it needs FDA.
+#
+# Exit: 0 all pass, 1 drift (a FAIL), 2 inconclusive only, 3 usage error.
+# No tmux server: logged, exit 0 (nothing to check).
+#
+# Nothing here changes a privacy setting. --fix only opens System Settings on
+# the right pane and reveals the binary to add; the clicking is yours.
+
+set -u
+SELF=${0:A}   # $0 inside a zsh function is the function's name, not the script
+
+# launchd hands a job a minimal environment; pin PATH so tmux, python3 and
+# curl resolve the same whether run by hand or by the daily job.
+export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+zmodload zsh/datetime
+
+LOG=${PRIVACY_CHECK_LOG:-$HOME/Library/Logs/macos-privacy-check.log}
+TARGET=${PRIVACY_CHECK_LAN_TARGET:-}
+# macOS 13+ deep links. Bundle id confirmed from
+# /System/Library/ExtensionKit/Extensions/SecurityPrivacyExtension.appex;
+# the ?anchor names are the documented ones and unverified on macOS 26 -
+# override here if Settings lands on the wrong pane.
+SETTINGS_FDA=${PRIVACY_CHECK_SETTINGS_URL:-x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles}
+SETTINGS_LAN=${PRIVACY_CHECK_SETTINGS_LAN_URL:-x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_LocalNetwork}
+
+NOTIFY=0 FIX=0 DRY=0 QUIET=0 WAIT=0
+
+usage() { sed -n '2,/^$/p' "$SELF" | sed 's/^# \{0,1\}//'; }
+
+while (( $# )); do
+  case $1 in
+    --notify) NOTIFY=1 ;;
+    --fix) FIX=1 ;;
+    --dry-run) DRY=1 ;;
+    --quiet) QUIET=1 ;;
+    --target) shift; TARGET=${1:-} ;;
+    --wait) shift; WAIT=${1:-0} ;;
+    -h|--help) usage; exit 0 ;;
+    *) print -u2 "unknown option: $1"; usage >&2; exit 3 ;;
+  esac
+  shift
+done
+
+mkdir -p "${LOG:h}"
+log() { print -r -- "$(strftime '%Y-%m-%dT%H:%M:%S%z' $EPOCHSECONDS) $*" >> "$LOG" }
+say() { (( QUIET )) || print -r -- "$*"; log "$*" }
+
+typeset -a FAILS INCONCLUSIVE REMEDY
+result() {  # result STATUS NAME REASON
+  say "$1 $2: $3"
+  case $1 in
+    FAIL) FAILS+=("$2") ;;
+    SKIP) INCONCLUSIVE+=("$2") ;;
+  esac
+}
+
+# --- tmux server -----------------------------------------------------------
+
+TMUX_BIN=$(command -v tmux) || { say "SKIP tmux: not installed"; exit 0 }
+TMUX_REAL=${TMUX_BIN:A}   # /opt/homebrew/Cellar/tmux/<ver>/bin/tmux
+
+server_pid() { "$TMUX_BIN" display-message -p '#{pid}' 2>/dev/null }
+
+SERVER_PID=$(server_pid)
+while [[ -z $SERVER_PID ]] && (( WAIT > 0 )); do
+  sleep 10; (( WAIT -= 10 )); SERVER_PID=$(server_pid)
+done
+if [[ -z $SERVER_PID ]]; then
+  say "SKIP tmux: no server running (nothing to check)"
+  exit 0
+fi
+
+# Run a probe as a child of the server. run-shell blocks until the command
+# exits and hands its output back to this client, so the probe's single
+# result line is what we parse.
+in_server() { "$TMUX_BIN" run-shell "$1" 2>&1 }
+
+# --- 1. server binary vs installed binary ------------------------------------
+
+# lsof on one's own process needs no root; the first txt entry is the
+# executable, even after brew has unlinked it.
+SERVER_BIN=$(lsof -p "$SERVER_PID" 2>/dev/null | awk '$4=="txt"{print $NF; exit}')
+if [[ -z $SERVER_BIN ]]; then
+  result SKIP server-binary "could not read the executable of server pid $SERVER_PID"
+elif [[ $SERVER_BIN == "$TMUX_REAL" ]]; then
+  result PASS server-binary "server pid $SERVER_PID runs the installed $TMUX_REAL"
+else
+  gone=""; [[ -e $SERVER_BIN ]] || gone=" (no longer on disk)"
+  result FAIL server-binary "server pid $SERVER_PID runs $SERVER_BIN$gone; installed is $TMUX_REAL - grants for the installed binary cannot reach panes until the server restarts"
+  REMEDY+=("Restart the tmux server (save sessions first: C-a C-s; then tmux kill-server; launchctl kickstart -k gui/$(id -u)/dev.tim.tmux-server).")
+fi
+
+# --- 2. Full Disk Access -----------------------------------------------------
+
+fda_probe='
+for d in "$HOME/Library/Safari" "$HOME/Library/Mail"; do
+  [ -d "$d" ] || continue
+  err=$(/bin/ls "$d" 2>&1 >/dev/null); rc=$?
+  if [ $rc -eq 0 ]; then echo "FDA ok $d"; exit 0; fi
+  case $err in *"Operation not permitted"*) echo "FDA eperm $d"; exit 0 ;; esac
+  echo "FDA other $d: $err"; exit 0
+done
+echo "FDA nopath"'
+out=$(in_server "$fda_probe")
+case $out in
+  "FDA ok "*)    result PASS full-disk-access "server context can read ${out#FDA ok }" ;;
+  "FDA eperm "*) result FAIL full-disk-access "server context gets EPERM on ${out#FDA eperm } - no Full Disk Access for $SERVER_BIN"
+                 REMEDY+=("Add $TMUX_REAL to Full Disk Access and remove any other 'tmux' row (older identities never match again).") ;;
+  "FDA nopath")  result SKIP full-disk-access "no FDA-gated path exists to probe (~/Library/Safari, ~/Library/Mail)" ;;
+  *)             result SKIP full-disk-access "unexpected probe result: $out" ;;
+esac
+
+# --- 3. Local Network --------------------------------------------------------
+
+if [[ -z $TARGET ]]; then
+  gw=$(route -n get default 2>/dev/null | awk '/gateway:/{print $2}')
+  [[ -n $gw ]] && TARGET="$gw:80"
+fi
+host=${TARGET%%:*}; port=${TARGET##*:}; [[ $port == "$host" ]] && port=80
+
+if [[ -z $host ]]; then
+  result SKIP local-network "no target: pass --target HOST[:PORT] or set PRIVACY_CHECK_LAN_TARGET (no default gateway found)"
+else
+  # Control: Apple-signed nc is never subject to the grant. -z scan, 4s.
+  ctl=$(in_server "/usr/bin/nc -z -G 4 $host $port >/dev/null 2>&1 && echo up || echo down")
+  if [[ $ctl != up ]]; then
+    result SKIP local-network "$host:$port not reachable even by Apple-signed /usr/bin/nc - target down or wrong, not a grant problem"
+  else
+    # Non-Apple binary. Homebrew python3 reports errno exactly; curl is the
+    # fallback (exit 7 with "No route to host" in its message).
+    if [[ -x /opt/homebrew/bin/python3 ]]; then
+      probe="/opt/homebrew/bin/python3 -I -c 'import socket,sys
+s=socket.socket(); s.settimeout(4)
+try:
+    s.connect((\"$host\", $port)); print(\"LAN ok connected\")
+except ConnectionRefusedError: print(\"LAN ok refused\")
+except OSError as e: print(\"LAN err\", e.errno, e.strerror)
+except Exception as e: print(\"LAN err\", 0, e)'"
+    elif [[ -x /opt/homebrew/opt/curl/bin/curl ]]; then
+      probe="out=\$(/opt/homebrew/opt/curl/bin/curl -sS --connect-timeout 4 -o /dev/null telnet://$host:$port 2>&1); rc=\$?
+case \$rc in 0) echo 'LAN ok connected' ;; 7) case \$out in *'No route to host'*) echo 'LAN err 65 No route to host' ;; *) echo 'LAN ok refused' ;; esac ;; *) echo \"LAN err \$rc \$out\" ;; esac"
+    else
+      probe=""
+    fi
+    if [[ -z $probe ]]; then
+      result SKIP local-network "no non-Apple probe binary (/opt/homebrew/bin/python3 or /opt/homebrew/opt/curl/bin/curl)"
+    else
+      out=$(in_server "$probe")
+      case $out in
+        "LAN ok "*)      result PASS local-network "non-Apple binary reaches $host:$port from the server context (${out#LAN ok })" ;;
+        "LAN err 65"*)   result FAIL local-network "EHOSTUNREACH to $host:$port from the server context while /usr/bin/nc reaches it - Local Network grant missing for $SERVER_BIN"
+                         REMEDY+=("Local Network has no + button: run the LAN tool once from a pane after the server restart and answer Allow.") ;;
+        "LAN err "*)     result SKIP local-network "non-Apple probe failed for another reason: ${out#LAN err }" ;;
+        *)               result SKIP local-network "unexpected probe result: $out" ;;
+      esac
+    fi
+  fi
+fi
+
+# --- verdict and remediation -------------------------------------------------
+
+if (( ${#FAILS} == 0 )); then
+  if (( ${#INCONCLUSIVE} )); then say "RESULT inconclusive: ${(j:, :)INCONCLUSIVE}"; exit 2; fi
+  say "RESULT ok"; exit 0
+fi
+
+say "RESULT drift: ${(j:, :)FAILS}"
+for r in "${REMEDY[@]}"; do say "  - $r"; done
+
+if (( NOTIFY )) && ! (( FIX || DRY )); then
+  osascript -e "display notification \"${(j:, :)FAILS} - run macos-privacy-check --fix\" with title \"macOS privacy drift (tmux)\"" >/dev/null 2>&1 || true
+fi
+
+if (( DRY )); then
+  print -r -- "--fix would:"
+  print -r -- "  open \"$SETTINGS_FDA\""
+  (( ${FAILS[(I)local-network]} )) && print -r -- "  open \"$SETTINGS_LAN\""
+  print -r -- "  open -R \"$TMUX_REAL\"   # the binary to add; the /opt/homebrew/bin/tmux symlink is not it"
+elif (( FIX )); then
+  msg="Privacy grants for tmux panes have lapsed: ${(j:, :)FAILS}."$'\n\n'"${(F)REMEDY}"$'\n\n'"Open System Settings now? Finder will reveal $TMUX_REAL for drag-and-drop."
+  btn=$(osascript -e "display dialog \"${msg//\"/\\\"}\" with title \"macOS privacy drift (tmux)\" buttons {\"Later\", \"Open Settings\"} default button \"Open Settings\"" 2>/dev/null | sed 's/.*button returned://')
+  if [[ $btn == "Open Settings" ]]; then
+    open "$SETTINGS_FDA"
+    (( ${FAILS[(I)local-network]} )) && open "$SETTINGS_LAN"
+    open -R "$TMUX_REAL"
+    log "opened settings ($SETTINGS_FDA) and revealed $TMUX_REAL"
+  else
+    log "user deferred remediation"
+  fi
+fi
+exit 1
