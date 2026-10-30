@@ -13,7 +13,8 @@
   "model": "sonnet",
   "deniedMcpServers": [
     { "serverName": "datadog" },
-    { "serverName": "boards" }
+    { "serverName": "boards" },
+    { "serverName": "playwright" }
   ],
   "permissions": {
     "deny": [

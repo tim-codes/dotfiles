@@ -17,6 +17,11 @@
     "boards": {
       "type": "http",
       "url": "https://boards.exxo.tools/mcp"
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "playwright-mcp",
+      "args": []
     }
   }
 }

@@ -335,13 +335,16 @@ entries, with a `.bak`).
   plugin that ships a skill also linked in a repo would go unflagged
   (noted 2026-10-23).
 
-- `~/.claude-exxo-personal` still has no MCP servers of its own beyond what
-  `claude-sync` manages. `~/.claude-exxo` carries three remaining hand-added
-  ones — `notion`, `playwright`, `workos` — and `~/.claude-personal` two of
-  them (no `workos`). They hold live credentials, so they cannot be codified
-  into `mcp.shared.json`; re-adding them by hand with `claude mcp add -s user`
-  under `CLAUDE_CONFIG_DIR=~/.claude-exxo-personal` is outstanding
-  (noted 2026-08-23).
+- `~/.claude-exxo` carries hand-added `notion` and `workos` servers that
+  `claude-sync` does not manage, and `~/.claude-personal` may still carry a
+  legacy `notion`. Credential-bearing ones cannot be codified into
+  `mcp.shared.json`; add them by hand with `claude mcp add -s user` under each
+  context's `CLAUDE_CONFIG_DIR` where needed (noted 2026-08-23, revised
+  2026-10-30). `playwright` turned out to be a credential-free stdio server
+  (`playwright-mcp`, from `scripts/pnpm-globals`) and moved into
+  `mcp.shared.json` on 2026-10-30, after the reserve context was found
+  without it; `exxo-openrouter` denies it in its overlay, so the unattended
+  K3 workers get no browser automation.
 - The `notion` entry holds a plaintext bearer token in each context's
   `.claude.json` (`env.NOTION_TOKEN`). Nothing here can fix that — a
   user-scope MCP server has no reference-at-invocation form, which is
