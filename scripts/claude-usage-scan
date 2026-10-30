@@ -7,7 +7,7 @@ aggregates and short, redacted description labels (never prompts or tool results
 Usage:
   claude-usage-scan [--root DIR ...] [--since YYYY-MM-DD] [--top N] [--json]
   claude-usage-scan --compare BASE.json [--current CUR.json] [--json] [...scan options]
-Default roots: ~/.claude-personal/projects ~/.claude-exxo/projects ~/.claude-exxo-personal/projects
+Default roots: ~/.claude-personal/projects ~/.claude-reserve/projects ~/.claude-exxo/projects ~/.claude-exxo-personal/projects
 --since sets the "window" period (default: 30 days before today); all-time is always computed.
 --compare diffs the per-period headline metrics (general-purpose share of subagent
 tokens and calls, subagent tokens by agent type, MCP calls by server, long sessions)
@@ -20,7 +20,7 @@ Baseline: docs/superpowers/specs/2026-10-23-usage-baseline.json in the dotfiles 
 import argparse, collections, datetime as dt, glob, json, os, re, statistics, sys
 
 DEFAULT_ROOTS = [os.path.expanduser(p) for p in (
-    "~/.claude-personal/projects", "~/.claude-exxo/projects", "~/.claude-exxo-personal/projects")]
+    "~/.claude-personal/projects", "~/.claude-reserve/projects", "~/.claude-exxo/projects", "~/.claude-exxo-personal/projects")]
 
 TS_RE = re.compile(r'"timestamp":"([0-9T:\-\.Z+]+)"')
 SECRET_RE = re.compile(

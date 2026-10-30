@@ -83,7 +83,7 @@ squad register --name <name> --role client --priority <1-5, default 3> \
 `--capabilities` lists the kinds of delegated work you will take (`code`,
 `review`, `integration`): work tags, never model names. `--model` is the model
 this session actually runs on (e.g. `claude-opus-5-5`, `moonshotai/kimi-k3`).
-A Claude member whose context provides `agent-run` (exxo, exxo-personal)
+A Claude member whose context provides `agent-run` (personal, reserve, exxo, exxo-personal)
 adds `credentials` to its capabilities, so `--need <work>,credentials` can
 match it; K3 members never do. Pass both when you serve jobs (§6c) and whenever you know them; omit
 `--capabilities` for a stream that takes none. Pool members register
@@ -93,7 +93,7 @@ match it; K3 members never do. Pass both when you serve jobs (§6c) and whenever
 if there are none. The pid comes from `$CLAUDE_CODE_MESSAGING_SOCKET` and the
 context from `$CLAUDE_CONFIG_DIR`; the broker derives the account from the
 config dir and returns the member as JSON. Read `req.account` from that
-output (`personal` or `exxo`); null means the config dir is not in
+output (`personal`, `reserve` or `exxo`); null means the config dir is not in
 `~/.config/squad/config.toml`, so stop and tell Tim.
 
 Then say in your reply: **"Squad member name: `<name>` (account

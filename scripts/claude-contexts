@@ -1,9 +1,13 @@
 #!/bin/bash
 # Create the per-account Claude Code CLI config contexts that the
-# claude/claude-personal/claude-exxo aliases in fish select via
+# claude/claude-personal/claude-reserve/claude-exxo aliases in fish select via
 # CLAUDE_CONFIG_DIR:
 #
 #   ~/.claude-personal       personal account (also what bare `claude` now uses)
+#   ~/.claude-reserve        second personal Max subscription, fully separate
+#                            from personal (own transcripts/history/plugins).
+#                            scripts/claude-sync builds its config from the
+#                            personal fragments; nothing is shared back.
 #   ~/.claude-exxo           work (Exxo) account
 #   ~/.claude-exxo-personal  exxo overlay on the personal subscription — the
 #                            exxo context with only the login swapped, for
@@ -37,7 +41,7 @@ adopt=0
 
 legacy="$HOME/.claude"
 
-for ctx in personal exxo exxo-personal exxo-openrouter; do
+for ctx in personal reserve exxo exxo-personal exxo-openrouter; do
     dir="$HOME/.claude-$ctx"
     mkdir -p "$dir"
 

@@ -1,6 +1,6 @@
 ---
 name: claude-workstation-setup
-description: Full disclosure of how Claude Code is set up on Tim's workstations — per-account contexts (personal, exxo, exxo-personal, and the exxo-openrouter (OpenRouter/Kimi K3) context), OpenRouter worker setup, shell wrappers, settings/CLAUDE.md fragment merge (incl. the global permission allow set and deny floor), the repo-config audit hook, repo-managed MCP servers, the two skill-delivery paths (including vendored upstream skills), and where approvals/memory live. Use when asked how the Claude setup/context segregation works, when changing any part of it (claude-sync, settings/CLAUDE.md/MCP fragments, skills, plugins), or when a session behaves as if it's in the wrong account, or when adding/updating a global (cross-session) instruction.
+description: Full disclosure of how Claude Code is set up on Tim's workstations — per-account contexts (personal, reserve, exxo, exxo-personal, and the exxo-openrouter (OpenRouter/Kimi K3) context), OpenRouter worker setup, shell wrappers, settings/CLAUDE.md fragment merge (incl. the global permission allow set and deny floor), the repo-config audit hook, repo-managed MCP servers, the two skill-delivery paths (including vendored upstream skills), and where approvals/memory live. Use when asked how the Claude setup/context segregation works, when changing any part of it (claude-sync, settings/CLAUDE.md/MCP fragments, skills, plugins), or when a session behaves as if it's in the wrong account, or when adding/updating a global (cross-session) instruction.
 ---
 
 # How Claude Code is set up on these workstations
@@ -16,6 +16,15 @@ repo — prefer reading those before modifying anything they govern.
 
 - `~/.claude-personal` — personal account. Bare `claude` (zsh/fish wrapper)
   pins it; desktop alias `claude-d-personal`.
+- `~/.claude-reserve` — a second personal Claude Max subscription as its own
+  context. `claude-reserve` pins it (fish and zsh); desktop alias
+  `claude-d-reserve` (own user-data dir `Claude-Reserve`). claude-sync builds
+  it from the PERSONAL fragments (`reserve:personal` in `CONTEXTS`:
+  settings.personal.json, CLAUDE.md.personal, mcp merge) and gives it the same
+  whole-directory skills and agents symlinks as personal, so it sees every
+  personal skill and agent. It is fully separate otherwise — see "What is
+  deliberately NOT shared" below. The squad/kickoff account label is
+  `reserve`, with its own `resume_group`.
 - `~/.claude-exxo` — work (Exxo) account. `claude-exxo` pins it; desktop
   alias `claude-d-exxo`.
 - `~/.claude-exxo-personal` — OVERLAY, not a third account: the exxo context
@@ -262,8 +271,10 @@ carried no MCP servers at all while `~/.claude-exxo` had four.
 ## Skills reach a context by exactly two paths
 
 1. **Dotfiles skills** (`files/claude/skills/`, this skill included):
-   personal gets a whole-directory symlink (`~/.claude-personal/skills` IS
-   the repo dir — author a skill in place and it lands in git). exxo gets a
+   the personal-account contexts (`personal` and `reserve`, chosen by fragment
+   account, not context name) get a whole-directory symlink
+   (`~/.claude-personal/skills` IS the repo dir — author a skill in place and
+   it lands in git). exxo gets a
    REAL directory of per-skill symlinks curated by claude-sync against an
    allow list: only repo skills named in `shared_skills()` in
    `scripts/claude-sync` get linked in (currently `claude-workstation-setup`,
@@ -338,8 +349,8 @@ managed on claude.ai.
 
 Dedicated subagents live in `files/claude/agents/<name>.md` (frontmatter
 `name`, `description`, `model`; body = the procedure, which restates the
-environment mechanics a subagent doesn't inherit). Personal gets
-`~/.claude-personal/agents` as a whole-directory symlink to that dir; exxo and
+environment mechanics a subagent doesn't inherit). The personal-account contexts (personal, reserve) get
+`agents` as a whole-directory symlink to that dir; exxo and
 exxo-personal get a real `agents/` directory of per-file symlinks for the
 names in `shared_agents()` in `scripts/claude-sync` (currently `implementer`,
 `reviewer`, `git-pr-ops`, `investigator`, `sanity-cms`, `notion-ops` — all of
@@ -388,6 +399,13 @@ plugin (`<context>/plugins/synced/`), which the fragments don't manage.
   `tasks` and `todos` are its own, and there is no cross-provider resume:
   transcripts carry provider-specific thinking blocks, so a session started on
   Anthropic cannot be continued on OpenRouter or vice versa.
+- **Reserve context state** — `~/.claude-reserve` shares NOTHING with
+  `~/.claude-personal`: no overlay symlinks, so its `projects/`,
+  `history.jsonl`, `plugins/`, `plans`, `tasks` and `todos` are its own and
+  there is no cross-resume with personal. Deliberate: Tim wants no conflation
+  of the two subscriptions on the Anthropic backend side (e.g. the desktop and
+  mobile apps); any integration across them is our own tooling's job (the
+  squad/kickoff `resume_group` keeps them apart for the same reason).
 - **Login state** (`.claude.json`), sessions, history — per context. The one
   exception is that file's `.mcpServers` key, which claude-sync merges into
   (above); every other key in `.claude.json` is left exactly as Claude Code
@@ -397,7 +415,8 @@ plugin (`<context>/plugins/synced/`), which the fragments don't manage.
 
 - Session sees Exxo skills in personal (or vice versa) → wrong
   CLAUDE_CONFIG_DIR. Concrete check: `echo $CLAUDE_CONFIG_DIR` —
-  `/Users/tim/.claude-personal` for bare `claude`, `/Users/tim/.claude-exxo`
+  `/Users/tim/.claude-personal` for bare `claude`,
+  `/Users/tim/.claude-reserve` for `claude-reserve`, `/Users/tim/.claude-exxo`
   for `claude-exxo`, `/Users/tim/.claude-exxo-personal` for
   `claude-exxo-personal`, `/Users/tim/.claude-exxo-openrouter` for the
   OpenRouter worker context; empty means the legacy default context (fine if

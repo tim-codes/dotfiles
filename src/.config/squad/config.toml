@@ -16,6 +16,13 @@ name = "personal"
 email = "timoconnell1024@gmail.com"
 config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
 
+# Second personal Max subscription (5x): a separate login with its own state,
+# so its own account and quota.
+[[accounts]]
+name = "reserve"
+email = "tim.oc@outlook.com"
+config_dirs = ["~/.claude-reserve"]
+
 [[accounts]]
 name = "exxo"
 email = "tim@exxo.io"

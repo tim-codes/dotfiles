@@ -9,7 +9,7 @@
 #   servers  — required: absent or not connected counts against the exit code
 #   optional — checked only if the context lists it; absent → skipped
 #
-# [all] applies to every context. Tables are personal, exxo, exxo-personal.
+# [all] applies to every context. Tables are personal, reserve, exxo, exxo-personal.
 # Kept to the subset the parser in claude-reauth reads: [table] headers,
 # `servers`/`optional` string arrays (single- or multi-line), # comments.
 
@@ -17,6 +17,11 @@
 servers = ["playwright"]
 
 [personal]
+servers = ["Sanity", "mantine"]
+
+# Second personal subscription, built from the personal fragments: same
+# expected servers as [personal].
+[reserve]
 servers = ["Sanity", "mantine"]
 
 # Datadog is the user-scope `datadog` server from mcp.shared.json (EU site,

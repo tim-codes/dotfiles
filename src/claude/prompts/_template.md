@@ -34,8 +34,8 @@ Values may run long. A comment after `context` is fine: only its first word coun
 
   cwd           working directory: ~/dev/..., an absolute path, or the bare name of one
                 git checkout under ~/dev
-  context       a context name in ~/.config/claude-kickoff/contexts.toml (personal, exxo,
-                exxo-personal, exxo-openrouter): which account context runs it
+  context       a context name in ~/.config/claude-kickoff/contexts.toml (personal, reserve,
+                exxo, exxo-personal, exxo-openrouter): which account context runs it
                 (overridable with `--account`)
   model         passed as `--model`
   effort        passed as `--effort`

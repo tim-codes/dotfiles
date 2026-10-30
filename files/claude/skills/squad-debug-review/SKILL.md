@@ -54,9 +54,10 @@ Pass `2026-10-24` for it.
 
 ## 3. Locate the transcripts
 
-Transcripts are `~/.claude-{personal,exxo,exxo-personal}/projects/*/<session_id>.jsonl`,
+Transcripts are `~/.claude-{personal,reserve,exxo,exxo-personal}/projects/*/<session_id>.jsonl`,
 plus `~/.claude-exxo-openrouter/projects/*/<session_id>.jsonl` (the K3
-context — a separate history, **not** a symlink into the others).
+context — a separate history, **not** a symlink into the others;
+`~/.claude-reserve` is likewise a fully separate history).
 `~/.claude-exxo-personal/projects` is a symlink to exxo's: dedupe by
 resolved path (`realpath`) so nothing is read twice.
 
