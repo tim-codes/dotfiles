@@ -130,6 +130,15 @@ check "squad-planner composes and never saves" contains "$P" 'compose, do not sa
 check "squad-planner carries the lane rulings" contains "$P" \
     '## Tickets' '## Decisions' '## Docs amendments' '## Recommended model and effort' \
     kickoff_dir notion-ops exxo-common:openspec-changes frontmatter_mismatch
+# Interactive posture (2026-10-30): drafting by default, so the retired --draft
+# flag is gone; the plan lives in a draft PR and Linear tickets mirror it; sibling
+# planners coordinate through Linear labels and a claims directory.
+check "squad-planner has no --draft flag" sh -c '! grep -nF -e "--draft" "$1"' _ "$P"
+check "squad-planner carries the drafting posture" contains "$P" \
+    'draft PR' 'gh pr ready' 'sub-issues' 'mirror' '## Approval'
+check "squad-planner carries the sibling-planner rules" has_headings "$P" '## Sibling planners'
+check "squad-planner names the claim labels and the claims directory" contains "$P" \
+    'squad:planning' 'squad:planned' 'planning/'
 check "kickoff template opens with the squad-member invocation and states merge authority and test policy" \
     sh -c '[ "$(sed -n 1p "$1")" = "/squad-member" ] && [ "$(sed -n 2p "$1")" = "Invoke the squad-member skill first." ] &&
         grep -qxF "## Merge authority" "$1" && grep -qxF "## Test policy" "$1"' _ "$K"
