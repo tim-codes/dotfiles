@@ -60,7 +60,7 @@ RETIRED_PATTERNS=(
     '\bsquad-prompt-hook\b'
     'claude-kickoff [^`]*--resume'
 )
-RETIRED_SCOPE=(squad-member)
+RETIRED_SCOPE=(squad-member squad-planner)
 
 no_retired_names() {
     local dir=$1 p rc=0
@@ -111,6 +111,28 @@ check "squad-member never registers" sh -c '! grep -n "call[^.]*mcp__squad__regi
 check "squad-member carries the section headings" has_headings "$M" \
     '## Turns' '## Status and questions' '## Testing and trunks' '## Landing' '## Heavy jobs' \
     '## Delegating and serving jobs' '## Watches' '## Repo conventions' '## Infra helpers' '## Finishing'
+
+# --- squad-planner and the kickoff template (P7 Task 3) ----------------------
+P="$SKILLS/squad-planner/SKILL.md"
+K="$SKILLS/squad-planner/kickoff-template.md"
+check "squad-planner exists and is shared" exists_and_shared squad-planner
+check "squad-planner names every TaskPlan field" contains "$P" \
+    title deliverables depends_on resources operator_steps infra kickoff_brief merge_authority \
+    test_policy priority_suggestion blocks_launch blocks_step trunk_service
+check "squad-planner carries the submit contract" contains "$P" \
+    mcp__squad__submit_task --draft squad://context-brief/ '--headless --task-id' \
+    '"squad_planner":"submitted"' '"squad_planner":"failed"' 'last non-empty line' 'code fence' ExitPlanMode
+check "squad-planner sends no content hash" sh -c '! grep -nE "sha256|shasum" "$1"' _ "$P"
+check "squad-planner composes and never saves" contains "$P" 'compose, do not save' 'existing readable file'
+# Lane rulings (2026-10-30): planner guidance as content headings, not TaskPlan
+# fields; the interim kickoff-directory drop when submit_task is absent; the
+# contract's frontmatter_mismatch refusal.
+check "squad-planner carries the lane rulings" contains "$P" \
+    '## Tickets' '## Decisions' '## Docs amendments' '## Recommended model and effort' \
+    kickoff_dir notion-ops exxo-common:openspec-changes frontmatter_mismatch
+check "kickoff template opens with the squad-member invocation and states merge authority and test policy" \
+    sh -c '[ "$(sed -n 1p "$1")" = "/squad-member" ] && [ "$(sed -n 2p "$1")" = "Invoke the squad-member skill first." ] &&
+        grep -qxF "## Merge authority" "$1" && grep -qxF "## Test policy" "$1"' _ "$K"
 
 [ "$fail" = 0 ] && echo "ok: skills lint clean"
 exit "$fail"
