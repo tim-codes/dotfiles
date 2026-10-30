@@ -110,7 +110,10 @@ check "squad-member teaches the turn format" contains "$M" '<squad-message' 'ack
 check "squad-member never registers" sh -c '! grep -n "call[^.]*mcp__squad__register" "$1" | grep -iv never' _ "$M"
 check "squad-member carries the section headings" has_headings "$M" \
     '## Turns' '## Status and questions' '## Testing and trunks' '## Landing' '## Heavy jobs' \
-    '## Delegating and serving jobs' '## Watches' '## Repo conventions' '## Infra helpers' '## Finishing'
+    '## Delegating and serving jobs' '## Watches' '## Repo conventions' '## Starting from a plan PR' \
+    '## Infra helpers' '## Finishing'
+check "squad-member teaches the plan PR staleness pass" contains "$M" rebase stale 'openspec validate' \
+    "onto the kickoff's base (main or the active trunk"
 
 # --- squad-planner and the kickoff template (P7 Task 3) ----------------------
 P="$SKILLS/squad-planner/SKILL.md"
@@ -120,7 +123,7 @@ check "squad-planner names every TaskPlan field" contains "$P" \
     '`title`' '`deliverables`' '`depends_on`' '`resources`' '`operator_steps`' '`infra`' '`kickoff_brief`' \
     '`merge_authority`' '`test_policy`' '`priority_suggestion`' '`blocks_launch`' '`blocks_step`' '`trunk_service`'
 check "squad-planner carries the submit contract" contains "$P" \
-    mcp__squad__submit_task --draft squad://context-brief/ '--headless --task-id' \
+    mcp__squad__submit_task squad://context-brief/ '--headless --task-id' \
     '"squad_planner":"submitted"' '"squad_planner":"failed"' 'last non-empty line' 'code fence' ExitPlanMode
 check "squad-planner sends no content hash" sh -c '! grep -nE "sha256|shasum" "$1"' _ "$P"
 check "squad-planner composes and never saves" contains "$P" 'compose, do not save' 'existing readable file'
@@ -130,6 +133,18 @@ check "squad-planner composes and never saves" contains "$P" 'compose, do not sa
 check "squad-planner carries the lane rulings" contains "$P" \
     '## Tickets' '## Decisions' '## Docs amendments' '## Recommended model and effort' \
     kickoff_dir notion-ops exxo-common:openspec-changes frontmatter_mismatch
+# Interactive posture (2026-10-30): drafting by default, so the retired --draft
+# flag is gone; the plan lives in a draft PR and Linear tickets mirror it; sibling
+# planners coordinate through Linear labels and a claims directory.
+check "squad-planner makes the member run the staleness pass" contains "$P" staleness \
+    "onto the kickoff's base (main or the active trunk)"
+check "kickoff template tells the member to run the staleness pass" contains "$K" staleness
+check "squad-planner has no --draft flag" sh -c '! grep -nF -e "--draft" "$1"' _ "$P"
+check "squad-planner carries the drafting posture" contains "$P" \
+    'draft PR' 'gh pr ready' 'sub-issues' 'mirror' '## Approval'
+check "squad-planner carries the sibling-planner rules" has_headings "$P" '## Sibling planners'
+check "squad-planner names the claim labels and the claims directory" contains "$P" \
+    'squad:planning' 'squad:planned' 'planning/'
 check "kickoff template opens with the squad-member invocation and states merge authority and test policy" \
     sh -c '[ "$(sed -n 1p "$1")" = "/squad-member" ] && [ "$(sed -n 2p "$1")" = "Invoke the squad-member skill first." ] &&
         grep -qxF "## Merge authority" "$1" && grep -qxF "## Test policy" "$1"' _ "$K"
