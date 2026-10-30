@@ -238,7 +238,7 @@ def context_of(repo):
     base = os.path.basename(cfg.rstrip("/"))
     if base.startswith(".claude-exxo"):
         return "exxo"
-    if base.startswith(".claude-personal"):
+    if base.startswith((".claude-personal", ".claude-reserve")):
         return "personal"
     if "/dev/exxo/" in repo + "/" or os.path.isdir(os.path.join(repo, SKILLS_SUBMODULE)):
         return "exxo"
