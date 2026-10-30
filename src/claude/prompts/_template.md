@@ -22,8 +22,8 @@ launcher, never a hand-built `claude` line. To continue an existing session in
 another context, the herder calls `claude-kickoff <file> --resume <session-id>
 --account <context> --cwd <the member's live directory>`: the frontmatter cwd is
 ignored, the account-bound and precondition checks run as for a launch, and the
-session restarts with a fixed relaunch note (re-register, then squad-join §5
-`relaunch`); `--dry-run` also prints `resume: <id>` and the context's
+session restarts with a fixed relaunch note (the SessionStart hook rebinds it;
+follow /squad-member); `--dry-run` also prints `resume: <id>` and the context's
 `resume_group`.
 
 FRONTMATTER (key: value lines, ended by the first line that is exactly `---`;
