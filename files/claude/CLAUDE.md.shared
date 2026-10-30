@@ -303,13 +303,18 @@ Model choice:
   one). Pass `opus` only with a one-line reason on the roster line (e.g. a
   design-sensitive implementation lane); `haiku` is fine for pure
   `git-pr-ops` surveys.
-- `general-purpose`: `sonnet` and `opus` are both ordinary choices. Match
-  the model to the task: how complex or multi-step the brief is, how
-  design-sensitive the edit, how much precise instruction-following
-  matters.
+- `general-purpose`: always pass `model` explicitly — `sonnet` by default;
+  `opus` with a one-line reason on the roster line; `fable` rare (below).
+  Never omit it: an omitted model inherits the orchestrator's own model,
+  which in a Fable session means Fable for a task that needed none of it. A
+  PreToolUse guard rejects a general-purpose launch without a model (except
+  in the exxo-openrouter context, where `CLAUDE_CODE_SUBAGENT_MODEL` pins
+  every subagent).
+- `fork`: not from a long-running orchestrator session — a fork inherits the
+  whole context at the parent's model. Write a brief and launch a fresh agent
+  instead.
 - `fable` — rare; only when the subtask needs frontier judgment end-to-end,
-  and say why. (Omitting `model` on `general-purpose` inherits the
-  orchestrator's Opus.)
+  and say why.
 
 On every launch, announce a numbered roster — **task** (agent type) —
 **model**, with a one-line brief per agent — so delegation and model
@@ -344,7 +349,10 @@ baseline. `CLAUDE_CODE_SUBAGENT_MODEL`
 is deliberately NOT set globally — a global value would replace the default
 model for every subagent that names none (per-agent pins and per-invocation
 `model` still win, as the variable no longer overrides them as of Claude Code
-v2.1.251), flattening the default; that is why it stays unset. The one
+v2.1.251), flattening the default; that is why it stays unset. A subagent
+that names no model inherits the orchestrator's own model, whatever that is,
+so `general-purpose` launches carry an explicit `model` instead, enforced by
+`scripts/claude-agent-model-guard`. The one
 exception: in the `exxo-openrouter` context only, `CLAUDE_CODE_SUBAGENT_MODEL`
 and every tier variable point at `moonshotai/kimi-k3@preset/tim-k3`, because one session has
 one backend; the overlay settings fragment sets them, never a session.

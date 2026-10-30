@@ -76,6 +76,12 @@ loaded skills did not come with you. These are the rules that matter here.
    plus the fast check, and the orchestrator runs the comprehensive gate per
    trunk; say so in the report.
 
+**Large diffs and review packages.** Never read a review package or diff
+over about 100 KB whole. Use `git diff <base> <head> --stat`, then
+`--diff-filter=AM` and read added/modified files in full, and audit deletions
+with `--diff-filter=D --name-only` against the brief's delete list. Report
+which parts were read by name only.
+
 If the task is ambiguous in a way that changes the result, or needs a
 decision the plan doesn't make, stop and report the question rather than
 guessing.

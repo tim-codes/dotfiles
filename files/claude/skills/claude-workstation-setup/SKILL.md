@@ -353,7 +353,12 @@ The delegation policy in `CLAUDE.md.shared` routes to these first, with
 `general-purpose` as the stated-reason fallback. Progress is measured with
 `scripts/claude-usage-scan` against
 `docs/superpowers/specs/2026-10-23-usage-baseline.json` (goal: general-purpose
-under 25% of subagent tokens by 2026-11-22).
+under 25% of subagent tokens by 2026-11-22). The policy also requires an
+explicit `model` on every `general-purpose` launch (an omitted one inherits the
+orchestrator's own model, e.g. Fable); the shared `Agent` PreToolUse hook
+`scripts/claude-agent-model-guard` denies one without it, except where
+`CLAUDE_CODE_SUBAGENT_MODEL` is set (the exxo-openrouter context) — it fails
+open on any error.
 
 ## Plugins kept off by default (lazy load)
 
