@@ -138,7 +138,7 @@ of `shared * exxo`, applied only to this context (naming: `settings.overlay.
   malformed content. Failures are
   logged, with reasons only, to
   `~/.local/state/claude-openrouter/keyhelper.jsonl`. There is deliberately no
-  1Password or `agent/run` path, and no key literal in the repo. Backlog:
+  1Password or `agent/run` path, and no key literal in the repo. Backlog (#240):
   revisit key storage (Keychain or 1Password).
 - **Worker deny rules**: no `gh pr merge`, default-branch pushes, `agent/run`,
   `esc`, `pulumi up`, `pulumi env open`, `op`, nor reads of `~/keys`. They are

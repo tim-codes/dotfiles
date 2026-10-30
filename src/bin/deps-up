@@ -10,11 +10,11 @@ $DOTFILES_ROOT/scripts/pipx-packages
 # everything to latest, and rebuild tmux-home against the new source.
 $DOTFILES_ROOT/scripts/tmux-plugins --update
 
-# todo: this is only working from native terminal, not emulator
+# todo (#244): this is only working from native terminal, not emulator
 # fish -c "fisher update"
 
 # see: https://github.com/nvm-sh/nvm?tab=readme-ov-file#migrating-global-packages-while-installing
-# todo: why does this not get executed by .zshrc?
+# todo (#244): why does this not get executed by .zshrc?
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 if command -v nvm >/dev/null; then
   nvm install-latest-npm
