@@ -252,6 +252,7 @@ squad-planner
 reauth
 workstation-sync
 workstation-setup
+dev-disk-doctor
 LIST
 }
 
