@@ -232,6 +232,12 @@ the installed version (the docs under `node_modules/<pkg>/`, `--help`,
 as a hypothesis to check, and when an answer came from research, say what
 it was checked against.
 
+For a quick look at how a CLI command is used, reach for `tldr <cmd>` and
+`bro <cmd>` (bropages: community usage examples) first. Fall back to
+`<cmd> --help`, `man <cmd>` or the official docs when those don't cover it, or
+when an exact flag or version matters. Both are installed by the dotfiles
+manifests (`tldr` in `brew-update`, `bropages` in `cargo-update`).
+
 ## New worktrees: local config is copied in, never asked for
 
 A new worktree gets the primary checkout's gitignored local config (`.env`,
