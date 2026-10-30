@@ -102,8 +102,10 @@ One exception to "account fragment wins": the permission rule arrays
 jq's `*` replaces arrays and the exxo grants would otherwise wipe the shared
 set. That is where the global permissions live (added 2026-10-23):
 `settings.shared.json` carries the read-only allow set (git/gh read
-subcommands, `just --list`, `WebSearch`, GitHub `WebFetch`,
-`mcp__ide__getDiagnostics`) and the **deny floor** (`op read`, `--reveal`,
+subcommands, `just --list`, `WebSearch`,
+`mcp__ide__getDiagnostics`; no explicit `WebFetch` allows, by policy: auto mode
+decides, and `claude-config-audit` flags any that reappear in a repo's
+`settings.local.json`) and the **deny floor** (`op read`, `--reveal`,
 `--show-secrets`, `pulumi`/`esc env open`, `gcloud secrets versions access`,
 each also as `* <cmd>` so a later segment matches; `Read` of `.claude.json`
 and `.credentials.json`); `settings.exxo.json` adds the Exxo read-only cloud

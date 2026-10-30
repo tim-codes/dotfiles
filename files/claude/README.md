@@ -326,7 +326,7 @@ entries, with a `.bak`).
   (noted 2026-10-23).
 - `claude-config-audit`'s mutating-recipe and research-domain checks are
   name/pattern heuristics (`deploy|revoke|destroy|reset|restore|env-set|-prod`,
-  writes to `.env`; >10 non-docs WebFetch domains). A recipe that mutates
+  writes to `.env`). A recipe that mutates
   under an innocuous name (h2gc-portal's `e2e-auth-state`) is not caught —
   extend the patterns when one turns up rather than trusting a clean run
   as proof (noted 2026-10-23).
