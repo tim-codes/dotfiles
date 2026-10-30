@@ -15,6 +15,7 @@ src/bin/*
 !src/bin/claude-kickoff
 !src/bin/squad-pr-merge
 !src/bin/squad-watch-mail-launch
+!src/bin/doctor-merged-branches
 .claude
 src/.config/alacritty/local.toml
 src/.config/alacritty/theme.toml
