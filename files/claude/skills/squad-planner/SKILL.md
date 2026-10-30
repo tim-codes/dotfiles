@@ -40,14 +40,18 @@ orchestrator never needs to know which way a plan was made.
   composed in context and passed as `content`: compose, do not save. The
   only exception is the interim file drop in step 5 when no orchestrator is
   reachable. The interactive planner also keeps the plan documents, draft
-  PR and Linear tickets of step 2 and the claim file of `## Sibling
-  planners`; it still makes no launches and sends no messages to members.
+  PR and Linear tickets of step 2 and its planning claim in the
+  orchestrator (`## Sibling planners`); it still makes no launches and sends
+  no messages to members.
 - It never calls `ExitPlanMode`: the plan goes to `submit_task`, not to a
   mode switch. The broker launches planners in plan mode (contracts README
   rule 7), but the skill relies on no permission mode: headless works
   read-only in all of them.
-- Of the squad's tools it uses `mcp__squad__submit_task` and the resources
-  only (`squad://context-brief/...`, `squad://me`).
+- Of the squad's tools it uses `mcp__squad__submit_task` and, interactive
+  only, `mcp__squad__claim` (`## Sibling planners`), plus the resources
+  (`squad://context-brief/...`, `squad://me`). Plans reach the squad only
+  through `submit_task`; nothing is written to a directory the orchestrator
+  watches, and no file records what a planner holds.
 - Its own delegation: dedicated agents first (`Explore` for read-only
   sweeps of the repo, `notion-ops` for every Notion read or write,
   `implementer` for the interactive plan documents); `general-purpose` only with an
@@ -66,7 +70,8 @@ orchestrator never needs to know which way a plan was made.
 - Read `squad://context-brief/<owner>%2F<name>` (the repo URL-encoded, so `/`
   is `%2F`) with ReadMcpResourceTool, server `squad`. It returns the repo's
   `tasks`, `members` with their branches or trunks, `pending_items`, `quota`
-  headroom per account, `recent_decisions` and the current `batch`. Say in
+  headroom per account, `recent_decisions`, the current `batch` and the
+  `planning_claims` that sibling planners hold (`## Sibling planners`). Say in
   three to five lines what the squad is doing in that repo; this becomes the
   `## Context` of the content.
 - If the read fails (orchestrator down): headless hands back `failed` with
@@ -75,11 +80,13 @@ orchestrator never needs to know which way a plan was made.
   unreadable `--task-file`, `mcp__squad__submit_task` absent, the brief
   unreadable) ends the turn with the `failed` hand-back, code
   `no_submission`, never with prose alone.
-- Interactive: read the sibling claims (`## Sibling planners`) before step 2.
-- No orchestrator yet (interactive only): if `mcp__squad__submit_task` is
-  absent, the squad is not reachable from here at all; skip the read.
-  Tell Tim, write "context brief unavailable" under `## Context`, and carry on;
-  step 5 then uses the interim file drop.
+- Interactive: tell Tim what the brief's `planning_claims` show siblings
+  holding (`## Sibling planners`) before step 2, and keep clear of it.
+- No orchestrator reachable (interactive only): if `mcp__squad__submit_task`
+  is absent, the squad is not reachable from here at all; skip the read and
+  the claim. Tell Tim, write "context brief unavailable" under `## Context`,
+  and carry on; step 5 then uses the interim file drop. With nothing to hold
+  a claim, the sibling check falls back to the Linear labels alone.
 
 ## 2. Shape the work
 
@@ -94,8 +101,8 @@ the artefacts, and `submit_task` is the hand-off. If the argument was a file,
 From the settled point, the planner keeps the following current. The settled
 point is when the brief is clear enough: the repo, the scope and an outline of
 the deliverables agreed with Tim, after the sibling check. At that point the
-planner also writes its claim file and labels its tickets (`## Sibling
-planners`). Each time the plan changes materially, it updates the plan
+planner also claims its scope with the orchestrator and labels its tickets
+(`## Sibling planners`). Each time the plan changes materially, it updates the plan
 documents, the draft PR and Linear in the same step.
 
 - **Plan documents and draft PR.** In the target repo's worktree, which the
@@ -141,7 +148,7 @@ documents, the draft PR and Linear in the same step.
   `## Recommended model and effort`.
 
 **Headless.** `Read` the task file and explore the repo read-only. Ask no
-one. Create no tickets, PRs, ADRs or Notion edits: under `## Tickets` and
+one. Hold no planning claim (the task already exists). Create no tickets, PRs, ADRs or Notion edits: under `## Tickets` and
 `## Decisions` carry over the references the task file already has; under
 `## Docs amendments` note documentation you saw that the work will make
 stale; under `## Recommended model and effort` give your recommendation.
@@ -253,12 +260,12 @@ in this order:
    merge it.
 3. Move the parent ticket to the team's ready or todo state and replace
    `squad:planning` with `squad:planned` on the parent and every sub-issue.
-4. Delete the claim file.
+4. Release the planning claim (`## Sibling planners`).
 
 If Tim ends the session without accepting, nothing is submitted, and the
 planner says so. The draft PR and the `squad:planning` labels stay for him to
-resume or clean up, and the planner tells him which they are; it deletes its
-claim file.
+resume or clean up, and the planner tells him which they are; it releases its
+planning claim.
 
 **Interim, no orchestrator (interactive only).** When
 `mcp__squad__submit_task` is absent (step 1's check), never drop the
@@ -270,9 +277,10 @@ add `-2`, `-3` … rather than overwrite an existing file). The kickoff dir is
 `kickoff_dir` under `[orchestrator]` in `~/.config/squad/config.toml` when
 set, else `~/squad/kickoff` (the config schema's default); create it if
 missing. Tell Tim the path, and that the orchestrator picks the file up from
-the kickoff directory at the cut-over, through intake, as an already-approved
+the kickoff directory through intake, as an already-approved
 plan: Tim's acceptance is the approval. Steps 2 to 4 above therefore apply
-at acceptance, as for a submission. With the tool present, the MCP path is authoritative and nothing
+at acceptance, as for a submission (with no orchestrator there is no claim to
+release). With the tool present, the MCP path is authoritative and nothing
 is written to the kickoff directory.
 
 ## 6. Problems
@@ -301,7 +309,7 @@ interactive shows Tim the problems and asks how to proceed.
   replacing the pending plan. Interactive, an amendment after acceptance
   first reverts the plan to drafting: `gh pr ready --undo <n> -R
   <owner/name>`, the labels back to `squad:planning` on every ticket, the
-  parent back in the planning state, and the claim file rewritten. Then it
+  parent back in the planning state, and the planning claim taken again. Then it
   updates the plan documents, the PR and the tickets, and resubmits when Tim
   says it is accepted again (his new words, quoted under `## Approval`),
   when the acceptance steps of step 5 run again. A headless turn ends with
@@ -336,31 +344,33 @@ without accepting, say what stays (step 5).
 
 Interactive form. Several planner sessions may run at once, including ones
 sweeping a backlog; there is no sweep mode or flag, so a backlog sweep is an
-ordinary planner session with that description. What siblings are tackling is
-recorded in shared state, never in chat.
+ordinary planner session with that description. The orchestrator holds the
+record of what siblings are tackling, and Linear labels mirror it for people;
+chat is never the record. No file on disk records a claim.
 
+- **Reading.** At the start, and before taking any ticket, read
+  `planning_claims` in the context brief (step 1): one entry per sibling
+  planner session, with its `scope`, its `tickets` and when it last
+  refreshed. `squad://me` shows this session's own. Tell Tim what siblings
+  hold and keep clear of it. The orchestrator ages out the claim of a planner
+  that stopped refreshing, so a claim in the brief is live; the planner does
+  no staleness arithmetic of its own. The brief's `tasks` already cover work
+  that has been planned and submitted.
+- **Claiming.** At the settled point (step 2), call `mcp__squad__claim` with
+  the repo, a one-line scope and the Linear ticket ids the plan takes. Refresh
+  it with the same tool at every material plan update, in the same step as the
+  PR and Linear update (this is also the heartbeat). Release it with
+  `release: true` at acceptance (step 5) or when Tim abandons the plan. If the
+  answer reports an overlap with a sibling's claim, stop and tell Tim, and
+  proceed only on his word. If the tool is not offered (an orchestrator that
+  predates it), say so, rely on the labels, and carry on.
 - **Tickets, in Linear.** Taking a ticket into a plan applies the label
   `squad:planning`; acceptance replaces it with `squad:planned` (step 5).
   Before proposing work, exclude tickets labelled `squad:planning` or
   `squad:planned` and tickets in an in-progress state. Labels go through the
   Linear tools of the session; with none, tell Tim which tickets the planner
-  would label, and carry on. A `squad:planning` ticket that no live claim file
-  lists (its planner ended without accepting) is reported to Tim, and taken
-  only with his say-so.
-- **Scope, and the interim path: the claims directory.** Work with no ticket
-  yet is claimed in `<kickoff_dir>/../planning/` (`kickoff_dir` as in step 5;
-  default `~/squad/planning/`; create it if missing), one JSON file per
-  planner session named `<session-id>.json`, holding `{repo, tickets, scope,
-  started_at, updated_at}` (timestamps ISO 8601 UTC). The session id is
-  `session_id` from `squad://me`; with no squad, `planner-` plus eight random
-  hex characters, chosen once. Write the file at the settled point, refresh
-  it (and `updated_at`) at every material plan update, in the same step as the
-  PR and Linear update, and delete it at acceptance or when Tim abandons the
-  plan. A file whose `updated_at` is over 24 hours old is stale and ignored.
-- **Reading.** At the start, and before taking any ticket, read every claim
-  file and the TaskPlan frontmatter of the files in the kickoff directory;
-  tell Tim what siblings hold, and keep clear of it.
+  would label, and carry on. A `squad:planning` ticket that no entry of
+  `planning_claims` lists (its planner ended without accepting) is reported to
+  Tim, and taken only with his say-so.
 - **Messages** between planner sessions are a tie-break only, never the
   record.
-- At slice 2 the orchestrator takes over claims (the context brief carries
-  them) and the claims directory goes.
