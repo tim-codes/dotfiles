@@ -110,7 +110,10 @@ check "squad-member teaches the turn format" contains "$M" '<squad-message' 'ack
 check "squad-member never registers" sh -c '! grep -n "call[^.]*mcp__squad__register" "$1" | grep -iv never' _ "$M"
 check "squad-member carries the section headings" has_headings "$M" \
     '## Turns' '## Status and questions' '## Testing and trunks' '## Landing' '## Heavy jobs' \
-    '## Delegating and serving jobs' '## Watches' '## Repo conventions' '## Infra helpers' '## Finishing'
+    '## Delegating and serving jobs' '## Watches' '## Repo conventions' '## Starting from a plan PR' \
+    '## Infra helpers' '## Finishing'
+check "squad-member teaches the plan PR staleness pass" contains "$M" rebase stale 'openspec validate' \
+    "onto the kickoff's base (main or the active trunk"
 
 # --- squad-planner and the kickoff template (P7 Task 3) ----------------------
 P="$SKILLS/squad-planner/SKILL.md"
@@ -133,6 +136,9 @@ check "squad-planner carries the lane rulings" contains "$P" \
 # Interactive posture (2026-10-30): drafting by default, so the retired --draft
 # flag is gone; the plan lives in a draft PR and Linear tickets mirror it; sibling
 # planners coordinate through Linear labels and a claims directory.
+check "squad-planner makes the member run the staleness pass" contains "$P" staleness \
+    "onto the kickoff's base (main or the active trunk)"
+check "kickoff template tells the member to run the staleness pass" contains "$K" staleness
 check "squad-planner has no --draft flag" sh -c '! grep -nF -e "--draft" "$1"' _ "$P"
 check "squad-planner carries the drafting posture" contains "$P" \
     'draft PR' 'gh pr ready' 'sub-issues' 'mirror' '## Approval'

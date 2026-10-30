@@ -174,7 +174,12 @@ omitted, never `null`.
   as `Task: <title>`; headless and revisions write `Task <id>: <title>`. When
   `resources.heavy_jobs` is not empty, list its commands under
   `## Test policy`, so the member asks for a slot before running them. Its
-  first two lines stay exactly as the template has them.
+  first two lines stay exactly as the template has them. Where a plan PR or an
+  OpenSpec change exists (an interactive plan always has the PR; a headless
+  one only if the task file names it), `## Notes` names the plan PR URL and
+  the OpenSpec change id and says to run the staleness pass first, rebasing
+  onto the kickoff's base (main or the active trunk), so the member cannot
+  miss it.
 - `merge_authority`: `trunk_service`, unless Tim says he merges this one
   himself, then `operator`.
 - `test_policy`: one line, 1–2000 characters; default

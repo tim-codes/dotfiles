@@ -196,6 +196,29 @@ poll in a loop or sleep waiting.
   logical step, push at checkpoints and pauses) and draft PRs apply as in any
   session. Delegation inside the session follows the global subagent policy.
 
+## Starting from a plan PR
+
+A plan PR (an OpenSpec change or plan documents, often kept as a draft for a
+while) goes stale against its base. When the kickoff names a plan PR or an
+OpenSpec change, your first step, before building anything, is a staleness
+pass:
+
+1. Fetch, then rebase the plan branch
+   onto the kickoff's base (main or the active trunk, e.g. `trunk/<name>`);
+   resolve conflicts in the plan documents only.
+2. Re-validate the plan against the rebased base: `openspec validate` on the
+   change (or the repo's equivalent); the files, modules and APIs the plan
+   cites still exist and look as described; the specs it amends have not
+   moved.
+3. Check that the Linear tickets it references are still open and unchanged
+   in scope.
+4. Record the drift in one `mcp__squad__set` `detail` line. If the drift
+   changes the approach, `mcp__squad__raise` a `review` before building;
+   never re-plan silently.
+
+Create the lane branch for the build from the rebased base. The plan documents
+land with the work, or in the plan PR, whichever the repo's convention is.
+
 ## Infra helpers
 
 A session of kind `infra` works in an exxo-infra worktree and produces a PR
