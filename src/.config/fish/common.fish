@@ -732,7 +732,7 @@ function __claude_ctx --description 'Run claude in a per-account config context'
     set -e argv[1]
     set -l home (path resolve $HOME)
     set -l here (path resolve .)
-    set -l ctx_dirs $home/.claude-personal $home/.claude-exxo $home/.claude-exxo-personal $home/.claude-exxo-openrouter
+    set -l ctx_dirs $home/.claude-personal $home/.claude-reserve $home/.claude-exxo $home/.claude-exxo-personal $home/.claude-exxo-openrouter
     set -l jumped 0
     if test "$here" = "$home"; or contains -- "$here" $ctx_dirs
         mkdir -p $home/claude
@@ -763,6 +763,13 @@ function claude --wraps claude --description 'claude in the personal context'
 end
 function claude-personal --wraps claude --description 'claude in the personal context'
     __claude_ctx "$HOME/.claude-personal" $argv
+end
+# The reserve context: a second personal Claude Max subscription with fully
+# separate state (own projects/, history, plugins; claude-sync builds its
+# config from the personal fragments, nothing is shared with personal). It
+# gets the same start-dir jump and OpenRouter env scrub as every wrapper.
+function claude-reserve --wraps claude --description 'claude in the reserve (second personal subscription) context'
+    __claude_ctx "$HOME/.claude-reserve" $argv
 end
 function claude-exxo --wraps claude --description 'claude in the exxo (work) context'
     __claude_ctx "$HOME/.claude-exxo" $argv

@@ -29,7 +29,19 @@ if [ -d "$HOME/.claude-personal" ]; then
     claude() {
         local dir="$HOME/.claude-personal"
         case "$PWD" in
-            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal|"$HOME"/.claude-exxo-openrouter)
+            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-reserve|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal|"$HOME"/.claude-exxo-openrouter)
+                mkdir -p "$HOME/claude"
+                ( cd "$HOME/claude" && command env "${_claude_scrub[@]}" CLAUDE_CONFIG_DIR="$dir" claude "$@" )
+                return ;;
+        esac
+        command env "${_claude_scrub[@]}" CLAUDE_CONFIG_DIR="$dir" claude "$@"
+    }
+    # reserve context: the second personal Max subscription, fully separate
+    # durable state (see claude-reserve in common.fish). Same scrub as claude.
+    claude-reserve() {
+        local dir="$HOME/.claude-reserve"
+        case "$PWD" in
+            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-reserve|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal|"$HOME"/.claude-exxo-openrouter)
                 mkdir -p "$HOME/claude"
                 ( cd "$HOME/claude" && command env "${_claude_scrub[@]}" CLAUDE_CONFIG_DIR="$dir" claude "$@" )
                 return ;;
@@ -42,7 +54,7 @@ if [ -d "$HOME/.claude-personal" ]; then
     claude-exxo-openrouter() {
         local dir="$HOME/.claude-exxo-openrouter"
         case "$PWD" in
-            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal|"$HOME"/.claude-exxo-openrouter)
+            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-reserve|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal|"$HOME"/.claude-exxo-openrouter)
                 mkdir -p "$HOME/claude"
                 ( cd "$HOME/claude" && CLAUDE_CONFIG_DIR="$dir" command claude "$@" )
                 return ;;
@@ -53,7 +65,7 @@ if [ -d "$HOME/.claude-personal" ]; then
     # ~/.claude and ~/.claude.json from scratch (fresh login/onboarding).
     claude-default() {
         case "$PWD" in
-            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal|"$HOME"/.claude-exxo-openrouter)
+            "$HOME"|"$HOME"/.claude-personal|"$HOME"/.claude-reserve|"$HOME"/.claude-exxo|"$HOME"/.claude-exxo-personal|"$HOME"/.claude-exxo-openrouter)
                 mkdir -p "$HOME/claude"
                 ( cd "$HOME/claude" && command env "${_claude_scrub[@]}" -u CLAUDE_CONFIG_DIR claude "$@" )
                 return ;;

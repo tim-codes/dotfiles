@@ -36,6 +36,8 @@ alias where="type -a"
 # inside it resolve their own context from CLAUDE_CONFIG_DIR, which `open`
 # must inject via --env (LaunchServices does not inherit the shell env).
 alias claude-d-personal='open -na "Claude" --env CLAUDE_CONFIG_DIR="$HOME/.claude-personal" --args --user-data-dir="$HOME/Library/Application Support/Claude-Personal"'
+# The reserve context (second personal subscription, fully separate state).
+alias claude-d-reserve='open -na "Claude" --env CLAUDE_CONFIG_DIR="$HOME/.claude-reserve" --args --user-data-dir="$HOME/Library/Application Support/Claude-Reserve"'
 alias claude-d-exxo='open -na "Claude" --env CLAUDE_CONFIG_DIR="$HOME/.claude-exxo" --args --user-data-dir="$HOME/Library/Application Support/Claude-Exxo"'
 # The exxo overlay on the personal subscription (see claude-exxo-personal in
 # common.fish). Own desktop user-data dir, so the in-app session picker won't

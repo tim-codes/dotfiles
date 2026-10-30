@@ -48,7 +48,15 @@ if command -v zsh >/dev/null; then
         out="$(run_zsh "$d")"
         has "$out" "cwd=$HP/claude" "zsh: from ${d#"$FH"}/ starts in ~/claude"
     done
-    for fn in claude claude-default; do
+    # reserve: own config dir, start-dir jump, and the same OpenRouter scrub
+    mkdir -p "$FH/.claude-reserve"
+    for d in "$FH" "$FH/.claude-reserve"; do
+        out="$(env -i HOME="$FH" PATH="$T/bin:/usr/bin:/bin:/opt/homebrew/bin" \
+            zsh -f -c "source '$SRC_REPO/src/.zshrc' >/dev/null 2>&1; cd '$d' && claude-reserve --model x -p y")"
+        has "$out" "cfg=$FH/.claude-reserve" "zsh: claude-reserve from ${d#"$FH"}/ pins the reserve dir"
+        has "$out" "cwd=$HP/claude" "zsh: claude-reserve from ${d#"$FH"}/ starts in ~/claude"
+    done
+    for fn in claude claude-default claude-reserve; do
         for d in "$FH/proj" "$FH"; do
             # shellcheck disable=SC2086
             out="$(env -i HOME="$FH" PATH="$T/bin:/usr/bin:/bin:/opt/homebrew/bin" $LEAKENV \
@@ -77,7 +85,11 @@ if command -v fish >/dev/null; then
     has "$out" "tok=UNSET" "fish: no ANTHROPIC_AUTH_TOKEN"
     has "$out" "cwd=$HP/claude" "fish: from \$HOME starts in ~/claude"
     has "$out" "args=--model x -p y" "fish: args pass through"
-    for fn in claude-exxo claude-default claude-personal; do
+    mkdir -p "$FH/.claude-reserve"
+    out="$(env HOME="$FH" PATH="$T/bin:$PATH" fish -c "source '$FISHF' 2>/dev/null; set -gx PATH '$T/bin' \$PATH; cd '$FH/.claude-reserve'; claude-reserve -p y" 2>&1)"
+    has "$out" "cfg=$FH/.claude-reserve" "fish: claude-reserve pins the reserve dir"
+    has "$out" "cwd=$HP/claude" "fish: claude-reserve from its own dir starts in ~/claude"
+    for fn in claude-exxo claude-default claude-personal claude-reserve; do
         out="$(env HOME="$FH" PATH="$T/bin:$PATH" ANTHROPIC_BASE_URL=x ANTHROPIC_API_KEY=x ANTHROPIC_AUTH_TOKEN=x ANTHROPIC_DEFAULT_OPUS_MODEL=x ANTHROPIC_DEFAULT_SONNET_MODEL=x ANTHROPIC_DEFAULT_HAIKU_MODEL=x ANTHROPIC_DEFAULT_FABLE_MODEL=x CLAUDE_CODE_SUBAGENT_MODEL=x \
             fish -c "source '$FISHF' 2>/dev/null; set -gx PATH '$T/bin' \$PATH; cd '$FH/proj'; $fn -p y" 2>&1)"
         has "$out" "leak=
