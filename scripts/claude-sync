@@ -250,6 +250,8 @@ squad-liaison
 squad-member
 squad-planner
 reauth
+workstation-sync
+workstation-setup
 LIST
 }
 

@@ -232,6 +232,12 @@ the installed version (the docs under `node_modules/<pkg>/`, `--help`,
 as a hypothesis to check, and when an answer came from research, say what
 it was checked against.
 
+For a quick look at how a CLI command is used, reach for `tldr <cmd>` and
+`bro <cmd>` (bropages: community usage examples) first. Fall back to
+`<cmd> --help`, `man <cmd>` or the official docs when those don't cover it, or
+when an exact flag or version matters. Both are installed by the dotfiles
+manifests (`tldr` in `brew-update`, `bropages` in `cargo-update`).
+
 ## New worktrees: local config is copied in, never asked for
 
 A new worktree gets the primary checkout's gitignored local config (`.env`,
@@ -374,6 +380,29 @@ are the ones that get dropped. The fallback clause exists because at least
 one harness build ships without a todo tool — an instruction that dies
 silently on such a build is a dead hook, and dead hooks get discovered
 weeks later (cf. the $HOME-quoting hook fix, #39).
+
+## Dev stack
+
+"Dev stack", "dev-stack" or "my stack" means the setup repos plus the
+open-source tools Tim authors or builds in (tmux-home, stray, and upstream
+ones like althemer and worktrunk), consumed mainly by his two MacBooks. The
+`workstation-sync` skill's list is the canonical inventory. Setup repos:
+
+- `~/dev/dotfiles` (tim-codes/dotfiles)
+- `~/dev/homelab` (tim-codes/homelab)
+- `~/dev/exxo/skills` (Exxo-Labs/skills, also the exxo-skills plugin marketplace)
+- `~/dev/exxo/agent-tooling` (Exxo-Labs/agent-tooling)
+
+squad (~/dev/squad) is deliberately excluded while under active development; it is managed by its own sessions. Re-add it to this list to include it.
+
+Authored open-source tools (local checkouts): `~/dev/tmux-home`
+(tim-codes/tmux-home) and `~/dev/oss/stray` (tim-codes/stray).
+Incorporated upstream tools (no checkout, refreshed through the dotfiles
+install manifests): althemer (fork of xdagiz/althemer) and worktrunk.
+
+Plus the Claude plugin marketplaces and installs that come from them. The
+`workstation-sync` skill brings the whole stack up to date; `workstation-setup`
+prepares a session to work.
 
 ## Git remotes: always SSH, never HTTPS
 

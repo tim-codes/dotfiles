@@ -29,6 +29,12 @@ fi
 cargo install $cargoDeps
 
 for repo in $cargoGitDeps; do
+  # CARGO_UPDATE_SKIP: space-separated owner/name entries to leave alone this
+  # run (workstation-sync skips squad while it is under active development)
+  if (( ${${=CARGO_UPDATE_SKIP:-}[(Ie)${repo#ssh://git@github.com/}]} )); then
+    echo "cargo-update: skipping $repo (CARGO_UPDATE_SKIP)"
+    continue
+  fi
   # use the git CLI so ssh auth (1Password agent) works for private/rewritten remotes
   CARGO_NET_GIT_FETCH_WITH_CLI=true cargo install --git $repo
 done
