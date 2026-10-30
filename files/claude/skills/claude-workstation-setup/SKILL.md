@@ -87,10 +87,14 @@ Consequence: never hand-edit `~/.claude-*/settings.json` for anything meant
 to last — it reverts on the next sync. Put it in the right fragment instead.
 Account-specific keys (the exxo-skills marketplace, its plugin) live only in
 `settings.exxo.json`; `~/.claude-personal` must never receive Exxo config.
-The one carve-out is OAuth-only MCP servers (`datadog`, `boards`): they hold
-no credential and access is gated by Exxo's WorkOS org, so they live in
-`mcp.shared.json` and reach every context. `exxo-openrouter` denies them via
-`deniedMcpServers` in its overlay, since workers cannot authenticate.
+The one carve-out is OAuth-only MCP servers (`datadog`, `boards`, `workos`):
+they hold no credential and access is gated by the provider's own login, so
+they live in `mcp.shared.json` and reach every context, as does the stdio
+`playwright`. `exxo-openrouter` denies all four via `deniedMcpServers` in its
+overlay: workers cannot authenticate, and get no browser automation. The same
+overlay sets `superpowers@claude-plugins-official` to `false`, because its
+process skills stop and ask the user questions, which an unattended K3 worker
+cannot answer (2026-10-30).
 
 One exception to "account fragment wins": the permission rule arrays
 (`permissions.allow`/`deny`/`ask`) are CONCATENATED across the two fragments
@@ -428,9 +432,12 @@ plugin (`<context>/plugins/synced/`), which the fragments don't manage.
 - An MCP server is missing in one context but present in another → check
   whether it's managed. Credential-free servers belong in
   `files/claude/mcp.shared.json` (this now includes `Sanity`, OAuth-only
-  since 2026-09-28 and no longer token-bearing, plus `datadog` and `boards`,
-  OAuth-only and moved here on 2026-10-25 so exxo-personal gets them) and reach every context on
-  the next `claude-sync`; genuinely token-bearing ones (`notion`) are
+  since 2026-09-28 and no longer token-bearing; `datadog` and `boards`,
+  OAuth-only and moved here on 2026-10-25 so exxo-personal gets them; and
+  `playwright` and `workos`, moved here on 2026-10-30 after the reserve
+  context was found without them) and reach every context on the next
+  `claude-sync`. Notion is the claude.ai account connector, not a server
+  here. Genuinely token-bearing ones are
   hand-added per context by design and simply haven't been added there yet —
   `claude mcp add -s user` under that CLAUDE_CONFIG_DIR. `claude-sync --diff`
   lists the managed names per context, and the unmanaged ones it is leaving

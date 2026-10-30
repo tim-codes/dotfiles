@@ -335,13 +335,25 @@ entries, with a `.bak`).
   plugin that ships a skill also linked in a repo would go unflagged
   (noted 2026-10-23).
 
-- `~/.claude-exxo-personal` still has no MCP servers of its own beyond what
-  `claude-sync` manages. `~/.claude-exxo` carries three remaining hand-added
-  ones — `notion`, `playwright`, `workos` — and `~/.claude-personal` two of
-  them (no `workos`). They hold live credentials, so they cannot be codified
-  into `mcp.shared.json`; re-adding them by hand with `claude mcp add -s user`
-  under `CLAUDE_CONFIG_DIR=~/.claude-exxo-personal` is outstanding
-  (noted 2026-08-23).
+- No context carries a hand-added MCP server any more (checked 2026-10-30).
+  The two that were hand-added once both turned out to be credential-free and
+  moved into `mcp.shared.json` on 2026-10-30, after the reserve context was
+  found without them. They were `playwright`, a stdio server (`playwright-mcp`,
+  from `scripts/pnpm-globals`), and `workos`, which is OAuth-only HTTP and so
+  needs a per-context login. `exxo-openrouter` denies both in its overlay: the
+  unattended K3 workers get no browser automation and cannot complete an
+  OAuth login. The legacy user-scope `notion` server is retired everywhere.
+  Notion reaches a context through the claude.ai `Notion` connector, which
+  follows the logged-in account rather than these fragments. A
+  credential-bearing server is still added by hand with `claude mcp add -s
+  user`, never codified (noted 2026-08-23, revised 2026-10-30).
+- superpowers (`superpowers@claude-plugins-official`) is enabled in
+  `settings.shared.json` for every context, and the `exxo-openrouter` overlay
+  sets it to `false`. Its SessionStart hook makes every session invoke process
+  skills before responding, and some of those (such as brainstorming) ask
+  clarifying questions and wait for approval. An unattended K3 worker cannot
+  answer them, and would also pay OpenRouter rates for the injected text
+  (decided 2026-10-30).
 - The `notion` entry holds a plaintext bearer token in each context's
   `.claude.json` (`env.NOTION_TOKEN`). Nothing here can fix that — a
   user-scope MCP server has no reference-at-invocation form, which is
