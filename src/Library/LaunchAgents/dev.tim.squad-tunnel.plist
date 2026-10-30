@@ -7,8 +7,8 @@
 
   <!-- Hosts the squad orchestrator GUI (127.0.0.1:7790, served at /) through the persistent
        Microsoft dev tunnel exxo-tfo-squad (`squad-tunnel host`), so Tim can
-       open it from his phone. The script ensures the tunnel, publishes its
-       URL as the `dashboard` gauge, then execs `devtunnel host`.
+       open it from his phone. The script ensures the tunnel, caches its
+       URL in ~/.config/squad/tunnel.json, then execs `devtunnel host`.
        If the devtunnel login has expired it exits 78 with a log line;
        ThrottleInterval paces the retries until `devtunnel user login -d`
        (or /reauth) is run. Absolute paths: launchd does no ~ expansion. -->

@@ -2,7 +2,7 @@
 # squad-tunnel — host the squad orchestrator GUI (127.0.0.1:7790) through a persistent
 # Microsoft dev tunnel so Tim can open it from his phone.
 #
-#   squad-tunnel host     ensure the tunnel, publish its URL, then run
+#   squad-tunnel host     ensure the tunnel, cache its URL, then run
 #                         `devtunnel host` in the foreground (the launchd mode)
 #   squad-tunnel ensure   create/reconcile the tunnel and cache its URL
 #   squad-tunnel url      print the cached URL
@@ -12,7 +12,7 @@
 # per-port `tenant` access (signed-in Exxo Entra users; never anonymous).
 # Port URLs only exist while hosted, so the URL is cached under
 # ~/.config/squad/tunnel.json (stowed from src/.config/squad/, gitignored:
-# per-machine state) and republished as the `dashboard` gauge.
+# per-machine state); `squad-tunnel url` prints it.
 #
 # No secrets: devtunnel keeps its own login in the system keychain. When that
 # login has expired, `host` logs a clear line and exits 78 (EX_CONFIG) so the
@@ -90,23 +90,14 @@ ensure() {
   fi
 }
 
-# Write the cache and publish the gauge. Publish failure (broker down) is
-# logged, never fatal.
+# Write the URL cache (v0.5's squad CLI has no publish; nothing else reads it).
 record_url() { # url
   local url=$1 now
   now=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
   mkdir -p "$(dirname "$CACHE")"
   jq -n --arg id "$ID" --arg u "$url" --arg t "$now" \
     '{id: $id, tunnel_url: $u, updated_at: $t}' >"$CACHE.tmp" && mv "$CACHE.tmp" "$CACHE"
-  local data
-  data=$(jq -cn --arg u "$url" --arg id "$ID" '{tunnel_url: $u, tunnel_id: $id}')
-  if command -v squad >/dev/null 2>&1; then
-    squad publish --kind gauge dashboard "$data" >/dev/null 2>&1 ||
-      log "squad publish dashboard failed (broker down?); URL is still cached in $CACHE"
-  else
-    log "squad not on PATH; skipped gauge publish"
-  fi
-  log "dashboard URL $url"
+  log "tunnel URL $url"
 }
 
 # Poll for the port URL (it appears once `devtunnel host` connects).
@@ -132,7 +123,7 @@ cmd_url() {
 cmd_ensure() {
   ensure
   if [[ $DRY == 1 ]]; then
-    printf '(dry run) would resolve the %s URL, write %s and publish gauge dashboard\n' "$PORT" "$CACHE"
+    printf '(dry run) would resolve the %s URL, write %s\n' "$PORT" "$CACHE"
     return 0
   fi
   local show url
@@ -155,7 +146,7 @@ cmd_host() {
     printf '(dry run) exec devtunnel host %s\n' "$ID"
     return 0
   fi
-  # Republish the cached URL straight away, then refresh from the live tunnel
+  # Re-log the cached URL straight away, then refresh from the live tunnel
   # once the host connects.
   [[ -s $CACHE ]] && record_url "$(jq -r '.tunnel_url' "$CACHE")" || true
   watch_url &
