@@ -375,6 +375,21 @@ one harness build ships without a todo tool — an instruction that dies
 silently on such a build is a dead hook, and dead hooks get discovered
 weeks later (cf. the $HOME-quoting hook fix, #39).
 
+## Dev stack
+
+"Dev stack", "dev-stack" or "my stack" means the projects that make up Tim's
+shell, Claude and system setup, consumed mainly by his two MacBooks:
+
+- `~/dev/dotfiles` (tim-codes/dotfiles)
+- `~/dev/squad` (tim-codes/squad)
+- `~/dev/homelab` (tim-codes/homelab)
+- `~/dev/exxo/skills` (Exxo-Labs/skills, also the exxo-skills plugin marketplace)
+- `~/dev/exxo/agent-tooling` (Exxo-Labs/agent-tooling)
+
+plus the Claude plugin marketplaces and installs that come from them. The
+`workstation-sync` skill brings the whole stack up to date; `workstation-setup`
+prepares a session to work.
+
 ## Git remotes: always SSH, never HTTPS
 
 Hard rule: every git remote is SSH (`git@<host>:...`), on every forge —
