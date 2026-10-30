@@ -1,7 +1,8 @@
 #!/bin/bash
 # Distribute repo-managed Claude Code config into every per-account context
-# (~/.claude-personal, ~/.claude-exxo, ~/.claude-exxo-personal,
-# ~/.claude-exxo-openrouter — created by scripts/claude-contexts).
+# (~/.claude-personal, ~/.claude-reserve, ~/.claude-exxo,
+# ~/.claude-exxo-personal, ~/.claude-exxo-openrouter — created by
+# scripts/claude-contexts).
 #
 # Replaces homelab's projects/macos-common/sync-claude-config.sh. Two changes
 # of substance beyond the move:
@@ -100,6 +101,14 @@
 # plans, tasks and todos stay its own, so a different model's sessions never
 # mix into the exxo history. CLAUDE.md, skills and agents match exxo's.
 #
+# reserve is a SECOND personal-account context: a separate Claude Max
+# subscription, built from the personal fragments (settings, CLAUDE.md, MCP)
+# and receiving the same whole-directory skills/agents symlinks as personal.
+# Unlike the exxo overlays it shares NOTHING back — its transcripts, history,
+# plugins, plans, tasks and todos are its own, so there is no overlay step.
+# Skills/agents are keyed on the fragment ACCOUNT, not the context name, which
+# is what makes it "personal" for delivery purposes.
+#
 # Usage:
 #   claude-sync            apply settings + CLAUDE.md + MCP servers + skills + agents
 #                          to every context
@@ -141,7 +150,7 @@ SRC_AGENTS="$REPO_DIR/files/claude/agents"
 # context name : fragment account. The fragment account picks which
 # settings.<account>.json / CLAUDE.md.<account> the context is built from —
 # exxo-personal deliberately reuses the exxo fragments (see header).
-CONTEXTS=("personal:personal" "exxo:exxo" "exxo-personal:exxo" "exxo-openrouter:exxo")
+CONTEXTS=("personal:personal" "reserve:personal" "exxo:exxo" "exxo-personal:exxo" "exxo-openrouter:exxo")
 
 # The durable state exxo-personal shares back into ~/.claude-exxo. Runtime
 # state (daemon, caches, session-env, shell-snapshots, sessions) and auth
@@ -273,7 +282,7 @@ is_shared_agent() {
 
 # Read-only report of what sync_agents would do to a context, for --diff.
 agents_status_lines() {
-    local name="$1" ctx="$2" dir="$2/agents"
+    local account="$1" ctx="$2" dir="$2/agents"
     local entry base f n prune=() adopt=() personal_only=()
 
     for f in "$SRC_AGENTS"/*.md; do
@@ -282,7 +291,7 @@ agents_status_lines() {
         is_shared_agent "$n" || personal_only+=("$n")
     done
 
-    if [ "$name" = "personal" ]; then
+    if [ "$account" = "personal" ]; then
         if [ -L "$dir" ] && [ "$(readlink "$dir")" = "$SRC_AGENTS" ]; then
             echo "  agents: already linked"
         else
@@ -410,7 +419,7 @@ if [ "$diff_only" = 1 ]; then
         fi
 
         info "${ctx/#$HOME/~}/agents vs repo (files/claude/agents, shared_agents() for curated contexts)"
-        agents_status_lines "$name" "$ctx"
+        agents_status_lines "$account" "$ctx"
     done
     exit 0
 fi
@@ -624,9 +633,10 @@ sync_skills_curated() {
 sync_skills() {
     local name="$1" account="$2" ctx="$3"
 
-    # personal is the authoring context: whole-dir symlink, sees everything.
-    # Everyone else gets the curated shared_skills() subset.
-    if [ "$name" = "personal" ]; then
+    # The personal ACCOUNT (personal, reserve) is the authoring side:
+    # whole-dir symlink, sees everything. Everyone else gets the curated
+    # shared_skills() subset. Keyed on account, not context name.
+    if [ "$account" = "personal" ]; then
         sync_skills_wholedir "$ctx"
     else
         sync_skills_curated "$account" "$ctx"
@@ -725,7 +735,7 @@ sync_agents() {
     local name="$1" account="$2" ctx="$3"
 
     [ -d "$SRC_AGENTS" ] || return 0
-    if [ "$name" = "personal" ]; then
+    if [ "$account" = "personal" ]; then
         sync_agents_wholedir "$ctx"
     else
         sync_agents_curated "$account" "$ctx"
