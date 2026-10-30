@@ -82,6 +82,8 @@ Driven by `git -C <dir> diff --name-only old..new`.
     (brewDeps/brewCasks), `scripts/cargo-update`, `scripts/pnpm-globals`,
     `scripts/pipx-packages`, `scripts/gcloud-setup`, `scripts/pwsh-modules`,
     `scripts/tmux-plugins` — or offer full `src/bin/deps-up` if several changed or Tim asks.
+    Always prefix `cargo-update` and `deps-up` with `CARGO_UPDATE_SKIP=tim-codes/squad`. squad
+    stays in the manifest for fresh machines but is excluded from this sync.
     Warn Tim before anything that may raise a sudo or GUI prompt (brew casks) and run it
     on its own, not in a compound command.
 - **Exxo-Labs/agent-tooling** changed: read its README and package.json for the install step.
@@ -94,11 +96,10 @@ Driven by `git -C <dir> diff --name-only old..new`.
   script then runs `cargo build --release` on it (incremental).
 - **stray** changed: `scripts/cargo-update` installs it with
   `cargo install --git ssh://git@github.com/tim-codes/stray` (remote, not the local
-  checkout), so the binary tracks pushed main. Re-run `~/dev/dotfiles/scripts/cargo-update`
-  (it reinstalls every cargoGitDeps entry, which also refreshes althemer; that list still
-  contains squad, so tell Tim it was reinstalled from its remote despite the exclusion, and
-  restart nothing) once stray's
-  main moved, e.g. after a merge.
+  checkout), so the binary tracks pushed main. Re-run
+  `CARGO_UPDATE_SKIP=tim-codes/squad ~/dev/dotfiles/scripts/cargo-update` once stray's main
+  moved, e.g. after a merge. It reinstalls every other cargoGitDeps entry too, so althemer
+  is refreshed as well.
 - **althemer, worktrunk** (no checkout): updated only when `scripts/cargo-update` /
   `scripts/brew-update` run and the plugin refresh below covers the worktrunk marketplace.
   Upstream changes arrive no sooner than those runs.
