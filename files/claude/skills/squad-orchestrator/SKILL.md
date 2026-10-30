@@ -87,7 +87,7 @@ or ambiguous: `squad set --name orchestrator --status blocked --detail
    --priority 1 --session-id "$CLAUDE_CODE_SESSION_ID" --notes "squad
    orchestrator"`. On `orchestrator-exists: …`, print the name and stop.
 3. **Subscribe.** For each account `A` in `~/.config/squad/config.toml`
-   (today `personal`, `exxo`):
+   (today `personal`, `reserve`, `exxo`):
    ```
    squad subscribe orchestrator quota.A.threshold
    squad subscribe orchestrator quota.A.reset
