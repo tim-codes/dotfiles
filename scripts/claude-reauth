@@ -4,7 +4,7 @@
 # missing, one at a time. Use it after a reboot, before going AFK, or when a
 # squad `preflight blocked` comes back. The /reauth skill drives it.
 #
-#   claude-reauth [--check] [--context personal|exxo|exxo-personal|all] [--ttl-hours N]
+#   claude-reauth [--check] [--context personal|reserve|exxo|exxo-personal|all] [--ttl-hours N]
 #
 # --check reports only and changes nothing. The default reports, then runs each
 # missing login in turn (browser / Touch ID — the operator answers them), starts
@@ -19,7 +19,7 @@
 # Scope by --context: Docker, 1Password, gh and glab are machine-wide and always
 # checked; the exxo secret cache, gcloud (+ADC, which the Pulumi GCP provider
 # uses), pulumi (+ESC) and az belong to exxo/exxo-personal; the homelab secret
-# cache to personal; MCP servers are checked per context against
+# cache to personal and reserve; MCP servers are checked per context against
 # files/claude/reauth-needed.toml.
 #
 # Status strings these checks parse, as observed 2026-10-23 (CLI versions:
@@ -77,7 +77,7 @@ MCP_CWD="$HOME/claude"; [ -d "$MCP_CWD" ] || MCP_CWD="$HOME"
 
 usage() {
     cat <<'EOF'
-Usage: claude-reauth [--check] [--context personal|exxo|exxo-personal|all] [--ttl-hours N]
+Usage: claude-reauth [--check] [--context personal|reserve|exxo|exxo-personal|all] [--ttl-hours N]
 
   --check        report only; run no login and start nothing
   --context C    limit context-specific checks (default: all)
@@ -103,8 +103,8 @@ while [ $# -gt 0 ]; do
     shift
 done
 case "$CTX_ARG" in
-    all) CONTEXTS="personal exxo exxo-personal" ;;
-    personal|exxo|exxo-personal) CONTEXTS="$CTX_ARG" ;;
+    all) CONTEXTS="personal reserve exxo exxo-personal" ;;
+    personal|reserve|exxo|exxo-personal) CONTEXTS="$CTX_ARG" ;;
     *) usage >&2; exit 2 ;;
 esac
 case "$TTL_HOURS" in ''|*[!0-9]*|0) usage >&2; exit 2 ;; esac
@@ -112,7 +112,7 @@ TTL_SECONDS=$((TTL_HOURS * 3600))
 
 want_personal=0; want_exxo=0
 for c in $CONTEXTS; do
-    case "$c" in personal) want_personal=1 ;; *) want_exxo=1 ;; esac
+    case "$c" in personal|reserve) want_personal=1 ;; *) want_exxo=1 ;; esac
 done
 
 have() { command -v "$1" >/dev/null 2>&1; }

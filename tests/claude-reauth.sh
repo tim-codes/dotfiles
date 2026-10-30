@@ -15,7 +15,7 @@ mkdir -p "$REPO/scripts" "$REPO/files/claude" "$FAKE/dev/homelab" "$BIN" "$STATE
 cp "$SRC_REPO/scripts/claude-reauth" "$REPO/scripts/"
 cp "$SRC_REPO/files/claude/reauth-needed.toml" "$REPO/files/claude/"
 touch "$FAKE/dev/homelab/justfile"
-for c in personal exxo exxo-personal; do mkdir -p "$FAKE/.claude-$c"; done
+for c in personal reserve exxo exxo-personal; do mkdir -p "$FAKE/.claude-$c"; done
 ln -s "$(command -v jq)" "$BIN/jq"
 
 fail=0
@@ -93,7 +93,7 @@ case "$1 $2" in
   "mcp list")
     echo "Checking MCP server health…"; echo
     case "$ctx" in
-      personal) echo "Sanity: https://mcp.sanity.io?k=SECRETLEAK (HTTP) - $(st Sanity)"
+      personal|reserve) echo "Sanity: https://mcp.sanity.io?k=SECRETLEAK (HTTP) - $(st Sanity)"
                 echo "mantine: npx -y @mantine/mcp-server SECRETLEAK - ✔ Connected" ;;
       exxo)     echo "datadog: https://mcp.datadoghq.eu/v1/mcp?SECRETLEAK (HTTP) - $(st datadog)"
                 echo "workos: https://mcp.workos.com/SECRETLEAK (HTTP) - ✔ Connected"
@@ -134,6 +134,7 @@ reset; go --check
 check "all ok: exit 0" test "$rc" -eq 0
 for r in docker exxo-secret-cache homelab-secret-cache 1password gh glab gcloud gcloud-adc pulumi az \
          'mcp:personal:Sanity' 'mcp:personal:mantine' 'mcp:personal:playwright' \
+         'mcp:reserve:Sanity' 'mcp:reserve:mantine' 'mcp:reserve:playwright' \
          'mcp:exxo:datadog' 'mcp:exxo:workos' 'mcp:exxo:claude.ai Microsoft 365' \
          'mcp:exxo:claude.ai Datadog' 'mcp:exxo-personal:datadog'; do
     check "all ok: $r ok" row "$r" ok
@@ -197,8 +198,16 @@ check "mcp exxo: no secret-like output" noleak
 reset; go --check --context personal
 check "--context personal: no exxo rows" bash -c '! grep -qE "^  (gcloud|pulumi|az|exxo-secret-cache|mcp:exxo)" <<<"$1"' _ "$summary"
 check "--context personal: personal MCP rows" row 'mcp:personal:Sanity' ok
+reset; go --check --context reserve
+check "--context reserve: counts as personal (no exxo rows)" bash -c '! grep -qE "^  (gcloud|pulumi|az|exxo-secret-cache|mcp:exxo)" <<<"$1"' _ "$summary"
+check "--context reserve: homelab cache row, like personal" row homelab-secret-cache ok
+check "--context reserve: only that context's MCP" bash -c '! grep -qE "^  mcp:(personal|exxo|exxo-personal):" <<<"$1"' _ "$summary"
+check "--context reserve: Sanity row" row 'mcp:reserve:Sanity' ok
+reset; STUBENV=(STUB_mcp_reserve=missing); go --check --context reserve
+check "reserve mcp missing: Sanity needs-auth" row 'mcp:reserve:Sanity' needs-auth
+check "reserve mcp missing: step names claude-reserve" grep -q 'claude-reserve' <<<"$out"
 reset; go --check --context exxo-personal
-check "--context exxo-personal: only that context's MCP" bash -c '! grep -qE "^  mcp:(personal|exxo):" <<<"$1"' _ "$summary"
+check "--context exxo-personal: only that context's MCP" bash -c '! grep -qE "^  mcp:(personal|reserve|exxo):" <<<"$1"' _ "$summary"
 check "--context exxo-personal: datadog row" row 'mcp:exxo-personal:datadog' ok
 rm -rf "$FAKE/.claude-exxo-personal"
 reset; go --check --context exxo-personal

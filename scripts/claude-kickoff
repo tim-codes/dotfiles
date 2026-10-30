@@ -11,8 +11,8 @@
 #                              [--no-member-deny]
 #   claude-kickoff --check-trust <cwd> --account CONTEXT
 #
-# The context wrappers (claude-personal, claude-exxo, claude-exxo-personal,
-# claude-exxo-openrouter) are
+# The context wrappers (claude-personal, claude-reserve, claude-exxo,
+# claude-exxo-personal, claude-exxo-openrouter) are
 # fish functions (src/.config/fish/common.fish, __claude_ctx), not executables, so
 # this does not call them. It reproduces their whole effect instead: `env
 # CLAUDE_CONFIG_DIR=<context dir> claude ...`, plus the wrapper's guard that never
@@ -196,7 +196,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         -h|--help) usage; exit 0 ;;
         --account)
-            [ $# -ge 2 ] || die 2 "--account needs a value (exxo, exxo-personal or personal)"
+            [ $# -ge 2 ] || die 2 "--account needs a value (a context name from contexts.toml, e.g. exxo, exxo-personal, personal or reserve)"
             account="$2"; shift 2 ;;
         --account=*) account="${1#--account=}"; shift ;;
         --resume)
@@ -382,7 +382,7 @@ fi
 [ -n "$model" ] || die 4 "frontmatter key 'model' is missing or empty in $prompt"
 [ -n "$effort" ] || die 4 "frontmatter key 'effort' is missing or empty in $prompt"
 
-# --- context -> config dir (mirrors claude-exxo / claude-exxo-personal / claude-personal)
+# --- context -> config dir (mirrors claude-exxo / claude-exxo-personal / claude-personal / claude-reserve)
 ctx="$account"
 [ -n "$ctx" ] || ctx=$(printf '%s\n' "$context_raw" | first_word)
 case " $CONTEXTS " in

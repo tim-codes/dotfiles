@@ -15,7 +15,7 @@ REAL_HOME="$HOME"
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 FAKE="$T/home"; BIN="$T/bin"; REC="$T/rec"
-mkdir -p "$FAKE/.claude-exxo" "$FAKE/.claude-exxo-openrouter" "$FAKE/.claude-exxo-personal" "$FAKE/.claude-personal" \
+mkdir -p "$FAKE/.claude-exxo" "$FAKE/.claude-exxo-openrouter" "$FAKE/.claude-exxo-personal" "$FAKE/.claude-personal" "$FAKE/.claude-reserve" \
          "$FAKE/work/proj/.git" "$FAKE/work/other" "$FAKE/dev/grp/named/.git" "$FAKE/dev/one/dup/.git" \
          "$FAKE/dev/two/dup/.git" "$FAKE/dev/shallow/.git" "$FAKE/dev/x/shallow/.git" "$FAKE/.claude-lab" "$BIN"
 # The launcher parses its contexts file with yq (v4); put the real one on the stub PATH.
@@ -31,7 +31,7 @@ JQ_REAL="$(command -v jq || true)"
 mkdir -p "$FAKE/claude"
 FAKE_REAL="$(cd "$FAKE" && pwd -P)"
 TRUSTED_JSON=$(jq -n --arg h "$FAKE_REAL" '{projects: ([$h + "/work/proj", $h + "/work/other", $h + "/dev/grp/named", $h + "/dev/shallow", $h + "/claude"] | map({key: ., value: {hasTrustDialogAccepted: true}}) | from_entries)}')
-for d in .claude-exxo .claude-exxo-openrouter .claude-exxo-personal .claude-personal .claude-lab; do
+for d in .claude-exxo .claude-exxo-openrouter .claude-exxo-personal .claude-personal .claude-reserve .claude-lab; do
     printf '%s\n' "$TRUSTED_JSON" >"$FAKE/$d/.claude.json"
 done
 # Tests read the repo's contexts file unless a case sets its own.
@@ -177,21 +177,25 @@ sed 's|^cwd: .*|cwd: shallow|' "$T/fixture.md" >"$T/shallow.md"
 kick "$T/shallow.md" --dry-run
 check "shallowest bare-name match wins" has "cwd: $(cd "$FAKE/dev/shallow" && pwd -P)"
 sed 's|^cwd: .*|cwd: nowhere|' "$T/fixture.md" >"$T/nowhere.md"
+kick "$T/fixture.md" --account reserve --dry-run
+check "--account reserve maps to .claude-reserve" has "config_dir: $FAKE/.claude-reserve"
+check "reserve is its own squad account" has "account: reserve"
+
 expect_rc "unmatched bare cwd name" 5 "$T/nowhere.md" --dry-run
 # --- needs mapping (exit 9) ---
 withneeds() { sed "s|^model: .*|&\nneeds: $1|" "$T/fixture.md" >"$T/needs.md"; }
 for n in datadog boards; do
     withneeds "$n"
-    for c in exxo exxo-personal personal; do expect_rc "needs $n is met in $c" 0 "$T/needs.md" --account "$c" --dry-run; done
+    for c in exxo exxo-personal personal reserve; do expect_rc "needs $n is met in $c" 0 "$T/needs.md" --account "$c" --dry-run; done
     expect_rc "needs $n is unmet in exxo-openrouter" 9 "$T/needs.md" --account exxo-openrouter --dry-run
 done
 for n in m365 figma notion; do
     withneeds "$n"
     expect_rc "needs $n is met in exxo" 0 "$T/needs.md" --account exxo --dry-run
-    for c in exxo-personal personal exxo-openrouter; do expect_rc "needs $n is unmet in $c" 9 "$T/needs.md" --account "$c" --dry-run; done
+    for c in exxo-personal personal reserve exxo-openrouter; do expect_rc "needs $n is unmet in $c" 9 "$T/needs.md" --account "$c" --dry-run; done
 done
 withneeds "agent-run"
-for c in exxo exxo-personal personal; do expect_rc "needs agent-run is met in $c" 0 "$T/needs.md" --account "$c" --dry-run; done
+for c in exxo exxo-personal personal reserve; do expect_rc "needs agent-run is met in $c" 0 "$T/needs.md" --account "$c" --dry-run; done
 expect_rc "needs agent-run is unmet in exxo-openrouter" 9 "$T/needs.md" --account exxo-openrouter --dry-run
 withneeds "Datadog, M365 something-else"
 expect_rc "needs is case-insensitive, comma or space separated, ignores unknown words" 9 "$T/needs.md" --account personal --dry-run
@@ -338,7 +342,7 @@ cat >"$BIN/claude" <<'EOF'
 #!/bin/bash
 echo "TTL=${EXXO_SECRET_CACHE_TTL_SECONDS-unset}" >"$REC"
 EOF
-for c in exxo exxo-personal personal exxo-openrouter; do
+for c in exxo exxo-personal personal reserve exxo-openrouter; do
     kick "$T/fixture.md" --account "$c" --dry-run
     check "$c dry-run prints secret_cache_ttl_seconds: 43200" has "secret_cache_ttl_seconds: 43200"
     kick "$T/fixture.md" --account "$c"
@@ -380,6 +384,8 @@ sed "s|^model: .*|&\nneeds: m365|" "$T/rcwd.md" >"$T/rneeds.md"
 expect_rc "resume_needs_m365_on_exxo_personal_exits_9" 9 "$T/rneeds.md" --resume sess-2 --cwd "$W" --account exxo-personal --dry-run
 kick "$T/rcwd.md" --resume sess-2 --cwd "$W" --account personal --dry-run
 check "personal is its own resume_group" has "resume_group: personal"
+kick "$T/rcwd.md" --resume sess-2 --cwd "$W" --account reserve --dry-run
+check "reserve is its own resume_group, not personal's" has "resume_group: reserve"
 kick "$T/rcwd.md" --resume sess-2 --cwd "$W" --account exxo-openrouter --dry-run
 check "context_without_group_prints_none" has "resume_group: none"
 expect_rc "resume_without_account_exits_2" 2 "$T/rcwd.md" --resume sess-2 --cwd "$W" --dry-run
