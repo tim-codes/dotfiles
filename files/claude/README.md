@@ -349,6 +349,38 @@ entries, with a `.bak`).
 
 ## Deferred follow-ups
 
+- **claude.ai account settings are clickops (backlogged 2026-10-30).** Checked
+  against current Anthropic docs: these settings have no CLI, settings.json key,
+  consumer API or export, so they are web-UI only:
+  - profile and About-me text;
+  - capabilities, memory, privacy and notifications;
+  - the Claude Code page: branch prefix, auto PRs, session classification;
+  - connector OAuth and skill upload.
+
+  Mirroring them between the personal and reserve accounts on 2026-10-30 took
+  two browser-driving sessions. Recommended options:
+  1. **Desired-state file + a `claude-ai-account-sync` skill.** The file records
+     the target values: the About-me text (rewrite it; the 2026-10-30 review
+     found it dated) and the toggles every personal-side account should have.
+     The skill drives Claude-in-Chrome per account: read, diff against the
+     file, apply on approval.
+     Keep the file in a PRIVATE repo (homelab, say), not dotfiles, which is
+     public. Today's run also found account emails in dotfiles'
+     `src/.config/squad/config.toml`; move those out too.
+  2. **Pin the few local controls that exist.** `syncClaudeAiSkills` /
+     `syncClaudeAiPlugins` (pull account skills and plugins into Claude Code)
+     in the settings fragments. `disableClaudeAiConnectors: true` in the
+     `exxo-openrouter` overlay, so claude.ai connectors never reach K3 workers.
+     Claude Code's own `theme`/`viewMode`/`claudeInChromeDefaultEnabled` are
+     already managed (`prefs.personal.json`). They do not sync to claude.ai.
+  3. **Account hygiene from the same review, done by hand:**
+     - prune the 57 sessions and the stale trusted devices, and consider
+       "require trusted devices";
+     - repoint the claude.ai custom Datadog connector to `/v1/mcp`;
+     - reconnect Figma;
+     - set a Claude-in-Chrome default site policy;
+     - review the "Tim's Individual Org" API org created on 2026-10-30.
+
 - The deny floor makes any Bash command whose text contains `--reveal`,
   `--show-secrets` or ` op read` unrunnable — including a `grep` for those
   strings. Accepted trade-off (Grep/Write tools still work); revisit if it
