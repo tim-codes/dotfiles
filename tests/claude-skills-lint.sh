@@ -117,8 +117,8 @@ P="$SKILLS/squad-planner/SKILL.md"
 K="$SKILLS/squad-planner/kickoff-template.md"
 check "squad-planner exists and is shared" exists_and_shared squad-planner
 check "squad-planner names every TaskPlan field" contains "$P" \
-    title deliverables depends_on resources operator_steps infra kickoff_brief merge_authority \
-    test_policy priority_suggestion blocks_launch blocks_step trunk_service
+    '`title`' '`deliverables`' '`depends_on`' '`resources`' '`operator_steps`' '`infra`' '`kickoff_brief`' \
+    '`merge_authority`' '`test_policy`' '`priority_suggestion`' '`blocks_launch`' '`blocks_step`' '`trunk_service`'
 check "squad-planner carries the submit contract" contains "$P" \
     mcp__squad__submit_task --draft squad://context-brief/ '--headless --task-id' \
     '"squad_planner":"submitted"' '"squad_planner":"failed"' 'last non-empty line' 'code fence' ExitPlanMode

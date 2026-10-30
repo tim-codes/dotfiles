@@ -55,6 +55,9 @@ orchestrator never needs to know which way a plan was made.
   and converts it to `owner/name` (`git@github.com:o/n.git` and
   `https://github.com/o/n` both give `o/n`); if the task file or Tim names
   another repo, that one; if there is no remote, ask Tim.
+- First check whether the squad is reachable: `mcp__squad__submit_task` is
+  among this session's tools, counting deferred tools (search for it with
+  ToolSearch before concluding it is absent).
 - Read `squad://context-brief/<owner>%2F<name>` (the repo URL-encoded, so `/`
   is `%2F`) with ReadMcpResourceTool, server `squad`. It returns the repo's
   `tasks`, `members` with their branches or trunks, `pending_items`, `quota`
@@ -63,8 +66,12 @@ orchestrator never needs to know which way a plan was made.
   `## Context` of the content.
 - If the read fails (orchestrator down): headless hands back `failed` with
   code `no_submission` (step 8); interactive tells Tim and stops.
-- No orchestrator yet (interactive only): if `mcp__squad__submit_task` is not
-  among this session's tools, the squad is not reachable from here at all.
+- Headless, any failure before a submission (a missing argument, an
+  unreadable `--task-file`, `mcp__squad__submit_task` absent, the brief
+  unreadable) ends the turn with the `failed` hand-back, code
+  `no_submission`, never with prose alone.
+- No orchestrator yet (interactive only): if `mcp__squad__submit_task` is
+  absent, the squad is not reachable from here at all; skip the read.
   Tell Tim, write "context brief unavailable" under `## Context`, and carry on;
   step 5 then uses the interim file drop.
 
@@ -137,9 +144,13 @@ omitted, never `null`.
   1–2000 characters) whenever supporting infra is needed, so the orchestrator
   creates the exxo-infra dependency task that lands first (spec §8).
 - `kickoff_brief`: 1–50000 characters, `kickoff-template.md` in this
-  directory filled in: replace every `<…>`, keep the merge-authority line
-  that applies and delete the other. Its first two lines stay exactly as the
-  template has them.
+  directory filled in: replace every `<…>`; keep the merge-authority line
+  that applies, remove its brackets and delete the other. A new task with no
+  id yet (an interactive submission without `task_id`) writes the task line
+  as `Task: <title>`; headless and revisions write `Task <id>: <title>`. When
+  `resources.heavy_jobs` is not empty, list its commands under
+  `## Test policy`, so the member asks for a slot before running them. Its
+  first two lines stay exactly as the template has them.
 - `merge_authority`: `trunk_service`, unless Tim says he merges this one
   himself, then `operator`.
 - `test_policy`: one line, 1–2000 characters; default
@@ -196,7 +207,7 @@ The answer is `{task_id, state}` (plus the orchestrator's hash of the
 content, which needs no action).
 
 **Interim, no orchestrator (interactive only).** When
-`mcp__squad__submit_task` is not among this session's tools, never drop the
+`mcp__squad__submit_task` is absent (step 1's check), never drop the
 plan. Write the composed `content` (frontmatter and body, exactly what would
 have been passed to `submit_task`) to `<kickoff dir>/<task-slug>.md`, where
 `<task-slug>` is the title in lower-case kebab case (at most 60 characters;

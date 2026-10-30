@@ -88,9 +88,9 @@ plus the repo's fast check (`just check` or its equivalent) once before
 landing. No `just ci`, `just verify`, full suites, e2e, browser runs or
 production builds without a heavy slot. Heavy verification is batched by the
 trunk service, per trunk, not per lane. A red trunk is fixed forward by a
-`trunk_fix` job before any further squash lands. A kickoff line "Test policy:
-squad-member, Testing and trunks" means exactly this section; any exception
-is stated in the kickoff.
+`trunk_fix` job before any further squash lands. A kickoff whose Test policy
+section reads "squad-member, Testing and trunks" means exactly this section;
+any exception is stated there.
 
 | Stack | Allowed mid-build | Not without a heavy slot |
 |---|---|---|
@@ -130,8 +130,8 @@ comprehensive gate per trunk.
 
 ## Heavy jobs
 
-Before any command the kickoff lists under heavy jobs, or that Testing and
-trunks marks heavy, call `mcp__squad__heavy_slot` with
+Before any command the kickoff's Test policy section lists as heavy, or that
+Testing and trunks marks heavy, call `mcp__squad__heavy_slot` with
 `{action: "request", est_minutes: <1-240>, reason: "<one line>"}`. A
 `queued` answer means wait: do other work and end the turn; a turn granting
 the slot arrives. The PreToolUse gate denies heavy commands without a grant,
