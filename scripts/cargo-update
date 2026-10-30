@@ -13,9 +13,11 @@ cargoGitDeps=(
   # it rewrites the theme.toml indirection, not the stow-managed
   # alacritty.toml); move to crates.io `althemer` once a release > 0.3.0 ships
   ssh://git@github.com/xdagiz/althemer
-  # squad: local broker + quota/host watchers coordinating Claude Code sessions
-  # (the launchd agents in src/Library/LaunchAgents run ~/.cargo/bin/squad);
-  # remote created by the squad build PR
+  # squad: the v0.5 broker daemon (headless member supervisor, hooks and MCP
+  # proxy, doctor); the quota/host watchers are folded into it. Its launchd
+  # jobs dev.tim.squad-broker and dev.tim.squad-orchestrator are rendered by
+  # `just -f deploy/Justfile install-launchd` in the squad repo, not stowed
+  # from here. Installs from git HEAD (main is v0.5).
   ssh://git@github.com/tim-codes/squad
 )
 

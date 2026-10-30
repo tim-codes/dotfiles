@@ -55,8 +55,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
-            "timeout": 5
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook prompt-cleared) && printf '%s\\n' \"$o\"; exit 0",
+            "timeout": 10
           }
         ]
       }
@@ -83,8 +83,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
-            "timeout": 5
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook prompt-cleared) && printf '%s\\n' \"$o\"; exit 0",
+            "timeout": 10
           }
         ]
       }
@@ -137,6 +137,16 @@
             "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/refresh-cache.sh\" # tmux-claude-hatch"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook pre-tool-use) && printf '%s\\n' \"$o\"; exit 0",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -169,6 +179,15 @@
           {
             "type": "command",
             "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SessionEnd >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook session-end) && printf '%s\\n' \"$o\"; exit 0",
             "timeout": 5
           }
         ]
@@ -209,6 +228,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook session-start) && printf '%s\\n' \"$o\"; exit 0",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "Stop": [
@@ -246,8 +274,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
-            "timeout": 5
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook stop) && printf '%s\\n' \"$o\"; exit 0",
+            "timeout": 10
           }
         ]
       }
@@ -282,8 +310,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
-            "timeout": 5
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook user-prompt-submit) && printf '%s\\n' \"$o\"; exit 0",
+            "timeout": 10
           }
         ]
       }
@@ -313,8 +341,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" cleared # squad-prompt-hook",
-            "timeout": 5
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook prompt-cleared) && printf '%s\\n' \"$o\"; exit 0",
+            "timeout": 10
           }
         ]
       }
@@ -346,8 +374,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/dev/dotfiles/files/claude/hooks/squad-prompt-hook\" pending # squad-prompt-hook",
-            "timeout": 5
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook permission-request) && printf '%s\\n' \"$o\"; exit 0",
+            "timeout": 10
           }
         ]
       }
@@ -407,25 +435,20 @@
       "Bash(gh run view:*)",
       "Bash(gh run list:*)",
       "Bash(just --list:*)",
-      "Bash(squad send:*)",
-      "Bash(squad set:*)",
-      "Bash(squad publish:*)",
-      "Bash(squad subscribe:*)",
-      "Bash(squad unsubscribe:*)",
-      "Bash(squad register:*)",
-      "Bash(squad deregister:*)",
       "Bash(squad status:*)",
-      "Bash(squad roster:*)",
-      "Bash(squad get:*)",
-      "Bash(squad history:*)",
       "Bash(squad doctor:*)",
-      "Bash(squad debug:*)",
-      "Bash(squad operator raise:*)",
-      "Bash(squad operator set:*)",
-      "Bash(squad operator decide:*)",
-      "Bash(squad operator list:*)",
-      "Bash(squad operator get:*)",
-      "Bash(squad ack:*)",
+      "Bash(squad debug report:*)",
+      "mcp__squad__register",
+      "mcp__squad__set",
+      "mcp__squad__ack",
+      "mcp__squad__delegate",
+      "mcp__squad__delegate_result",
+      "mcp__squad__job_review",
+      "mcp__squad__raise",
+      "mcp__squad__watch",
+      "mcp__squad__unwatch",
+      "mcp__squad__heavy_slot",
+      "mcp__squad__land",
       "WebSearch",
       "mcp__ide__getDiagnostics"
     ],

@@ -240,13 +240,7 @@ claude-workstation-setup
 worktree-closedown
 dotfiles-repo
 claude-repo-config
-squad-infra
-squad-join
-squad-orchestrator
 squad-debug-review
-squad-concierge
-squad-herder
-squad-liaison
 squad-member
 squad-planner
 reauth
