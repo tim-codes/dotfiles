@@ -95,7 +95,8 @@ case "$1 $2" in
     case "$ctx" in
       personal|reserve) echo "Sanity: https://mcp.sanity.io?k=SECRETLEAK (HTTP) - $(st Sanity)"
                 echo "mantine: npx -y @mantine/mcp-server SECRETLEAK - ✔ Connected"
-                echo "workos: https://mcp.workos.com/SECRETLEAK (HTTP) - ✔ Connected" ;;
+                echo "workos: https://mcp.workos.com/SECRETLEAK (HTTP) - ✔ Connected"
+                for s in Notion Slack Figma; do echo "claude.ai $s: https://x/SECRETLEAK - ✔ Connected"; done ;;
       exxo)     echo "datadog: https://mcp.datadoghq.eu/v1/mcp?SECRETLEAK (HTTP) - $(st datadog)"
                 echo "workos: https://mcp.workos.com/SECRETLEAK (HTTP) - ✔ Connected"
                 for s in "Microsoft 365" Notion Slack Figma; do echo "claude.ai $s: https://x/SECRETLEAK - ✔ Connected"; done
