@@ -4,9 +4,6 @@
 
 [broker]
 grace_minutes = 10
-# Sessions here can register but belong to no account (never wall-paused):
-# the K3 workers' OpenRouter context.
-extra_config_dirs = ["~/.claude-exxo-openrouter"]
 
 # Personal and exxo-personal are the same account; listing both dirs lets the
 # watcher dedupe their caches. The first dir is the one whose keychain token
