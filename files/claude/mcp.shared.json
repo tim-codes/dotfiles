@@ -30,6 +30,11 @@
     "vercel": {
       "type": "http",
       "url": "https://mcp.vercel.com"
+    },
+    "squad": {
+      "type": "stdio",
+      "command": "squad",
+      "args": ["mcp"]
     }
   }
 }
