@@ -6,6 +6,10 @@ brewDeps=(
   bash
   bat
   btop
+  # Cloud SQL Auth Proxy: IAM-authenticated, read-only checks against
+  # exxo-platform-pg (e.g. billing ledger role/migration state) without
+  # authorised networks.
+  cloud-sql-proxy
   colordiff
   composer
   # macOS ships no timeout(1)/nproc/shuf, so Linux-written scripts and agent
@@ -46,6 +50,9 @@ brewDeps=(
   k9s
   lazydocker
   lazygit
+  # psql for the Cloud SQL proxy checks above. Keg-only: run it as
+  # /opt/homebrew/opt/libpq/bin/psql rather than linking over anything.
+  libpq
   lsd
   mdcat
   mysql-client
@@ -80,6 +87,9 @@ brewDeps=(
   ripgrep
   scdoc
   shellcheck
+  # Ad-hoc socket/port relays (e.g. a short-lived LAN relay of a local Unix
+  # socket). Not for anything long-running or unattended.
+  socat
   stow
   telnet
   tldr
