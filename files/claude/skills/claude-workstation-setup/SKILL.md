@@ -392,6 +392,24 @@ parentedit's `linear-tpe` skill names `mcp__plugin_linear_linear__*` tools.
 Figma reaches a context only inside the claude.ai account-synced `design`
 plugin (`<context>/plugins/synced/`), which the fragments don't manage.
 
+## Managed preferences: top-level `.claude.json` keys
+
+The fourth managed artefact, merged exactly like `.mcpServers` above (same
+seed, checksum guard, no-op skip, atomic mode-preserving swap). Optional
+`files/claude/prefs.shared.json` + `prefs.<account>.json`, account wins per
+key; only `prefs.personal.json` exists today (personal and reserve). Managed
+keys win, every other key in `.claude.json` is untouched, and `--diff` prints
+key names with current/missing/differs, never values. The fragment is the
+allow-list, so nothing is managed unless named.
+
+- Qualifies: user preferences and one-time dialog dismissals.
+- Never qualifies: account or login state, oauth data, caches, counters,
+  migration markers, paths, `projects`.
+- The `unpin*LaunchEffort` flags stop a model's launch default effort
+  overriding the `effortLevel` pin.
+
+Tests: `tests/claude-sync-prefs.sh`.
+
 ## What is deliberately NOT shared or synced
 
 - **A context-level `settings.local.json`** — not allowed: claude-sync backs
@@ -416,10 +434,10 @@ plugin (`<context>/plugins/synced/`), which the fragments don't manage.
   of the two subscriptions on the Anthropic backend side (e.g. the desktop and
   mobile apps); any integration across them is our own tooling's job (the
   squad/kickoff `resume_group` keeps them apart for the same reason).
-- **Login state** (`.claude.json`), sessions, history — per context. The one
-  exception is that file's `.mcpServers` key, which claude-sync merges into
-  (above); every other key in `.claude.json` is left exactly as Claude Code
-  wrote it.
+- **Login state** (`.claude.json`), sessions, history — per context. The
+  exceptions are that file's `.mcpServers` key and the keys named in a
+  `prefs.*.json` fragment, which claude-sync merges into (above); every other
+  key in `.claude.json` is left exactly as Claude Code wrote it.
 
 ## Quick diagnosis
 

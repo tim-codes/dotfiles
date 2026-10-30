@@ -113,6 +113,26 @@ Four properties of the merge, all deliberate:
   managing it; it does not delete it from a context. Retire one with
   `claude mcp remove -s user <name>` under that `CLAUDE_CONFIG_DIR`.
 
+Managed preferences are the same merge applied to top-level `.claude.json`
+keys. An optional `files/claude/prefs.shared.json` plus
+`files/claude/prefs.<account>.json` (account wins per key, as for MCP) are
+merged into `<context>/.claude.json` by `claude-sync`: `{}` is seeded if the
+file is absent, the checksum is taken before the read and re-checked before the
+swap, a no-op is skipped, and the swap is atomic in the same directory with the
+mode preserved. Managed keys win; every other key is untouched. `--diff` lists
+each managed key as `current`, `missing` or `differs`, key NAMES only, never
+values. The fragment is the allow-list by construction: a key is touched only
+if it is named there. Today only `prefs.personal.json` exists (so personal and
+reserve get it; exxo contexts are untouched).
+
+- **Qualifies:** user preferences and one-time dialog dismissals.
+- **Never qualifies:** account or login state, oauth data, caches, counters,
+  migration markers, paths, and `projects`.
+- The `unpin*LaunchEffort` flags are there so a model's launch default effort
+  cannot override the `effortLevel` pin.
+
+Tests: `tests/claude-sync-prefs.sh`.
+
 Skills follow the same split. `~/.claude-personal/skills` (and
 `~/.claude-reserve/skills`: the choice keys on the fragment account, not the
 context name) stays a whole-directory symlink to `files/claude/skills`. `~/.claude-exxo/skills` is

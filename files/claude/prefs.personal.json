@@ -1,0 +1,18 @@
+{
+  "claudeInChromeDefaultEnabled": true,
+  "deepLinkTerminal": "iTerm",
+  "diffSidebarOpen": false,
+  "showSpinnerTree": false,
+  "remoteControlAtStartup": false,
+  "hasOpusPlanDefault": false,
+  "shiftEnterKeyBindingInstalled": true,
+  "effortCalloutDismissed": true,
+  "effortCalloutV2Dismissed": true,
+  "hasCompletedClaudeInChromeOnboarding": true,
+  "hasIdeAutoConnectDialogBeenShown": true,
+  "hasSeenAutoModeOutsideReadPrompt": true,
+  "remoteDialogSeen": true,
+  "unpinFable5LaunchEffort": true,
+  "unpinOpus47LaunchEffort": true,
+  "unpinOpus48LaunchEffort": true
+}

@@ -58,6 +58,11 @@
 # file moved underneath it — .claude.json is rewritten constantly by any live
 # session, and clobbering a token someone just added would be unrecoverable.
 #
+# Managed preferences work the same way for top-level .claude.json keys:
+# files/claude/prefs.shared.json plus an optional prefs.<account>.json (account
+# wins per key) are MERGED in (build_prefs / sync_prefs), with the same checksum
+# guard, no-op skip and atomic swap. The fragment is the allow-list.
+#
 # Skills default to a whole-directory symlink, so ~/.claude-*/skills IS
 # files/claude/skills in this repo: author a skill straight into the context
 # and it lands in git, exactly like editing ~/.config/fish/*. That's still
@@ -218,7 +223,9 @@ MERGE_TMP="$(mktemp)"
 # would be written, and (in --diff) the live side being compared against.
 MCP_TMP="$(mktemp)"
 MCP_OUT="$(mktemp)"
-trap 'rm -f "$MERGE_TMP" "$MCP_TMP" "$MCP_OUT"' EXIT
+PREFS_TMP="$(mktemp)"
+PREFS_OUT="$(mktemp)"
+trap 'rm -f "$MERGE_TMP" "$MCP_TMP" "$MCP_OUT" "$PREFS_TMP" "$PREFS_OUT"' EXIT
 
 # The repo skills that are cross-account. Everything NOT named here is
 # personal-only: linked into ~/.claude-personal (which gets the whole
@@ -405,6 +412,43 @@ local_settings_status() {
     echo "  settings.local.json: present ($counts rules) — would be retired"
 }
 
+# Collapse the optional prefs.shared.json and prefs.<account>.json into one
+# flat object at $1 (account wins per key, same precedence as the MCP
+# fragments); {} when neither exists. These are the keys claude-sync manages at
+# the top level of <context>/.claude.json. The fragment IS the allow-list: a
+# key is only ever touched because it is named there. Only user preferences and
+# one-time dialog dismissals qualify; account/login state, oauth data, caches,
+# counters, migration markers, paths and `projects` never do (see README). The
+# unpin*LaunchEffort flags stop a model's launch default effort overriding the
+# effortLevel pin.
+build_prefs() {
+    local account="$1" out="$2"
+    local shared="$REPO_DIR/files/claude/prefs.shared.json"
+    local fragment="$REPO_DIR/files/claude/prefs.$account.json"
+    local files=()
+    [ -f "$shared" ] && files+=("$shared")
+    [ -f "$fragment" ] && files+=("$fragment")
+    if [ "${#files[@]}" -eq 0 ]; then
+        echo '{}' > "$out"
+    else
+        jq -s 'add' "${files[@]}" > "$out"
+    fi
+}
+
+# Report, by KEY NAME only (never a value), how a context's live .claude.json
+# compares to the managed preferences.
+prefs_status_lines() {
+    local live="$1"
+    [ -f "$live" ] || live=/dev/null
+    jq -rn --slurpfile m "$PREFS_TMP" --slurpfile d "$live" '
+        (($d[0] // {}) | if type == "object" then . else {} end) as $doc
+        | ($m[0] // {}) | to_entries[] | .key as $k | .value as $v
+        | if   ($doc | has($k) | not) then "  \($k): missing (would be added)"
+          elif $doc[$k] != $v         then "  \($k): differs (would be reset)"
+          else                             "  \($k): current" end
+    ' 2>/dev/null || echo "  (unreadable .claude.json — skipped)"
+}
+
 if [ "$diff_only" = 1 ]; then
     for mapping in "${CONTEXTS[@]}"; do
         name="${mapping%%:*}"
@@ -432,6 +476,12 @@ if [ "$diff_only" = 1 ]; then
             info "${ctx/#$HOME/~}/.claude.json mcpServers vs repo (mcp.shared.json + mcp.$account.json if present)"
             build_mcp "$account" "$MCP_TMP"
             mcp_status_lines "$ctx/.claude.json"
+        fi
+
+        build_prefs "$account" "$PREFS_TMP"
+        if [ "$(jq 'length' "$PREFS_TMP")" -gt 0 ]; then
+            info "${ctx/#$HOME/~}/.claude.json preferences vs repo (prefs.shared.json + prefs.$account.json if present)"
+            prefs_status_lines "$ctx/.claude.json"
         fi
 
         info "${ctx/#$HOME/~}/agents vs repo (files/claude/agents, shared_agents() for curated contexts)"
@@ -569,6 +619,53 @@ sync_mcp_servers() {
     cat "$MCP_OUT" > "$swap"
     mv "$swap" "$live"
     echo "  .claude.json: mcpServers merged from mcp.shared.json + mcp.$account.json (if present)"
+}
+
+# ---- preferences: merge the managed top-level keys into <context>/.claude.json ----
+# Same discipline as sync_mcp_servers: seed {} if absent, checksum before the
+# read and again before the swap, skip a no-op, swap atomically in-directory
+# preserving the mode. Managed keys win; every other key is untouched.
+sync_prefs() {
+    local account="$1" ctx="$2"
+    local live="$ctx/.claude.json"
+
+    build_prefs "$account" "$PREFS_TMP"
+    if [ "$(jq 'length' "$PREFS_TMP")" -eq 0 ]; then
+        return 0
+    fi
+
+    if [ ! -f "$live" ]; then
+        echo '{}' > "$live"
+        chmod 600 "$live"
+        echo "  .claude.json: seeded (context has never been launched)"
+    fi
+
+    local sum_before
+    sum_before="$(cksum < "$live")"
+
+    if ! jq --slurpfile p "$PREFS_TMP" '. + $p[0]' "$live" > "$PREFS_OUT" 2>/dev/null; then
+        warn "  .claude.json is not readable as JSON — preferences left alone"
+        return
+    fi
+
+    if [ "$(jq -cS . "$live")" = "$(jq -cS . "$PREFS_OUT")" ]; then
+        echo "  .claude.json: preferences already current ($(jq 'length' "$PREFS_TMP") managed)"
+        return
+    fi
+
+    if [ "$(cksum < "$live")" != "$sum_before" ]; then
+        warn "  .claude.json changed while syncing (a Claude session is likely running)"
+        warn "  — not written, nothing lost; re-run claude-sync"
+        return
+    fi
+
+    prefs_status_lines "$live"
+
+    local swap="$ctx/.claude.json.claude-sync-$$"
+    cp -p "$live" "$swap"
+    cat "$PREFS_OUT" > "$swap"
+    mv "$swap" "$live"
+    echo "  .claude.json: preferences merged from prefs.shared.json + prefs.$account.json (if present)"
 }
 
 # ---- skills: whole-dir symlink for accounts with no exclusions ----
@@ -830,6 +927,7 @@ for mapping in "${CONTEXTS[@]}"; do
     sync_local_settings "$account" "$ctx"
     sync_claude_md "$account" "$ctx"
     sync_mcp_servers "$account" "$ctx"
+    sync_prefs "$account" "$ctx"
     sync_skills "$name" "$account" "$ctx"
     sync_agents "$name" "$account" "$ctx"
     if [ "$name" = "exxo-personal" ]; then
