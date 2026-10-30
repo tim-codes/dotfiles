@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# squad-tunnel — host the squad dashboard (127.0.0.1:7780) through a persistent
+# squad-tunnel — host the squad orchestrator GUI (127.0.0.1:7790) through a persistent
 # Microsoft dev tunnel so Tim can open it from his phone.
 #
 #   squad-tunnel host     ensure the tunnel, publish its URL, then run
@@ -23,7 +23,7 @@
 set -euo pipefail
 
 ID=${SQUAD_TUNNEL_ID:-exxo-tfo-squad}
-PORT=${SQUAD_TUNNEL_PORT:-7780}
+PORT=${SQUAD_TUNNEL_PORT:-7790}
 CACHE=${SQUAD_TUNNEL_CACHE:-$HOME/.config/squad/tunnel.json}
 DRY=${SQUAD_TUNNEL_DRY_RUN:-0}
 
@@ -73,7 +73,7 @@ ensure() {
   if [[ -z $show ]]; then
     log "creating tunnel $ID"
     run devtunnel create "$ID" --labels exxo --labels squad --labels dashboard \
-      --description "squad dashboard (127.0.0.1:$PORT)" --expiration 30d --json
+      --description "squad orchestrator GUI (127.0.0.1:$PORT)" --expiration 30d --json
     show=""
     # A new tunnel gets new hostnames; any cached URL is stale.
     [[ $DRY == 1 ]] || rm -f "$CACHE"

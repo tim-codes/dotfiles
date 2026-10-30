@@ -5,7 +5,7 @@
   <key>Label</key>
   <string>dev.tim.squad-tunnel</string>
 
-  <!-- Hosts the squad dashboard (127.0.0.1:7780) through the persistent
+  <!-- Hosts the squad orchestrator GUI (127.0.0.1:7790, served at /) through the persistent
        Microsoft dev tunnel exxo-tfo-squad (`squad-tunnel host`), so Tim can
        open it from his phone. The script ensures the tunnel, publishes its
        URL as the `dashboard` gauge, then execs `devtunnel host`.
@@ -24,6 +24,11 @@
     <string>/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/Users/tim/.cargo/bin</string>
     <key>HOME</key>
     <string>/Users/tim</string>
+    <!-- Must match [orchestrator] http_addr in ~/.config/squad/config.toml
+         (v0.5 orchestrator GUI on 127.0.0.1:7790; v0.4's dashboard on 7780
+         is retired). -->
+    <key>SQUAD_TUNNEL_PORT</key>
+    <string>7790</string>
   </dict>
 
   <key>RunAtLoad</key>
