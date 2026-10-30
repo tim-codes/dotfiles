@@ -62,10 +62,15 @@ bash:  .bashrc > common.sh > local.sh, then interactive-only aliases/prompt
   use is fish. ssh one-liners, cron, scripts and Claude Code all land in zsh,
   and `.zshenv` is the only file they read — so nothing shared may live in
   `.zshrc`.
-- zsh is deliberately **not** at parity with fish. It is the redundant fallback
-  for machines and contexts without fish, so it gets variables and PATH and
-  nothing else; aliases, prompt and completions stay in `.bashrc` and the fish
-  config.
+- zsh is the redundant fallback, brought **toward** fish parity for the cheap
+  parts only. Variables and PATH (including the gcloud SDK bin and
+  `LSCOLORS`) live in `common.sh`; `.zshrc` (interactive only) carries nvm,
+  the Claude context wrappers (`claude`, `claude-personal`, `claude-exxo`,
+  `claude-exxo-personal`, `claude-exxo-openrouter`, `claude-default`, one
+  `_claude_ctx` helper and one context-dir list, mirroring fish's
+  `__claude_ctx`) and the plain one-line aliases shared with fish and
+  `.bashrc`. Prompt, completions, functions with fish machinery (`md`, `tx`,
+  `theme`, `restow` ...) and fish abbreviations stay fish-only.
 - `.zprofile` re-sources `common.sh` because macOS's `/etc/zprofile` runs
   `path_helper`, which reorders PATH *and* adds the `/etc/paths.d` entries
   after `.zshenv` has already run.
