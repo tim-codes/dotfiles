@@ -377,8 +377,10 @@ weeks later (cf. the $HOME-quoting hook fix, #39).
 
 ## Dev stack
 
-"Dev stack", "dev-stack" or "my stack" means the projects that make up Tim's
-shell, Claude and system setup, consumed mainly by his two MacBooks:
+"Dev stack", "dev-stack" or "my stack" means the setup repos plus the
+open-source tools Tim authors or builds in (tmux-home, stray, and upstream
+ones like althemer and worktrunk), consumed mainly by his two MacBooks. The
+`workstation-sync` skill's list is the canonical inventory. Setup repos:
 
 - `~/dev/dotfiles` (tim-codes/dotfiles)
 - `~/dev/squad` (tim-codes/squad)
@@ -386,7 +388,12 @@ shell, Claude and system setup, consumed mainly by his two MacBooks:
 - `~/dev/exxo/skills` (Exxo-Labs/skills, also the exxo-skills plugin marketplace)
 - `~/dev/exxo/agent-tooling` (Exxo-Labs/agent-tooling)
 
-plus the Claude plugin marketplaces and installs that come from them. The
+Authored open-source tools (local checkouts): `~/dev/tmux-home`
+(tim-codes/tmux-home) and `~/dev/oss/stray` (tim-codes/stray).
+Incorporated upstream tools (no checkout, refreshed through the dotfiles
+install manifests): althemer (fork of xdagiz/althemer) and worktrunk.
+
+Plus the Claude plugin marketplaces and installs that come from them. The
 `workstation-sync` skill brings the whole stack up to date; `workstation-setup`
 prepares a session to work.
 

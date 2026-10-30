@@ -6,8 +6,9 @@ description: Lightweight start-of-day check that makes this machine ready to wor
 # Workstation setup: ready to work
 
 A short checklist. It reports and fixes auth; it never pulls, merges or installs
-(that is `workstation-sync`). Dev stack = `~/dev/dotfiles`, `~/dev/squad`,
-`~/dev/homelab`, `~/dev/exxo/skills`, `~/dev/exxo/agent-tooling`.
+(that is `workstation-sync`). Dev stack checkouts: `~/dev/dotfiles`, `~/dev/squad`,
+`~/dev/homelab`, `~/dev/exxo/skills`, `~/dev/exxo/agent-tooling`, `~/dev/tmux-home`,
+`~/dev/oss/stray` (`workstation-sync` holds the canonical inventory).
 
 ## Output rule (governs the whole run)
 
