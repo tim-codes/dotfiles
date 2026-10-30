@@ -87,10 +87,10 @@ Consequence: never hand-edit `~/.claude-*/settings.json` for anything meant
 to last — it reverts on the next sync. Put it in the right fragment instead.
 Account-specific keys (the exxo-skills marketplace, its plugin) live only in
 `settings.exxo.json`; `~/.claude-personal` must never receive Exxo config.
-The one carve-out is OAuth-only MCP servers (`datadog`, `boards`, `workos`):
+The one carve-out is OAuth-only MCP servers (`datadog`, `boards`, `workos`, `vercel`):
 they hold no credential and access is gated by the provider's own login, so
 they live in `mcp.shared.json` and reach every context, as does the stdio
-`playwright`. `exxo-openrouter` denies all four via `deniedMcpServers` in its
+`playwright`. `exxo-openrouter` denies all five via `deniedMcpServers` in its
 overlay: workers cannot authenticate, and get no browser automation. The same
 overlay sets `superpowers@claude-plugins-official` to `false`, because its
 process skills stop and ask the user questions, which an unattended K3 worker
@@ -102,8 +102,10 @@ One exception to "account fragment wins": the permission rule arrays
 jq's `*` replaces arrays and the exxo grants would otherwise wipe the shared
 set. That is where the global permissions live (added 2026-10-23):
 `settings.shared.json` carries the read-only allow set (git/gh read
-subcommands, `just --list`, `WebSearch`, GitHub `WebFetch`,
-`mcp__ide__getDiagnostics`) and the **deny floor** (`op read`, `--reveal`,
+subcommands, `just --list`, `WebSearch`,
+`mcp__ide__getDiagnostics`; no explicit `WebFetch` allows, by policy: auto mode
+decides, and `claude-config-audit` flags any that reappear in a repo's
+`settings.local.json`) and the **deny floor** (`op read`, `--reveal`,
 `--show-secrets`, `pulumi`/`esc env open`, `gcloud secrets versions access`,
 each also as `* <cmd>` so a later segment matches; `Read` of `.claude.json`
 and `.credentials.json`); `settings.exxo.json` adds the Exxo read-only cloud
@@ -390,8 +392,30 @@ parentedit's `linear-tpe` skill names `mcp__plugin_linear_linear__*` tools.
 Figma reaches a context only inside the claude.ai account-synced `design`
 plugin (`<context>/plugins/synced/`), which the fragments don't manage.
 
+## Managed preferences: top-level `.claude.json` keys
+
+The fourth managed artefact, merged exactly like `.mcpServers` above (same
+seed, checksum guard, no-op skip, atomic mode-preserving swap). Optional
+`files/claude/prefs.shared.json` + `prefs.<account>.json`, account wins per
+key; only `prefs.personal.json` exists today (personal and reserve). Managed
+keys win, every other key in `.claude.json` is untouched, and `--diff` prints
+key names with current/missing/differs, never values. The fragment is the
+allow-list, so nothing is managed unless named.
+
+- Qualifies: user preferences and one-time dialog dismissals.
+- Never qualifies: account or login state, oauth data, caches, counters,
+  migration markers, paths, `projects`.
+- The `unpin*LaunchEffort` flags stop a model's launch default effort
+  overriding the `effortLevel` pin.
+
+Tests: `tests/claude-sync-prefs.sh`.
+
 ## What is deliberately NOT shared or synced
 
+- **A context-level `settings.local.json`** — not allowed: claude-sync backs
+  it up as `settings.local.json.bak-<ts>` and removes it (`--diff` reports it
+  by rule counts only). Promote anything worth keeping into
+  `settings.shared.json` / `settings.<account>.json`.
 - **Permission approvals** — per repository, in `.claude/settings.local.json`
   at the repo root, untouched by claude-sync. (The audit's `--fix-local`
   prunes them on request; nothing does so automatically.)
@@ -410,10 +434,10 @@ plugin (`<context>/plugins/synced/`), which the fragments don't manage.
   of the two subscriptions on the Anthropic backend side (e.g. the desktop and
   mobile apps); any integration across them is our own tooling's job (the
   squad/kickoff `resume_group` keeps them apart for the same reason).
-- **Login state** (`.claude.json`), sessions, history — per context. The one
-  exception is that file's `.mcpServers` key, which claude-sync merges into
-  (above); every other key in `.claude.json` is left exactly as Claude Code
-  wrote it.
+- **Login state** (`.claude.json`), sessions, history — per context. The
+  exceptions are that file's `.mcpServers` key and the keys named in a
+  `prefs.*.json` fragment, which claude-sync merges into (above); every other
+  key in `.claude.json` is left exactly as Claude Code wrote it.
 
 ## Quick diagnosis
 
@@ -426,6 +450,9 @@ plugin (`<context>/plugins/synced/`), which the fragments don't manage.
   OpenRouter worker context; empty means the legacy default context (fine if
   launched deliberately via `claude-default` or an unpinned tool, wrong if
   an account wrapper was intended).
+- `settings.local.json` vanished from a context → claude-sync retires it as
+  drift (backup `settings.local.json.bak-<ts>` alongside); promote what you
+  need into the fragments.
 - A settings or CLAUDE.md change vanished → it was hand-written into a
   context file; promote it into the matching fragment (`settings.<account>.json`
   or `CLAUDE.md.shared`/`CLAUDE.md.<account>`) and re-run `claude-sync`.
@@ -434,8 +461,8 @@ plugin (`<context>/plugins/synced/`), which the fragments don't manage.
   `files/claude/mcp.shared.json` (this now includes `Sanity`, OAuth-only
   since 2026-09-28 and no longer token-bearing; `datadog` and `boards`,
   OAuth-only and moved here on 2026-10-25 so exxo-personal gets them; and
-  `playwright` and `workos`, moved here on 2026-10-30 after the reserve
-  context was found without them) and reach every context on the next
+  `playwright`, `workos` and `vercel`, moved here on 2026-10-30 after the
+  reserve context was found without them) and reach every context on the next
   `claude-sync`. Notion is the claude.ai account connector, not a server
   here. Genuinely token-bearing ones are
   hand-added per context by design and simply haven't been added there yet —

@@ -20,8 +20,8 @@ through `claude-sync` (see the `claude-workstation-setup` skill).
 
 **Global read-only allow set.** `git status/diff/log/branch/show/worktree
 list`, `gh pr view/list/checks/diff`, `gh run view/list`, `just --list`,
-`WebSearch`, `WebFetch` for github.com and raw.githubusercontent.com, and
-`mcp__ide__getDiagnostics`. The local `squad` broker CLI (same-uid Unix-socket IPC to the
+`WebSearch` and `mcp__ide__getDiagnostics`. There are no explicit `WebFetch`
+allows, by policy: auto mode decides. The local `squad` broker CLI (same-uid Unix-socket IPC to the
 broker, no network or credentials) is granted subcommand by subcommand: `squad
 send/set/publish/subscribe/unsubscribe/register/deregister/status/roster/get/
 history/doctor/debug/ack` and `squad operator raise/set/decide/list/get`. Exxo
@@ -200,7 +200,7 @@ the primary checkout):
    - entries the global or committed set already covers
    - shell fragments, heredoc commit messages and one-off absolute paths
    - dead plugin grants (`mcp__plugin_Notion_notion__*`, `mcp__plugin_vercel_*`)
-   - bulk research-domain lists (more than 10 non-docs domains)
+   - `WebFetch(domain:...)` allows (no explicit WebFetch allows by policy: auto mode decides)
 
    It keeps `deny`, `additionalDirectories` and other keys. An emptied file
    becomes `{}`.

@@ -52,7 +52,6 @@ PRUNE_DIRS = {"node_modules", "target", "dist", "build", ".venv", "venv", ".next
 IDLE_DAYS = 30
 CLAUDE_MD_MAX = 300
 LOCAL_MAX = 25
-RESEARCH_DOMAIN_BULK = 10
 LOCAL_STRIP_WARN = 5  # fewer strippable local entries than this is info, not a warning
 SUBMODULE_WARN_BEHIND = 3
 SKILLS_SUBMODULE = ".claude/vendor/skills"
@@ -101,10 +100,6 @@ INLINE_SECRET_RE = re.compile(
 SHELL_KEYWORDS = {"for", "do", "done", "then", "fi", "if", "else", "elif", "while",
                   "until", "case", "esac", "{", "}", "(", ")", "&&", "||", ";"}
 DEAD_PREFIXES = ("mcp__plugin_Notion_notion__", "mcp__plugin_vercel_")
-DOCS_DOMAIN_RE = re.compile(
-    r"(^|\.)(docs?|developers?|api|learn|support)\.|\.dev$|github|npmjs|pypi|mantine|"
-    r"pulumi|datadoghq|cloud\.google|anthropic|claude\.com|vercel|sanity|nextjs|"
-    r"python\.org|mozilla\.org|readthedocs")
 FLOOR_LIKE_RE = re.compile(r"op read|--reveal|--show-secrets|env open|secrets versions access|\.claude\.json|\.credentials\.json")
 BLANKET_RE = re.compile(r"^Bash\(\s*just\s+(--justfile[= ]|-f\s*)\S*agent/Justfile\b.*\*\)$")
 
@@ -172,9 +167,11 @@ def junk_reason(rule):
     return None
 
 
-def research_domain(rule):
+def webfetch_domain(rule):
+    """An explicit WebFetch(domain:...) allow. Policy: there are none; the auto-mode
+    classifier decides WebFetch, so any that appears locally is redundant residue."""
     tool, arg = parse_rule(rule)
-    return tool == "WebFetch" and bool(arg) and arg.startswith("domain:") and not DOCS_DOMAIN_RE.search(arg[7:])
+    return tool == "WebFetch" and bool(arg) and arg.startswith("domain:")
 
 
 def covered(rule, allows):
@@ -361,14 +358,11 @@ class Audit:
         allows_above = global_settings(self.ctx)["allow"] + committed_allow
         kept, removed = [], []
         allow = perms(doc, "allow")
-        # A handful of non-docs WebFetch domains is benign local state; a long
-        # list of them is a research session's residue (survey: ~70 in two repos).
-        bulk_research = sum(map(research_domain, allow)) > RESEARCH_DOMAIN_BULK
         for r in allow:
             why = dangerous_reason(r)
             if why:
                 removed.append((r, "dangerous", why)); continue
-            why = junk_reason(r) or ("one-off research domain" if bulk_research and research_domain(r) else None)
+            why = junk_reason(r) or ("redundant under auto mode (WebFetch domains are not granted explicitly)" if webfetch_domain(r) else None)
             if why:
                 removed.append((r, "dead" if why.startswith("dead") else "junk", why)); continue
             if covered(r, allows_above):

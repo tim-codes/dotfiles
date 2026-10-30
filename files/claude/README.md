@@ -71,6 +71,16 @@ other argument prints the usage to stderr and exits 2 *without syncing* (before
 this, an unrecognised flag such as `--help` fell through to a real sync).
 `tests/claude-sync-args.sh` covers it.
 
+A context-level `<context>/settings.local.json` is drift too: Claude Code reads
+it as extra user-scope config, so it would let one context diverge from the
+fragments. `claude-sync --diff` reports it as `settings.local.json: present (N
+allow / N deny / N ask rules) — would be retired` (counts only, never rules),
+and apply copies it to `settings.local.json.bak-<timestamp>`, removes it and
+prints the promote hint. Promote anything worth keeping into
+`settings.shared.json` / `settings.<account>.json`. (This is not the per-repo
+`.claude/settings.local.json`, which holds permission approvals and is left
+alone.) `tests/claude-sync-local-settings.sh` covers it.
+
 MCP servers are the same shared+fragment family, but they are the one piece of
 repo-managed config that is not a `settings.json` key at all: Claude Code keeps
 user-scope servers in `<context>/.claude.json`, alongside login state and
@@ -102,6 +112,26 @@ Four properties of the merge, all deliberate:
 - Removal is not a merge operation. Dropping a server from the fragment stops
   managing it; it does not delete it from a context. Retire one with
   `claude mcp remove -s user <name>` under that `CLAUDE_CONFIG_DIR`.
+
+Managed preferences are the same merge applied to top-level `.claude.json`
+keys. An optional `files/claude/prefs.shared.json` plus
+`files/claude/prefs.<account>.json` (account wins per key, as for MCP) are
+merged into `<context>/.claude.json` by `claude-sync`: `{}` is seeded if the
+file is absent, the checksum is taken before the read and re-checked before the
+swap, a no-op is skipped, and the swap is atomic in the same directory with the
+mode preserved. Managed keys win; every other key is untouched. `--diff` lists
+each managed key as `current`, `missing` or `differs`, key NAMES only, never
+values. The fragment is the allow-list by construction: a key is touched only
+if it is named there. Today only `prefs.personal.json` exists (so personal and
+reserve get it; exxo contexts are untouched).
+
+- **Qualifies:** user preferences and one-time dialog dismissals.
+- **Never qualifies:** account or login state, oauth data, caches, counters,
+  migration markers, paths, and `projects`.
+- The `unpin*LaunchEffort` flags are there so a model's launch default effort
+  cannot override the `effortLevel` pin.
+
+Tests: `tests/claude-sync-prefs.sh`.
 
 Skills follow the same split. `~/.claude-personal/skills` (and
 `~/.claude-reserve/skills`: the choice keys on the fragment account, not the
@@ -326,7 +356,7 @@ entries, with a `.bak`).
   (noted 2026-10-23).
 - `claude-config-audit`'s mutating-recipe and research-domain checks are
   name/pattern heuristics (`deploy|revoke|destroy|reset|restore|env-set|-prod`,
-  writes to `.env`; >10 non-docs WebFetch domains). A recipe that mutates
+  writes to `.env`). A recipe that mutates
   under an innocuous name (h2gc-portal's `e2e-auth-state`) is not caught —
   extend the patterns when one turns up rather than trusting a clean run
   as proof (noted 2026-10-23).
@@ -336,11 +366,13 @@ entries, with a `.bak`).
   (noted 2026-10-23).
 
 - No context carries a hand-added MCP server any more (checked 2026-10-30).
-  The two that were hand-added once both turned out to be credential-free and
+  The three that were hand-added once all turned out to be credential-free and
   moved into `mcp.shared.json` on 2026-10-30, after the reserve context was
   found without them. They were `playwright`, a stdio server (`playwright-mcp`,
-  from `scripts/pnpm-globals`), and `workos`, which is OAuth-only HTTP and so
-  needs a per-context login. `exxo-openrouter` denies both in its overlay: the
+  from `scripts/pnpm-globals`), and `workos` and `vercel`
+  (`https://mcp.vercel.com`), which are OAuth-only HTTP and so need a
+  per-context login. The separate `vercel@claude-plugins-official` plugin
+  stays `false`. `exxo-openrouter` denies all three in its overlay: the
   unattended K3 workers get no browser automation and cannot complete an
   OAuth login. The legacy user-scope `notion` server is retired everywhere.
   Notion reaches a context through the claude.ai `Notion` connector, which

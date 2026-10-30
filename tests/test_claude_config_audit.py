@@ -98,7 +98,7 @@ class ClassifierTests(unittest.TestCase):
                      "mcp__plugin_vercel_vercel__get_project"]:
             self.assertIsNotNone(cca.junk_reason(rule), rule)
         self.assertIsNone(cca.junk_reason("Read(//Users/tim/dev/sibling/**)"))
-        self.assertIsNone(cca.junk_reason("WebFetch(domain:tailscale.com)"))
+        self.assertIsNone(cca.junk_reason("WebFetch(domain:tailscale.com)"))  # classified in strip_plan
 
     def test_covered(self):
         allows = ["Bash(git log:*)", "Bash(just --list:*)", "WebSearch"]
@@ -181,6 +181,19 @@ class CliTests(unittest.TestCase):
         self.assertTrue(os.path.exists(local + ".bak"))
         self.assertEqual(doc["repos"][0]["fixed"][0]["removed"], 6)
         self.assertEqual(checks(doc), set())
+
+    def test_webfetch_domain_allows_are_redundant(self):
+        repo = self.fx.repo("r")
+        local = os.path.join(repo, ".claude", "settings.local.json")
+        self.fx.write(repo, {".claude/settings.local.json": {"permissions": {
+            "allow": ["WebFetch(domain:docs.anthropic.com)", "WebFetch(domain:github.com)", "WebSearch",
+                      "Bash(just test-web:*)"]}}})
+        _, doc = self.fx.audit(repo)
+        self.assertIn(("local-strippable", "info"), checks(doc))
+        _, doc = self.fx.audit(repo, "--fix-local")
+        with open(local) as f:
+            self.assertEqual(json.load(f), {"permissions": {"allow": ["Bash(just test-web:*)"]}})
+        self.assertEqual(doc["repos"][0]["fixed"][0]["removed"], 3)  # two WebFetch + WebSearch (global)
 
     def test_fix_local_empties_to_braces(self):
         repo = self.fx.repo("r")
