@@ -129,8 +129,8 @@ omitted, never `null`.
 - `depends_on` (optional): up to 50 task ids, only ids present in the
   brief's `tasks`, never the task's own id.
 - `resources`: `repo` (`owner/name`); `base` (a branch or a `trunk/...` named
-  in the brief, else the default branch); `capabilities` (up to 16 tags of
-  `[a-z0-9-]`, may be empty); `heavy_jobs` (up to 20 `{command,
+  in the brief, else the default branch); `capabilities` (up to 16 tags,
+  each matching `^[a-z0-9][a-z0-9-]{0,31}$`, may be empty); `heavy_jobs` (up to 20 `{command,
   est_minutes}` with `est_minutes` 1–240, may be empty); `account` (optional,
   a name from the squad config's `[[accounts]]`, only when the work is bound
   to one); `model` (optional, only when a model is a hard requirement; a
@@ -230,7 +230,7 @@ A refused call returns a `ToolError` `{code, message, problems?}`.
 | `frontmatter_mismatch` | Regenerate the frontmatter from `plan`, resubmit. | Same. |
 | `unknown_task` | Hand back `failed`. | Resubmit without `task_id` only if Tim agrees. |
 | `task_running` | Never retry from a planner session; hand back `failed`. | Not raised for an operator session (step 7). |
-| `not_allowed_for_kind` | Hand back `failed`. | Tell Tim this session cannot submit; offer the interim file drop. |
+| `not_allowed_for_kind` | Hand back `failed`. | Tell Tim this session cannot submit and stop. |
 | `invalid_input` | Hand back `failed`. | Show Tim the message. |
 
 A schema rejection (the MCP SDK's validation text, not a `ToolError`) is

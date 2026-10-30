@@ -111,15 +111,16 @@ comprehensive gate per trunk.
 ## Landing
 
 - Open lane PRs against the base the kickoff names (a branch or a
-  `trunk/...`), as a draft until the milestone is ready. Never push to a
-  trunk branch.
+  `trunk/...`) as drafts. Never push to a trunk branch.
+- On either merge path, mark the PR ready (`gh pr ready <n> -R <owner/name>`)
+  before landing or handing it to Tim: the trunk service refuses drafts.
 - Merge authority `trunk_service`: call `mcp__squad__land` with
   `{pr: "<https PR URL>", kind: "milestone"}` at each milestone the kickoff
   names, and `kind: "completion"` at the end. `queued` means the service is
   waiting on CI; `landed` means merged. A `refused` result's `reason` is
   final: fix its cause and land again, never route around it.
-- Merge authority `operator`: open the PR against the base, mark it ready and
-  raise a `review` item with the PR `url`; Tim merges.
+- Merge authority `operator`: once the PR is ready, raise a `review` item
+  with the PR `url`; Tim merges.
 - Never `gh pr merge` (the member settings deny it), never the GitHub UI,
   never another merge route.
 - Before calling a PR green, check each expected CI job on the head sha by
@@ -153,8 +154,8 @@ behaviour only an e2e run exercises).
   `job` turn. Judge it once with `mcp__squad__job_review`: `verdict`
   `accepted`, `rework` or `rejected`, with a `reason` (`wrong_approach`,
   `failing_tests`, `conflicts`, `integration`, `incomplete`) unless accepted.
-  `rework` queues the job again; a fresh `delegate` with `rework_of` does the
-  same with a new brief.
+  `rework` marks the job `amended`; delegate the follow-up with
+  `mcp__squad__delegate` and `rework_of: <job_id>`.
 - **Serving.** A `job_assign` directive or `job` turn addressed to you is a
   job to serve: do it within its brief and close it with
   `mcp__squad__delegate_result` (`job_id`, `status` `ok` or `failed`, a
@@ -199,16 +200,20 @@ poll in a loop or sleep waiting.
 
 A session of kind `infra` works in an exxo-infra worktree and produces a PR
 only. The orchestrator's merge gate merges it and GitHub Actions applies it.
-Never `pulumi up`, never `mcp__squad__land` (it is not allowed for `infra`),
-never merge. exxo-infra's own repo skills govern how the change is written
-and previewed. Everything else in this skill applies.
+Never `pulumi up`, never merge, and never `mcp__squad__land`: it is not
+allowed for `infra`, because the PR goes through the orchestrator's merge
+gate instead. exxo-infra's own repo skills govern how the change is written
+and previewed. Everything else in this skill applies, except Finishing's
+landing step.
 
 ## Finishing
 
 When every deliverable's check passes: land `completion` (or, for merge
 authority `operator`, raise the review item), stop completed subagents and
 background shells you started, `set` `done` with the PR URL in `detail`, and
-end the turn. The policy layer winds the session down; do not wait for it.
+end the turn. A session of kind `infra` never calls `mcp__squad__land`: its
+PR goes through the orchestrator's merge gate, so it finishes with `set`
+`status: "done"` (PR URL in `detail`) only. The policy layer winds the session down; do not wait for it.
 
 Reading state, at any point, with ReadMcpResourceTool on server `squad` (no
 permission needed): `squad://me` (your session, inbox counts, pending acks),
