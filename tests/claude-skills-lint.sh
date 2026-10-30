@@ -128,14 +128,14 @@ check "squad-planner carries the submit contract" contains "$P" \
 check "squad-planner sends no content hash" sh -c '! grep -nE "sha256|shasum" "$1"' _ "$P"
 check "squad-planner composes and never saves" contains "$P" 'compose, do not save' 'existing readable file'
 # Lane rulings (2026-10-30): planner guidance as content headings, not TaskPlan
-# fields; the interim kickoff-directory drop when submit_task is absent; the
-# contract's frontmatter_mismatch refusal.
+# fields; the contract's frontmatter_mismatch refusal.
 check "squad-planner carries the lane rulings" contains "$P" \
     '## Tickets' '## Decisions' '## Docs amendments' '## Recommended model and effort' \
-    kickoff_dir notion-ops exxo-common:openspec-changes frontmatter_mismatch
+    notion-ops exxo-common:openspec-changes frontmatter_mismatch
 # Interactive posture (2026-10-30): drafting by default, so the retired --draft
 # flag is gone; the plan lives in a draft PR and Linear tickets mirror it; sibling
-# planners coordinate through Linear labels and a claims directory.
+# planners coordinate through the orchestrator's planning claims, with Linear
+# labels as the human-visible mirror, and no file-system claims directory.
 check "squad-planner makes the member run the staleness pass" contains "$P" staleness \
     "onto the kickoff's base (main or the active trunk)"
 check "kickoff template tells the member to run the staleness pass" contains "$K" staleness
@@ -143,8 +143,12 @@ check "squad-planner has no --draft flag" sh -c '! grep -nF -e "--draft" "$1"' _
 check "squad-planner carries the drafting posture" contains "$P" \
     'draft PR' 'gh pr ready' 'sub-issues' 'mirror' '## Approval'
 check "squad-planner carries the sibling-planner rules" has_headings "$P" '## Sibling planners'
-check "squad-planner names the claim labels and the claims directory" contains "$P" \
-    'squad:planning' 'squad:planned' 'planning/'
+check "squad-planner names the claim labels and the orchestrator's claims" contains "$P" \
+    'squad:planning' 'squad:planned' planning_claims mcp__squad__claim
+check "squad-planner writes no task files (no kickoff-dir drop)" sh -c \
+    '! grep -nE "kickoff_dir|kickoff dir|kickoff directory|file drop|interim" "$1"' _ "$P"
+check "squad-planner has no claims directory or claim file" sh -c \
+    '! grep -nE "claims directory|claim file|squad/planning|planning/" "$1"' _ "$P"
 check "kickoff template opens with the squad-member invocation and states merge authority and test policy" \
     sh -c '[ "$(sed -n 1p "$1")" = "/squad-member" ] && [ "$(sed -n 2p "$1")" = "Invoke the squad-member skill first." ] &&
         grep -qxF "## Merge authority" "$1" && grep -qxF "## Test policy" "$1"' _ "$K"
