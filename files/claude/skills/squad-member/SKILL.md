@@ -120,18 +120,24 @@ comprehensive gate per trunk.
   before landing or handing it to Tim: the trunk service refuses drafts.
 - Merge authority `trunk_service`: call `mcp__squad__land` with
   `{pr: "<https PR URL>", kind: "milestone"}` at each milestone the kickoff
-  names, and `kind: "completion"` at the end. `queued` means the service is
-  waiting on CI; `landed` means merged. A `refused` result's `reason` is
-  final: fix its cause and land again, never route around it.
+  names, and `kind: "completion"` at the end. `land` means the trunk service
+  reviews the PR (correctness and conformity) and, if the review, the GitHub
+  checks and the merge state are clean, squash-merges it itself. Never merge
+  yourself. `queued` means the service is waiting on the review or CI;
+  `landed` means merged. A `refused` result's `reason` is final: fix its
+  cause and land again, never route around it.
 - A `completion` land puts the task into `landing`: it is done on your side,
-  waiting for the trunk service to merge. Finish as under Finishing and wind
-  down; do not wait for `landed`.
-- A review-fix resume (a resume turn carrying review findings on a PR you
-  already landed or requested) means apply the findings on the same branch,
-  push, re-run the focused tests and the fast check, then request the land
-  again with `mcp__squad__land`. Never open a second PR for the fixes.
-- Merge authority `operator`: once the PR is ready, raise a `review` item
-  with the PR `url`; Tim merges.
+  waiting for the trunk service to review and merge. Finish as under
+  Finishing and wind down; do not wait for `landed`.
+- A refusal resumes you: a resume turn carrying the reasons and review
+  findings on a PR you already landed (failed checks, a reviewer finding, or
+  "rebase onto <base>" for a dirty or behind branch). Fix the findings, or
+  rebase onto the base, on the same branch, push, re-run the focused tests
+  and the fast check, then call `mcp__squad__land` again. Never open a
+  second PR for the fixes. A third refusal of the same PR goes to Tim.
+- Merge authority `operator` (also any repo flagged operator-only or
+  release-needs-approval, which the trunk service never auto-merges): once
+  the PR is ready, raise a `review` item with the PR `url`; Tim merges.
 - **Multi-repo tasks.** When the kickoff ends with a `## Repos` section, the
   task spans several repos: the anchor repo is this worktree, and each other
   repo gets its own worktree on the same branch, cut with the command the
