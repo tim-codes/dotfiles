@@ -52,11 +52,24 @@ orchestrator never needs to know which way a plan was made.
   ever appears, do not work around it, hand back `failed` with code
   `no_submission`. The skill relies on no permission mode: headless works
   read-only in all of them.
-- Of the squad's tools it uses `mcp__squad__submit_task` and, interactive
+- Of the squad's tools it uses `mcp__squad__submit_task`,
+  `mcp__squad__heavy_slot` (below) and, interactive
   only, `mcp__squad__claim` (`## Sibling planners`), plus the resources
   (`squad://context-brief/...`, `squad://me`). Plans reach the squad only
   through `submit_task`; nothing is written to a directory the orchestrator
   watches, and no file records what a planner holds.
+- **Heavy slots.** The heavy gate applies to headless planners too. Before
+  `just check`, `cargo test` or any other command matching the heavy patterns
+  that plan validation needs, call `mcp__squad__heavy_slot` with
+  `{action: "request", est_minutes: <1-240>, reason: "<one line>"}`; a
+  `queued` answer means end the turn's work on that step and wait for the
+  grant turn, and the gate denies the command without one, so do not try
+  first. Release with `{action: "release"}` as soon as the command ends or
+  fails. If the slot is denied (or would not arrive in reasonable time), skip
+  that heavy step, plan without it, and say so in the plan hand-back: name the
+  skipped command under `## Open questions` and in the summary prose before
+  the hand-back line. Prefer focused read-only checks, and take no slot for
+  them.
 - Its own delegation: dedicated agents first (`Explore` for read-only
   sweeps of the repo, `notion-ops` for every Notion read or write,
   `implementer` for the interactive plan documents); `general-purpose` only with an
