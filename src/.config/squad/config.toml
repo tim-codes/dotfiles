@@ -17,7 +17,8 @@ name = "personal"
 #   (empty means the pool can never be placed).
 # placement_rank: lower is preferred (reserve first, then exxo, then personal).
 # reserve_pct: floor kept back for Tim's own use (squad v0.5 P4 decision).
-provides = ["docker", "rust", "shell", "node", "postgres"]
+# playwright/browser are capabilities whose MCP servers (playwright, claude-in-chrome) the orchestrator passes to member launches that need them ([policy.launch] needs_mcp)
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser"]
 placement_rank = 30
 reserve_pct = 10
 email = "timoconnell1024@gmail.com"
@@ -27,7 +28,7 @@ config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
 # so its own account and quota.
 [[accounts]]
 name = "reserve"
-provides = ["docker", "rust", "shell", "node", "postgres"]
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser"]
 placement_rank = 10
 reserve_pct = 0
 email = "tim.oc@outlook.com"
@@ -35,7 +36,7 @@ config_dirs = ["~/.claude-reserve"]
 
 [[accounts]]
 name = "exxo"
-provides = ["docker", "rust", "shell", "node", "postgres"]
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser"]
 placement_rank = 20
 reserve_pct = 30
 email = "tim@exxo.io"
