@@ -3,6 +3,10 @@
 # config.example.toml for the knobs.
 
 [broker]
+# Deny overlay merged into every member launch's --settings (permissions.deny: the
+# gh pr merge block and the secret-read floor). Members run in auto permission mode;
+# deny rules are checked before the mode, so these always hold.
+member_settings = "~/.config/squad/member-settings.json"
 
 # Personal and exxo-personal are the same account; listing both dirs lets the
 # watcher dedupe their caches. The first dir is the one whose keychain token
