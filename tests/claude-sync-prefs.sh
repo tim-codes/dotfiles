@@ -3,8 +3,8 @@
 # into <context>/.claude.json) against a throwaway repo copy and a fake $HOME —
 # never the real contexts. Checks the keys merge, unrelated keys (oauthAccount,
 # projects) survive, a re-run is a no-op, --diff prints key names and never
-# values, a missing file is seeded, the mode is preserved, and exxo contexts
-# (no prefs fragment) are untouched.
+# values, a missing file is seeded, the mode is preserved, and the exxo contexts
+# get only the keys in prefs.exxo.json (oauth and counters untouched).
 # Usage: bash tests/claude-sync-prefs.sh
 set -uo pipefail
 
@@ -39,8 +39,8 @@ check "diff: current key listed" grep -qF 'diffSidebarOpen: current' <<<"$out"
 check "diff: differing key listed" grep -qF 'deepLinkTerminal: differs (would be reset)' <<<"$out"
 check "diff: missing key listed" grep -qF 'effortCalloutDismissed: missing (would be added)' <<<"$out"
 check "diff: no values printed" bash -c '! grep -qE "sentinel|iTerm" <<<"$1"' _ "$out"
-check "diff: exxo has no preferences section" \
-    bash -c '! grep -q "exxo/.claude.json preferences" <<<"$1"' _ "$out"
+check "diff: exxo lists its own preferences section" \
+    grep -q "exxo/.claude.json preferences" <<<"$out"
 check "diff changed nothing" bash -c '! jq -e has\(\"effortCalloutDismissed\"\) "$1"' _ "$P/.claude.json"
 
 sync >"$T/apply.log" 2>&1 || { bad "apply exited non-zero"; cat "$T/apply.log"; }
@@ -58,6 +58,10 @@ check "reserve: seeded file is mode 600" test "$(stat -f %Lp "$FAKE/.claude-rese
 check "apply output prints no values" bash -c '! grep -qE "sentinel|iTerm" "$1"' _ "$T/apply.log"
 check "exxo .claude.json carries no managed pref" bash -c '! jq -e has\(\"deepLinkTerminal\"\) "$1"' _ "$X/.claude.json"
 check "exxo-personal gets no managed pref" bash -c '! jq -e has\(\"deepLinkTerminal\"\) "$1"' _ "$FAKE/.claude-exxo-personal/.claude.json"
+for c in exxo exxo-personal; do
+    check "$c: gets the exxo-fragment Chrome pref" \
+        jq -e --slurpfile m "$SRC_REPO/files/claude/prefs.exxo.json" '. as $d | $m[0] | to_entries | all($d[.key] == .value)' "$FAKE/.claude-$c/.claude.json"
+done
 check "exxo oauth and counter untouched" \
     jq -e '.oauthAccount.emailAddress == "sentinel-exxo" and .numStartups == 7' "$X/.claude.json"
 
