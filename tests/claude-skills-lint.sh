@@ -126,7 +126,13 @@ check "squad-planner carries the submit contract" contains "$P" \
     mcp__squad__submit_task squad://context-brief/ '--headless --task-id' \
     '"squad_planner":"submitted"' '"squad_planner":"failed"' 'last non-empty line' 'code fence' ExitPlanMode
 check "squad-planner sends no content hash" sh -c '! grep -nE "sha256|shasum" "$1"' _ "$P"
-check "squad-planner composes and never saves" contains "$P" 'compose, do not save' 'existing readable file'
+check "squad-planner composes and never saves headless" contains "$P" 'compose, do not save' 'existing readable file'
+# Local drafts (2026-10-31): the interactive planner keeps the task markdown in a
+# personal draft file outside the repo, submits the file's content, finishes into
+# it when the squad is unreachable, and resumes from it.
+check "squad-planner keeps an interactive local draft" has_headings "$P" '## Drafts'
+check "squad-planner names the draft location, resume and later submission" contains "$P" \
+    '~/.local/state/squad/plans/' '/squad-planner <draft path>' 'New batch' "draft file's content"
 # Lane rulings (2026-10-30): planner guidance as content headings, not TaskPlan
 # fields; the contract's frontmatter_mismatch refusal.
 check "squad-planner carries the lane rulings" contains "$P" \
