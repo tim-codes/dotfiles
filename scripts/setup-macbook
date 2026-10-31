@@ -128,6 +128,10 @@ $DOTFILES_ROOT/scripts/pipx-packages
 # add fonts
 $DOTFILES_ROOT/scripts/install-fonts-mac
 
+# Kushview Element: standalone AU/VST plugin host, for running plugin chains
+# outside Live; not in Homebrew, installs from GitHub releases
+$DOTFILES_ROOT/scripts/install-kushview-element
+
 # install alacritty terminal emulator
 # built from source: the homebrew cask is deprecated (unnotarized, fails
 # Gatekeeper) and is disabled from 2026-09-01; a locally-built app bundle

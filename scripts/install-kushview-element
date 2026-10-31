@@ -14,8 +14,18 @@ set -euo pipefail
 repo="kushview/element"
 app="/Applications/Element.app"
 
+# gh when it's logged in; on a fresh machine (setup-macbook runs before any
+# `gh auth login`) fall back to the public API, which needs no auth for this repo
+if gh auth status &>/dev/null; then
+  authed=true
+  releases() { gh api "repos/$repo/releases" }
+else
+  authed=false
+  releases() { curl -fsSL "https://api.github.com/repos/$repo/releases" }
+fi
+
 # Newest release (by publish date) carrying a *-macos.dmg asset
-read -r tag dmg <<<"$(gh api "repos/$repo/releases" --jq '
+read -r tag dmg <<<"$(releases | jq -r '
   [.[] | select(.draft | not) | select(.prerelease | not)
        | {tag: .tag_name, dmg: ([.assets[].name | select(endswith("-macos.dmg"))] | first)}
        | select(.dmg != null)]
@@ -43,7 +53,11 @@ work="$(mktemp -d)"
 mnt="$work/mnt"
 trap 'hdiutil detach -quiet "$mnt" 2>/dev/null || true; rm -rf "$work"' EXIT
 
-gh release download "$tag" --repo "$repo" --pattern "$dmg" --dir "$work"
+if $authed; then
+  gh release download "$tag" --repo "$repo" --pattern "$dmg" --dir "$work"
+else
+  curl -fSL --progress-bar -o "$work/$dmg" "https://github.com/$repo/releases/download/$tag/$dmg"
+fi
 hdiutil attach -quiet -nobrowse -readonly -mountpoint "$mnt" "$work/$dmg"
 
 pkg=("$mnt"/*.pkg(N))
