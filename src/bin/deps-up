@@ -20,7 +20,9 @@ if command -v nvm >/dev/null; then
   nvm install-latest-npm
 fi
 
-# install global pnpm packages
+# install global pnpm packages; ~/.npmrc (private @exxo-labs registry auth)
+# must be rendered first
 if command -v pnpm >/dev/null; then
+  $DOTFILES_ROOT/scripts/npmrc-render
   $DOTFILES_ROOT/scripts/pnpm-globals
 fi

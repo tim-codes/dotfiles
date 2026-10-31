@@ -1,0 +1,60 @@
+#!/bin/bash
+# Idempotent render of ~/.npmrc for the private GitHub Packages registry
+# (@exxo-labs). Writes exactly two lines, mode 600:
+#   @exxo-labs:registry=https://npm.pkg.github.com
+#   //npm.pkg.github.com/:_authToken=<token>
+# The token is the read PAT in 1Password: "[EXXO] github npm read PAT" in the
+# Exxo Engineering vault. A re-run whose rendered content equals the file
+# leaves it untouched (no rewrite, no mtime change). The token is never printed.
+#
+# Where the token comes from, first match wins:
+#   1. agent-run (Exxo secret cache, exxo-1p-cache on 127.0.0.1:6380) when
+#      NPM_READ_PAT is defined in the repo or ~/.config/exxo/agent.env, e.g.
+#      NPM_READ_PAT=1p:<item-uuid>  (cached: one Touch ID per TTL window)
+#   2. op read on the item by name (live: one Touch ID per run). This is also
+#      the first-run path, since agent-run itself is installed from this
+#      registry by pnpm-globals.
+# Run before scripts/pnpm-globals (deps-up and setup-macbook do).
+#
+# Test hooks: NPMRC_PATH overrides the target (default $HOME/.npmrc).
+
+set -euo pipefail
+
+target="${NPMRC_PATH:-$HOME/.npmrc}"
+ref='op://Exxo Engineering/[EXXO] github npm read PAT/password'
+
+token=""
+if command -v agent-run >/dev/null 2>&1; then
+  token="$(agent-run -- sh -c 'printf %s "${NPM_READ_PAT:-}"' 2>/dev/null || true)"
+fi
+if [ -z "$token" ]; then
+  if ! command -v op >/dev/null 2>&1; then
+    echo "npmrc-render: neither a cached NPM_READ_PAT (agent-run) nor op is available, skipping" >&2
+    exit 0
+  fi
+  token="$(op read "$ref" 2>/dev/null || true)"
+fi
+# Trim surrounding whitespace.
+token="${token#"${token%%[![:space:]]*}"}"
+token="${token%"${token##*[![:space:]]}"}"
+if [ -z "$token" ]; then
+  echo "npmrc-render: could not read the token from 1Password (signed in? approved?); $target unchanged" >&2
+  exit 1
+fi
+case "$token" in *[[:space:]]*) echo "npmrc-render: token is malformed; $target unchanged" >&2; exit 1;; esac
+
+want="$(printf '@exxo-labs:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=%s\n' "$token")"
+
+if [ -f "$target" ] && [ ! -L "$target" ] && [ "$(cat "$target")" = "$want" ]; then
+  chmod 600 "$target"
+  echo "npmrc-render: $target up to date"
+  exit 0
+fi
+
+tmp="$(umask 077; mktemp "$target.XXXXXX")"
+trap 'rm -f "$tmp"' EXIT
+printf '%s\n' "$want" >"$tmp"
+chmod 600 "$tmp"
+mv -f "$tmp" "$target"
+trap - EXIT
+echo "npmrc-render: wrote $target"
