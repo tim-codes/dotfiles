@@ -104,3 +104,18 @@ max_slots = 6
 # the heavy queue never drained (tim-codes/squad#228, 2026-10-31). The derived slot count already
 # follows live CPU and memory headroom, so keep only a short dwell here. Patterns keep the defaults.
 heavy_slot_min_calm_s = 20
+
+[orchestrator]
+# Stable URL of the 7790 GUI tunnel that src/bin/squad-tunnel hosts (persistent dev tunnel
+# exxo-tfo-squad; the hostname survives restarts, and only changes if the tunnel is deleted and
+# recreated, when this must be updated from `squad-tunnel url`). Takes effect at the next orchestrator restart.
+public_url = "https://j9fsc30w-7790.uks1.devtunnels.ms"
+
+[policy.trunk]
+# Appended to each squash-merge body after the PR body.
+trailers = ["Co-Authored-By: Claude <noreply@anthropic.com>"]
+
+[policy.preview]
+# Run once per member when a task is done or its land is finally refused (execFile, no shell, so an
+# absolute path). Tears down the lane previews the member owns.
+teardown = ["just", "-f", "/Users/tim/dev/squad/deploy/Justfile", "preview-prune", "{member}"]

@@ -117,8 +117,8 @@ comprehensive gate per trunk.
 - Open lane PRs against the base the kickoff names (a branch or a
   `trunk/...`) as drafts. Never push to a trunk branch.
 - On either merge path, mark the PR ready (`gh pr ready <n> -R <owner/name>`)
-  before landing or handing it to Tim, and have the branch rebased or merged
-  up to its base, with CI green or the failure explained in the PR. The
+  before landing or handing it to Tim, and have the branch up to date with
+  its base (merge `origin/<base>` in once pushed; see the pushed-branch rule below), with CI green or the failure explained in the PR. The
   trunk service pre-gates only a closed PR and a dirty or behind branch; it
   does not check for a draft, so a draft would still be reviewed.
 - Merge authority `trunk_service`: call `mcp__squad__land` with
@@ -133,9 +133,10 @@ comprehensive gate per trunk.
   - **Disabled:** nothing reviews or merges the PR. A `completion` land
     raises the item `policy:land:<task_id>` and Tim merges by hand.
   - A `milestone` land is **not** reviewed or merged by the service in
-    either mode: the task keeps running and no item is raised. You may show
-    `blocked` until the PR merges by other means; carry on with whatever
-    does not depend on it.
+    either mode: it is recorded with its PR URL and the task keeps running.
+    With the service enabled no item is raised; with it disabled the land
+    raises a milestone land item for Tim (`policy:land:<task_id>:milestone:<request id>`). You may show `blocked` until the PR
+    merges by other means (Tim, or whatever the kickoff names); carry on with whatever does not depend on it.
 - A `completion` land puts the task into `landing`: it is done on your side,
   waiting for the trunk service to review and merge. Finish as under
   Finishing and wind down; do not wait for `landed`.
@@ -144,14 +145,26 @@ comprehensive gate per trunk.
   review to start again.
 - A `refused` result carries a `reason`, and a refusal after the land was
   accepted reaches you as a `message` turn carrying the reasons and review
-  findings (failed checks, a reviewer finding, or "rebase onto <base>" for a
-  dirty or behind branch). Either way the reason is final: fix its cause on
-  the same branch, push, re-run the focused tests and the fast check, then
-  call `mcp__squad__land` again. Never open a second PR for the fixes, never
+  findings (failed checks, a reviewer finding, or a stale-branch refusal).
+  Either way the reason is final: fix its cause on the same branch, push,
+  re-run the focused tests and the fast check, then call `mcp__squad__land`
+  again. Never open a second PR for the fixes, never
   route around a refusal. A third refusal of the same PR goes to Tim.
   `operator_pending` means a land for that repo is already waiting on Tim
   (it names the item `policy:land:<task_id>`): wait for his answer, do not
   land again.
+  A BEHIND or DIRTY branch is refused with `behind <base>: merge origin/<base>
+  into the branch with a merge commit (git merge origin/<base>), run your
+  gates, push without force and land again; never rebase or force-push a
+  pushed branch` (`conflicts with <base>` leads instead of `behind <base>` when
+  DIRTY). Do exactly that: `git fetch`, `git merge origin/<base>` (resolve
+  conflicts keeping both sides), run the focused tests and the fast check,
+  plain `git push`, `mcp__squad__land` again.
+- **Never rebase, amend or force-push a lane branch once it is pushed.** The
+  trunk service, the PR and the reviewer all key on the pushed history; bring
+  the branch up to its base only by merging `origin/<base>` into it. A rebase
+  before the first push is fine (kickoff preparation and the staleness pass below do one), and the
+  plan branch is never pushed to at all.
 - Merge authority `operator` (also any repo flagged operator-only or
   release-needs-approval, which the trunk service never auto-merges): once
   the PR is ready, raise a `review` item with the PR `url`; Tim merges.
@@ -160,8 +173,8 @@ comprehensive gate per trunk.
   repo gets its own worktree on the same branch, cut with the command the
   section gives (`wt -C <checkout> switch --create <branch> --base
   origin/<base> --no-cd -y`); work in it by absolute path. One PR per repo,
-  each against that repo's own base, and rebase each on its own base, never
-  on the anchor's. Land each repo's PR separately with `mcp__squad__land`
+  each against that repo's own base, and bring each up to date by merging its
+  own base in (rebasing only before its first push), never the anchor's. Land each repo's PR separately with `mcp__squad__land`
   `{pr, kind, repo: "<owner>/<name>"}` (no `repo` means the anchor; a PR that
   is not in the repo named is refused `not_a_lane`). The first `completion`
   land puts the task into `landing`, and it is done only once every repo has
@@ -235,8 +248,8 @@ the watch cannot be set (the tool refuses it, or the dependency has no PR).
 
 ## Repo conventions
 
-- If the kickoff names repo preparation (`git pull --ff-only`, a rebase), do
-  it first.
+- If the kickoff names repo preparation (`git pull --ff-only`, a rebase
+  before the first push), do it first.
 - Stay in the worktree the broker started you in and use absolute paths into
   it (a multi-repo task adds one worktree per other repo, as its kickoff's
   `## Repos` section says; nothing else). If the cwd is a primary checkout
@@ -281,10 +294,10 @@ pass:
 1. In your own lane worktree, fetch. Create the lane branch from the plan PR
    branch (`origin/<plan-branch>`), so the OpenSpec change directory travels in
    the implementing PR, as `exxo-common:openspec-changes` has it. Then rebase
-   the lane onto the kickoff's base (main or the active trunk), that is
+   the lane, before its first push only, onto the kickoff's base (main or the active trunk), that is
    `origin/<base>`; resolve conflicts in the plan documents only. Never push
    to, and never force-push, the plan branch.
-2. Re-validate the plan against the rebased base: `openspec validate <id>
+2. Re-validate the plan against the new base: `openspec validate <id>
    --strict` on the change (or the repo's equivalent); the files, modules and
    APIs the plan cites still exist and look as described; the specs it
    amends have not moved.
@@ -317,6 +330,11 @@ in `detail`, and end the turn. A session of kind `infra` never calls
 `mcp__squad__land`: its PR goes through the orchestrator's merge gate, so it
 finishes with `set` `status: "done"` (PR URL in `detail`) only. The policy
 layer winds the session down; do not wait for it.
+
+Previews: the orchestrator tears down a lane's previews when the task is done or
+its land is finally refused (`[policy.preview] teardown`), so do not leave that to the end. A lane removes
+any preview it no longer needs, while it works, with `just -f deploy/Justfile
+preview-rm <slug>`.
 
 Reading state, at any point, with ReadMcpResourceTool on server `squad` (no
 permission needed): `squad://me` (your session, inbox counts, pending acks),
