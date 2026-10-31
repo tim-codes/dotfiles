@@ -172,6 +172,22 @@ draft PR and Linear in the same step.
 - **Model and effort.** Recommend the model and effort the squad should pick
   the work up with, with one line of why, under
   `## Recommended model and effort`.
+- **Tasks with a design component.** When a task adds or reshapes UI that a
+  client, designer or Tim will judge visually (a new screen, flow or page, or
+  a redesign), follow the route table in the `claude-design-workflow` skill.
+  For the full pipeline, plan a design step ahead of the implementation
+  lanes: a Claude Design canvas titled `<TICKET> <screen>`, then an approval
+  checkpoint (Tim comments on the canvas or answers "approved: <artboards>"),
+  then the Figma rebuild. Implementation lanes depend on that checkpoint. Put
+  a `## Design` section in the plan with the canvas link and, once they
+  exist, the Figma file and node links (built from key and node id, never a
+  share link). Lanes that read or write Figma declare `figma` in
+  `resources.capabilities`; lanes that take screenshots declare `playwright`.
+  Every UI lane's deliverables include a `## Preview` (URL and commit),
+  screenshots from the preview in the PR, and a passing
+  `design:design-critique` and `design:accessibility-review`. Internal-only
+  UI with no designer may skip Figma (canvas plus a `design:design-handoff`
+  spec); small changes inside existing components skip the design step.
 
 **Headless.** `Read` the task file and explore the repo read-only. Ask no
 one. Read the task file's frontmatter first: if it already carries a
@@ -199,7 +215,7 @@ omitted, never `null`.
   brief's `tasks`, never the task's own id.
 - `resources`: `repo` (`owner/name`); `base` (a branch or a `trunk/...` named
   in the brief, else the default branch); `capabilities` (up to 16 tags,
-  each matching `^[a-z0-9][a-z0-9-]{0,31}$`, may be empty); known tags include `playwright` and `browser`, plus `1password` (the task resolves 1Password references via agent/run, available on every account) and `vercel` (the task needs the Vercel MCP server, exxo account only)); `heavy_jobs` (up to 20 `{command,
+  each matching `^[a-z0-9][a-z0-9-]{0,31}$`, may be empty); known tags include `playwright` and `browser`, plus `figma` (the task reads or writes Figma through the Figma MCP, so the member needs it signed in), plus `1password` (the task resolves 1Password references via agent/run, available on every account) and `vercel` (the task needs the Vercel MCP server, exxo account only)); `heavy_jobs` (up to 20 `{command,
   est_minutes}` with `est_minutes` 1–240, may be empty); `account` (optional,
   a name from the squad config's `[[accounts]]`, only when the work is bound
   to one); `model` (optional, only when a model is a hard requirement; a
