@@ -118,7 +118,7 @@ comprehensive gate per trunk.
   `trunk/...`) as drafts. Never push to a trunk branch.
 - On either merge path, mark the PR ready (`gh pr ready <n> -R <owner/name>`)
   before landing or handing it to Tim, and have the branch up to date with
-  its base (merged in once pushed, see the pushed-branch rule below), with CI green or the failure explained in the PR. The
+  its base (merge `origin/<base>` in once pushed; see the pushed-branch rule below), with CI green or the failure explained in the PR. The
   trunk service pre-gates only a closed PR and a dirty or behind branch; it
   does not check for a draft, so a draft would still be reviewed.
 - Merge authority `trunk_service`: call `mcp__squad__land` with
@@ -135,8 +135,8 @@ comprehensive gate per trunk.
   - A `milestone` land is **not** reviewed or merged by the service in
     either mode: it is recorded with its PR URL and the task keeps running.
     With the service enabled no item is raised; with it disabled the land
-    raises a milestone land item for Tim. You may show `blocked` until the PR
-    merges by other means; carry on with whatever does not depend on it.
+    raises a milestone land item for Tim (`policy:land:<task_id>:milestone:<request id>`). You may show `blocked` until the PR
+    merges by other means (Tim, or whatever the kickoff names); carry on with whatever does not depend on it.
 - A `completion` land puts the task into `landing`: it is done on your side,
   waiting for the trunk service to review and merge. Finish as under
   Finishing and wind down; do not wait for `landed`.
@@ -163,7 +163,7 @@ comprehensive gate per trunk.
 - **Never rebase, amend or force-push a lane branch once it is pushed.** The
   trunk service, the PR and the reviewer all key on the pushed history; bring
   the branch up to its base only by merging `origin/<base>` into it. A rebase
-  before the first push is fine (the staleness pass below does one), and the
+  before the first push is fine (kickoff preparation and the staleness pass below do one), and the
   plan branch is never pushed to at all.
 - Merge authority `operator` (also any repo flagged operator-only or
   release-needs-approval, which the trunk service never auto-merges): once
@@ -297,7 +297,7 @@ pass:
    the lane, before its first push only, onto the kickoff's base (main or the active trunk), that is
    `origin/<base>`; resolve conflicts in the plan documents only. Never push
    to, and never force-push, the plan branch.
-2. Re-validate the plan against the rebased base: `openspec validate <id>
+2. Re-validate the plan against the new base: `openspec validate <id>
    --strict` on the change (or the repo's equivalent); the files, modules and
    APIs the plan cites still exist and look as described; the specs it
    amends have not moved.
@@ -331,8 +331,8 @@ in `detail`, and end the turn. A session of kind `infra` never calls
 finishes with `set` `status: "done"` (PR URL in `detail`) only. The policy
 layer winds the session down; do not wait for it.
 
-Previews: the orchestrator tears down a lane's previews when the task is done
-(`[policy.preview] teardown`), so do not leave that to the end. A lane removes
+Previews: the orchestrator tears down a lane's previews when the task is done or
+its land is finally refused (`[policy.preview] teardown`), so do not leave that to the end. A lane removes
 any preview it no longer needs, while it works, with `just -f deploy/Justfile
 preview-rm <slug>`.
 
