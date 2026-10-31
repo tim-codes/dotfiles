@@ -199,7 +199,7 @@ omitted, never `null`.
   brief's `tasks`, never the task's own id.
 - `resources`: `repo` (`owner/name`); `base` (a branch or a `trunk/...` named
   in the brief, else the default branch); `capabilities` (up to 16 tags,
-  each matching `^[a-z0-9][a-z0-9-]{0,31}$`, may be empty); `heavy_jobs` (up to 20 `{command,
+  each matching `^[a-z0-9][a-z0-9-]{0,31}$`, may be empty); known tags include `playwright` and `browser`, plus `1password` (the task resolves 1Password references via agent/run, available on every account) and `vercel` (the task needs the Vercel MCP server, exxo account only)); `heavy_jobs` (up to 20 `{command,
   est_minutes}` with `est_minutes` 1–240, may be empty); `account` (optional,
   a name from the squad config's `[[accounts]]`, only when the work is bound
   to one); `model` (optional, only when a model is a hard requirement; a
