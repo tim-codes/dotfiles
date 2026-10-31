@@ -9,6 +9,13 @@
 # the API tier reads.
 [[accounts]]
 name = "personal"
+# provides: capabilities this pool can satisfy; placement needs provides ⊇ task needs
+#   (empty means the pool can never be placed).
+# placement_rank: lower is preferred (reserve first, then exxo, then personal).
+# reserve_pct: floor kept back for Tim's own use (squad v0.5 P4 decision).
+provides = ["docker", "rust", "shell", "node", "postgres"]
+placement_rank = 30
+reserve_pct = 10
 email = "timoconnell1024@gmail.com"
 config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
 
@@ -16,11 +23,17 @@ config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
 # so its own account and quota.
 [[accounts]]
 name = "reserve"
+provides = ["docker", "rust", "shell", "node", "postgres"]
+placement_rank = 10
+reserve_pct = 0
 email = "tim.oc@outlook.com"
 config_dirs = ["~/.claude-reserve"]
 
 [[accounts]]
 name = "exxo"
+provides = ["docker", "rust", "shell", "node", "postgres"]
+placement_rank = 20
+reserve_pct = 30
 email = "tim@exxo.io"
 config_dirs = ["~/.claude-exxo"]
 
