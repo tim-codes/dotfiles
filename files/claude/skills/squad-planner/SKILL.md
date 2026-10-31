@@ -190,8 +190,11 @@ The plan is strict: no fields beyond these, and an absent optional field is
 omitted, never `null`.
 
 - `title`: 1–200 characters, what the task delivers.
-- `deliverables`: 1–50 entries `{name, check}`; `name` 1–200 characters,
-  `check` 1–2000 characters, something a reviewer can run or observe.
+- `deliverables`: 1–50 entries `{name, check}` plus an optional `repo`;
+  `name` 1–200 characters, `check` 1–2000 characters, something a reviewer
+  can run or observe. In a multi-repo plan, give each deliverable its `repo`
+  (`owner/name`, the anchor or one of `resources.repos`) so the plan says
+  where it lands.
 - `depends_on` (optional): up to 50 task ids, only ids present in the
   brief's `tasks`, never the task's own id.
 - `resources`: `repo` (`owner/name`); `base` (a branch or a `trunk/...` named
@@ -203,6 +206,23 @@ omitted, never `null`.
   preference goes under `## Recommended model and effort`). Never invent a
   model: the default guidance is Sonnet, which the orchestrator applies when
   the plan names none.
+  `repos` (optional, 1–24 `{repo, base?}`): every other repo the task
+  changes, for a task that spans repos.
+  **Cross-repo work is ONE plan.** A change that touches several repos (a
+  rollout to many target repos, an API and its callers) is one task with one
+  plan, never one plan per repo. `resources.repo` is the *anchor*: the repo
+  that hosts the plan PR and the member's main worktree; for a rollout, the
+  repo whose change the others depend on. List every other target in
+  `resources.repos` with its `base` (absent means the repo's trunk-policy
+  base: its open trunk under the `trunk` policy, else `main`); never repeat
+  the anchor there or list a repo twice. Every repo must be registered with
+  the squad first (tRPC `repos.put` or the GUI Repos tab); an unregistered
+  one is refused with `invalid_plan` at `resources.repos.<i>` ("unknown repo;
+  register it with repos.put"): ask Tim to register it, or raise it, rather
+  than splitting the plan. Read `squad://context-brief/<owner>%2F<name>` for
+  each repo, not only the anchor. The orchestrator tells the member how to
+  cut a worktree per repo; the member opens one PR per repo and lands each
+  with its `repo`, and the task is done only when every repo has landed.
   **Intake resources are carried unchanged.** When the plan is made from a
   task file (headless with `--task-id`, or an uploaded intake), the submitted
   `resources` carry the intake's `model`, `account`, `capabilities`,
@@ -449,7 +469,10 @@ chat is never the record. No file on disk records a claim.
   no staleness arithmetic of its own. The brief's `tasks` already cover work
   that has been planned and submitted.
 - **Claiming.** At the settled point (step 2), call `mcp__squad__claim` with
-  the repo, a one-line scope and the Linear ticket ids the plan takes. Refresh
+  the repo, a one-line scope and the Linear ticket ids the plan takes; for a
+  multi-repo plan, the anchor as `repo` and the other repos as `repos`, so a
+  sibling planning in any of them sees the claim (submitting the plan also
+  extends the claim to its `resources.repos`). Refresh
   it with the same tool at every material plan update, in the same step as the
   PR and Linear update (this is also the heartbeat). Release it with
   `release: true` at acceptance (step 5) or when Tim abandons the plan. If the
