@@ -8,6 +8,11 @@
 # deny rules are checked before the mode, so these always hold.
 member_settings = "~/.config/squad/member-settings.json"
 
+# PATH the broker launches members with (replaces the built-in default). The default
+# list plus the pnpm global bin dir, where the playwright-mcp shim lives. Applies at
+# the next broker restart.
+launch_path = ["~/.cargo/bin", "~/.local/bin", "~/Library/pnpm/bin", "~/.orbstack/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+
 # Personal and exxo-personal are the same account; listing both dirs lets the
 # watcher dedupe their caches. The first dir is the one whose keychain token
 # the API tier reads.

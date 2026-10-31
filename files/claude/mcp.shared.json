@@ -24,7 +24,7 @@
     },
     "playwright": {
       "type": "stdio",
-      "command": "playwright-mcp",
+      "command": "/Users/tim/Library/pnpm/bin/playwright-mcp",
       "args": []
     },
     "vercel": {
