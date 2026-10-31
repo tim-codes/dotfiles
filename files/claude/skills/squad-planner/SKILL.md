@@ -206,23 +206,6 @@ omitted, never `null`.
   preference goes under `## Recommended model and effort`). Never invent a
   model: the default guidance is Sonnet, which the orchestrator applies when
   the plan names none.
-  `repos` (optional, 1–24 `{repo, base?}`): every other repo the task
-  changes, for a task that spans repos.
-  **Cross-repo work is ONE plan.** A change that touches several repos (a
-  rollout to many target repos, an API and its callers) is one task with one
-  plan, never one plan per repo. `resources.repo` is the *anchor*: the repo
-  that hosts the plan PR and the member's main worktree; for a rollout, the
-  repo whose change the others depend on. List every other target in
-  `resources.repos` with its `base` (absent means the repo's trunk-policy
-  base: its open trunk under the `trunk` policy, else `main`); never repeat
-  the anchor there or list a repo twice. Every repo must be registered with
-  the squad first (tRPC `repos.put` or the GUI Repos tab); an unregistered
-  one is refused with `invalid_plan` at `resources.repos.<i>` ("unknown repo;
-  register it with repos.put"): ask Tim to register it, or raise it, rather
-  than splitting the plan. Read `squad://context-brief/<owner>%2F<name>` for
-  each repo, not only the anchor. The orchestrator tells the member how to
-  cut a worktree per repo; the member opens one PR per repo and lands each
-  with its `repo`, and the task is done only when every repo has landed.
   **Intake resources are carried unchanged.** When the plan is made from a
   task file (headless with `--task-id`, or an uploaded intake), the submitted
   `resources` carry the intake's `model`, `account`, `capabilities`,
@@ -233,6 +216,27 @@ omitted, never `null`.
   with `invalid_plan` and a `resources.<field>` problem path (for example
   `resources.model`); a dropped `model` once sent a task to the context
   default, Opus, at several times the cost.
+- `resources.repos` (optional, 1–24 `{repo, base?}`): every other repo the
+  task changes, for a task that spans repos.
+  **Cross-repo work is ONE plan.** A change that touches several repos (a
+  rollout to many target repos, an API and its callers) is one task with one
+  plan, never one plan per repo. `resources.repo` is the *anchor*: the repo
+  that hosts the plan PR and the member's main worktree; for a rollout, the
+  repo whose change the others depend on. List every other target in
+  `resources.repos` with its `base` (absent means the repo's trunk-policy
+  base, resolved once at submission and stored: its open trunk under the
+  `trunk` policy, else `main`; a trunk opened later is not picked up); never
+  repeat the anchor there or list a repo twice. Every repo must be registered
+  with the squad first (tRPC `repos.put` or the GUI Repos tab); an
+  unregistered one is refused with `invalid_plan` at `resources.repos.<i>`
+  ("unknown repo; register it with repos.put"): ask Tim to register it, or
+  raise it, rather than splitting the plan. Plan review compares the full
+  repo set (anchor plus `resources.repos`) with the intake's and flags any
+  repo outside it as `new repo`, so justify each extra repo in the plan's
+  notes (`## Approach`). Read `squad://context-brief/<owner>%2F<name>` for
+  each repo, not only the anchor. The orchestrator tells the member how to
+  cut a worktree per repo; the member opens one PR per repo and lands each
+  with its `repo`, and the task is done only when every repo has landed.
 - `operator_steps`: up to 50 (may be empty), each `{title, class}` plus
   `instructions`, `commands` and `est_minutes` where known. `class` is
   `blocks_launch` when it must be done before the member starts (credentials,
