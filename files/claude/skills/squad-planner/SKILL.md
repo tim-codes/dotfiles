@@ -1,7 +1,7 @@
 ---
 name: squad-planner
-description: Plan one squad task into a TaskPlan and submit it to the squad orchestrator with submit_task — headless over a task file when the broker launches a planner, or interactively with Tim. Reads the squad context brief for the repo, drives brainstorming and plan-writing, composes the task markdown with its plan frontmatter, and handles validation problems, resubmission and scope changes. Use for "/squad-planner", "plan this for the squad", or a headless launch carrying --headless --task-id.
-argument-hint: "[--headless --task-id N --repo owner/name --task-file PATH] | [task file or description]"
+description: Plan one squad task into a TaskPlan and submit it to the squad orchestrator with submit_task — headless over a task file when the broker launches a planner, or interactively with Tim, resuming a local draft when given one. Reads the squad context brief for the repo, drives brainstorming and plan-writing, composes the task markdown with its plan frontmatter, and handles validation problems, resubmission and scope changes. Use for "/squad-planner", "plan this for the squad", or a headless launch carrying --headless --task-id.
+argument-hint: "[--headless --task-id N --repo owner/name --task-file PATH] | [draft, task file or description]"
 ---
 
 # Squad planner
@@ -16,14 +16,16 @@ orchestrator never needs to know which way a plan was made.
 | Form | Session | Arguments |
 |---|---|---|
 | Headless | `planner` kind, launched by the broker, nobody watching | `/squad-planner --headless --task-id <int> --repo <owner/name> --task-file <abs path>` |
-| Interactive | Tim's own session (`operator` kind) | `/squad-planner [<task file path> \| <description>]` |
+| Interactive | Tim's own session (`operator` kind) | `/squad-planner [<draft path> \| <task file path> \| <description>]` |
 
 - `--headless` selects the headless form; all three of its other arguments
   are required. A headless session **never asks anyone anything**: no
   `AskUserQuestion`, and no turn ends with a question. Every assumption and
   every unresolved question goes under `## Open questions` in the content.
 - Interactive disambiguation: if the argument names an
-  existing readable file (after `~` expansion), it is the task file;
+  existing readable file (after `~` expansion) under
+  `~/.local/state/squad/plans/`, it is a draft to resume (`## Drafts`); any
+  other existing readable file is the task file;
   otherwise the whole argument is a description of the work. Nothing given: ask Tim what to
   plan. The interactive form may ask Tim questions, one at a time.
 - Interactive posture is drafting, with no flag. The planner iterates the
@@ -37,8 +39,9 @@ orchestrator never needs to know which way a plan was made.
 
 - The headless planner plans only: no worktrees, no PRs, no launches, no
   messages to members, no commits, no file writes. Its task markdown is
-  composed in context and passed as `content`: compose, do not save,
-  for the interactive planner too. The interactive planner also keeps the plan documents, draft
+  composed in context and passed as `content`: compose, do not save.
+  The interactive planner instead keeps the task markdown in a local draft
+  file (`## Drafts`), and also keeps the plan documents, draft
   PR and Linear tickets of step 2 and its planning claim in the
   orchestrator (`## Sibling planners`); it still makes no launches and sends
   no messages to members.
@@ -57,7 +60,8 @@ orchestrator never needs to know which way a plan was made.
   only, `mcp__squad__claim` (`## Sibling planners`), plus the resources
   (`squad://context-brief/...`, `squad://me`). Plans reach the squad only
   through `submit_task`; nothing is written to a directory the orchestrator
-  watches, and no file records what a planner holds.
+  watches, and no file records what a planner holds (a draft is personal
+  scratch, never a claim).
 - **Heavy slots.** The heavy gate applies to headless planners too. Before
   `just check`, `cargo test` or any other command matching the heavy patterns
   that plan validation needs, call `mcp__squad__heavy_slot` with
@@ -93,7 +97,8 @@ orchestrator never needs to know which way a plan was made.
   three to five lines what the squad is doing in that repo; this becomes the
   `## Context` of the content.
 - If the read fails (orchestrator down): headless hands back `failed` with
-  code `no_submission` (step 8); interactive tells Tim and stops.
+  code `no_submission` (step 8); interactive carries on as below, with no
+  orchestrator.
 - Headless, any failure before a submission (a missing argument, an
   unreadable `--task-file`, `mcp__squad__submit_task` absent, the brief
   unreadable) ends the turn with the `failed` hand-back, code
@@ -101,11 +106,12 @@ orchestrator never needs to know which way a plan was made.
 - Interactive: tell Tim what the brief's `planning_claims` show siblings
   holding (`## Sibling planners`) before step 2, and keep clear of it.
 - No orchestrator reachable (interactive only): if `mcp__squad__submit_task`
-  is absent, the squad is not reachable from here at all; skip the read and
-  the claim. Tell Tim, write "context brief unavailable" under `## Context`,
-  and carry on as far as step 2: plan documents, draft PR and Linear ticket,
-  with the sibling check on the Linear labels alone. Nothing more is
-  possible, so the planner stops there (step 5, "No orchestrator").
+  is absent, or the brief cannot be read, the squad is not reachable from
+  here; skip the read and the claim. Tell Tim, write "context brief
+  unavailable" under `## Context`, do the sibling check on the Linear labels
+  alone, and plan to the end anyway: plan documents, draft PR, Linear ticket
+  and the draft file, which on acceptance is left ready to submit (step 5,
+  "Squad unreachable").
 
 ## 2. Shape the work
 
@@ -121,8 +127,9 @@ From the settled point, the planner keeps the following current. The settled
 point is when the brief is clear enough: the repo, the scope and an outline of
 the deliverables agreed with Tim, after the sibling check. At that point the
 planner also claims its scope with the orchestrator and labels its tickets
-(`## Sibling planners`). Each time the plan changes materially, it updates the plan
-documents, the draft PR and Linear in the same step.
+(`## Sibling planners`) and writes the draft file (`## Drafts`). Each time the
+plan changes materially, it updates the draft file, the plan documents, the
+draft PR and Linear in the same step.
 
 - **Plan documents and draft PR.** In the target repo's worktree, which the
   planner creates with `wt -C <repo> switch --create plan/<slug> --base
@@ -236,7 +243,9 @@ omitted, never `null`.
 
 ## 4. Compose the task markdown
 
-Compose, do not save. `content` is:
+Headless: compose, do not save. Interactive: the composed text is the draft
+file (`## Drafts`), written at the settled point and rewritten on every
+revision. `content` is:
 
 ```text
 ---
@@ -276,6 +285,10 @@ are missing. Otherwise it is new text. Body headings, in this order:
 
 Call `mcp__squad__submit_task` with `content`, `plan`, and:
 
+- Interactive, `content` is the draft file's content, read back from the file
+  just before the call, and `plan` is its frontmatter parsed; never a version
+  held only in context.
+
 - `task_id`: headless, always the `--task-id`; interactive, only when
   revising an existing task.
 - `draft`: headless (a `planner` session), always `true`. Interactive (an
@@ -290,12 +303,14 @@ content, which needs no action).
 plan is accepted or finalised, the planner does not call `submit_task`.
 Agreement to a step ("yes, create the tickets") is
 not acceptance of the plan; when unsure, ask whether he accepts it. Show him
-the composed markdown as the current draft before asking. When he accepts,
-in this order:
+the draft file's path and its current content before asking. When he
+accepts, in this order:
 
-1. Quote his words verbatim, with the date, under `## Approval`, then submit.
-   If the call is refused, fix it per step 6;
-   nothing after this step happens until a submission has succeeded.
+1. Quote his words verbatim, with the date, under `## Approval` in the draft
+   file, then submit. If the call is refused, fix the draft per step 6 and
+   resubmit; if the squad turns out to be unreachable, go to "Squad
+   unreachable" below. Nothing after this step happens until a submission has
+   succeeded.
 2. Mark the plan PR ready with `gh pr ready <n> -R <owner/name>`. Never
    merge it.
 3. Move the parent ticket to the team's ready or todo state and replace
@@ -307,13 +322,15 @@ planner says so. The draft PR and the `squad:planning` labels stay for him to
 resume or clean up, and the planner tells him which they are; it releases its
 planning claim.
 
-**No orchestrator (interactive only).** When `mcp__squad__submit_task` is
-absent (step 1's check), the planner tells Tim the squad is unreachable and
-stops at the plan documents, the draft PR and the Linear ticket of step 2.
-It submits nothing, and writes nothing to any directory the orchestrator
-watches: the composed task markdown is shown to Tim in the session, not saved
-as a task file. Plans reach the squad only through `submit_task`; when the
-squad is reachable again, Tim re-runs `/squad-planner` on the same work.
+**Squad unreachable (interactive only).** When `mcp__squad__submit_task` is
+absent (step 1's check) or the call fails without one of step 6's codes (a
+transport or connection error, the tool gone, the session's token refused),
+the planner submits nothing and does not retry in a loop. It still runs the
+acceptance gate: on Tim's acceptance it quotes his words under `## Approval`
+in the draft, validates the draft locally (`## Drafts`), marks nothing ready,
+moves no ticket, releases any planning claim it holds if `mcp__squad__claim`
+still answers (otherwise the orchestrator ages it out), and ends by giving Tim
+the draft path and the two ways to submit it later (`## Drafts`).
 
 ## 6. Problems
 
@@ -327,6 +344,7 @@ A refused call returns a `ToolError` `{code, message, problems?}`.
 | `task_running` | Never retry from a planner session; hand back `failed`. | Not raised for an operator session (step 7). |
 | `not_allowed_for_kind` | Hand back `failed`. | Tell Tim this session cannot submit and stop. |
 | `invalid_input` | Hand back `failed`. | Show Tim the message. |
+| none (unreachable) | Hand back `failed` with `no_submission`. | Keep the draft; step 5, "Squad unreachable". |
 
 A schema rejection (the MCP SDK's validation text, not a `ToolError`) is
 treated like `invalid_plan`: fix the named fields and resubmit, reporting it
@@ -339,8 +357,8 @@ interactive shows Tim the problems and asks how to proceed.
 - An amendment (a `plan_amended` turn, or any later turn in the same session
   asking for changes) is applied and resubmitted with the same `task_id`,
   replacing the pending plan. Interactive, an amendment after acceptance
-  first reverts the plan to drafting: `gh pr ready --undo <n> -R
-  <owner/name>`, the labels back to `squad:planning` on every ticket, the
+  first reverts the plan to drafting: `## Approval` removed from the draft
+  file, `gh pr ready --undo <n> -R <owner/name>`, the labels back to `squad:planning` on every ticket, the
   parent back in the planning state, and the planning claim taken again. Then it
   updates the plan documents, the PR and the tickets, and resubmits when Tim
   says it is accepted again (his new words, quoted under `## Approval`),
@@ -368,10 +386,51 @@ else counts as no hand-back. Summary prose may come before it. Then end the
 turn. The `submit_task` call itself is the authoritative record of the plan.
 
 **Interactive.** Tell Tim the task id and state (an approved plan goes to
-preflight), that the plan PR is ready and which tickets are `squad:planned`.
-If the squad was unreachable, say that nothing was submitted and what stands
-(plan documents, draft PR, ticket). If he ended
+preflight), that the plan PR is ready, which tickets are `squad:planned`, and
+the draft path. If the squad was unreachable, say that nothing was submitted,
+what stands (draft file, plan documents, draft PR, ticket) and how to submit
+the draft later (`## Drafts`). If he ended
 without accepting, say what stays (step 5).
+
+## Drafts
+
+Interactive form only; the headless planner keeps no draft. The draft is the
+source of truth for the task markdown: written to a file as the plan takes
+shape, kept current on every revision, and the text `submit_task` sends.
+
+- **Where.** `~/.local/state/squad/plans/<owner>-<name>/<yyyy-mm-dd>-<task-slug>.md`,
+  the repo's `owner/name` with `/` as `-`, the date the draft was started and a
+  short slug of the title. Create the directories with `mkdir -p` and
+  `chmod 700` them. It is outside every repo, so it never enters a git
+  history, survives the session, and lists per repo with `ls`. It is personal
+  scratch: no other session reads it, it records no claim, and it is never
+  copied into a directory the orchestrator watches.
+- **Shape.** Exactly step 4's task markdown: the TaskPlan as JSON frontmatter
+  and the body, the same file `submit_task` and a GUI batch upload accept.
+  Until the plan is complete, fill the frontmatter with what is settled and
+  keep the gaps visible in the body; it must be a complete TaskPlan before
+  acceptance.
+- **Validate locally** before asking for acceptance, and again on every
+  submission from it: the frontmatter parses (`jq` over the text between the
+  `---` lines), it carries only step 3's fields within their limits, the
+  kickoff brief's first two lines are the template's, and the body has step
+  4's interactive headings (`## Approval` only once Tim has accepted). What needs the orchestrator (`depends_on` ids, a repo the
+  squad manages, intake `resources`) is checked by the submission; say which
+  of these went unchecked.
+- **Resume** with `/squad-planner <draft path>`. `Read` the draft, run step 1
+  for its repo, and show Tim where it stands. A draft carrying `## Approval`
+  was accepted: re-validate it and submit it as it stands through step 5's
+  acceptance order, re-planning nothing; first look in the brief's `tasks`
+  (and `squad://me`) for a task of the same title, and if one exists ask Tim
+  whether this is a revision of it (`task_id`) before submitting. A draft
+  without `## Approval` is a plan in progress: carry on drafting from it.
+- **Submit later** when the squad was unreachable, either way: re-run
+  `/squad-planner <draft path>` once the orchestrator is up (above); or, in
+  the GUI at `http://127.0.0.1:7790`, Batches → New batch, upload the draft
+  with the repository set to its `owner/name`. An upload enters as an intake
+  task, and a plan equal to the intake frontmatter is approved without a
+  review run.
+- A draft stays after submission as Tim's record; he deletes it when done.
 
 ## Sibling planners
 
