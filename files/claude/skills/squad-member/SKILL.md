@@ -132,6 +132,20 @@ comprehensive gate per trunk.
   again with `mcp__squad__land`. Never open a second PR for the fixes.
 - Merge authority `operator`: once the PR is ready, raise a `review` item
   with the PR `url`; Tim merges.
+- **Multi-repo tasks.** When the kickoff ends with a `## Repos` section, the
+  task spans several repos: the anchor repo is this worktree, and each other
+  repo gets its own worktree on the same branch, cut with the command the
+  section gives (`wt -C <checkout> switch --create <branch> --base
+  origin/<base> --no-cd -y`); work in it by absolute path. One PR per repo,
+  each against that repo's own base, and rebase each on its own base, never
+  on the anchor's. Land each repo's PR separately with `mcp__squad__land`
+  `{pr, kind, repo: "<owner>/<name>"}` (no `repo` means the anchor; a PR that
+  is not in the repo named is refused `not_a_lane`). The first `completion`
+  land puts the task into `landing`, and it is done only once every repo has
+  landed, so request the `completion` lands only when every repo's PR is
+  ready, then land them all in one go. Read each repo's
+  `squad://context-brief/<owner>%2F<name>` before working in it, and list
+  every PR URL in the final `set` `detail`.
 - Never `gh pr merge` (the member settings deny it), never the GitHub UI,
   never another merge route.
 - Before calling a PR green, check each expected CI job on the head sha by
@@ -201,7 +215,9 @@ the watch cannot be set (the tool refuses it, or the dependency has no PR).
 - If the kickoff names repo preparation (`git pull --ff-only`, a rebase), do
   it first.
 - Stay in the worktree the broker started you in and use absolute paths into
-  it. If the cwd is a primary checkout with `main` or `master` checked out
+  it (a multi-repo task adds one worktree per other repo, as its kickoff's
+  `## Repos` section says; nothing else). If the cwd is a primary checkout
+  with `main` or `master` checked out
   (`git rev-parse --path-format=absolute --git-common-dir` equals
   `$(git rev-parse --show-toplevel)/.git`), `set` `blocked` and raise; never
   work there.
@@ -256,12 +272,14 @@ landing step.
 
 ## Finishing
 
-When every deliverable's check passes: land `completion` (or, for merge
-authority `operator`, raise the review item), stop completed subagents and
-background shells you started, `set` `done` with the PR URL in `detail`, and
-end the turn. A session of kind `infra` never calls `mcp__squad__land`: its
-PR goes through the orchestrator's merge gate, so it finishes with `set`
-`status: "done"` (PR URL in `detail`) only. The policy layer winds the session down; do not wait for it.
+When every deliverable's check passes: land `completion` (once per repo for a
+multi-repo task, each with its `repo`; or, for merge authority `operator`,
+raise the review item), stop completed subagents and background shells you
+started, `set` `done` with the PR URL (every PR URL, for a multi-repo task)
+in `detail`, and end the turn. A session of kind `infra` never calls
+`mcp__squad__land`: its PR goes through the orchestrator's merge gate, so it
+finishes with `set` `status: "done"` (PR URL in `detail`) only. The policy
+layer winds the session down; do not wait for it.
 
 Reading state, at any point, with ReadMcpResourceTool on server `squad` (no
 permission needed): `squad://me` (your session, inbox counts, pending acks),
