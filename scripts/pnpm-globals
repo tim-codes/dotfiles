@@ -22,8 +22,9 @@ packages=(
   # markdown → OOXML conversion in the office-files skill (md2exxo-report.sh, via MD2EXXO_MARKDOWN_IT)
   markdown-it@latest
   # Exxo agent credential tooling (agent-run / agent-tooling); private GH
-  # Packages registry — needs the read PAT in ~/.npmrc (1Password:
-  # "[EXXO] github npm read PAT" in Exxo Engineering)
+  # Packages registry — needs the read PAT in ~/.npmrc, which
+  # scripts/npmrc-render writes from 1Password ("[EXXO] github npm read PAT"
+  # in Exxo Engineering); deps-up runs it before this script
   @exxo-labs/agent-tooling@latest
 )
 

@@ -20,6 +20,7 @@ This is a personal dotfiles repository for macOS and Linux development environme
 - `~/dev/dotfiles/scripts/brew-update` - Update Homebrew packages
 - `~/dev/dotfiles/scripts/gcloud-setup` - Idempotent gcloud Python setup: python@3.12 virtualenv (`~/.config/gcloud/virtenv`) with numpy; called by setup-macbook and deps-up. Shell configs export `CLOUDSDK_PYTHON` at the virtualenv python (Homebrew default 3.14 breaks gcloud)
 - `~/dev/dotfiles/scripts/pwsh-modules` - Idempotent PowerShell module install (ExchangeOnlineManagement, current user, from PSGallery); called by setup-macbook and deps-up
+- `~/dev/dotfiles/scripts/npmrc-render` - Idempotent render of `~/.npmrc` (mode 600: `@exxo-labs:registry` + `_authToken` for npm.pkg.github.com) from the 1Password item "[EXXO] github npm read PAT" (Exxo Engineering); rewrites only when content differs, never prints the token. Token via `agent-run` when `NPM_READ_PAT=1p:<item-uuid>` is in `~/.config/exxo/agent.env` (Exxo secret cache), else live `op read`. Called by deps-up before pnpm-globals; test `bash tests/npmrc-render.sh`
 - `~/dev/dotfiles/scripts/pipx-packages` - Idempotent pipx installs (ansible), each pinned with `--python` to the python@3.12 keg; reinstalls a venv whose interpreter is missing or not 3.12; called by setup-macbook and deps-up
 - `~/dev/dotfiles/scripts/cargo-update` - Update Rust packages
 - `~/dev/dotfiles/scripts/firefox-prefs` - Link codified Firefox prefs into each installation's active profile (only needed for a new profile/machine; the link means repo edits apply on Firefox restart)
