@@ -23,7 +23,8 @@ name = "personal"
 # placement_rank: lower is preferred (reserve first, then exxo, then personal).
 # reserve_pct: floor kept back for Tim's own use (squad v0.5 P4 decision).
 # playwright/browser are capabilities for placement; only playwright has an MCP server the orchestrator passes to member launches that need it ([policy.launch] needs_mcp)
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser"]
+# 1password: agent/run resolves 1Password references on this host in every context, so every account provides it; vercel: the Vercel MCP server is exxo-only, so only exxo provides it
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password"]
 placement_rank = 30
 reserve_pct = 10
 email = "timoconnell1024@gmail.com"
@@ -33,7 +34,7 @@ config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
 # so its own account and quota.
 [[accounts]]
 name = "reserve"
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser"]
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password"]
 placement_rank = 10
 reserve_pct = 0
 email = "tim.oc@outlook.com"
@@ -41,7 +42,7 @@ config_dirs = ["~/.claude-reserve"]
 
 [[accounts]]
 name = "exxo"
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser"]
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "vercel"]
 placement_rank = 20
 reserve_pct = 30
 email = "tim@exxo.io"
