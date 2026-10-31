@@ -256,6 +256,20 @@ the watch cannot be set (the tool refuses it, or the dependency has no PR).
 - The repo's own CLAUDE.md, the global commit and push cadence (commit every
   logical step, push at checkpoints and pauses) and draft PRs apply as in any
   session. Delegation inside the session follows the global subagent policy.
+- **UI lanes with a design component.** Follow the `claude-design-workflow`
+  skill. Before claiming Figma work, call `whoami` on the Figma MCP; if it is
+  not signed in, raise a question for Tim with the skill's sign-in prompt and
+  carry on with other work, and never start an OAuth flow and wait on it.
+  Take the approved artboards and Figma node ids from the plan's `## Design`
+  section, and implement with `/figma-design-to-code` against the repo's own
+  components and tokens. Build the preview with `just preview` (a heavy job,
+  so take a slot first, see Heavy jobs) and take screenshots of each state
+  and scheme from the preview, never the live app, saving them where the repo
+  says (squad: `gui/acceptance/<feature>-NN-<step>.png`, under 300 KB). Run
+  `design:design-critique` and `design:accessibility-review` on them before
+  marking the PR ready. The PR body links the canvas and the Figma frame and
+  carries `## Design`, `## Preview`, `## Screenshots` and `## Design review`;
+  every deliberate departure from Figma goes in the repo's deviations log.
 
 ## Starting from a plan PR
 
