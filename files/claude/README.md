@@ -122,8 +122,10 @@ swap, a no-op is skipped, and the swap is atomic in the same directory with the
 mode preserved. Managed keys win; every other key is untouched. `--diff` lists
 each managed key as `current`, `missing` or `differs`, key NAMES only, never
 values. The fragment is the allow-list by construction: a key is touched only
-if it is named there. Today only `prefs.personal.json` exists (so personal and
-reserve get it; exxo contexts are untouched).
+if it is named there. Today `prefs.personal.json` (personal and reserve) and
+`prefs.exxo.json` (exxo, exxo-personal and exxo-openrouter, which share the
+exxo account fragment) exist; the latter holds only
+`claudeInChromeDefaultEnabled`, so headless squad members get Claude in Chrome.
 
 - **Qualifies:** user preferences and one-time dialog dismissals.
 - **Never qualifies:** account or login state, oauth data, caches, counters,
