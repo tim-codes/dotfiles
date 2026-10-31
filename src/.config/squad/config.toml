@@ -91,3 +91,10 @@ name = "host"
 # headroom are set low enough that measured CPU, not load, decides (code fix tracked in squad).
 cpu_per_slot_pct = 15
 min_headroom_pct = 10
+
+[heavy]
+# Grants used to wait for the broker's calm clock to reach 300 s, and that clock resets whenever
+# CPU is at or above 65%; with six members running their own fast checks the host never calmed and
+# the heavy queue never drained (tim-codes/squad#228, 2026-10-31). The derived slot count already
+# follows live CPU and memory headroom, so keep only a short dwell here. Patterns keep the defaults.
+heavy_slot_min_calm_s = 20
