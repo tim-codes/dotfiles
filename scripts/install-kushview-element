@@ -1,0 +1,59 @@
+#!/bin/zsh
+
+# Install Kushview Element (standalone AU/VST plugin host) from its GitHub
+# releases. Not in Homebrew: the `element` cask is the unrelated Matrix client.
+#
+# The release .dmg wraps a notarized .pkg that installs /Applications/Element.app
+# plus Element's own AU/VST2/VST3/CLAP/LV2 plugins under /Library/Audio/Plug-Ins,
+# so the install step needs sudo. Picks the newest release that actually ships a
+# macOS .dmg (some releases go out without one) and skips when the installed app
+# is already at least that version — the app self-updates via Sparkle after this.
+
+set -euo pipefail
+
+repo="kushview/element"
+app="/Applications/Element.app"
+
+# Newest release (by publish date) carrying a *-macos.dmg asset
+read -r tag dmg <<<"$(gh api "repos/$repo/releases" --jq '
+  [.[] | select(.draft | not) | select(.prerelease | not)
+       | {tag: .tag_name, dmg: ([.assets[].name | select(endswith("-macos.dmg"))] | first)}
+       | select(.dmg != null)]
+  | first | "\(.tag) \(.dmg)"')"
+
+if [[ -z "$tag" || "$tag" == "null" ]]; then
+  echo "Element: no release with a macOS .dmg found on $repo" >&2
+  exit 1
+fi
+latest="${tag#v}"
+
+if [[ -d "$app" ]]; then
+  installed="$(defaults read "$app/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null || echo 0)"
+  # Installed is current if it sorts last (or equal) against the release version
+  if [[ "$(printf '%s\n%s\n' "$latest" "$installed" | sort -V | tail -1)" == "$installed" ]]; then
+    echo "Element: $installed installed (latest macOS release $latest) — nothing to do"
+    exit 0
+  fi
+  echo "Element: upgrading $installed -> $latest"
+else
+  echo "Element: installing $latest"
+fi
+
+work="$(mktemp -d)"
+mnt="$work/mnt"
+trap 'hdiutil detach -quiet "$mnt" 2>/dev/null || true; rm -rf "$work"' EXIT
+
+gh release download "$tag" --repo "$repo" --pattern "$dmg" --dir "$work"
+hdiutil attach -quiet -nobrowse -readonly -mountpoint "$mnt" "$work/$dmg"
+
+pkg=("$mnt"/*.pkg(N))
+if (( ${#pkg} != 1 )); then
+  echo "Element: expected one .pkg in $dmg, found ${#pkg}" >&2
+  exit 1
+fi
+
+# Refuse anything not notarized under a Developer ID before running it as root
+spctl --assess --type install "$pkg[1]"
+
+sudo installer -pkg "$pkg[1]" -target /
+echo "Element: installed $latest"
