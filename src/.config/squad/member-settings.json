@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(gh pr merge*)",
+      "Bash(* gh pr merge*)",
+      "Bash(gh * pr merge*)",
+      "Bash(* gh * pr merge*)",
+      "Bash(gh api *merge*)",
+      "Bash(* gh api *merge*)",
+      "Bash(op read*)",
+      "Bash(* op read*)",
+      "Bash(*--reveal*)",
+      "Bash(*--show-secrets*)",
+      "Bash(pulumi env open*)",
+      "Bash(* pulumi env open*)",
+      "Bash(esc env open*)",
+      "Bash(* esc env open*)",
+      "Bash(gcloud secrets versions access*)",
+      "Bash(* gcloud secrets versions access*)",
+      "Read(**/.claude.json)",
+      "Read(**/.credentials.json)"
+    ]
+  }
+}
