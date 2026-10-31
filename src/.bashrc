@@ -71,7 +71,6 @@ alias pip="pip3"
 alias tf="tofu"
 alias pm="podman"
 alias p="pnpm"
-alias pnpm="corepack pnpm"
 alias pu="pulumi"
 alias gcp="gcloud"
 

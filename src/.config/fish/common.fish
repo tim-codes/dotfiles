@@ -205,7 +205,7 @@ complete -c tx -f -a "(tmux list-sessions -F '#S' 2>/dev/null)"
 alias rf="source ~/.config/fish/config.fish"
 alias cl="cd ~/Claude && claude"
 
-alias pnpm="corepack pnpm"
+# pnpm is Homebrew's (scripts/brew-update) and honours each repo's packageManager pin itself; no corepack alias (node >= 25 no longer bundles corepack)
 
 alias mp="mkdir -p"
 if type -q lsd
