@@ -50,19 +50,23 @@ ack_required: <directive_id>
   is re-delivered and escalated to Tim. `squad://me` lists your
   `pending_acks`.
 
-| Directive kind | What you do |
-|---|---|
-| `pause` | Finish the tool call in flight; start nothing new. Commit work in progress on the lane branch (`wip: <what is half-done>`), push if the branch already has a PR, `set` `paused` with `detail` saying exactly where you stopped and the next step, ack, end the turn. |
-| `resume` | Read `squad://me` and your last `detail`, `set` `working`, ack, carry on from the next step. |
-| `priority` | Note it and ack. At 4 or 5, defer optional work (polish, extra refactors, nice-to-have tests). |
-| `fanout` | The payload caps parallel subagents and may cap their model. A lower cap applies at once: start no subagent until you are under it; let running ones finish. Ack. |
-| `delegate_mode` | `pool`: route new implementer and reviewer work for the listed needs through `mcp__squad__delegate` instead of local subagents; `local`: back to subagents. Work already running stays where it is. Ack. |
-| `heavy_slot` | A grant, deny or revoke of your heavy slot (see Heavy jobs). On a revoke, interrupt the heavy command, then release. Ack. |
-| `scope_change` | Tim changed the task. His quoted words supersede the kickoff where they conflict; re-plan the remaining work around them, `set` a `detail` naming the change, ack. |
-| `operator_decision` | Tim's answer to one of your raises, in his words. Act on the option he chose and nothing broader, ack. |
-| `job_assign` | A job for you to serve (see Delegating and serving jobs). Ack, then serve it. |
-| `cleanup` | Stop completed subagents (`TaskStop`), end background shells you started, kill dev servers and browsers you launched (check each pid is yours). Ack with a `note` of what you stopped. |
-| `wind_down` | Commit and push work in progress, `set` `done` or `paused` with a `detail` naming the next step, ack, end the turn. The policy layer ends the session. |
+| Directive kind | Payload keys | What you do |
+|---|---|---|
+| `pause` | `reason`, optional `resets_at` | Finish the tool call in flight; start nothing new. Commit work in progress on the lane branch (`wip: <what is half-done>`), push if the branch already has a PR, `set` `paused` with `detail` saying exactly where you stopped and the next step, ack, end the turn. |
+| `resume` | `reason`, optional `from`, `to` (accounts, after a switch) | Read `squad://me` and your last `detail`, `set` `working`, ack, carry on from the next step. |
+| `priority` | `priority` (1 to 5) | Note it and ack. At 4 or 5, defer optional work (polish, extra refactors, nice-to-have tests). |
+| `fanout` | `max_subagents` (0 to 8), optional `model_ceiling` (none means no ceiling) | The payload caps parallel subagents and may cap their model. A lower cap applies at once: start no subagent until you are under it; let running ones finish. Ack. |
+| `delegate_mode` | `mode` (`local` or `pool`), optional `needs` | `pool`: route new implementer and reviewer work for the listed needs through `mcp__squad__delegate` instead of local subagents; `local`: back to subagents. Work already running stays where it is. Ack. |
+| `heavy_slot` | `decision` (`grant`, `deny`, `revoke`), optional `expires_at`, `est_minutes`, `retry_after_s`, `reason` | A grant, deny or revoke of your heavy slot (see Heavy jobs). On a revoke, interrupt the heavy command, then release. Ack. |
+| `scope_change` | `task_id`, `content_sha256`, `quote` (Tim's words) | Tim changed the task. His quoted words supersede the kickoff where they conflict; re-plan the remaining work around them, `set` a `detail` naming the change, ack. |
+| `operator_decision` | `item_id`, `decision`, optional `note` | Tim's answer to one of your raises, in his words. Act on the option he chose and nothing broader, ack. |
+| `job_assign` | as the job brief says | A job for you to serve (see Delegating and serving jobs). Ack, then serve it. |
+| `cleanup` | `pid`, `cmd`, optional `cpu_pct`, `rss_mb`, `reason` | Stop completed subagents (`TaskStop`), end background shells you started, kill dev servers and browsers you launched (check each pid is yours). Ack with a `note` of what you stopped. |
+| `wind_down` | `reason` | Commit and push work in progress, `set` `done` or `paused` with a `detail` naming the next step, ack, end the turn. The policy layer ends the session. |
+
+Any payload may also carry `trigger`, the snapshot of the decision that
+caused the directive: informational, never needed to act. The payload keys are
+the contract (`contracts/mcp-tools.md`, "Directive payloads" in the squad repo).
 
 ## Status and questions
 
@@ -119,6 +123,13 @@ comprehensive gate per trunk.
   names, and `kind: "completion"` at the end. `queued` means the service is
   waiting on CI; `landed` means merged. A `refused` result's `reason` is
   final: fix its cause and land again, never route around it.
+- A `completion` land puts the task into `landing`: it is done on your side,
+  waiting for the trunk service to merge. Finish as under Finishing and wind
+  down; do not wait for `landed`.
+- A review-fix resume (a resume turn carrying review findings on a PR you
+  already landed or requested) means apply the findings on the same branch,
+  push, re-run the focused tests and the fast check, then request the land
+  again with `mcp__squad__land`. Never open a second PR for the fixes.
 - Merge authority `operator`: once the PR is ready, raise a `review` item
   with the PR `url`; Tim merges.
 - Never `gh pr merge` (the member settings deny it), never the GitHub UI,
@@ -131,15 +142,21 @@ comprehensive gate per trunk.
 
 ## Heavy jobs
 
-Before any command the kickoff's Test policy section lists as heavy, or that
-Testing and trunks marks heavy, call `mcp__squad__heavy_slot` with
+Take a heavy slot before `just check`, `cargo test`, docker-backed tests or
+any other command that matches the heavy patterns, as well as before any
+command the kickoff's Test policy section lists as heavy or that Testing and
+trunks marks heavy. Call `mcp__squad__heavy_slot` with
 `{action: "request", est_minutes: <1-240>, reason: "<one line>"}`. A
 `queued` answer means wait: do other work and end the turn; a turn granting
 the slot arrives. The PreToolUse gate denies heavy commands without a grant,
 so do not try first. As soon as the heavy job finishes (or fails), call
-`mcp__squad__heavy_slot` with `{action: "release"}`. Ask only when focused
-tests cannot show the change works (a migration, build or CI config,
-behaviour only an e2e run exercises).
+`mcp__squad__heavy_slot` with `{action: "release"}`; never hold a slot while
+idle. Proceed without a slot only by skipping the heavy step (a `deny`, or a
+wait that would stall the lane) and saying so in the hand-back: name the
+command skipped in the `set` `detail` and the PR description. Ask for a slot
+beyond the fast check only when focused tests cannot show the change works (a
+migration, build or CI config, behaviour only an e2e run exercises);
+`just check` always takes one.
 
 ## Delegating and serving jobs
 
@@ -173,6 +190,11 @@ mailbox, a Slack or Teams thread, a Linear project), call
 `reason`, then end the turn: a `watch_hit` turn wakes you. Call
 `mcp__squad__unwatch` with the `watch_id` once you no longer need it. Never
 poll in a loop or sleep waiting.
+
+When blocked on a dependency whose PR is not yet merged, `watch` that PR
+(`github_pr`, target the PR URL) rather than raising an item, `set`
+`blocked` with the PR in `detail`, and end the turn. Raise an item only if
+the watch cannot be set (the tool refuses it, or the dependency has no PR).
 
 ## Repo conventions
 

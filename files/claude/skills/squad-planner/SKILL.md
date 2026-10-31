@@ -43,14 +43,33 @@ orchestrator never needs to know which way a plan was made.
   orchestrator (`## Sibling planners`); it still makes no launches and sends
   no messages to members.
 - It never calls `ExitPlanMode`: the plan goes to `submit_task`, not to a
-  mode switch. The broker launches planners in plan mode (contracts README
-  rule 7), but the skill relies on no permission mode: headless works
+  mode switch. The broker launches headless planners in `auto` permission
+  mode, not plan mode (plan mode ignores allow rules for non-read-only tools,
+  which made every planner raise a permission item for `submit_task`). Auto
+  mode is not a licence to edit: the planner still does no repo edits and
+  only reads. `mcp__squad__submit_task` needs no operator prompt, because the
+  broker answers the squad's own tools itself; if a permission prompt for it
+  ever appears, do not work around it, hand back `failed` with code
+  `no_submission`. The skill relies on no permission mode: headless works
   read-only in all of them.
-- Of the squad's tools it uses `mcp__squad__submit_task` and, interactive
+- Of the squad's tools it uses `mcp__squad__submit_task`,
+  `mcp__squad__heavy_slot` (below) and, interactive
   only, `mcp__squad__claim` (`## Sibling planners`), plus the resources
   (`squad://context-brief/...`, `squad://me`). Plans reach the squad only
   through `submit_task`; nothing is written to a directory the orchestrator
   watches, and no file records what a planner holds.
+- **Heavy slots.** The heavy gate applies to headless planners too. Before
+  `just check`, `cargo test` or any other command matching the heavy patterns
+  that plan validation needs, call `mcp__squad__heavy_slot` with
+  `{action: "request", est_minutes: <1-240>, reason: "<one line>"}`; a
+  `queued` answer means end the turn's work on that step and wait for the
+  grant turn, and the gate denies the command without one, so do not try
+  first. Release with `{action: "release"}` as soon as the command ends or
+  fails. If the slot is denied (or would not arrive in reasonable time), skip
+  that heavy step, plan without it, and say so in the plan hand-back: name the
+  skipped command under `## Open questions` and in the summary prose before
+  the hand-back line. Prefer focused read-only checks, and take no slot for
+  them.
 - Its own delegation: dedicated agents first (`Explore` for read-only
   sweeps of the repo, `notion-ops` for every Notion read or write,
   `implementer` for the interactive plan documents); `general-purpose` only with an
@@ -148,10 +167,13 @@ documents, the draft PR and Linear in the same step.
   `## Recommended model and effort`.
 
 **Headless.** `Read` the task file and explore the repo read-only. Ask no
-one. Hold no planning claim (the task already exists). Create no tickets, PRs, ADRs or Notion edits: under `## Tickets` and
+one. Read the task file's frontmatter first: if it already carries a
+complete, valid TaskPlan, step 4's as-is rule applies and this step shrinks to
+checking it. Otherwise its `resources` (step 3) are the intake's and travel
+into the plan. Hold no planning claim (the task already exists). Create no tickets, PRs, ADRs or Notion edits: under `## Tickets` and
 `## Decisions` carry over the references the task file already has; under
 `## Docs amendments` note documentation you saw that the work will make
-stale; under `## Recommended model and effort` give your recommendation.
+stale; under `## Recommended model and effort` give your recommendation (Sonnet unless the work needs more).
 Record each assumption and each unresolved question under
 `## Open questions`.
 
@@ -171,7 +193,19 @@ omitted, never `null`.
   est_minutes}` with `est_minutes` 1–240, may be empty); `account` (optional,
   a name from the squad config's `[[accounts]]`, only when the work is bound
   to one); `model` (optional, only when a model is a hard requirement; a
-  preference goes under `## Recommended model and effort`).
+  preference goes under `## Recommended model and effort`). Never invent a
+  model: the default guidance is Sonnet, which the orchestrator applies when
+  the plan names none.
+  **Intake resources are carried unchanged.** When the plan is made from a
+  task file (headless with `--task-id`, or an uploaded intake), the submitted
+  `resources` carry the intake's `model`, `account`, `capabilities`,
+  `heavy_jobs` and `base` exactly as the intake has them, adding nothing the
+  intake lacks except fields it left out. Change one only for a stated reason,
+  written in the plan's notes (`## Approach`, or `## Scope change` on a
+  resubmission). The orchestrator refuses a plan that drops an intake field
+  with `invalid_plan` and a `resources.<field>` problem path (for example
+  `resources.model`); a dropped `model` once sent a task to the context
+  default, Opus, at several times the cost.
 - `operator_steps`: up to 50 (may be empty), each `{title, class}` plus
   `instructions`, `commands` and `est_minutes` where known. `class` is
   `blocks_launch` when it must be done before the member starts (credentials,
@@ -212,9 +246,15 @@ Compose, do not save. `content` is:
 <body>
 ```
 
-ending with a newline. The frontmatter JSON is the `plan` argument exactly
+ending with a newline. **As-is rule.** When the intake already carries a
+complete, valid plan frontmatter (it parses as a TaskPlan and every `depends_on`
+id is in the brief's `tasks`), submit the task file's `content` byte-identical,
+with the frontmatter parsed into `plan` and nothing re-serialised or
+reformatted: the orchestrator's fast path then approves it without a review
+run. Anything added or rewritten defeats that, so touch the file only to fix a
+problem the validation names. The frontmatter JSON is the `plan` argument exactly
 (JSON is valid YAML, and the orchestrator refuses a mismatch with
-`frontmatter_mismatch`). When a task file was given, `content` is that file's
+`frontmatter_mismatch`). When a task file was given without a complete, valid plan frontmatter, `content` is that file's
 text with this frontmatter added at the top (or replacing the frontmatter it
 already has), its body kept and extended with the headings below where they
 are missing. Otherwise it is new text. Body headings, in this order:
