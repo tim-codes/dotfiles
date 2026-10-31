@@ -117,21 +117,44 @@ comprehensive gate per trunk.
 - Open lane PRs against the base the kickoff names (a branch or a
   `trunk/...`) as drafts. Never push to a trunk branch.
 - On either merge path, mark the PR ready (`gh pr ready <n> -R <owner/name>`)
-  before landing or handing it to Tim: the trunk service refuses drafts.
+  before landing or handing it to Tim, and have the branch rebased or merged
+  up to its base, with CI green or the failure explained in the PR. The
+  trunk service pre-gates only a closed PR and a dirty or behind branch; it
+  does not check for a draft, so a draft would still be reviewed.
 - Merge authority `trunk_service`: call `mcp__squad__land` with
   `{pr: "<https PR URL>", kind: "milestone"}` at each milestone the kickoff
-  names, and `kind: "completion"` at the end. `queued` means the service is
-  waiting on CI; `landed` means merged. A `refused` result's `reason` is
-  final: fix its cause and land again, never route around it.
+  names, and `kind: "completion"` at the end. `queued` means the land is
+  accepted and waiting; `landed` means merged. What happens next depends on
+  `[policy.trunk] enabled`:
+  - **Enabled:** a `completion` land is reviewed by the trunk service
+    (correctness and estate conformity) and squash-merged by it once the
+    review, the GitHub checks and the merge state are clean. The task
+    reaches `done` with no operator item.
+  - **Disabled:** nothing reviews or merges the PR. A `completion` land
+    raises the item `policy:land:<task_id>` and Tim merges by hand.
+  - A `milestone` land is **not** reviewed or merged by the service in
+    either mode: the task keeps running and no item is raised. You may show
+    `blocked` until the PR merges by other means; carry on with whatever
+    does not depend on it.
 - A `completion` land puts the task into `landing`: it is done on your side,
-  waiting for the trunk service to merge. Finish as under Finishing and wind
-  down; do not wait for `landed`.
-- A review-fix resume (a resume turn carrying review findings on a PR you
-  already landed or requested) means apply the findings on the same branch,
-  push, re-run the focused tests and the fast check, then request the land
-  again with `mcp__squad__land`. Never open a second PR for the fixes.
-- Merge authority `operator`: once the PR is ready, raise a `review` item
-  with the PR `url`; Tim merges.
+  waiting for the trunk service to review and merge. Finish as under
+  Finishing and wind down; do not wait for `landed`.
+- Push nothing to the PR while the service is reviewing it: a new head
+  cancels the review and re-queues the land. If you must push, expect the
+  review to start again.
+- A `refused` result carries a `reason`, and a refusal after the land was
+  accepted reaches you as a `message` turn carrying the reasons and review
+  findings (failed checks, a reviewer finding, or "rebase onto <base>" for a
+  dirty or behind branch). Either way the reason is final: fix its cause on
+  the same branch, push, re-run the focused tests and the fast check, then
+  call `mcp__squad__land` again. Never open a second PR for the fixes, never
+  route around a refusal. A third refusal of the same PR goes to Tim.
+  `operator_pending` means a land for that repo is already waiting on Tim
+  (it names the item `policy:land:<task_id>`): wait for his answer, do not
+  land again.
+- Merge authority `operator` (also any repo flagged operator-only or
+  release-needs-approval, which the trunk service never auto-merges): once
+  the PR is ready, raise a `review` item with the PR `url`; Tim merges.
 - **Multi-repo tasks.** When the kickoff ends with a `## Repos` section, the
   task spans several repos: the anchor repo is this worktree, and each other
   repo gets its own worktree on the same branch, cut with the command the
