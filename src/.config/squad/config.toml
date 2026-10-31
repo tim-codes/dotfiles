@@ -84,3 +84,10 @@ runaway_minutes = 2
 name = "quota"
 [[watchers]]
 name = "host"
+
+[policy.heavy]
+# Slots are derived from live host headroom (Tim, 2026-10-30). The one-minute load average on this
+# 12-core host overstates CPU use while many idle sessions exist, so per-slot CPU and the reserved
+# headroom are set low enough that measured CPU, not load, decides (code fix tracked in squad).
+cpu_per_slot_pct = 15
+min_headroom_pct = 10
