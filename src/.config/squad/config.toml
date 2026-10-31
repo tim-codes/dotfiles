@@ -24,7 +24,7 @@ name = "personal"
 # reserve_pct: floor kept back for Tim's own use (squad v0.5 P4 decision).
 # playwright/browser are capabilities for placement; only playwright has an MCP server the orchestrator passes to member launches that need it ([policy.launch] needs_mcp)
 # 1password: agent/run resolves 1Password references on this host in every context, so every account provides it; vercel: the Vercel MCP server is exxo-only, so only exxo provides it
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password"]
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"]
 placement_rank = 30
 reserve_pct = 10
 email = "timoconnell1024@gmail.com"
@@ -34,7 +34,7 @@ config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
 # so its own account and quota.
 [[accounts]]
 name = "reserve"
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password"]
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"]
 placement_rank = 10
 reserve_pct = 0
 email = "tim.oc@outlook.com"
@@ -42,7 +42,7 @@ config_dirs = ["~/.claude-reserve"]
 
 [[accounts]]
 name = "exxo"
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "vercel"]
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "vercel", "boards"]
 placement_rank = 20
 reserve_pct = 30
 email = "tim@exxo.io"
@@ -62,7 +62,7 @@ projection_horizon_minutes = 60
 # Replaces the built-in needs_mcp. `browser` has no server on purpose: the Chrome
 # integration (claude-in-chrome) is a Claude Code settings flag, not an mcpServers entry.
 # `browser` still gates placement through `provides`.
-needs_mcp = { playwright = "playwright" }
+needs_mcp = { playwright = "playwright", boards = "boards" }
 # Up to ten live members while unattended (Tim, 2026-10-31: use up to 80-90% of the host).
 max_live_members = 10
 
