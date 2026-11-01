@@ -25,8 +25,9 @@ allows, by policy: auto mode decides. The local `squad` broker CLI (same-uid Uni
 broker, no network or credentials) is granted subcommand by subcommand, and only
 read-only ones: `squad doctor` and `squad debug report`. The squad session tools are
 granted as the `squad` MCP server's own tools, `mcp__squad__register/set/ack/
-delegate/delegate_result/job_review/raise/watch/unwatch/heavy_slot/land/
-submit_task/claim`, never as a `mcp__squad__*` wildcard. The v0.4 CLI verbs
+delegate/delegate_result/job_review/raise/watch/unwatch/heavy_slot/land`,
+never as a `mcp__squad__*` wildcard. `submit_task` and `claim` are deliberately
+not granted (they mutate squad state, so they prompt). The v0.4 CLI verbs
 (`send`, `set`, `status`, `roster`, `history`, `operator ...`) no longer exist in
 the binary (`config`, `broker`, `debug`, `doctor`, `hook`, `mcp`, `read`,
 `sessions`), so grant none of them. Exxo

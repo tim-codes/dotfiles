@@ -448,8 +448,6 @@
       "mcp__squad__unwatch",
       "mcp__squad__heavy_slot",
       "mcp__squad__land",
-      "mcp__squad__submit_task",
-      "mcp__squad__claim",
       "WebSearch",
       "mcp__ide__getDiagnostics"
     ],
