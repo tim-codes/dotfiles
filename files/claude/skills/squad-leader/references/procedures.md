@@ -5,18 +5,37 @@ Each use is an intervention (L-function in brackets).
 
 ## tRPC access
 
-The orchestrator listens on `http://127.0.0.1:7790`. Locally,
-`GET /auth/local` issues the operator cookie; then call
-`/trpc/<router>.<procedure>`. Mutations the leader uses: `tasks.approve`,
-`tasks.markLanded`, `items.decide`, `inbox.send`
+The orchestrator listens on `http://127.0.0.1:7790`. Sign in locally with
+the leader label (v0.5.10, tim-codes/squad#307; the label must match
+`^[a-z][a-z0-9_-]{0,31}$`) so mutations record actor `gui:leader`:
+
+```bash
+JAR=/path/in/scratchpad/leader.jar
+curl -sS -c "$JAR" -o /dev/null 'http://127.0.0.1:7790/auth/local?label=leader'
+```
+
+Or pair: `POST /auth/pair` with body `{"label":"leader"}`, then redeem the
+returned `url` path with `-c "$JAR"`. The minted URL is relative when
+`public_url` is unset, so prefix the tunnel origin yourself. (`squad pair
+--as leader` does the same from the CLI after the attended rebuild.)
+
+Then call `/trpc/<router>.<procedure>` with `-b "$JAR"`; the POST body is
+the input itself. Recording an intervention:
+
+```bash
+curl -sS -b "$JAR" -X POST http://127.0.0.1:7790/trpc/operator.intervene \
+  -H 'content-type: application/json' \
+  -d '{"function":"L2","action":"checkpoint tim-codes/squad#277 refused by the classifier; command on Tim'"'"'s list","reason":"trunk service does not land framework PRs (#287)","outcome":"handed_to_tim","pr":"tim-codes/squad#277"}'
+```
+
+Mutations the leader uses: `tasks.approve`, `tasks.markLanded`,
+`items.decide`, `inbox.send`
 (`{to: {member}, priority: 'now', kind: 'note', text}`), `sessions.resume`,
 `sessions.close`, `presence.set`, `repos.put`; from v0.5.10 `runs.live`,
 `ops.annotate`, `operator.intervene`; `repos.list` for `managed_repos`.
-Pair the GUI with `POST /auth/pair`; the minted URL is relative when
-`public_url` is unset, so prefix the tunnel origin yourself. `squad pair
---as leader` (cookie mapped to actor `gui:leader`) arrives with the
-attended rebuild once lane E defines the label; until then attribution
-comes from `intervene` calls only.
+Both `operator.intervene` and `mcp__squad__intervene` arrive with the
+v0.5.10 orchestrator restart (no broker rebuild); older builds use the
+file log below.
 
 ## Capture readiness check
 
@@ -36,7 +55,7 @@ v0.5.10 has no `runs` at all: capture cannot be verified, say so, and the
 review runs on the Postgres fallback. The broker sinks (`host.jsonl`,
 `quota.jsonl`) prove nothing about the orchestrator.
 
-## Intervention log file (before the `intervene` tool exists)
+## Intervention log file (orchestrator older than v0.5.10)
 
 Path: `~/.local/state/squad/debug/<run>/interventions.jsonl`, where `<run>`
 is the basename of `squad debug dir`. One JSON object per line, appended

@@ -97,23 +97,28 @@ review to run on the Postgres fallback.
 After **each** hand-done action, in the same turn:
 
 ```
-intervene({ function: "L5", action: "told t3 the pnpm alias fix is live (inbox note)",
-            reason: "no confirmation note when an item's fix lands (#290)",
-            outcome: "done", member: "t3", item_id: "r-20261031053635-1a2b3c" })
+mcp__squad__intervene({ function: "L5", action: "told t3 the pnpm alias fix is live (inbox note)",
+                        reason: "no confirmation note when an item's fix lands (#290)",
+                        outcome: "done", member: "t3", item_id: "r-20261031053635-1a2b3c" })
 ```
 
-`intervene` is the squad MCP tool for operator sessions (v0.5.10); tRPC
-`operator.intervene` is the same call from a script. Fields: `function`
-L1–L13, `action` (one imperative line), `reason` (why the squad could not;
-a ruling id or `managed_repos` row when authority is the point), `outcome`
+`mcp__squad__intervene` is the squad MCP tool for operator sessions
+(v0.5.10, tim-codes/squad#307; an interactive session may be asked to
+approve the tool once, which is expected). Fields: `function` L1–L13,
+`action` (one imperative line), `reason` (why the squad could not; a
+ruling id or `managed_repos` row when authority is the point), `outcome`
 (`done` | `parked` | `handed_to_tim`), and whichever of `item_id`,
-`task_id`, `member`, `pr`, `command` apply. Before the tool exists, append
-one JSON line of the same fields to
+`task_id`, `member`, `pr`, `command`, `ruling` apply. The same call from a
+script is tRPC `operator.intervene` (procedures.md). On an orchestrator
+older than v0.5.10, append one JSON line of the same fields to
 `~/.local/state/squad/debug/<run>/interventions.jsonl` (shape in
-procedures.md); the bundle ingests it. Once the attended rebuild ships
-`squad pair --as leader`, pair the GUI with it so your tRPC mutations are
-attributed to `gui:leader` even when you forget the call; until lane E
-defines that label, attribution comes from your `intervene` calls only.
+procedures.md); the bundle ingests it.
+
+Sign in to the orchestrator **with the label** `leader`
+(`/auth/local?label=leader`, or a pairing with `{"label":"leader"}`;
+procedures.md) so every tRPC mutation you make is recorded as actor
+`gui:leader` even when you forget the call; an unlabelled sign-in is
+indistinguishable from Tim.
 
 **Operator steps you deliver yourself** (a Figma deck, a Boards publish, a
 sign-in, a render) are decided and closed in the same breath:
