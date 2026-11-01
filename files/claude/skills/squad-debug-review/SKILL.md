@@ -65,9 +65,12 @@ run predates v0.5.10). Query Postgres read-only through
 `decisions`, `operator_items`, `inbox`, `trunk_lands`, `heavy_requests`,
 `session_usage`, `sessions` with the window from `runs` (or, before `runs`
 exists, from the first and last event of the day). Queries in
-[references/postgres-fallback.md](references/postgres-fallback.md). The
-summary's first line then says **"Evidence: Postgres fallback, no bundle"**,
-and every number is labelled as hand-computed. Never write to the database.
+[references/postgres-fallback.md](references/postgres-fallback.md); save
+each result as a TSV in your scratchpad, named after the bundle file it
+stands in for (`items.tsv`, `interventions.tsv`, …), and hand those paths
+to the investigator in place of the bundle. The summary's evidence line
+then says **"Evidence: Postgres fallback, no bundle"**, and every number is
+labelled as hand-computed. Never write to the database.
 
 ## 3. Read before delegating
 
@@ -93,8 +96,11 @@ self-contained and carries:
   (`sessions.csv` column `transcript_path`, with `transcript_exists`) are
   opened only for an incident already cited from a bundle file, filtered
   with `jq`/`grep` to the window; subagent transcripts live beside the
-  parent under `<session_id>/subagents/`. No secrets or tokens in the
-  report.
+  parent under `<session_id>/subagents/`. One exception: asks 1 and 8 may
+  run a single `grep` sweep over the member transcripts listed in
+  `sessions.csv` for fixed patterns (`Touch ID`, `waiting for you`,
+  browser-login steps, `invalid_input`, "what does this message mean"),
+  then read only the hits. No secrets or tokens in the report.
 - The ask, **findings only, at most 120 lines**, each with an evidence
   pointer (`bundle/<file>:<line>`, a `decisions.jsonl` id, or a transcript
   path plus record `uuid` and timestamp). Sort every incident into one of
@@ -136,10 +142,11 @@ order. Where the bundle computed a number, cite the file; where you did,
 say so. Section-to-column map and the carried-over pass/fail targets in
 [references/review-sections.md](references/review-sections.md).
 
-1. **Summary**: run id, window, mode, versions, headline table from
-   `summary.md`, evidence line (bundle, or the fallback sentence), verdict in
-   three sentences. An anti-goal breach (an unauthorised merge, a secret
-   logged, the live stack broken) is the first sentence.
+1. **Summary**: run id, window, mode, versions, the evidence line (bundle,
+   or the fallback sentence) as the section's first line, the headline
+   table from `summary.md`, then the verdict in three sentences. An
+   anti-goal breach (an unauthorised merge, a secret logged, the live stack
+   broken) is the verdict's first sentence.
 2. **What shipped since**: previous ranked list, each item shipped / live /
    merged-not-live / open.
 3. **HITL interruptions**: counts and waits per source, clusters with

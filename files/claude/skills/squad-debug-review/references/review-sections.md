@@ -28,13 +28,17 @@ either way):
   `wait_s`);
 - every approval item has a decision; delivered items are closed
   (`items.csv`);
-- no member idle > 10 min with `wait_reason = none` (`idle.csv`);
+- no member idle > 10 min with `wait_reason = none` (`idle.csv` lists
+  stretches from 5 min; the target counts those over 10);
 - heavy wait p95 under the configured dwell plus one tick while headroom
   existed (`heavy.csv` headroom columns);
 - zero lands against the wrong base, zero force-pushes after a refusal
   (`lands.csv`, member transcripts only if a refusal names one);
 - every preflight `blocks_launch` item notified a channel within a minute
   (`items.csv` `notified`);
-- orchestrator restarts only through the recipe, each with a build
-  annotation before bootout (`run.json.restarts`);
+- every orchestrator restart has a build check before bootout and an L7
+  intervention row; through the `ops.Justfile` recipe once it exists (a
+  logged hand restart while the recipe is absent passes; an unlogged one,
+  or one on a failed build, fails) (`run.json.restarts`,
+  `interventions.csv`);
 - leader interventions per function not higher than the previous run.
