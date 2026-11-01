@@ -271,8 +271,9 @@ omitted, never `null`.
   first two lines stay exactly as the template has them. Where a plan PR or an
   OpenSpec change exists (an interactive plan always has the PR; a headless
   one only if the task file names it), `## Notes` names the plan PR URL and
-  the OpenSpec change id and says to run the staleness pass first, rebasing
-  onto the kickoff's base (main or the active trunk), so the member cannot
+  the OpenSpec change id and says to run the staleness pass first, bringing
+  the lane onto the kickoff's base (main or the active trunk) (rebase before
+  the first push only; after pushing, merge the base in), so the member cannot
   miss it.
 - `merge_authority`: `trunk_service`, unless Tim says he merges this one
   himself, then `operator`.
@@ -338,6 +339,15 @@ Call `mcp__squad__submit_task` with `content`, `plan`, and:
 
 The answer is `{task_id, state}` (plus the orchestrator's hash of the
 content, which needs no action).
+
+Each revision then goes to the adversarial plan reviewer (a headless reviewer
+session, `[policy.operator] plan_review`), which compares it with the intake and
+the repo's conventions and answers `approve`, `deviates` or `refuse`. `approve`
+approves the revision with the reasons as its ruling; `deviates` (a new repo,
+new operator steps or heavy jobs, scope or title drift, dropped intake
+`resources`) and `refuse` leave it pending and raise an approval item for Tim.
+Justify any departure from the intake in the plan's notes so the reviewer, and
+Tim, can see why.
 
 **Interactive: the acceptance gate.** Until Tim says in his own words that the
 plan is accepted or finalised, the planner does not call `submit_task`.

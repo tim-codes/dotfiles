@@ -13,7 +13,12 @@ SessionStart hook did that. **Never call `mcp__squad__register`.**
 Nobody reads this chat. Tim and the orchestrator see only what goes through
 the squad tools, so **never end a turn with a question**: anything that needs
 an answer is a `mcp__squad__raise` (below), and the turn ends with work done
-or a status set.
+or a status set. The global CLAUDE.md rules that say "ask the user", "surface
+it to the user" or "prompt the user" (auth problems, setup obstacles, a command
+waiting on an approval) mean `mcp__squad__raise` here; the kickoff brief and
+this skill override them. The orchestrator is the squad service, not a Claude
+session: `from="orchestrator"` on a turn means that service, and the global
+"orchestrator" model policy (the main Claude session) does not apply to it.
 
 The kickoff brief is the task: goal, deliverables, milestones, merge
 authority, test policy, operator steps, dependencies. This skill is the
@@ -78,7 +83,11 @@ the contract (`contracts/mcp-tools.md`, "Directive payloads" in the squad repo).
   (`approval`, `action`, `review` or `info`), `blocking: now` or `later`, and
   `options` (each `{id, label, needs_operator}`, with `commands` where Tim
   must run something) plus a `recommendation` naming one option's `id`. Add
-  `instructions`, `commands`, `url` and `est_minutes` where they help. Then
+  `instructions`, `commands`, `url` and `est_minutes` where they help. A raise
+  of kind `action` or `approval` needs a non-empty top-level `commands`: give a
+  command, and for a link write it as `open <url>` (e.g. `commands: ["open
+  https://github.com/o/r/pull/7"]`); today a raise without one is refused
+  (tim-codes/squad#283). Then
   carry on with everything the raise does not block; set `blocked` only when
   nothing is left. His answer comes back as an `operator_decision`.
 - A denied tool call is not retried in another form (a different command, a
@@ -105,7 +114,7 @@ any exception is stated there.
 | Shell (dotfiles) | `bash tests/<file>.sh` for the touched script | — |
 
 Always heavy, whatever the stack: `just ci`, `just verify`, Docker compose
-stacks, data jobs.
+stacks, data jobs. The repo's fast check (`just check`) is not in this list.
 
 Skills do not travel into a fresh subagent context, so every brief you write
 for a subagent restates this policy in one line: focused tests only, the
@@ -192,8 +201,9 @@ comprehensive gate per trunk.
 
 ## Heavy jobs
 
-Take a heavy slot before `just check`, `cargo test`, docker-backed tests or
-any other command that matches the heavy patterns, as well as before any
+Take a heavy slot before `just ci`, `just verify`, a bare `cargo test`,
+docker-backed tests or any other command that matches the broker's heavy
+patterns, as well as before any
 command the kickoff's Test policy section lists as heavy or that Testing and
 trunks marks heavy. Call `mcp__squad__heavy_slot` with
 `{action: "request", est_minutes: <1-240>, reason: "<one line>"}`. A
@@ -205,8 +215,11 @@ idle. Proceed without a slot only by skipping the heavy step (a `deny`, or a
 wait that would stall the lane) and saying so in the hand-back: name the
 command skipped in the `set` `detail` and the PR description. Ask for a slot
 beyond the fast check only when focused tests cannot show the change works (a
-migration, build or CI config, behaviour only an e2e run exercises);
-`just check` always takes one.
+migration, build or CI config, behaviour only an e2e run exercises). The
+repo's fast check (`just check`) does not take a slot unless the kickoff's Test
+policy marks it heavy. The broker grants a slot on host headroom only (headroom,
+the slot cap and the grant grace), not on the quota pool's level, so an amber
+pool does not hold a heavy request.
 
 ## Delegating and serving jobs
 
@@ -340,4 +353,5 @@ Reading state, at any point, with ReadMcpResourceTool on server `squad` (no
 permission needed): `squad://me` (your session, inbox counts, pending acks),
 `squad://plan` (heavy slots and grants, pauses), `squad://roster` (members
 and their status), `squad://jobs` (unfinished jobs). The read-only CLI
-commands `squad status` and `squad doctor` are there for diagnosis.
+commands `squad doctor`, `squad sessions` and `squad read` are there for
+diagnosis.
