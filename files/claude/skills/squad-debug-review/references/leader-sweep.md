@@ -68,6 +68,18 @@ One `grep -c` per pattern per transcript, then read only the hits (the
 | `Figma`, `Boards`, `slack_send_message`, `notion`, Linear updates | L12 |
 | `Monitor`, `no action needed`, `monitor` scripts in the scratchpad | L13 (count turns, not polls) |
 | `verify.sh`, `format.sh`, `render`, `node --check` run by the leader | L3 |
+| `squad debug on`, `debug.on` | not an L row: capture readiness (review section 5), with the timestamp |
+
+## Targeted checks (ask 11)
+
+One check per class, each a single filtered read, reported in one to three
+lines with the pointer:
+
+| Class | Method |
+|---|---|
+| Wind-down before the land verdict | For each `lands.csv` row, compare its `finished_at` with the wind-down directive to the same member (`deliveries.csv`, `directive_kind` wind-down, or `events.jsonl.gz` `directive.*`); a wind-down earlier than `landed`/`refused` is a hit. Open the member transcript only to quote the turn |
+| Decided item, member never told | For each `items.csv` row with `source = raise` and a `resolved` time, look for an inbox row to its member within 5 min after (`deliveries.csv`); none, and the member's next idle stretch starts there, is a hit. Confirm in the member transcript that no decision text arrived |
+| Heavy grant followed by a Bash gate refusal | For each `heavy.csv` granted row, grep the member transcript between `granted_at` and `ended_at` for `heavy` together with `denied`, `refused`, `gate` or `grant`; a refusal of the command the grant was for is a hit (the 2026-10-31 t13 case, misread as polling) |
 
 ## Output
 

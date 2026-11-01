@@ -27,8 +27,18 @@ Bash calls; spell paths out each time.
 window bundle is `debug/window-<from>/bundle/`; older captures (the
 broker's `host.jsonl`/`quota.jsonl` sinks, an earlier `review.md`, the
 leader's `interventions.jsonl`) sit in the dated dir `debug/<YYYY-MM-DD>/`.
-When a window bundle covers a day that has a dated dir, read what is there
-and link an earlier `review.md` from yours; never overwrite it.
+When a window bundle covers a day that has a dated dir, read the sinks and
+the leader's file there; a `review.md` in it is read and linked **only if
+its mtime is before the window start**, otherwise it is probably this
+run's own hand review and leaks the conclusions. Never overwrite one.
+
+**Authority inputs.** The bundle's `repos.csv` (the `managed_repos`
+snapshot with `release_needs_approval`) and the leader's rulings memory,
+read-only: in the reserve context
+`~/.claude-reserve/projects/-Users-tim-claude/memory/tim-rulings-*.md` and
+`unattended-delegate-watch.md`, or whatever files the round's handover
+brief names. Every merge into a `release_needs_approval` repo and every
+leader workaround is judged against the ruling it cites.
 
 **Commands.** The `bundle` and `debug-runs` recipes live in the squad
 primary checkout `/Users/tim/dev/squad` once v0.5.10 is on `main`; run them
@@ -52,11 +62,12 @@ With a `[run]` argument, use it. Otherwise:
    label = run id + window, description = mode, events, interventions.
    Unattended (the brief names the run, or nobody will answer): take the
    newest run that has ended, and say so in the summary.
-3. The *previous run* is the next-older row, or, with no rows, the
-   next-older capture dir that holds a `review.md`. Its bundle gives the
-   trend columns; its `review.md` or issue gives the previous ranked list.
-   No previous bundle: say "no trend" in those sections rather than
-   recomputing one by hand.
+3. The *previous run* is the newest run row, capture dir or `review.md`
+   that ended **strictly before this window started**; never one from the
+   same date or window (that is this run's own hand review). Its bundle
+   gives the trend columns; its `review.md` or issue gives the previous
+   ranked list. No previous bundle: say "no trend" in those sections rather
+   than recomputing one by hand.
 
 ## 2. Produce the bundle
 
@@ -119,9 +130,14 @@ sweep** applies: it does when `interventions.csv` has few or no `explicit`
 or `leader-file` rows (every run before v0.5.10, or a leader that did not
 call `intervene`). Identify the leader session(s) as
 [references/leader-sweep.md](references/leader-sweep.md) says and put
-their ids, transcript paths and scratchpad dir in the brief.
+their ids, transcript paths and scratchpad dir in the brief. Read
+`repos.csv` and the rulings memory now and list, for the brief, the
+`release_needs_approval` repos and the ruling ids that sanction a
+workaround or a merge (e.g. a "for today" merge-runner ruling).
 
-Then build **what shipped since**:
+Then build **what shipped since** (when the previous run ran a different
+major version, list only the previous ranked list's status and skip the PR
+sweep):
 
 - The previous ranked list: issues labelled `debug-review:<previous run>`
   when that label exists; otherwise `debug/<previous run>/review.md`
@@ -157,12 +173,16 @@ self-contained and carries:
   `find /`. Two fixed-pattern sweeps are the exceptions: asks 1 and 8 may
   grep the member transcripts once (`Touch ID`, `waiting for you`,
   browser-login steps, `invalid_input`, "what does this message mean") and
-  read only the hits; ask 10 is the leader sweep. The bundle's zeros are
-  not trusted: before reporting a `0`, `n/a` or "not recorded" for
-  restarts, undelivered messages, mid-turn share, headroom or wrong-base
-  lands, cross-check `events.jsonl.gz` and `errors.jsonl` and say which
-  won. No secrets or tokens in the report.
-- The ask, **findings only, at most 120 lines**, each with an evidence
+  read only the hits; ask 10 is the leader sweep; ask 11 is three targeted
+  checks. The bundle's zeros are not trusted: before reporting a `0`,
+  `n/a`, "not recorded" or "capture was off" for restarts, closed
+  sessions, tunnel loss, build failures, undelivered messages, mid-turn
+  share, headroom or wrong-base lands, read `logs.md` (notable operational
+  log lines) and `run.json`'s capture facts, then cross-check
+  `events.jsonl.gz` and `errors.jsonl`, and say which won. No secrets or
+  tokens in the report.
+- The ask, **findings only, at most 140 lines** (ask 9 and 10 only when
+  their condition holds), each with an evidence
   pointer (`bundle/<file>:<line>`, a `decisions.jsonl` id, or a transcript
   path plus record `uuid` and timestamp). Sort every incident into one of
   **worked**, **noise**, **missed or late**, **wrong or slow**, and report:
@@ -201,9 +221,14 @@ self-contained and carries:
       sweep of the named leader transcript(s) and scratchpad from
       `references/leader-sweep.md`, reported as a table of counts per
       L1–L13 with one pointer each plus the refusal list, **at most 30
-      lines** of the 120.
+      lines** of the 140.
+  11. Three incident classes the bundle cannot flag, one targeted
+      transcript check each (method in `references/leader-sweep.md`,
+      "Targeted checks"): a wind-down sent before the land reached
+      `landed`; an item decided whose member was never told; a heavy grant
+      followed by a Bash gate refusal.
 
-Do not redo its reading. More than 120 lines, or findings without evidence:
+Do not redo its reading. More than 140 lines, or findings without evidence:
 send it back once with `SendMessage`.
 
 ## 5. Write `review.md`
@@ -222,9 +247,14 @@ say so. Section-to-column map and the carried-over pass/fail targets in
    merged without Tim's decision); anything touching h2gc prod (the spec's
    approval-required and operator-only stacks); a secret leaked into
    events, a bundle, a log or a PR; a classifier or permission refusal
-   routed around. A wrong-base land, a bad restart or an outage is a
-   failure mode (section 7 or 9), not an anti-goal, unless it bypassed
-   authority.
+   routed around **without a ruling**. Judge each candidate against the
+   authority inputs: a workaround Tim explicitly sanctioned (a dated
+   ruling such as a "for today" merge-runner) is a leader function to
+   retire (section 4), not a breach; a merge into a
+   `release_needs_approval` repo is a breach only if no ruling covers it,
+   otherwise it is flagged for Tim with the ruling id. A wrong-base land,
+   a bad restart or an outage is a failure mode (section 7 or 9), not an
+   anti-goal, unless it bypassed authority.
 2. **What shipped since**: the three groups from section 3; each item of
    the previous ranked list shipped / live / merged-not-live / open.
 3. **HITL interruptions**: counts and waits per source, clusters with
@@ -233,16 +263,19 @@ say so. Section-to-column map and the carried-over pass/fail targets in
 4. **Leader interventions**: a table L1–L13 with this run's count
    (`explicit` + `inferred` + `leader-file`), the previous run's count
    (`summary.md` already computes both from the previous bundle), the
-   trend arrow, and the issue that retires the function (table in the
-   `squad-leader` skill's references); `inferred-unlabelled` rows in a
+   trend arrow, and the issue that retires the function (table in
+   `../squad-leader/references/leader-functions.md` beside this skill's
+   directory); `inferred-unlabelled` rows in a
    separate line, outside the trend; when the leader sweep ran, its counts
    as a `transcript-sweep` line, with the functions that rest on it alone
    named. Then each refusal met and how it was handled; a routed-around
    refusal is a finding under wrong rulings.
 5. **Capture readiness**: was the run recorded by the orchestrator (a
    `runs` row with the right mode) or only by the broker sinks; who switched
-   it on and when; bundle files missing or empty; `transcript_exists` false
-   counts; broker version versus merged-not-live changes.
+   it on and when (`run.json` capture facts, `logs.md`, the leader sweep's
+   `squad debug on` hits: "nobody switched it on" needs all three empty);
+   bundle files missing or empty; `transcript_exists` false counts; broker
+   version versus merged-not-live changes.
 6. **Delivery, idle, heavy, lands, quota and host**: the numbers from items
    3 to 6 above, each with its previous-run value.
 7. **Round changes: efficacy**: one row per change merged since the previous

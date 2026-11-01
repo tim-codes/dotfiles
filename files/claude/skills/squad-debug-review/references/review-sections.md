@@ -9,7 +9,8 @@ means the same file in the previous run's bundle.
 | 2 What shipped since | issues labelled `debug-review:<prev run>`; CHANGELOG sections between `run.json.versions` of the two runs; Rollout lines for merged-not-live broker parts | the previous ranked list |
 | 3 HITL | `items.csv`: `source`, `kind`, `blocking`, `preflight_class`, `raised`, `presented`, `first_notified`, `notified_n`, `notified` (channels), `notify_skipped`, `decided_by`, `decision`, `resolved`, `wait_min`, `foreseeable`; `invalid_input` raise refusals in `decisions.jsonl`; `timeline.md` for what Tim did | count, p50/p95 per source |
 | 4 Leader interventions | `interventions.csv`: `ts`, `source` (`explicit`, `inferred`, `inferred-unlabelled`, `leader-file`), `function`, `action`, `reason`, `ruling`, `outcome`, `item_id`, `task_id`, `member`, `pr`, `command`, `actor`, `event_type`, `event_id`. The file log is already merged; `inferred-unlabelled` is outside the trend | count per L-function, trend arrow (`summary.md` computes it against the previous bundle) |
-| 5 Capture readiness | `run.json` (`mode`, `started_by`, `started_at` versus the first event); files missing or empty; `sessions.csv` `transcript_exists`; `run.json.versions.broker` versus CHANGELOG Rollout | none |
+| 5 Capture readiness | `run.json` (`mode`, `started_by`, `started_at` versus the first event, capture facts); `logs.md` (restarts, closing sessions, tunnel loss, build failures); leader-sweep `squad debug on` hits; files missing or empty; `sessions.csv` `transcript_exists`; `run.json.versions.broker` versus CHANGELOG Rollout | none |
+| Authority (sections 1, 4, 9) | `repos.csv` (`managed_repos` snapshot: repo, trunk policy, `release_needs_approval`); the rulings memory files; `gh pr view --json baseRefName,mergedBy` per landed PR | none |
 | 6 Delivery | `deliveries.csv` `queue_s`, `wait_s`, `total_s`, `ack_s`, `mid_turn`, `via`, `undelivered_closed`; `latency.md` p50/p95/max per kind and member, mid-turn share, directives never acked | p50/p95/max |
 | 6 Idle | `idle.csv`: stretches of 5 min or more, `idle_s`, `ended_by`, `wait_reason` (heavy, item, land, watch, none), `wait_detail` | member-minutes idle with no reason |
 | 6 Heavy | `heavy.csv`: `waited_s`, `held_s`, `revoked_cause`, `headroom_at_request`, `headroom_at_grant`, `slots_at_grant`, `calm_s_at_grant`, `forced` | p50/p95 wait |
@@ -54,4 +55,15 @@ Bundle values to verify before citing (wrong, not merely unknown, on the
 `orchestrator.started`/`broker.connected` in `events.jsonl.gz` and
 `errors.jsonl`), `mid_turn` "not recorded" (derive from `via` and the
 session state), `heavy.csv` `headroom_at_*` empty (the `decisions.jsonl`
-triggers hold the numbers), and any wrong-base count (`gh pr view`).
+triggers hold the numbers), any wrong-base count (`gh pr view`; the
+summary's expected base is wrong for repos outside the squad), `idle.csv`
+`wait_reason = none` during an admission pause or a heavy wait (check
+`heavy.csv` and `decisions.jsonl` for the stretch), `watches.csv` blank
+`polls` for `github_run`, and `items.csv` `notified` "unknown" for raises
+that `operator.notified` shows were notified.
+
+Incident classes the bundle cannot flag at all (investigator ask 11, one
+targeted transcript check each): a wind-down before the land verdict, a
+decided item whose member was never told, a heavy grant followed by a Bash
+gate refusal. Facts only in service logs (`logs.md`): sessions closed by a
+restart, `lost` exits, live sessions at bootout, tunnel loss.
