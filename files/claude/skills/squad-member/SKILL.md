@@ -245,7 +245,7 @@ pool does not hold a heavy request.
 
 ## Watches
 
-When you wait on something external (a PR's review or CI, a workflow run, a
+When you wait on something external (a PR, a workflow run, a
 mailbox, a Slack or Teams thread, a Linear project), call
 `mcp__squad__watch` with its `kind` (`github_pr`, `github_run`, `mailbox`,
 `slack_channel`, `slack_thread`, `slack_dm`, `teams_chat`,
@@ -253,6 +253,13 @@ mailbox, a Slack or Teams thread, a Linear project), call
 `reason`, then end the turn: a `watch_hit` turn wakes you. Call
 `mcp__squad__unwatch` with the `watch_id` once you no longer need it. Never
 poll in a loop or sleep waiting.
+
+A plain `github_pr` watch hits only on a state change (merged or closed). To
+wait for CI, watch with `filter: {checks: true}`: the hit's `to` is
+`checks_green` or `checks_red` (the PR still open), and red is reported once
+every required check has settled. One hit ends the watch, so re-watch after
+pushing a fix. A `github_run` watch is polled and hits when the run completes,
+with `to` set to its conclusion.
 
 When blocked on a dependency whose PR is not yet merged, `watch` that PR
 (`github_pr`, target the PR URL) rather than raising an item, `set`
