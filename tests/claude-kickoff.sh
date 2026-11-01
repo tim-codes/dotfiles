@@ -289,9 +289,9 @@ has "before_launch: a key with a space, ignored" && ok "'before launch' (with a 
 sed 's|^model: .*|&\nbefore-launch: pull first|' "$T/nokeys.md" >"$T/hyph.md"
 kick "$T/hyph.md" --dry-run
 check "before-launch (hyphen) is read" has "before_launch: pull first"
-sed 's|^model: .*|&\nenv-pass: SQUAD_MERGE_AUTHORITY\nrole: orchestrator\ncapabilities: tmux, gh|' "$T/fixture.md" >"$T/keys.md"
+sed 's|^model: .*|&\nenv-pass: SQUAD_TEST_ENV_PASS\nrole: orchestrator\ncapabilities: tmux, gh|' "$T/fixture.md" >"$T/keys.md"
 kick "$T/keys.md" --dry-run
-check "env-pass is echoed as env_pass" has "env_pass: SQUAD_MERGE_AUTHORITY"
+check "env-pass is echoed as env_pass" has "env_pass: SQUAD_TEST_ENV_PASS"
 check "role orchestrator defaults lifetime to run" bash -c 'printf "%s\n" "$1" | grep -qx "role: orchestrator" && printf "%s\n" "$1" | grep -qx "lifetime: run"' _ "$out"
 check "capabilities are echoed" has "capabilities: tmux, gh"
 sed 's|^model: .*|&\nlifetime: task\nrole: infra|' "$T/fixture.md" >"$T/life.md"
