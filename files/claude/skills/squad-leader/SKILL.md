@@ -38,7 +38,7 @@ Run through all six with Tim still present; the output is one message.
    will use it (`claude mcp list` per context shows `Needs authentication`).
    A sign-in discovered after Tim leaves is a 9-hour block.
 3. **Capture readiness.** `squad debug on --run <run>` and then confirm the
-   orchestrator recorded it: tRPC `runs.live` returns the run with `mode:
+   orchestrator recorded it: tRPC `runs.current` returns the run with `mode:
    debug`. That is the only check until the attended rebuild (lane R);
    after it, `squad debug on` also prints `orchestrator: recording` and
    `squad doctor` shows the debug row. A file under
@@ -112,13 +112,22 @@ ruling id or `managed_repos` row when authority is the point), `outcome`
 script is tRPC `operator.intervene` (procedures.md). On an orchestrator
 older than v0.5.10, append one JSON line of the same fields to
 `~/.local/state/squad/debug/<run>/interventions.jsonl` (shape in
-procedures.md); the bundle ingests it.
+procedures.md); the bundle merges it into `interventions.csv`.
 
 Sign in to the orchestrator **with the label** `leader`
 (`/auth/local?label=leader`, or a pairing with `{"label":"leader"}`;
 procedures.md) so every tRPC mutation you make is recorded as actor
 `gui:leader` even when you forget the call; an unlabelled sign-in is
-indistinguishable from Tim.
+indistinguishable from Tim. Inbox notes are the exception: `inbox.send`
+records sender `operator` with no label, so after each note that unblocks
+work, call `intervene` with `function: "L5"` and the member (or the inbox
+id in `action`), or the note counts as "the leader or Tim" and drops out
+of the trend.
+
+Never put a secret, token, cookie or key in any `intervene` field
+(`action`, `reason`, `command`, …): the record is stored in `events` and
+exported in every review bundle. Name the item or the 1Password reference
+instead.
 
 **Operator steps you deliver yourself** (a Figma deck, a Boards publish, a
 sign-in, a render) are decided and closed in the same breath:

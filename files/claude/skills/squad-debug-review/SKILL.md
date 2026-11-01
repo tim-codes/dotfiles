@@ -28,9 +28,11 @@ With a `[run]` argument, use it. Otherwise:
 
 1. `squad debug list` (one row per `runs` row: id, mode, window, events,
    decisions, interventions, bundle present). Until the attended rebuild
-   ships that CLI, read the orchestrator's `runs.live` / `runs.list` through
-   tRPC (cookie from `GET http://127.0.0.1:7790/auth/local`, local only) and
-   `ls -t ~/.local/state/squad/debug/`.
+   ships that CLI, the same rows come from
+   `just -f /Users/tim/dev/squad/orchestrator/Justfile debug-runs [limit]`
+   (loopback `GET /debug/runs`), or tRPC `runs.list` / `runs.current` (cookie
+   from `GET http://127.0.0.1:7790/auth/local`, local only). A run before
+   the `runs` table has no row: it is bundled from a window (section 2).
 2. Attended: ask with `AskUserQuestion`, newest first, at most 4 options,
    label = run id + window, description = mode, events, interventions.
    Unattended (the brief names the run, or nobody will answer): take the
@@ -42,11 +44,15 @@ With a `[run]` argument, use it. Otherwise:
 ## 2. Produce the bundle
 
 ```bash
-squad debug bundle <run>                                          # after the attended rebuild
-just -f /Users/tim/dev/squad/orchestrator/Justfile bundle <run>   # today; same files
+squad debug bundle <run>                                             # after the attended rebuild
+just -f /Users/tim/dev/squad/orchestrator/Justfile bundle <run>      # today; same files
+just -f /Users/tim/dev/squad/orchestrator/Justfile bundle '' <from> <until>   # a run before the runs table: ISO 8601 window, named window-<from>
 ls ~/.local/state/squad/debug/<run>/bundle/
 ```
 
+The recipe (`bundle [run] [from] [until] [out]`) asks the running
+orchestrator (loopback `POST /debug/bundle`) and, when it is down or
+predates the route, runs the bundler itself; no broker rebuild is needed.
 Expected files: `run.json`, `summary.md`, `timeline.md`/`.jsonl`,
 `tasks.csv`, `deliveries.csv` + `latency.md`, `idle.csv`, `heavy.csv`,
 `lands.csv`, `items.csv`, `interventions.csv`, `quota.md`, `host.md`,
@@ -54,13 +60,16 @@ Expected files: `run.json`, `summary.md`, `timeline.md`/`.jsonl`,
 `decisions.jsonl`, `events.jsonl.gz`. A missing file is a capture-readiness
 finding (section 5), not a reason to stop.
 
-Also read, if present, the leader's pre-v0.5.10 intervention log
-`~/.local/state/squad/debug/<run>/interventions.jsonl` (shape in the
-`squad-leader` skill); merge it with `interventions.csv` and label the rows
-`leader-file`.
+`interventions.csv` is already complete: the bundler merges
+`leader.intervention` events (`source` = `explicit`), `gui:leader`
+mutations (`inferred`), unlabelled `gui` mutations and operator inbox notes
+(`inferred-unlabelled`: the leader or Tim, indistinguishable) and the
+leader's `<run>/interventions.jsonl` (`leader-file`). Never merge that file
+again, it double counts. `inferred-unlabelled` rows are reported but left
+out of the L1–L13 trend.
 
-**Fallback: no bundle can be produced** (orchestrator down, recipe absent,
-run predates v0.5.10). Query Postgres read-only through
+**Fallback: no bundle can be produced** (the recipe itself fails: no
+orchestrator checkout, Postgres down). Query Postgres read-only through
 `just -f /Users/tim/dev/squad/deploy/Justfile psql` over `events`,
 `decisions`, `operator_items`, `inbox`, `trunk_lands`, `heavy_requests`,
 `session_usage`, `sessions` with the window from `runs` (or, before `runs`
@@ -112,10 +121,11 @@ self-contained and carries:
      (`operator.notify_skipped`), raise refusals (`invalid_input`), and any
      unqueued prompt in a member transcript (`Touch ID`, browser login,
      permission prompt).
-  2. Leader interventions (`interventions.csv` plus the file log): count per
-     function L1–L13, each refusal the leader met and what it did
-     (`outcome`: done, parked, handed_to_tim), any routed-around refusal
-     (a nested session, a re-run of a denied command: always an incident).
+  2. Leader interventions (`interventions.csv`): count per function L1–L13
+     and per `source` (`inferred-unlabelled` counted apart: the leader or
+     Tim), each refusal the leader met and what it did (`outcome`: done,
+     parked, handed_to_tim), any routed-around refusal (a nested session, a
+     re-run of a denied command: always an incident).
   3. Idle stretches (`idle.csv`) over 10 min with their wait reason or none;
      heavy waits (`heavy.csv` `waited_s`) p50/p95 and the top members.
   4. Lands (`lands.csv`): landed, refused by `reason_code`, review time,
@@ -153,9 +163,12 @@ say so. Section-to-column map and the carried-over pass/fail targets in
 3. **HITL interruptions**: counts and waits per source, clusters with
    foreseeability, notification gaps, raise friction, unqueued prompts, what
    Tim actually did and when.
-4. **Leader interventions**: a table L1–L13 with this run's count, the
-   previous run's count, the trend arrow, and the issue that retires the
-   function (table in the `squad-leader` skill's references). Then each
+4. **Leader interventions**: a table L1–L13 with this run's count
+   (`explicit` + `inferred` + `leader-file`), the previous run's count
+   (`summary.md` already computes both from the previous bundle), the
+   trend arrow, and the issue that retires the function (table in the
+   `squad-leader` skill's references); `inferred-unlabelled` rows in a
+   separate line, outside the trend. Then each
    refusal met and how it was handled; a routed-around refusal is a finding
    under wrong rulings.
 5. **Capture readiness**: was the run recorded by the orchestrator (a

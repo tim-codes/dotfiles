@@ -80,8 +80,9 @@ where actor like 'gui%' and ts between :from and :to group by 1 order by 2 desc;
 select count(*) from inbox where sender = 'operator' and created_at between :from and :to;
 ```
 
-Merge in the leader's file log
-`~/.local/state/squad/debug/<run>/interventions.jsonl` when it exists.
+In this fallback only (no bundle), add the leader's file log
+`~/.local/state/squad/debug/<run>/interventions.jsonl` as `leader-file`
+rows; the bundle does that itself, so never do it when a bundle exists.
 
 ## Idle stretches and wait reasons (review §6)
 

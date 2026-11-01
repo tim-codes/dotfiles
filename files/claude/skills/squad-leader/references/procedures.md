@@ -31,7 +31,8 @@ curl -sS -b "$JAR" -X POST http://127.0.0.1:7790/trpc/operator.intervene \
 Mutations the leader uses: `tasks.approve`, `tasks.markLanded`,
 `items.decide`, `inbox.send`
 (`{to: {member}, priority: 'now', kind: 'note', text}`), `sessions.resume`,
-`sessions.close`, `presence.set`, `repos.put`; from v0.5.10 `runs.live`,
+`sessions.close`, `presence.set`, `repos.put`; from v0.5.10 `runs.current`
+(a query; `runs.live` is the GUI subscription), `runs.list`,
 `ops.annotate`, `operator.intervene`; `repos.list` for `managed_repos`.
 Both `operator.intervene` and `mcp__squad__intervene` arrive with the
 v0.5.10 orchestrator restart (no broker rebuild); older builds use the
@@ -43,11 +44,11 @@ file log below.
 squad debug on --run <run>    # writes <state>/debug.on (src/cmd/debug.rs: --run is a flag)
 ```
 
-Then `runs.live` through tRPC: the run id with `mode: debug` and
+Then `runs.current` through tRPC: the run id with `mode: debug` and
 `started_at` is the proof, and until the attended rebuild (lane R) the
 only one. After the rebuild `squad debug on` also polls the orchestrator
 and prints `orchestrator: recording`, and `squad doctor` gains a debug row
-(run id, mode, recording). If `runs.live` shows the implicit `auto-<date>`
+(run id, mode, recording). If `runs.current` shows the implicit `auto-<date>`
 run or nothing, the orchestrator did not notice the switch: check it is the
 v0.5.10 build (`orchestrator.started` event, `squad doctor` version), and
 fix that before declaring the round started. An orchestrator older than
@@ -59,16 +60,18 @@ review runs on the Postgres fallback. The broker sinks (`host.jsonl`,
 
 Path: `~/.local/state/squad/debug/<run>/interventions.jsonl`, where `<run>`
 is the basename of `squad debug dir`. One JSON object per line, appended
-with `>>`; the bundle ingests it beside `interventions.csv` and labels the
-rows `leader-file`. Fields match the `leader.intervention` event:
+with `>>`; the bundle merges it into `interventions.csv` with `source`
+`leader-file` (the reviewer never merges it again). Fields match the
+`leader.intervention` event:
 
 ```json
 {"ts":"2026-11-02T10:12:00Z","function":"L2","action":"merged tim-codes/squad#277 (checkpoint)","reason":"trunk service does not land framework PRs; ruling 38","outcome":"done","pr":"tim-codes/squad#277","item_id":null,"task_id":null,"member":null,"command":null,"session_id":"<leader session id>","actor":"leader"}
 ```
 
 `ts` is UTC ISO-8601; `outcome` is `done`, `parked` or `handed_to_tim`;
-unused ids are `null`, not omitted. Never put a token, password or secret
-value in `action`, `reason` or `command`.
+unused ids are `null`, not omitted. Never put a token, cookie, password
+or secret value in `action`, `reason` or `command`: the line is exported
+in every review bundle.
 
 ## Restart and release the orchestrator [L7, L8]
 
@@ -102,7 +105,7 @@ recipe is absent rather than mistyped:
    "Input/output error 5" and left the job down).
 6. `launchctl bootstrap gui/501 ~/Library/LaunchAgents/<orchestrator label>.plist`.
 7. `squad doctor` exit 0; migrations applied at start; GUI answers on 7790;
-   `runs.live` still shows the debug run.
+   `runs.current` still shows the debug run.
 8. `sessions.resume` every session the restart ended (`lost`, or a member
    whose land was refused during the gap); send each a one-line note on
    what changed.
