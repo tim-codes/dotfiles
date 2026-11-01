@@ -32,8 +32,10 @@ either way):
   stretches from 5 min; the target counts those over 10);
 - heavy wait p95 under the configured dwell plus one tick while headroom
   existed (`heavy.csv` headroom columns);
-- zero lands against the wrong base, zero force-pushes after a refusal
-  (`lands.csv`, member transcripts only if a refusal names one);
+- zero lands against the wrong base (`gh pr view <n> -R <repo> --json
+  baseRefName,mergedBy` for every landed PR in `lands.csv`, against the
+  repo's trunk policy; `lands.csv` has no base column), zero force-pushes
+  after a refusal (member transcripts only if a refusal names one);
 - every preflight `blocks_launch` item notified a channel within a minute
   (`items.csv` `notified`);
 - every orchestrator restart has a build check before bootout and an L7
@@ -42,4 +44,14 @@ either way):
   or one on a failed build, fails) (`run.json.restarts`,
   `interventions.csv`);
 - leader interventions per function not higher than the previous run
-  (`explicit` + `inferred` + `leader-file`; `inferred-unlabelled` excluded).
+  (`explicit` + `inferred` + `leader-file`, plus `transcript-sweep` rows
+  when the sweep ran; `inferred-unlabelled` excluded).
+
+Bundle values to verify before citing (wrong, not merely unknown, on the
+2026-10-31 bundle; drop a line here once the bundler fixes it):
+`deliveries.csv`/`summary.md` undelivered-to-closed count (check inbox rows
+`queued` to sessions with `ended_at`), `run.json.restarts` (check
+`orchestrator.started`/`broker.connected` in `events.jsonl.gz` and
+`errors.jsonl`), `mid_turn` "not recorded" (derive from `via` and the
+session state), `heavy.csv` `headroom_at_*` empty (the `decisions.jsonl`
+triggers hold the numbers), and any wrong-base count (`gh pr view`).
