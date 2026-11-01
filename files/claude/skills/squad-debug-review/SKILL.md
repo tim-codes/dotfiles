@@ -90,8 +90,9 @@ Exactly **one** subagent, nothing else. Roster line before launching:
 with `Agent`, `subagent_type: investigator`, `model: sonnet`. The brief is
 self-contained and carries:
 
-- The absolute bundle dir, the window, the file list with what each holds
-  (section 2), and the terms paragraph above (leader versus orchestrator).
+- The absolute bundle dir, the window, the file descriptions (pass the
+  absolute path of this skill's `references/review-sections.md`, or inline
+  its table), and the terms paragraph above (leader versus orchestrator).
 - Mechanics: absolute paths; read-only; bundle first. Transcripts
   (`sessions.csv` column `transcript_path`, with `transcript_exists`) are
   opened only for an incident already cited from a bundle file, filtered

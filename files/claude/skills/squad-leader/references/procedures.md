@@ -11,20 +11,24 @@ The orchestrator listens on `http://127.0.0.1:7790`. Locally,
 `tasks.markLanded`, `items.decide`, `inbox.send`
 (`{to: {member}, priority: 'now', kind: 'note', text}`), `sessions.resume`,
 `sessions.close`, `presence.set`, `repos.put`; from v0.5.10 `runs.live`,
-`ops.annotate`, `operator.intervene`. Pair the GUI with
-`POST /auth/pair` (v0.5.10: `squad pair --as leader`, so the cookie maps to
-actor `gui:leader`); the minted URL is relative when `public_url` is unset,
-so prefix the tunnel origin yourself.
+`ops.annotate`, `operator.intervene`; `repos.list` for `managed_repos`.
+Pair the GUI with `POST /auth/pair`; the minted URL is relative when
+`public_url` is unset, so prefix the tunnel origin yourself. `squad pair
+--as leader` (cookie mapped to actor `gui:leader`) arrives with the
+attended rebuild once lane E defines the label; until then attribution
+comes from `intervene` calls only.
 
 ## Capture readiness check
 
 ```bash
-squad debug on <run>          # writes <state>/debug.on; v0.5.10 CLI also polls the orchestrator
-squad doctor                  # debug row: run id, mode, orchestrator recording
+squad debug on --run <run>    # writes <state>/debug.on (src/cmd/debug.rs: --run is a flag)
 ```
 
 Then `runs.live` through tRPC: the run id with `mode: debug` and
-`started_at` is the proof. If `runs.live` shows the implicit `auto-<date>`
+`started_at` is the proof, and until the attended rebuild (lane R) the
+only one. After the rebuild `squad debug on` also polls the orchestrator
+and prints `orchestrator: recording`, and `squad doctor` gains a debug row
+(run id, mode, recording). If `runs.live` shows the implicit `auto-<date>`
 run or nothing, the orchestrator did not notice the switch: check it is the
 v0.5.10 build (`orchestrator.started` event, `squad doctor` version), and
 fix that before declaring the round started. An orchestrator older than

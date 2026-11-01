@@ -37,12 +37,14 @@ Run through all six with Tim still present; the output is one message.
    WorkOS, gcloud ADC, phone pairing), get it done now, in the context that
    will use it (`claude mcp list` per context shows `Needs authentication`).
    A sign-in discovered after Tim leaves is a 9-hour block.
-3. **Capture readiness.** `squad debug on <run>` and then confirm the
-   orchestrator recorded it: `runs.live` returns the run with `mode:
-   debug`, `squad doctor` shows the debug row, `squad debug on` prints
-   `orchestrator: recording`. A file under `~/.local/state/squad/debug/` is
-   not evidence (2026-10-31: "73 lines across the broker, quota and host
-   files" was read as success; no decision was captured all day).
+3. **Capture readiness.** `squad debug on --run <run>` and then confirm the
+   orchestrator recorded it: tRPC `runs.live` returns the run with `mode:
+   debug`. That is the only check until the attended rebuild (lane R);
+   after it, `squad debug on` also prints `orchestrator: recording` and
+   `squad doctor` shows the debug row. A file under
+   `~/.local/state/squad/debug/` is not evidence (2026-10-31: "73 lines
+   across the broker, quota and host files" was read as success; no
+   decision was captured all day).
 4. **Broker version.** `squad doctor` broker version against the CHANGELOG
    Rollout lines: list every merged-not-live broker change. If the attended
    rebuild (#292) is due, ask for it now; never expect a broker fix to be
@@ -64,7 +66,7 @@ review to run on the Postgres fallback.
 ## Authority
 
 - **Merge scope** is `managed_repos.release_needs_approval` (read it with
-  tRPC `repos.live`): true only for h2gc-portal and h2gc-legacy, which Tim
+  tRPC `repos.list`): true only for h2gc-portal and h2gc-legacy, which Tim
   merges. Every other managed repo, production-stage or not, merges and
   deploys under the squad's authority (Tim, 2026-11-01). The global
   CLAUDE.md gate on production-stage Exxo repos is Tim's default for a
@@ -108,9 +110,19 @@ a ruling id or `managed_repos` row when authority is the point), `outcome`
 `task_id`, `member`, `pr`, `command` apply. Before the tool exists, append
 one JSON line of the same fields to
 `~/.local/state/squad/debug/<run>/interventions.jsonl` (shape in
-procedures.md); the bundle ingests it. Pair the GUI as leader
-(`squad pair --as leader`, or the label in the pairing URL) so your tRPC
-mutations are attributed to `gui:leader` even when you forget the call.
+procedures.md); the bundle ingests it. Once the attended rebuild ships
+`squad pair --as leader`, pair the GUI with it so your tRPC mutations are
+attributed to `gui:leader` even when you forget the call; until lane E
+defines that label, attribution comes from your `intervene` calls only.
+
+**Operator steps you deliver yourself** (a Figma deck, a Boards publish, a
+sign-in, a render) are decided and closed in the same breath:
+`items.decide` on the matching item with the delivered result, and the
+intervention record carries that `item_id`. Skipping this left pf-t16-r1-1
+open after its deck was built (tim-codes/squad#301). `blocks_step` items
+often outlive their task (sign-offs, the attended rebuild) and are never
+auto-closed when the task is done, so an item you did not decide stays
+open until Tim or you decide it.
 
 The per-function count is the round's KPI: the round summary and the
 `squad-debug-review` lane report it L1–L13 against the previous round, and
