@@ -46,11 +46,20 @@ With a `[run]` argument, use it. Otherwise:
 ```bash
 squad debug bundle <run>                                             # after the attended rebuild
 just -f /Users/tim/dev/squad/orchestrator/Justfile bundle <run>      # today; same files
-just -f /Users/tim/dev/squad/orchestrator/Justfile bundle '' <from> <until>   # a run before the runs table: ISO 8601 window, named window-<from>
+just -f /Users/tim/dev/squad/orchestrator/Justfile bundle '' 2026-10-31T05:00Z 2026-11-01T03:00Z   # window mode
 ls ~/.local/state/squad/debug/<run>/bundle/
 ```
 
-The recipe (`bundle [run] [from] [until] [out]`) asks the running
+**Window mode** is the first choice for a run that predates the `runs`
+table (anything before v0.5.10, such as 2026-10-31): `bundle '' <from>
+<until>` with ISO 8601 UTC bounds. The bundle id is `window-<from>` with
+the colons and milliseconds removed, so the example above writes
+`~/.local/state/squad/debug/window-2026-10-31T050000Z/bundle/`; use that
+id as `<run>` everywhere below. The route caps a window at 7 days; a
+larger one takes a fifth argument, `bundle '' <from> <until> '' large`,
+which bundles directly (`--allow-large`).
+
+The recipe (`bundle [run] [from] [until] [out] [large]`) asks the running
 orchestrator (loopback `POST /debug/bundle`) and, when it is down or
 predates the route, runs the bundler itself; no broker rebuild is needed.
 Expected files: `run.json`, `summary.md`, `timeline.md`/`.jsonl`,
@@ -65,11 +74,14 @@ finding (section 5), not a reason to stop.
 mutations (`inferred`), unlabelled `gui` mutations and operator inbox notes
 (`inferred-unlabelled`: the leader or Tim, indistinguishable) and the
 leader's `<run>/interventions.jsonl` (`leader-file`). Never merge that file
-again, it double counts. `inferred-unlabelled` rows are reported but left
-out of the L1–L13 trend.
+again, it double counts. Coverage tagging marks an inferred row that an
+explicit record already describes as `covered`, so the KPI counts each
+intervention once; `inferred-unlabelled` rows are reported but left out of
+the L1–L13 trend.
 
-**Fallback: no bundle can be produced** (the recipe itself fails: no
-orchestrator checkout, Postgres down). Query Postgres read-only through
+**Fallback: no bundle can be produced**, only when the bundler itself
+cannot run (no orchestrator checkout, Postgres down; a pre-v0.5.10 run is
+not a reason, window mode covers it). Query Postgres read-only through
 `just -f /Users/tim/dev/squad/deploy/Justfile psql` over `events`,
 `decisions`, `operator_items`, `inbox`, `trunk_lands`, `heavy_requests`,
 `session_usage`, `sessions` with the window from `runs` (or, before `runs`
