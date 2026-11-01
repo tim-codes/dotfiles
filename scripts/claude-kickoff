@@ -1,9 +1,10 @@
 #!/bin/bash
 # Launch a Claude Code session from a kickoff prompt file: read its frontmatter,
 # cd to the working directory, and exec claude in the right account context with
-# the stated model and effort. It is the ONLY launcher the squad herder calls
-# (docs/superpowers/specs/2026-10-25-squad-herder-design.md in tim-codes/squad,
-# section 4.3), so the interface and exit codes below are a stable contract.
+# the stated model and effort. It is the attended launcher for squad lanes (the
+# leader session starts "client" lanes in tmux with it; the v0.5 broker launches
+# its own members and never calls it), so the interface and exit codes below are a
+# stable contract.
 #
 #   claude-kickoff <prompt.md> [--account CONTEXT]
 #                              [--resume <session_id> --cwd <dir>] [--dry-run]
@@ -19,7 +20,7 @@
 # starts a session in $HOME or a context dir (redirected to ~/claude). That is
 # more robust than `fish -c`: no fish startup per launch, no second layer of
 # argument quoting around a multi-kilobyte prompt body, no dependence on fish
-# existing on the box, and exec replaces this process so the herder's pane runs
+# existing on the box, and exec replaces this process so the tmux pane runs
 # claude directly.
 #
 # The contexts come from data: ~/.config/claude-kickoff/contexts.toml
@@ -50,7 +51,7 @@
 #                    when the cwd is not trusted; the file is never modified
 #   --trust          record when missing (the default); of --trust and --no-trust the
 #                    last one given wins
-# --no-trust-check beats both. --dry-run never writes (the herder resolves with it
+# --no-trust-check beats both. --dry-run never writes (callers resolve with it
 # first, so it must stay side-effect free): it reports `trust: would-record <path>
 # in <context>` and exits 0 where a real launch would record, or refuses with exit 3
 # under --no-trust. --check-trust <cwd> is always the read-only check, for the
@@ -58,7 +59,7 @@
 set -uo pipefail
 
 CONTEXTS_FILE="${CLAUDE_KICKOFF_CONTEXTS:-$HOME/.config/claude-kickoff/contexts.toml}"
-ROLES="client herder concierge orchestrator infra liaison"
+ROLES="client orchestrator infra"
 # Env the wrapper unsets for every context except exxo-openrouter, whose overlay
 # routes through OpenRouter; any other context must never inherit it.
 OPENROUTER_ENV="ANTHROPIC_BASE_URL ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_SONNET_MODEL ANTHROPIC_DEFAULT_HAIKU_MODEL ANTHROPIC_DEFAULT_FABLE_MODEL CLAUDE_CODE_SUBAGENT_MODEL"
@@ -74,7 +75,8 @@ Usage: claude-kickoff <prompt.md> [--account CONTEXT]
 Reads the frontmatter of <prompt.md>, changes to its cwd and execs claude in the
 matching account context with --model and --effort from the file. A new session
 gets the prompt body as its single positional argument; --resume continues an
-existing session instead and passes no body.
+existing session instead (attended, e.g. to move it to another account) and passes
+no body.
 
 Prompt file format: key: value lines, ended by the first line that is exactly
 `---`; the body is everything after it. A leading `---` line (conventional YAML
@@ -87,14 +89,14 @@ effort is used):
   context  a context `name` in the contexts file (a trailing comment is ignored)
   model    passed as --model
   effort   passed as --effort
-  Optional keys, all echoed by --dry-run (the herder's only source of launch facts):
+  Optional keys, all echoed by --dry-run:
   harness  must equal the context's harness (default claude-code; else exit 5)
-  role     client (default) | herder | concierge | orchestrator | infra | liaison
+  role     client (default) | orchestrator | infra
   lifetime run | task; the default is task for a client, else run
   needs    comma or space separated; each one the file lists in `account_bound` must
            be in the context's `provides` (exit 9); other words are ignored with a
            warning. Only this key is read, never the `join:` line.
-  capabilities, env-pass   comma lists, passed through to --dry-run for the herder
+  capabilities, env-pass   comma lists, echoed by --dry-run (informational)
   add_dirs        comma or space separated paths (~ expanded), each passed as
                   --add-dir so the session may use them outside its cwd; each must
                   exist (else exit 3); a path cannot contain spaces
@@ -136,7 +138,7 @@ Options:
                   skip the member deny overlay. By default every launch passes
                   `--settings <repo>/files/claude/settings.member-deny.json`, which
                   denies raw `gh pr merge` (and `gh api ... merge`) for the session,
-                  so members merge only through squad-pr-merge. Use it for an
+                  so members land only through mcp__squad__land. Use it for an
                   attended launch. --dry-run prints `member_deny: <path>` and
                   `member_deny_rules: <rules>`, or `member_deny: off`.
   --check-trust DIR
@@ -370,7 +372,7 @@ before_launch_raw=$(fm_get before-launch)
 
 # On resume the member's live cwd (--cwd) replaces the frontmatter one: the file
 # was written for the original launch and may point at a directory that no longer
-# exists. The account must also come from the herder, not the file.
+# exists. The account must also come from the caller, not the file.
 if [ -n "$resume" ]; then
     [ -n "$account" ] || die 2 "--resume needs --account (the relaunch note names the target context)"
     [ -n "$resume_cwd" ] || die 2 "--resume needs --cwd <dir> (the member's live working directory; the frontmatter cwd is not trusted)"

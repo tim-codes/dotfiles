@@ -6,7 +6,7 @@
 # launches and no live .claude.json is read. Cases: trusted path -> 0, untrusted -> 3,
 # path absent from `projects` -> 3, invalid JSON or no file -> 2, a symlinked path
 # resolves to its real path, --no-trust refuses a launch (exit 3, stub never run),
-# --no-trust-check skips everything, and a refusal under --dry-run too (the herder's
+# --no-trust-check skips everything, and a refusal under --dry-run too (the caller's
 # view). Seeding: a fresh dir gets its entry, a merge keeps every other key and
 # project, an already-trusted cwd is `trust: ok` with no backup, invalid JSON is exit
 # 2 with the file untouched, a dry run only says `would-record`, a missing file is
@@ -117,7 +117,7 @@ out=$(CLAUDE_KICKOFF_NO_TRUST_CHECK=1 HOME="$FAKE" PATH="$BIN:/usr/bin:/bin:/usr
 yes_if "launch: CLAUDE_KICKOFF_NO_TRUST_CHECK=1 skips it (exit $rc)" test "$rc" -eq 0 -a -e "$STARTED"
 expect "launch: --no-trust and no trust file is exit 2" 2 - "missing or unreadable" "$T/k.md" --account exxo-openrouter "${NT[@]}"
 
-# --dry-run is the herder's view: --no-trust refuses it, and nothing launches
+# --dry-run is the read-only view: --no-trust refuses it, and nothing launches
 expect "dry-run: --no-trust refuses an untrusted cwd" 3 - "trust: missing $W/untrusted in exxo-personal" "$T/k-untrusted.md" --dry-run "${NT[@]}"
 expect "dry-run: trusted cwd reports trust: ok" 0 "trust: ok $W/trusted in exxo-personal" - "$T/k.md" --dry-run
 expect "dry-run: --no-trust-check reports skipped" 0 "trust: skipped" - "$T/k-untrusted.md" --dry-run --no-trust-check

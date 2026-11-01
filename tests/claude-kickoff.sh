@@ -289,19 +289,18 @@ has "before_launch: a key with a space, ignored" && ok "'before launch' (with a 
 sed 's|^model: .*|&\nbefore-launch: pull first|' "$T/nokeys.md" >"$T/hyph.md"
 kick "$T/hyph.md" --dry-run
 check "before-launch (hyphen) is read" has "before_launch: pull first"
-sed 's|^model: .*|&\nenv-pass: SQUAD_MERGE_AUTHORITY\nrole: herder\ncapabilities: tmux, gh|' "$T/fixture.md" >"$T/keys.md"
+sed 's|^model: .*|&\nenv-pass: SQUAD_MERGE_AUTHORITY\nrole: orchestrator\ncapabilities: tmux, gh|' "$T/fixture.md" >"$T/keys.md"
 kick "$T/keys.md" --dry-run
 check "env-pass is echoed as env_pass" has "env_pass: SQUAD_MERGE_AUTHORITY"
-check "role herder defaults lifetime to run" bash -c 'printf "%s\n" "$1" | grep -qx "role: herder" && printf "%s\n" "$1" | grep -qx "lifetime: run"' _ "$out"
+check "role orchestrator defaults lifetime to run" bash -c 'printf "%s\n" "$1" | grep -qx "role: orchestrator" && printf "%s\n" "$1" | grep -qx "lifetime: run"' _ "$out"
 check "capabilities are echoed" has "capabilities: tmux, gh"
 sed 's|^model: .*|&\nlifetime: task\nrole: infra|' "$T/fixture.md" >"$T/life.md"
 kick "$T/life.md" --dry-run
 check "an explicit lifetime wins over the role default" has "lifetime: task"
 sed 's|^model: .*|&\nrole: boss|' "$T/fixture.md" >"$T/badrole.md"
 expect_rc "an unknown role is exit 5" 5 "$T/badrole.md" --dry-run
-sed 's|^model: .*|&\nrole: liaison\ncapabilities: comms|' "$T/fixture.md" >"$T/liaison.md"
-kick "$T/liaison.md" --dry-run
-check "role liaison is accepted, lifetime run" bash -c 'printf "%s\n" "$1" | grep -qx "role: liaison" && printf "%s\n" "$1" | grep -qx "lifetime: run"' _ "$out"
+sed 's|^model: .*|&\nrole: herder|' "$T/fixture.md" >"$T/herder.md"
+expect_rc "the retired v0.4 role herder is exit 5" 5 "$T/herder.md" --dry-run
 # add_dirs: passed in order as --add-dir, shown in --dry-run, must exist
 mkdir -p "$FAKE/briefs" "$FAKE/reports"
 sed 's|^model: .*|&\nadd_dirs: ~/briefs, '"$FAKE"'/reports|' "$T/fixture.md" >"$T/adddirs.md"

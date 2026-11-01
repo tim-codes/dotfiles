@@ -17,19 +17,15 @@ before-launch: none
 Kickoff prompt template. Copy to ~/claude/prompts/<yymmdd>/<NN>-<member>.md,
 fill it in and delete every comment. Launch with
 `claude-kickoff <that file>` (add `--account` to override the context, and
-`--dry-run` to see what it would do first); the squad herder calls the same
-launcher, never a hand-built `claude` line. To continue an existing session in
-another context, the herder calls `claude-kickoff <file> --resume <session-id>
---account <context> --cwd <the member's live directory>`: the frontmatter cwd is
-ignored, the account-bound and precondition checks run as for a launch, and the
-session restarts with a fixed relaunch note (the SessionStart hook rebinds it;
-follow /squad-member); `--dry-run` also prints `resume: <id>` and the context's
-`resume_group`.
+`--dry-run` to see what it would do first), never a hand-built `claude` line.
+This is the attended launcher (the leader starts client lanes in tmux with it);
+the squad broker launches its own members from the plan's `kickoff_brief`
+(squad-planner/kickoff-template.md) and does not read this file.
 
 FRONTMATTER (key: value lines, ended by the first line that is exactly `---`;
 the body is everything after it). claude-kickoff reads the first four keys and the optional
 launch keys below (harness to before-launch, add_dirs); `join`, `launch`, `base`, `depends` and
-`tickets` are for the humans and the orchestrator, and are ignored by it.
+`tickets` are notes for the humans, and are ignored by it.
 Values may run long. A comment after `context` is fine: only its first word counts.
 
   cwd           working directory: ~/dev/..., an absolute path, or the bare name of one
@@ -43,15 +39,9 @@ Values may run long. A comment after `context` is fine: only its first word coun
                 contexts file lists in `account_bound` (m365, figma, notion, agent-run,
                 datadog, boards) must be provided by the context; an unmet one exits 9
   harness       optional, default claude-code; must equal the context's harness (else exit 5)
-  role          optional: client (default) | herder | concierge | orchestrator | infra | liaison;
-                the herder reads it from --dry-run to order launches
-  lifetime      optional: run | task; default task for a client, else run. `run` members
-                stay up for the whole run (managers, liaison, dashboard)
-  harness       optional, default claude-code (listed again for completeness)
-  needs         the account_bound connectors the context must provide (see above)
-  capabilities  optional comma list (e.g. comms), passed to the herder via --dry-run
-  env-pass      optional comma list of variable names the herder forwards from its
-                environment (names only, never values)
+  role          optional: client (default) | infra; echoed by --dry-run
+  lifetime      optional: run | task; default task for a client, else run. Echoed by
+                --dry-run
   add_dirs      optional comma or space separated paths (~ expanded), each passed as
                 `--add-dir`, so the member can read and write brief and report files outside
                 its cwd without prompts; each must exist (else exit 3)
@@ -64,9 +54,7 @@ Values may run long. A comment after `context` is fine: only its first word coun
   before-launch ONLY human steps that must happen first (a consent, a merge, a device
                 code); `none` if there are none (`before launch` with a space reads
                 the same). Repo commands such as `git pull --ff-only` are NOT listed
-                here: they are the member's own first step, in the body. The herder
-                never runs commands in a member's repo, and `squad herd launch` exits 10
-                unless the orchestrator says Tim has cleared the listed steps.
+                here: they are the member's own first step, in the body.
 -->
 
 <!--
@@ -105,15 +93,15 @@ Auth seam: <who owns what>.
 2. <Next step, with the ticket key, the acceptance check and what to report back.>
 3. <Production or irreversible steps: quote Tim's words granting the authority, and the
    evidence required before using it.>
-4. <Closing step: written review or report, tickets updated, `squad set --status done`.>
+4. <Closing step: written review or report, tickets updated, `mcp__squad__set` with status `done` and the PR URL.>
 
 Authority (Tim's words): "<merge authority, verbatim>"; "<credential authority, verbatim>".
 
 Operator items to raise up front: <consents, DNS, device codes, admin panels, each with
 command or URL and the step it unblocks>.
 
-Testing: squad batched testing applies. Run only focused tests for the code you changed, plus the repo's fast check (`just check` or equivalent) once before `pr_ready`; do not run the full suite, `just ci` / `just verify` or a production build without a test slot. The orchestrator runs the comprehensive gate per trunk. Open your PR against the open trunk named in the plan gauge, admit it on the orchestrator's `admit` directive with `squad-pr-merge <n> --repo <owner/name> --into-trunk` (never `gh pr merge` directly), and say in the report that testing was focused. (Delete this line if batched testing does not apply to this stream.)
+Testing: squad batched testing applies. Run only focused tests for the code you changed, plus the repo's fast check (`just check` or equivalent) once before landing; do not run the full suite, `just ci` / `just verify` or a production build without a heavy slot (`mcp__squad__heavy_slot`). The trunk service runs the comprehensive gate per trunk. Open your PR against the base named above and land it with `mcp__squad__land` (never `gh pr merge` directly), and say in the report that testing was focused. (Delete this line if batched testing does not apply to this stream.)
 
-Guardrails: <what the member must not do; evals kept minimal; heavy_slot before any
-browser or Lighthouse run; anything out of bounds>. Decisions you can make, make and
-record; route the rest to the orchestrator.
+Guardrails: <what the member must not do; evals kept minimal; `mcp__squad__heavy_slot`
+before any browser or Lighthouse run; anything out of bounds>. Decisions you can make,
+make and record; raise the rest with `mcp__squad__raise`.
