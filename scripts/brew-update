@@ -59,6 +59,9 @@ brewDeps=(
   ncdu
   fastfetch
   neovim
+  # keg-only, deliberately not linked: squad members get /opt/homebrew/opt/node@24/bin first
+  # on [broker] launch_path (src/.config/squad/config.toml, dotfiles#281); the default node is 26
+  "node@24"
   pandoc
   # pinned: h2gc-legacy requires 8.3. Must be linked AFTER composer, which pulls
   # in the unversioned php formula as a dependency and auto-links it on top.
