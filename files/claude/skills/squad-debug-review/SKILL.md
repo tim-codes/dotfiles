@@ -1,261 +1,210 @@
 ---
 name: squad-debug-review
-description: Review a squad debug-mode ensemble run — read the capture report and the orchestrator's decision log, have one investigator subagent comb the orchestrator and member transcripts, then write review.md with what worked, what was noise, missed or late reactions, wrong rulings and a ranked list of changes. Use the morning after a run started with `/squad-orchestrator --debug`, when Tim says "/squad-debug-review [date]", "review last night's squad run" or "what did the orchestrator get wrong".
-argument-hint: "[YYYY-MM-DD]"
+description: Use after an unattended squad v0.5 round, when Tim says "/squad-debug-review [run]", "review last night's squad run", "what did the leader have to do by hand" or "rank the changes from that run", or when a leader's round wrap-up launches the review lane. Reviews one run from its review bundle (or, when none can be produced, read-only Postgres) and writes review.md.
+argument-hint: "[run]"
 ---
 
 # Squad debug review
 
-Turns one run's debug capture (`~/.local/state/squad/debug/<run>/`) into a
-ranked list of improvements to the squad. Personal context only. Read-only
-against the capture; the one file you write is `review.md` beside it.
+Turns one squad v0.5 run into a ranked list of changes. Shared to every
+context. Read-only against the squad: the files you write are `review.md`
+beside the bundle and, when the brief asks, a copy in the squad repo on a
+branch with a PR.
 
-State dir: `D=~/.local/state/squad/debug`. Env vars do not persist between
-Bash calls: spell the paths out each time.
+**Terms.** The *orchestrator* is the v0.5 TypeScript service (policy, items,
+trunk service, tRPC). The *broker* is the Rust daemon. The *leader* is the
+temporary operator Claude session that keeps the squad moving by hand; it is
+not part of the squad design, and everything it did by hand is a capability
+the squad is missing. Never call the leader "the orchestrator".
 
-## 1. Pick the capture
+**Inputs.** The review bundle at
+`~/.local/state/squad/debug/<run>/bundle/` is the primary input. Transcripts
+are second: open one only for an incident the bundle already names. Env vars
+do not persist between Bash calls; spell paths out each time.
 
-A capture is filed under its run id, normally a date (`YYYY-MM-DD`, or
-`YYYY-MM-DD-2` for a second run that day), not under each process's start
-date. With a `[YYYY-MM-DD]` argument, use it as the run id (check `$D/<date>`
-exists; if not, say so and fall to the picker). While capture is still on,
-`squad debug dir` prints the current run's directory; use its basename.
-Otherwise:
+## 1. Pick the run
 
-1. `squad debug list --json` gives one row per run, newest first:
-   `{date, first, last, members, deliveries, pause_resume_pairs, errors}`.
-   Each row is one run; its `date` field is the run id.
-   Nothing listed: tell Tim there is no capture (was the orchestrator started
-   with `--debug`, or `squad debug on` run?) and stop.
-2. Ask with `AskUserQuestion`, one option per capture, newest first, at most
-   4. Label = date + time window (local, from `first`..`last`); description =
-   `<members> members, <deliveries> deliveries, <n> pause/resume pairs,
-   <errors> errors`. The tool adds "Other" itself: say in the question text
-   that Other takes an older date as `YYYY-MM-DD`.
-3. Use the chosen run id for everything below (`<date>`).
+With a `[run]` argument, use it. Otherwise:
 
-The 2026-10-25 test run predates run ids: it lives in `debug/2026-10-24/`
-(the baseline), with its events snapshot at `events-snapshot-20261025T0430Z`.
-Pass `2026-10-24` for it.
+1. `squad debug list` (one row per `runs` row: id, mode, window, events,
+   decisions, interventions, bundle present). Until the attended rebuild
+   ships that CLI, read the orchestrator's `runs.live` / `runs.list` through
+   tRPC (cookie from `GET http://127.0.0.1:7790/auth/local`, local only) and
+   `ls -t ~/.local/state/squad/debug/`.
+2. Attended: ask with `AskUserQuestion`, newest first, at most 4 options,
+   label = run id + window, description = mode, events, interventions.
+   Unattended (the brief names the run, or nobody will answer): take the
+   newest run that has ended, and say so in the summary.
+3. The *previous run* is the next-older row; its bundle gives the trend
+   columns. No previous bundle: say "no trend" in those sections rather than
+   recomputing one by hand.
 
-## 2. Read the evidence
+## 2. Produce the bundle
 
-1. `squad debug report <date>` (add `--json` only if you need to compute on
-   it). Read it in full: timeline, deliveries by member with p50/p95 latency
-   and outcomes, candidate-noise turns, pause/resume pairs and whether the
-   wall was hit anyway, projection ETAs vs actual, pressure episodes, watcher
-   cadence, errors.
-2. `$D/<date>/orchestrator-decisions.md` if present (blocks of `## <ts>
-   <directive> → <member>` with reasoning and triggering seqs). Absent: the
-   run was not `--debug` on the orchestrator side; note that, and the review
-   rests on the report and transcripts only.
-3. Window = `first`..`last` from the list row (the report header gives it
-   too).
+```bash
+squad debug bundle <run>                                          # after the attended rebuild
+just -f /Users/tim/dev/squad/orchestrator/Justfile bundle <run>   # today; same files
+ls ~/.local/state/squad/debug/<run>/bundle/
+```
 
-## 3. Locate the transcripts
+Expected files: `run.json`, `summary.md`, `timeline.md`/`.jsonl`,
+`tasks.csv`, `deliveries.csv` + `latency.md`, `idle.csv`, `heavy.csv`,
+`lands.csv`, `items.csv`, `interventions.csv`, `quota.md`, `host.md`,
+`watches.csv`, `sessions.csv`, `usage.csv`, `errors.jsonl`,
+`decisions.jsonl`, `events.jsonl.gz`. A missing file is a capture-readiness
+finding (section 5), not a reason to stop.
 
-Transcripts are `~/.claude-{personal,reserve,exxo,exxo-personal}/projects/*/<session_id>.jsonl`,
-plus `~/.claude-exxo-openrouter/projects/*/<session_id>.jsonl` (the K3
-context — a separate history, **not** a symlink into the others;
-`~/.claude-reserve` is likewise a fully separate history).
-`~/.claude-exxo-personal/projects` is a symlink to exxo's: dedupe by
-resolved path (`realpath`) so nothing is read twice.
+Also read, if present, the leader's pre-v0.5.10 intervention log
+`~/.local/state/squad/debug/<run>/interventions.jsonl` (shape in the
+`squad-leader` skill); merge it with `interventions.csv` and label the rows
+`leader-file`.
 
-Include each session's subagent transcripts, at
-`~/.claude-*/projects/*/<session_id>/subagents/agent-*.jsonl` — attribute
-their tokens to the session that launched them.
+**Fallback: no bundle can be produced** (orchestrator down, recipe absent,
+run predates v0.5.10). Query Postgres read-only through
+`just -f /Users/tim/dev/squad/deploy/Justfile psql` over `events`,
+`decisions`, `operator_items`, `inbox`, `trunk_lands`, `heavy_requests`,
+`session_usage`, `sessions` with the window from `runs` (or, before `runs`
+exists, from the first and last event of the day). Queries in
+[references/postgres-fallback.md](references/postgres-fallback.md). The
+summary's first line then says **"Evidence: Postgres fallback, no bundle"**,
+and every number is labelled as hand-computed. Never write to the database.
 
-Also read, over the window. Some sources exist on squad main today and some
-are planned; for each, use the fallback when it is absent and label any
-estimate taken from transcripts as an estimate:
+## 3. Read before delegating
 
-- `~/.local/state/claude-openrouter/guard.jsonl` (exists today) — the
-  PreToolUse guard's block/allow decisions (`ts, session_id, cwd, rule,
-  target, form, decision`); join to sessions on `session_id`. Fallback if
-  absent: no guard evidence; say so rather than assume zero blocks.
-- `~/.local/state/claude-openrouter/keyhelper.jsonl` (planned, O10) — key-helper
-  failures (`ts, reason`); it logs failures only, so an absent file means no
-  failures, not a broken capture. Any row in the window is an incident.
-- `$D/<date>/openrouter.jsonl` (planned, O4) — per-generation provider and
-  cost records. If absent, run `squad debug openrouter <date>` once and
-  re-check the file exists. If that command is rejected, the binary predates
-  O4: estimate served model, cost and cache reads from the K3 transcripts
-  (`message.model`, `usage`), labelled as transcript estimates.
-- `squad debug report <date> --from/--until` (planned, O12) — if rejected,
-  the binary predates O12: compute baseline-window metrics from the events
-  snapshot by hand, labelled as estimates.
-- `$D/<date>/mail.jsonl`, `liaison-decisions.md` and
-  `<state>/mail/audit.jsonl` (planned, Plan F) — if absent, mark the liaison
-  rubric row "not assessable" rather than pass.
-
-- **Orchestrator**: `squad history orchestrator --limit 5`; take the newest
-  gauge with `debug: true` and its `session_id`.
-- **Members, live**: `squad roster` (`.req.name`, `.req.session_id`,
-  `.req.account`).
-- **Members, via registry**: `$CLAUDE_CONFIG_DIR/sessions/*.json` records
-  (`pid`, `sessionId`, `cwd`, `name`) whose `cwd` matches a member seen.
-- **Members gone since**: the `register` request lines in
-  `$D/<date>/broker.jsonl`
-  (`jq -c 'select(.op=="register")'`; inspect one line first to confirm the
-  field names) carry each member's name and session id.
-
-Resolve each id to a path with `ls ~/.claude-*/projects/*/<id>.jsonl`. Keep
-a table `name, role, account, session_id, path`; flag ids with no file
-(deleted or on another machine) rather than dropping them.
+Read `summary.md`, `run.json`, `interventions.csv` and `items.csv` yourself:
+they decide the shape of the review. Then build **what shipped since**: the
+previous review's ranked list (issues labelled `debug-review:<previous run>`
+in `tim-codes/squad`: `gh issue list -R tim-codes/squad --label <label>
+--state all`) against `run.json` versions and the CHANGELOG sections between
+the two runs. Note broker changes that are merged but not in the running
+binary (`run.json.versions.broker` versus the CHANGELOG Rollout lines): a
+fix that was not live cannot be judged this run.
 
 ## 4. Dispatch one investigator
 
-This skill's delegation policy: **one** subagent, nothing else. Announce the
-roster line before launching: **1. Transcript review** (`investigator`) —
-**sonnet**. Launch it with `Agent`, `subagent_type: investigator`,
-`model: sonnet`. The brief must be self-contained (it has no context of
-yours) and carry:
+Exactly **one** subagent, nothing else. Roster line before launching:
+**1. Bundle and transcript review** (`investigator`) — **sonnet**. Launch
+with `Agent`, `subagent_type: investigator`, `model: sonnet`. The brief is
+self-contained and carries:
 
-- The report text in full, the decision-log path, the transcript table
-  (absolute paths), the window, and the absolute paths of `guard.jsonl`,
-  `keyhelper.jsonl` and `openrouter.jsonl` (say which are absent).
-- Mechanics: absolute paths only; read-only; transcripts are large JSONL, so
-  filter with `jq`/`grep` to the window rather than reading whole files; do
-  not print secrets or tokens.
-- The ask, **findings only, at most 120 lines**, no narrative of the
-  process. Sort every incident in items 1-4 and 7 into exactly one of four quadrants —
-  **worked**, **noise**, **missed or late**, **wrong or slow** — and give
-  every incident row its evidence pointer (a transcript path plus record
-  `uuid` and timestamp, or a capture file plus line `ts`):
-  1. what worked (reactions that were correct and timely);
-  2. turns that were noise (a `<squad-message>` delivered, no action taken);
-  3. missed or late reactions (a quota wall hit despite a projection; a
-     pressure episode with no `heavy_slot` revoke; a resume that came late);
-  4. wrong or slow rulings (cite the decision-log block and the seqs);
-  5. skill text that confused a member (a member asking what a message
-     means, or mis-running a `squad` command; quote the line);
-  6. numbers: deliveries, p95 latency, pause/resume count, wall hits.
-  7. **HITL interruptions (the primary metric; put them first).** From
-     `squad history operator` (the `operator` gauge) list each item with its
-     raised/presented/resolved times and wait minutes. Say which could have
-     been pre-empted in preflight (foreseeable at brief time); which were
-     raised by a member directly instead of queued (grep the transcripts for
-     auth prompts, `Touch ID`, `waiting for you`, browser-login steps); and the ranked changes that
-     would remove or shorten them.
-  8. **Deliverables.** Every deliverable named in a member's prompt (the
-     plan's `deliverables`, orchestrator skill §3a) is delivered or
-     tracked-deferred; list any that are neither.
-  9. **K3 issues** (data for the issues register; one row per hit, with
-     pointer): served `message.model` and provider per K3 transcript, flagging
-     any that is not the K3 model (silent fallback); every 401/402/403/5xx
-     `apiErrorStatus` row, with the job's final state; guard blocks joined
-     on `session_id`; and the K3-integrity tally from the decision log:
-     `grep -c 'k3-integrity: clean'` and `grep 'k3-integrity: flagged'`
-     over `orchestrator-decisions.md`, listing each flagged line.
-  10. **Per-job K3 numbers**: for each K3 job, cost, wall time versus
-      deadline, and cache-read share of input tokens from the third turn,
-      from `openrouter.jsonl` or labelled transcript estimates.
-  Every finding cites evidence: a log block, a seq, or a transcript path
-  plus timestamp.
+- The absolute bundle dir, the window, the file list with what each holds
+  (section 2), and the terms paragraph above (leader versus orchestrator).
+- Mechanics: absolute paths; read-only; bundle first. Transcripts
+  (`sessions.csv` column `transcript_path`, with `transcript_exists`) are
+  opened only for an incident already cited from a bundle file, filtered
+  with `jq`/`grep` to the window; subagent transcripts live beside the
+  parent under `<session_id>/subagents/`. No secrets or tokens in the
+  report.
+- The ask, **findings only, at most 120 lines**, each with an evidence
+  pointer (`bundle/<file>:<line>`, a `decisions.jsonl` id, or a transcript
+  path plus record `uuid` and timestamp). Sort every incident into one of
+  **worked**, **noise**, **missed or late**, **wrong or slow**, and report:
+  1. HITL items (`items.csv`): per source (preflight, raised, policy) the
+     count, p50/p95 wait, who decided (actor label), which were foreseeable
+     at brief time, which never notified anyone
+     (`operator.notify_skipped`), raise refusals (`invalid_input`), and any
+     unqueued prompt in a member transcript (`Touch ID`, browser login,
+     permission prompt).
+  2. Leader interventions (`interventions.csv` plus the file log): count per
+     function L1–L13, each refusal the leader met and what it did
+     (`outcome`: done, parked, handed_to_tim), any routed-around refusal
+     (a nested session, a re-run of a denied command: always an incident).
+  3. Idle stretches (`idle.csv`) over 10 min with their wait reason or none;
+     heavy waits (`heavy.csv` `waited_s`) p50/p95 and the top members.
+  4. Lands (`lands.csv`): landed, refused by `reason_code`, review time,
+     wrong-base or force-push incidents.
+  5. Delivery (`deliveries.csv`): p50/p95/max `wait_s`, `mid_turn` share,
+     undelivered to closed sessions, directives never acked.
+  6. Watches, quota, host, errors (`watches.csv`, `quota.md`, `host.md`,
+     `errors.jsonl`): dead watch kinds, walls, pressure episodes, restarts
+     (`run.json.restarts`) with build outcome and downtime.
+  7. Deliverables: every plan deliverable (`tasks.csv`) delivered, or
+     tracked as an item or issue; list what is neither.
+  8. Skill text that confused a member (a member asking what a message
+     means, a tool call refused for shape, a refusal text followed by the
+     wrong action); quote the line and the transcript pointer.
+  9. Only if `usage.csv` has rows with account `openrouter`: per session
+     the served model, cost, failures and any silent fallback.
 
-Do not re-do its reading yourself. If it returns more than 120 lines or
-findings without evidence, send it back once via `SendMessage`.
+Do not redo its reading. More than 120 lines, or findings without evidence:
+send it back once with `SendMessage`.
 
 ## 5. Write `review.md`
 
-Write `~/.local/state/squad/debug/<date>/review.md` (Write tool) with:
+`~/.local/state/squad/debug/<run>/review.md` (Write tool), sections in this
+order. Where the bundle computed a number, cite the file; where you did,
+say so. Section-to-column map and the carried-over pass/fail targets in
+[references/review-sections.md](references/review-sections.md).
 
-- **Summary**: window, members, headline numbers, the verdict in three
-  sentences. If any anti-goal was breached, the first sentence says so.
-- **HITL interruptions** (first, before everything else): count, total and
-  per-item wait, per-stream split; table of items (id, stream, raised,
-  presented, resolved, wait); pre-emptable-in-preflight list; member-raised
-  (unqueued) interruptions with transcript evidence; ranked reductions.
-- **K3 efficacy** (pass/fail table, one row per criterion):
-  - job success: `ok/finished` ≥ 80% passes, < 60% fails (between: judgement
-    call, explained);
-  - rework: `rework+rejected/reviewed` ≤ 25% passes, > 40% fails;
-  - cost: median per job ≤ $1.50 and none above $10 passes, otherwise
-    fails;
-  - wall time: median ≤ 50% of deadline and timeouts ≤ 10% passes,
-    timeouts > 20% fails;
-  - cache reads ≥ 50% of input tokens from each session's third turn
-    passes, < 25% fails;
-  - review pool share ≥ 50% of the run's reviews on K3 — reported, not
-    gated;
-  - tokens moved off Anthropic — reported, not gated.
-- **K3 issues register** (pass/fail table): zero anti-goal breaches; zero
-  silent fallback (a K3 job that quietly ran on a Claude account); zero
-  `wrong` denials or guard blocks that stopped a job (join
-  `~/.local/state/claude-openrouter/guard.jsonl` to jobs on
-  `session_id`); every 402 ended `failed/budget`; zero `k3-integrity:
-  flagged <job> <files>` lines in the orchestrator decision log (report
-  clean and flagged counts; each flagged line needs a follow-up block,
-  else it fails); every issue class listed in full and every `unclear`
-  verdict explained.
-- **Round changes: efficacy** (pass/fail table; each change against the
-  defect it targeted, with the baseline value in brackets):
-  - ENG-339 delivery: max hold age while busy ≤ `max_hold_seconds` + one
-    tick (baseline: 44 held `next` messages); every crossed level
-    delivered to each matching subscriber (75 and 90 together at 92%, no
-    85); zero duplicate `joined` (two per builder); ack-gated directive
-    p95 delivery ≤ 5 s;
-  - ENG-337: every approval item has a `decision`, and denials and items
-    join 1:1 (baseline: a denial lost; Approve recorded nothing);
-  - ENG-338: every merge by a grant holder or infra, zero denied merges
-    retried, zero K3 merges;
-  - ENG-340: burn noticed (decision or operator line) within 15 min of
-    `burn started` (baseline: about £3 burnt unnoticed in 15 min);
-  - herder split: zero tmux calls in the concierge transcript, every
-    launch and close in `history.jsonl`, zero unreported
-    `close_mismatch`;
-  - federation: every job reaches a terminal state or is in flight at run
-    end, no requester waits beyond a deadline, queued→assigned p95 ≤ 5
-    min while a capable worker is free;
-  - rate-aware pausing: every rate-aware directive has a trigger, no wall
-    hit after a `walls_before_reset` projection made 30+ min earlier;
-  - host: at most one pressure flap per 15 min;
-  - capture: one run dir holds every sink and log.
-- **Round changes: issues**: for each change, every regression or new
-  failure mode it caused (e.g. a `max_hold` flush interrupting a turn, an
-  ack bypass storm, a herder relaunch loop, a job leaking a worktree),
-  with evidence; plus one rubric row each for:
-  - liaison: every liaison action checked against the per-client policy —
-    a send to a non-`act` client, a send as tim@ without
-    `send_as = "tim"`, or a rate-limit breach is an incident (audit:
-    `$D/<date>/mail.jsonl` and `<state>/mail/audit.jsonl`, decisions in
-    `$D/<date>/liaison-decisions.md`);
-  - rebalancing: every rebalance has a trigger and an outcome recorded; a
-    move without a decision-log block is an incident; judge each proposal
-    `correct` / `wrong` / `unclear`;
-  - batched trunks: every trunk test run attributed, and every attributed
-    failure counted — a member's comprehensive run without a slot, a
-    landing on red, or a commit unlanded for more than 8 h is an
-    incident.
-- **Baseline comparison**: the same metrics for the 2026-10-25 run
-  (Claude only; its capture is the 2026-10-24 run dir), computed by `squad debug report 2026-10-24 --from <first
-  orchestrator decision> --until <wind-down>` over the frozen events
-  snapshot (`$D/2026-10-24/events-snapshot-20261025T0430Z`). Metrics for
-  both runs: deliveries, p50/p95 delivery latency, max hold age,
-  crossings published vs delivered per level, duplicate joins, HITL items
-  and wait, denials (and retries), wall hits, pause/resume pairs, exxo
-  five-hour %/h, extra usage burnt, Anthropic tokens by model including
-  subagents, and merged PRs, with Anthropic tokens per merged PR as the
-  normalised comparison.
-- **What worked**.
-- **Findings** (non-HITL): grouped as noise, missed/late, wrong rulings,
-  confusing skill text; each with its evidence.
-- **Ranked change list**, best benefit-for-cost first; changes that cut
-  HITL interruptions rank ahead of equal-cost others. Each item:
-  *change*; *where* (one of: code — which crate/module; skill text — which
-  skill and section; config threshold — which key and from/to values);
-  *cost* S/M/L; *benefit*; *evidence* (finding reference). Prefer fixes in
-  skill text and thresholds over code when they would do.
+1. **Summary**: run id, window, mode, versions, headline table from
+   `summary.md`, evidence line (bundle, or the fallback sentence), verdict in
+   three sentences. An anti-goal breach (an unauthorised merge, a secret
+   logged, the live stack broken) is the first sentence.
+2. **What shipped since**: previous ranked list, each item shipped / live /
+   merged-not-live / open.
+3. **HITL interruptions**: counts and waits per source, clusters with
+   foreseeability, notification gaps, raise friction, unqueued prompts, what
+   Tim actually did and when.
+4. **Leader interventions**: a table L1–L13 with this run's count, the
+   previous run's count, the trend arrow, and the issue that retires the
+   function (table in the `squad-leader` skill's references). Then each
+   refusal met and how it was handled; a routed-around refusal is a finding
+   under wrong rulings.
+5. **Capture readiness**: was the run recorded by the orchestrator (a
+   `runs` row with the right mode) or only by the broker sinks; who switched
+   it on and when; bundle files missing or empty; `transcript_exists` false
+   counts; broker version versus merged-not-live changes.
+6. **Delivery, idle, heavy, lands, quota and host**: the numbers from items
+   3 to 6 above, each with its previous-run value.
+7. **Round changes: efficacy**: one row per change merged since the previous
+   run, judged on the evidence column its PR named ("Evidence:" in the PR
+   body or CHANGELOG bullet): pass / fail / not live / **no evidence named**
+   (itself a finding). New failure modes a change caused, with evidence.
+8. **What worked**.
+9. **Findings**: noise; missed or late; wrong rulings (orchestrator policy
+   and leader alike, each `correct` / `wrong` / `slow` / `unclear` with the
+   ruling id or `managed_repos` row it should have cited); confusing skill
+   or message text; deliverables neither delivered nor tracked.
+10. **K3** only when item 9 returned rows; otherwise one line: "no
+    openrouter sessions this run".
+11. **Ranked change list**, best benefit for cost first; changes that remove
+    a HITL interruption or retire a leader function rank ahead of equal-cost
+    others. Columns: *change*; *where* (code: which module; skill text: which
+    skill and section; config: which key, from/to); *cost* S/M/L;
+    *benefit*; *evidence* (finding id); *evidence next round* (the bundle
+    column that will show it worked).
 
-Do not edit anything outside `review.md`; the changes are proposals.
+Write nothing else into the squad state dir. When the brief asks for a copy
+in the repo: a branch off the squad trunk in its own worktree
+(`wt -C /Users/tim/dev/squad switch --create docs/debug-review-<run> --base origin/trunk/v0.5 --no-cd -y`),
+file `docs/superpowers/plans/<date>-squad-debug-review-<run>.md`, draft PR
+with the brief's trailers. Never commit to `main`.
 
 ## 6. Present and offer issues
 
-Show Tim the ranked list in chat (table: rank, change, where, cost,
-benefit), the `review.md` path, and the three biggest findings in a line
-each. Then ask with `AskUserQuestion` whether to file the top items as
-GitHub issues in `tim-codes/squad` (options: top 3, top 5, none; Other for a
-chosen set). Only on a yes: for each item
-`gh issue create -R tim-codes/squad --title "<change>" --body "<where, cost,
-benefit, evidence, review.md path and date>"`, then list the issue URLs.
-Never file without the yes.
+Attended: show the ranked list in chat (rank, change, where, cost, benefit),
+the `review.md` path and the three biggest findings in a line each. Then
+ask with `AskUserQuestion` whether to file the top items as GitHub issues in
+`tim-codes/squad` (top 3, top 5, none; Other for a chosen set). Only on a
+yes: `gh issue create -R tim-codes/squad --title "<change>" --label
+"debug-review:<run>" --body "<where, cost, benefit, evidence, review.md
+path>"` (prefix the title with `[<run>]` when the label does not exist and
+cannot be created), then list the URLs.
+
+Unattended (nobody to answer, or the brief says so): file nothing, and end
+the report with "issues not filed: unattended; ranked list in review.md".
+
+## Common mistakes
+
+- Reading transcripts first. The bundle holds most of what transcripts
+  confirm; the 2026-10-31 review read 143 transcripts to learn what
+  `events` already said.
+- Calling the leader's workaround a fix. A nested session that re-runs a
+  denied command, a hand merge, a hand-run render: each is an intervention
+  to retire, never a solution to recommend.
+- Judging merge authority from prose. Merge scope is
+  `managed_repos.release_needs_approval` (true only for h2gc-portal and
+  h2gc-legacy); cite the row, not a rulings paragraph.
+- Blaming a fix that was not live. Check `run.json.versions.broker` before
+  marking a broker change failed.
+- Filing issues without the yes, or in an unattended session.
