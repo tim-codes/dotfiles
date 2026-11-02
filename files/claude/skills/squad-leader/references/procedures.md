@@ -118,7 +118,8 @@ trunk→main with a merge commit, never a squash; tag; then the restart
 above. The broker binary is not rebuilt: that is Tim's attended slot
 (#292). `cargo install --path . --locked` no longer resets the macOS App
 Management / Full Disk Access grant (verified 2 Nov 2026); if the broker
-fails after a rebuild, verify the grant is still present.
+reports a permission error after a rebuild (`squad doctor` or the broker),
+re-grant it then; otherwise leave the grant alone.
 
 ## Tunnel check
 

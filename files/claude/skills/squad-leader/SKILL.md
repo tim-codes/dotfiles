@@ -163,7 +163,8 @@ each count is expected to fall.
   bootout on a build whose log says `recipe failed`.
 - **The broker binary** changes only at Tim's attended rebuild (#292).
   `cargo install` no longer resets the macOS App Management / Full Disk
-  Access grant (verified 2 Nov 2026), but the rebuild stays attended. Batch
+  Access grant (verified 2 Nov 2026): re-grant only if `squad doctor` or
+  the broker reports a permission error. The rebuild stays attended. Batch
   broker PRs for that slot and list them in the consolidated ask.
 - **Kickoff lanes** (planners, implementers, reviewers you run outside the
   squad) launch with `claude-kickoff <prompt.md>` in a window of tmux

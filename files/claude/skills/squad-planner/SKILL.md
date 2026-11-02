@@ -520,30 +520,6 @@ chat is never the record. No file on disk records a claim.
 - **Messages** between planner sessions are a tie-break only, never the
   record.
 
-## Denials
-
-A denied tool call or permission denial is not retried in another form, and
-you note what kind it was. The orchestrator records each permission denial
-(event `permission_resolved`) with an outcome:
-
-- `answered`: the operator decided. Follow it. On deny, raise the exact
-  command with `mcp__squad__raise`; do not route around it.
-- `timed_out`: nobody answered in time. Raise once, and carry on with work
-  that does not depend on it.
-- `cancelled`: the request was withdrawn. Do not retry the same call.
-- `gone`: the session or request vanished. Re-check `squad://me` before
-  continuing.
-
-## Orchestrator unreachable
-
-If `mcp__squad__*` tools fail with connection errors or timeouts, the
-orchestrator (a service, not a Claude session) or its tunnel may be down.
-Do not loop or retry rapidly. Keep working on whatever does not need the
-squad, and retry the call after a pause (a few minutes, backing off). Never
-claim a plan submitted without a successful `submit_task` call; headless,
-hand back `failed` with `no_submission` if it stays unreachable (step 6).
-Progress notes go in the scratch dir.
-
 ## Scratch
 
 Each session has a durable scratch dir, `$SQUAD_SCRATCH_DIR`, exported by
@@ -551,7 +527,4 @@ the broker to launched sessions: `~/.local/state/squad/scratch/<session-id>/`,
 created 0700, kept on close and reused by a resume while the session id is
 unchanged (`/clear` gives a new id, so a fresh dir). If the variable is
 unset, use that path directly. Use it instead of `/tmp` for notes, logs and
-intermediate files that must survive a resume. Never commit it. Session
-tokens live under `$SQUAD_SESSION_DIR` (default
-`~/.local/state/squad/session-state`), not `/tmp/squad-<uid>`; never print
-token files.
+intermediate files that must survive a resume. Never commit it.
