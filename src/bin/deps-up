@@ -17,7 +17,25 @@ $DOTFILES_ROOT/scripts/tmux-plugins --update
 # todo (#244): why does this not get executed by .zshrc?
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 if command -v nvm >/dev/null; then
+  # nvm is the only source of Node, and only the version $NODE_VERSION names
+  # (lts/krypton = Node 24). Install it when missing, never "latest"/"lts/*",
+  # which would pull in a newer major (26) later.
+  if [ -n "$NODE_VERSION" ] && [ "$(nvm version "$NODE_VERSION")" = "N/A" ]; then
+    nvm install "$NODE_VERSION"
+  fi
   nvm install-latest-npm
+  # prune every other installed version, except one a launchd agent pins by
+  # path (the squad jobs name ~/.nvm/versions/node/vX.Y.Z/bin/node: deleting
+  # it would break them until the plist is re-rendered)
+  keep="$(nvm version "${NODE_VERSION:-default}")"
+  for v in $(nvm ls --no-colors --no-alias 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | sort -u); do
+    [ "$v" = "$keep" ] && continue
+    if grep -qs "versions/node/$v/" "$HOME"/Library/LaunchAgents/*.plist; then
+      echo "nvm: keeping $v (pinned by a LaunchAgent)"
+      continue
+    fi
+    nvm uninstall "$v"
+  done
 fi
 
 # install global pnpm packages; ~/.npmrc (private @exxo-labs registry auth)
