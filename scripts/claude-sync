@@ -241,6 +241,7 @@ worktree-closedown
 dotfiles-repo
 claude-repo-config
 squad-debug-review
+squad-leader
 squad-member
 squad-planner
 reauth
