@@ -92,16 +92,11 @@ open -a LinearMouse
 # from scripts/pipx-packages below, pinned to python@3.12
 pipx ensurepath
 
-# install nvm + node - skipped once $NODE_VERSION resolves to an installed node.
-# Checked on disk, not with `command -v nvm`: nvm is a shell function, never
-# defined in this script's shell. (Sourcing nvm.sh to ask it would break under
-# set -u.) Newer node releases are deps-up's job, not init's.
-nvm_alias="$NVM_DIR/alias/$NODE_VERSION"
-if [[ ! -s "$NVM_DIR/nvm.sh" || ! -s "$nvm_alias" || ! -d "$NVM_DIR/versions/node/$(<"$nvm_alias")" ]]; then
-  PROFILE=/dev/null bash -c 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash'
-  source $HOME/.nvm/nvm.sh
-  nvm install $NODE_VERSION
-  nvm use $NODE_VERSION
+# install node via mise (replaced nvm; ~/.nvm is left alone). Reads
+# ~/.config/mise/config.toml (node = "24"); newer 24.x releases are deps-up's
+# job, not init's.
+if command -v mise >/dev/null; then
+  mise install node
 fi
 
 # install claude code

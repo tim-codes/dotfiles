@@ -1,0 +1,13 @@
+# Global mise config (stowed to ~/.config/mise/config.toml).
+#
+# mise replaced nvm as the Node manager (trial). Node installs live at
+# ~/.local/share/mise/installs/node/<ver>, with a stable major-version symlink
+# ~/.local/share/mise/installs/node/24 -> 24.x.y that mise re-points on upgrade.
+# Point IntelliJ and launchd at that symlink, not at the full version.
+[tools]
+# "24" tracks the newest 24.x only; `mise upgrade` never crosses a major.
+node = "24"
+
+[settings]
+# mise ignores .nvmrc / .node-version unless the tool is enabled here.
+idiomatic_version_file_enable_tools = ["node"]
