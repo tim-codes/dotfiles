@@ -10,9 +10,9 @@ member_settings = "~/.config/squad/member-settings.json"
 
 # PATH the broker launches members with (replaces the built-in default). The default
 # list plus the pnpm global bin dir, where the playwright-mcp shim lives. Applies at
-# the next broker restart. The nvm entry is pinned to Node 24.21.0 (no stable path exists on
-# this machine), so it must move on Node upgrades.
-launch_path = ["~/.cargo/bin", "~/.local/bin", "~/Library/pnpm/bin", "~/.nvm/versions/node/v24.21.0/bin", "~/.orbstack/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+# the next broker restart. The node entry is the mise Node 24 major symlink, stable across
+# patch upgrades.
+launch_path = ["~/.cargo/bin", "~/.local/bin", "~/Library/pnpm/bin", "~/.local/share/mise/installs/node/24/bin", "~/.orbstack/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
 
 # Personal and exxo-personal are the same account; listing both dirs lets the
 # watcher dedupe their caches. The first dir is the one whose keychain token
