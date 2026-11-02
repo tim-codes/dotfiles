@@ -116,8 +116,9 @@ Cargo.lock, both `package.json`, `tests/cli_broker.rs`, README, CHANGELOG
 with a Rollout line naming merged-not-live broker parts); checkpoint PR
 trunk→main with a merge commit, never a squash; tag; then the restart
 above. The broker binary is not rebuilt: that is Tim's attended slot
-(#292), and `cargo install --path . --locked` resets the macOS App
-Management grant that he must re-toggle.
+(#292). `cargo install --path . --locked` no longer resets the macOS App
+Management / Full Disk Access grant (verified 2 Nov 2026); if the broker
+fails after a rebuild, verify the grant is still present.
 
 ## Tunnel check
 
