@@ -89,107 +89,26 @@ if type -q poetry; and not test -s ~/.config/fish/completions/poetry.fish
     poetry completions fish >~/.config/fish/completions/poetry.fish 2>/dev/null
     or rm -f ~/.config/fish/completions/poetry.fish
 end
-# node version manager (bash nvm via bass)
+# node version manager: mise (trial; replaced nvm)
 #
-# nvm is a bash function, so every call has to go through bass: fork a bash,
-# source nvm.sh, translate the environment back. That is ~240ms a time, and the
-# old block paid it four times per shell (alias default, version default,
-# version, find_nvmrc) plus twice more on every cd — ~750ms of a 1356ms startup.
+# Node comes from mise: ~/.local/share/mise/installs/node/<ver>, with the stable
+# major symlink ~/.local/share/mise/installs/node/24 for IntelliJ and launchd.
+# Global tool/settings live in ~/.config/mise/config.toml (src/.config/mise/).
+# `mise activate` swaps PATH per directory, so .nvmrc/.node-version are honoured
+# on cd (enabled for node via idiomatic_version_file_enable_tools). The shims dir
+# is also appended to PATH below for contexts that never run this activation.
 #
-# Nothing below reaches bass at startup. nvm's aliases and version dirs are just
-# files, so resolving "default" to a bin directory and putting it on PATH — all
-# `nvm use default` actually does — is a handful of reads. bass is now used only
-# to install a version that isn't present, or when nvm is run by hand.
-if test -s "$NVM_DIR/nvm.sh"
-  # Resolve an nvm spec (alias, partial, or exact version) to its bin dir by
-  # reading $NVM_DIR. No output means "not installed", which is the caller's
-  # signal that this is one of the rare cases needing real nvm.
-  function __nvm_bin_dir
-    set -l spec (string trim -- "$argv[1]")
-    # Follow alias indirection, e.g. default -> lts/krypton -> v24.19.0.
-    # Bounded, in case an alias is ever made to point at itself.
-    set -l hops 0
-    while test -n "$spec"; and test -r "$NVM_DIR/alias/$spec"; and test $hops -lt 5
-      set spec (string trim < "$NVM_DIR/alias/$spec")
-      set hops (math $hops + 1)
-    end
-    test -z "$spec"; and return 1
-    string match -q 'v*' -- $spec; or set spec "v$spec"
-    set -l root "$NVM_DIR/versions/node"
-    if test -d "$root/$spec/bin"
-      echo "$root/$spec/bin"
-      return 0
-    end
-    # Partial spec such as "v24": take the highest installed match. sort -V
-    # because a glob sorts lexically, which puts v24.9.0 above v24.19.0.
-    set -l best (for d in $root/$spec*; test -d "$d/bin"; and path basename $d; end | sort -V | tail -1)
-    test -n "$best"; and echo "$root/$best/bin"
-  end
-
-  # What `nvm use` does to PATH: drop whichever nvm-managed bin is on there and
-  # put the wanted one in front. Prepended rather than via add_to_path (which
-  # appends), so the selected version beats any other node on PATH.
-  function __nvm_use_bin
-    set -l keep
-    for p in $PATH
-      string match -q "$NVM_DIR/versions/node/*" -- $p; or set -a keep $p
-    end
-    set -gx PATH $argv[1] $keep
-  end
-
-  if type -q bass
-    function nvm
-      bass source $NVM_DIR/nvm.sh --no-use ';' nvm $argv
-    end
-  end
-
-  # Replaces the `nvm use default` the old load_nvm did on every shell. This is
-  # load-bearing, not an optimisation: $PATH_BASE carries no node, so without it
-  # there is no node on PATH at all.
-  set -l __nvm_default (__nvm_bin_dir default)
-  test -n "$__nvm_default"; and __nvm_use_bin "$__nvm_default"
-
-  # Keep nvm's default alias in step with $NODE_VERSION (set in local.sh). The
-  # alias file is exactly what `nvm alias default` writes, so compare first —
-  # normally equal, and then this costs nothing.
-  set -l __nvm_recorded (cat "$NVM_DIR/alias/default" 2>/dev/null)
-  if test -n "$NODE_VERSION"; and test "$__nvm_recorded" != "$NODE_VERSION"; and type -q bass
-    nvm alias default "$NODE_VERSION" &>/dev/null
-  end
-
-  # Nearest .nvmrc walking up from $PWD. Pure fish, replacing nvm_find_nvmrc,
-  # which was a bass round-trip on every single cd.
-  function __nvm_find_nvmrc
-    set -l dir (pwd -P)
-    while true
-      if test -f "$dir/.nvmrc"
-        echo "$dir/.nvmrc"
-        return 0
-      end
-      test "$dir" = /; and return 1
-      set dir (path dirname "$dir")
-    end
-  end
-
-  # Auto-switch on cd. Remembers which .nvmrc is currently applied, so moving
-  # around inside one project — or anywhere with no .nvmrc above it — costs only
-  # the walk above. Only an uninstalled version reaches bass.
-  set -g __nvm_applied ""
-  function load_nvm --on-variable PWD
-    set -l nvmrc (__nvm_find_nvmrc)
-    test "$nvmrc" = "$__nvm_applied"; and return
-    set -l want default
-    test -n "$nvmrc"; and set want (string trim < "$nvmrc")
-    set -l bin (__nvm_bin_dir "$want")
-    if test -z "$bin"; and type -q bass
-      nvm install "$want" &>/dev/null
-      set bin (__nvm_bin_dir "$want")
-    end
-    test -n "$bin"; and __nvm_use_bin "$bin"
-    set -g __nvm_applied "$nvmrc"
-  end
-  # Honour an .nvmrc in the directory this shell started in.
-  load_nvm
+# ROLLBACK to nvm: delete this block and restore the nvm one from git history
+# (git show <commit before the mise switch>:src/.config/fish/common.fish), do the
+# same for src/.zshrc, src/.bashrc and src/.config/shell/common.sh (the shims
+# entry), then `restow`. ~/.nvm stays installed and untouched, so nothing else
+# is needed. NODE_VERSION and NVM_DIR are still exported by local.sh.
+#
+# Homebrew's mise also ships a fish vendor_conf.d hook that activates it before
+# this file runs; the guard keeps a second activation from stacking.
+if type -q mise
+  functions -q __mise_env_eval; or mise activate fish --quiet | source
+  add_to_path "$HOME/.local/share/mise/shims"
 end
 
 # zoxide
@@ -385,7 +304,7 @@ for _line in $_lines
         # Multi-line function: show comment if present
         else if string match -rq '^\s*function\s+' -- $_line
             set -l _fname (string match -rg '^\s*function\s+(\S+)' -- $_line)
-            if test -n "$_fname"; and not contains $_fname help add_to_path print_path nvm __nvm_bin_dir __nvm_use_bin __nvm_find_nvmrc load_nvm fish_title
+            if test -n "$_fname"; and not contains $_fname help add_to_path print_path fish_title
                 if test -n "$_prev_comment"
                     set -a _help_entries (printf '%s\t%s' $_fname "$_prev_comment")
                 else

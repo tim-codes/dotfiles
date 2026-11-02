@@ -13,36 +13,20 @@ $DOTFILES_ROOT/scripts/tmux-plugins --update
 # todo (#244): this is only working from native terminal, not emulator
 # fish -c "fisher update"
 
-# see: https://github.com/nvm-sh/nvm?tab=readme-ov-file#migrating-global-packages-while-installing
-# todo (#244): why does this not get executed by .zshrc?
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-if command -v nvm >/dev/null; then
-  # nvm is the only source of Node, and only the version $NODE_VERSION names
-  # (lts/krypton = Node 24). Install it when missing, never "latest"/"lts/*",
-  # which would pull in a newer major (26) later.
-  if [ -n "$NODE_VERSION" ] && [ "$(nvm version "$NODE_VERSION")" = "N/A" ]; then
-    nvm install "$NODE_VERSION"
-  fi
-  nvm install-latest-npm
-  # prune every other installed version, except one a launchd agent pins by
-  # path (the squad jobs name ~/.nvm/versions/node/vX.Y.Z/bin/node: deleting
-  # it would break them until the plist is re-rendered)
-  keep="$(nvm version "${NODE_VERSION:-default}")"
-  # never prune when the version to keep can't be resolved (N/A): the loop
-  # below would then uninstall every Node
-  if [[ "$keep" != v[0-9]* ]]; then
-    echo "nvm: can't resolve '${NODE_VERSION:-default}', skipping prune"
-    keep=""
-  fi
-  for v in $([ -n "$keep" ] && nvm ls --no-colors --no-alias 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | sort -u); do
-    [ "$v" = "$keep" ] && continue
-    if grep -qs "versions/node/$v/" "$HOME"/Library/LaunchAgents/*.plist; then
-      echo "nvm: keeping $v (pinned by a LaunchAgent)"
-      continue
-    fi
-    nvm uninstall "$v"
-  done
+# Node comes from mise, pinned to the 24 major in ~/.config/mise/config.toml
+# (src/.config/mise/). `mise install` fetches 24.x if missing; `mise upgrade`
+# stays inside the configured range, so it never crosses to a newer major (that
+# needs `--bump`, deliberately not used). mise re-points the stable
+# ~/.local/share/mise/installs/node/24 symlink on upgrade. --prune drops the
+# superseded 24.x builds.
+if command -v mise >/dev/null; then
+  mise install
+  mise upgrade --prune
+  mise reshim
 fi
+# nvm is no longer on PATH, but ~/.nvm/versions/node/v24.21.0 must STAY on disk:
+# the squad launchd jobs (~/Library/LaunchAgents/dev.tim.squad-*.plist) name that
+# path. Do not uninstall it until those plists move to the mise path.
 
 # install global pnpm packages; ~/.npmrc (private @exxo-labs registry auth)
 # must be rendered first

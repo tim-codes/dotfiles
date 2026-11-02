@@ -13,9 +13,9 @@ if [[ -f "$HOME/.config/shell/common.sh" ]]; then
     source "$HOME/.config/shell/common.sh"
 fi
 
-# nvm configuration
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+# mise (Node manager; replaced nvm). Rollback: restore the nvm lines from git
+# history (see the note in .zshrc).
+command -v mise >/dev/null 2>&1 && eval "$(mise activate bash --quiet)"
 
 # ~~~ LOCAL OVERRIDES ~~~ #
 # ~~~~~~~~~~~~~~~~~~~~~~~ #

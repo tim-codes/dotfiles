@@ -111,6 +111,7 @@ add_to_path \
     "$HOME/.local/bin" \
     "$HOME/.nix-profile/bin" \
     "$HOME/.local/share/fnm" \
+    "$HOME/.local/share/mise/shims" \
     "$HOME/bin" \
     "$GOPATH/bin" \
     "$GOROOT/bin" \
@@ -134,8 +135,8 @@ for _gc_sdk in /opt/homebrew/share/google-cloud-sdk /usr/local/share/google-clou
 done
 unset _gc_sdk
 
-# Cargo/Rust (a plain PATH export — cheap enough for every shell, unlike nvm,
-# which stays in the interactive-only sections of .bashrc/.zshrc)
+# Cargo/Rust (a plain PATH export — cheap enough for every shell, unlike mise
+# activation, which stays in the interactive-only sections of .bashrc/.zshrc)
 if [ -f "$HOME/.cargo/env" ]; then
     . "$HOME/.cargo/env"
 fi
