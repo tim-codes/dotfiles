@@ -330,6 +330,40 @@ pass:
 The plan documents land with the work, in the lane PR. When it opens, close
 the plan PR as superseded, with a comment linking the lane PR.
 
+## Denials
+
+Read how a denied call ended from its message, and never retry it in another
+form (a different command, a wrapper, another tool reaching the same effect):
+
+- `squad: no answer to this permission request in time`: nobody answered. The
+  silence is not Tim declining and not a refusal. Raise once, with the exact
+  command and why, and carry on with work that does not depend on it.
+- `squad: the session or the broker ended before this permission request was
+  answered` (or the turn moved on): the request died with the session. Not Tim
+  declining. Re-check `squad://me`; raise again only if the work still needs it.
+- A deny carrying a note: only this is Tim's word. Follow it; do not route
+  around it. A classifier or policy denial is reported, not routed around:
+  raise it or name it in `set` `detail`.
+
+## Orchestrator unreachable
+
+If `mcp__squad__*` calls fail with connection errors or timeouts, the
+orchestrator (a service, not a Claude session) or its tunnel may be down.
+Retry the call once. If it still fails, keep working on the local steps that
+need no squad call (commit, tests, the diff), and raise nothing in a loop. At
+the next turn where the squad answers, report what happened with `set`. Never
+claim done or landed without a successful `set` or `land`, and never merge
+with `gh` instead.
+
+## Scratch
+
+Each session has a durable scratch dir, `$SQUAD_SCRATCH_DIR`, exported by
+the broker to launched sessions: `~/.local/state/squad/scratch/<session-id>/`,
+created 0700, kept on close and reused by a resume while the session id is
+unchanged (`/clear` gives a new id, so a fresh dir). If the variable is
+unset, use that path directly. Use it instead of `/tmp` for notes, logs and
+intermediate files that must survive a resume. Never commit it.
+
 ## Infra helpers
 
 A session of kind `infra` works in an exxo-infra worktree and produces a PR

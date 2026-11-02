@@ -519,3 +519,12 @@ chat is never the record. No file on disk records a claim.
   Tim, and taken only with his say-so.
 - **Messages** between planner sessions are a tie-break only, never the
   record.
+
+## Scratch
+
+Each session has a durable scratch dir, `$SQUAD_SCRATCH_DIR`, exported by
+the broker to launched sessions: `~/.local/state/squad/scratch/<session-id>/`,
+created 0700, kept on close and reused by a resume while the session id is
+unchanged (`/clear` gives a new id, so a fresh dir). If the variable is
+unset, use that path directly. Use it instead of `/tmp` for notes, logs and
+intermediate files that must survive a resume. Never commit it.
