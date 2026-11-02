@@ -31,7 +31,12 @@
 
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:$PATH"
 
-[ -e "$HOME/tmux_no_auto_restore" ] && exit 0
+# Clear the started guard too: tmux-home holds auto/pinned sidebars while a
+# restore is started but not done, so leaving it set would hold them forever.
+if [ -e "$HOME/tmux_no_auto_restore" ]; then
+  tmux set-option -gu @home_restore_started
+  exit 0
+fi
 
 # give tmux some time to start and source all the plugins (continuum's delay)
 sleep 1
