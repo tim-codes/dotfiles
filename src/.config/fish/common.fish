@@ -73,9 +73,10 @@ set -gx ENABLE_LSP_TOOL 1
 if test -f ~/keys/openai.key
   set -x OPENAI_KEY $(cat ~/keys/openai.key)
   set -x OPENAI_API_KEY $OPENAI_KEY
-  if type -q opencommit
-    opencommit config set OCO_OPENAI_API_KEY=$OPENAI_KEY 1&>/dev/null
-  end
+  # opencommit reads OCO_API_KEY from the environment. An env export instead of
+  # `opencommit config set` keeps a Node process out of every shell start (a
+  # broken Node crashed each tmux-restored pane at boot).
+  set -x OCO_API_KEY $OPENAI_KEY
 end
 
 # poetry completions — generated once, not on every shell start.
