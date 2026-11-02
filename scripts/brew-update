@@ -26,7 +26,6 @@ brewDeps=(
   dotnet
   fd
   fish
-  fish-lsp
   fzf
   gh
   glab
@@ -98,7 +97,6 @@ brewDeps=(
   # is what this list silently installed for months while `tf` stayed broken
   opentofu
   tree
-  vercel
   webp
   websocat
   wget

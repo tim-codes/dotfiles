@@ -15,7 +15,7 @@ packages=(
   typescript-language-server@latest
   # language servers for Claude Code code intelligence (LSP plugins declare
   # them; binaries must be on PATH) — pairs with gopls (brew), rust-analyzer
-  # (rustup), fish-lsp (brew)
+  # (rustup), fish-lsp (below)
   bash-language-server@latest
   pyright@latest
   @playwright/mcp@latest
@@ -26,6 +26,14 @@ packages=(
   # scripts/npmrc-render writes from 1Password ("[EXXO] github npm read PAT"
   # in Exxo Engineering); deps-up runs it before this script
   @exxo-labs/agent-tooling@latest
+  # node CLIs kept off Homebrew: their formulae depend on Homebrew's `node`
+  # (v26, banned — see scripts/brew-update), so they run on nvm's Node 24 here
+  # fish language server (editor / Claude Code LSP)
+  fish-lsp@latest
+  # Vercel CLI
+  vercel@latest
+  # MongoDB shell
+  mongosh@latest
 )
 
 pnpm i -g "${packages[@]}"
