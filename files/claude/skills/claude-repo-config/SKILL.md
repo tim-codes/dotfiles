@@ -22,9 +22,15 @@ through `claude-sync` (see the `claude-workstation-setup` skill).
 list`, `gh pr view/list/checks/diff`, `gh run view/list`, `just --list`,
 `WebSearch` and `mcp__ide__getDiagnostics`. There are no explicit `WebFetch`
 allows, by policy: auto mode decides. The local `squad` broker CLI (same-uid Unix-socket IPC to the
-broker, no network or credentials) is granted subcommand by subcommand: `squad
-send/set/publish/subscribe/unsubscribe/register/deregister/status/roster/get/
-history/doctor/debug/ack` and `squad operator raise/set/decide/list/get`. Exxo
+broker, no network or credentials) is granted subcommand by subcommand, and only
+read-only ones: `squad doctor` and `squad debug report`. The squad session tools are
+granted as the `squad` MCP server's own tools, `mcp__squad__register/set/ack/
+delegate/delegate_result/job_review/raise/watch/unwatch/heavy_slot/land`,
+never as a `mcp__squad__*` wildcard. `submit_task` and `claim` are deliberately
+not granted (they mutate squad state, so they prompt). The v0.4 CLI verbs
+(`send`, `set`, `status`, `roster`, `history`, `operator ...`) no longer exist in
+the binary (`config`, `broker`, `debug`, `doctor`, `hook`, `mcp`, `read`,
+`sessions`), so grant none of them. Exxo
 adds an enumerated set of read-only `gcloud` commands
 (`projects list`, `config list`, `run services list/describe`, `compute
 instances list/describe`, `logging read`, `storage ls`, ...) plus `gsutil ls`,

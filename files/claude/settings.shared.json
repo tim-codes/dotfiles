@@ -435,7 +435,6 @@
       "Bash(gh run view:*)",
       "Bash(gh run list:*)",
       "Bash(just --list:*)",
-      "Bash(squad status:*)",
       "Bash(squad doctor:*)",
       "Bash(squad debug report:*)",
       "mcp__squad__register",

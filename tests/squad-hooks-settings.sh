@@ -76,7 +76,7 @@ for ctx in "${CTXS[@]}"; do
     done
     check "$ctx: grants no submit_task and no squad wildcard" \
         jq -e '[.permissions.allow[] | select(. == "mcp__squad__submit_task" or . == "mcp__squad__*")] | length == 0' "$(S "$ctx")"
-    for r in 'Bash(squad status:*)' 'Bash(squad doctor:*)' 'Bash(squad debug report:*)'; do
+    for r in 'Bash(squad doctor:*)' 'Bash(squad debug report:*)'; do
         check "$ctx: keeps $r" jq -e --arg r "$r" '.permissions.allow | index($r) != null' "$(S "$ctx")"
     done
     check "$ctx: no v0.4 squad CLI grant" jq -e '[.permissions.allow[] | select(IN(
@@ -84,7 +84,7 @@ for ctx in "${CTXS[@]}"; do
         "Bash(squad unsubscribe:*)","Bash(squad register:*)","Bash(squad deregister:*)","Bash(squad roster:*)",
         "Bash(squad get:*)","Bash(squad history:*)","Bash(squad debug:*)","Bash(squad operator raise:*)",
         "Bash(squad operator set:*)","Bash(squad operator decide:*)","Bash(squad operator list:*)",
-        "Bash(squad operator get:*)","Bash(squad ack:*)"))] | length == 0' "$(S "$ctx")"
+        "Bash(squad operator get:*)","Bash(squad ack:*)","Bash(squad status:*)","Bash(squad herd:*)"))] | length == 0' "$(S "$ctx")"
 done
 
 # Rule 8 byte for byte: extract the pinned handler objects from the squad

@@ -83,7 +83,7 @@ runaway_cpu = 100.0
 runaway_rss_mb = 4096
 runaway_minutes = 2
 
-# Expected watchers: `squad status` reports one that has gone silent.
+# Expected watchers: `squad doctor` reports one that has gone silent.
 [[watchers]]
 name = "quota"
 [[watchers]]

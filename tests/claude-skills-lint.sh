@@ -6,9 +6,8 @@
 #
 # Scope: every directory under files/claude/skills/ except synced/ (claude.ai
 # account cache) and the vendored skills named in files/claude/vendor/*.lock.json.
-# The retired-name patterns apply to RETIRED_SCOPE only while the v0.4 skills
-# are still live; the P8 cut-over (P7 Task 1) widens it to every in-scope skill
-# and adds the "retired skill is gone" checks.
+# The retired-name patterns apply to every files/claude/skills/squad-*/ skill
+# (squad v0.5.10 widened them from squad-member and squad-planner).
 set -uo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -53,14 +52,16 @@ has_headings() {
 }
 
 RETIRED_PATTERNS=(
-    '(^|`)[[:space:]]*squad (send|ack|set|subscribe|unsubscribe|publish|register|deregister|roster|get|history|operator|herd|heavy|job|jobs|mail|trunk|prompt)\b'
-    '(^|`)[[:space:]]*squad debug (on|off|status|dir|list)\b'
+    '(^|`)[[:space:]]*squad (status|send|ack|set|subscribe|unsubscribe|publish|register|deregister|roster|get|history|operator|herd|heavy|job|jobs|mail|trunk|prompt|watch)\b'
+    # `squad debug on|off|status|dir|list|report` still exist in the v0.5 binary; these never did.
+    '(^|`)[[:space:]]*squad debug (openrouter|capture)\b'
     '/?squad-(orchestrator|herder|concierge|liaison|infra|join)\b'
     '\bsquad-pr-merge\b'
     '\bsquad-prompt-hook\b'
     'claude-kickoff [^`]*--resume'
 )
-RETIRED_SCOPE=(squad-member squad-planner)
+RETIRED_SCOPE=()
+for d in "$SKILLS"/squad-*/; do RETIRED_SCOPE+=("$(basename "$d")"); done
 
 no_retired_names() {
     local dir=$1 p rc=0
