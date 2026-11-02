@@ -26,7 +26,6 @@ brewDeps=(
   dotnet
   fd
   fish
-  fish-lsp
   fzf
   gh
   glab
@@ -98,7 +97,6 @@ brewDeps=(
   # is what this list silently installed for months while `tf` stayed broken
   opentofu
   tree
-  vercel
   webp
   websocat
   wget
@@ -168,6 +166,14 @@ brewCasks=(
 
 # homebrew dependencies
 brew install $brewDeps
+
+# Node 26 is banned (it SIGABRTs in native code inside ParsePackageJSON, which
+# broke opencommit); Node comes from nvm 24 only. Nothing above may depend on
+# the unversioned `node` formula — node-based CLIs live in scripts/pnpm-globals.
+# Exactly `node`, not `node@24`. Idempotent: no-op once removed.
+if brew list --formula --versions node &>/dev/null; then
+  brew uninstall node
+fi
 
 # composer pulls in the unversioned php formula and auto-links it, silently
 # overriding php@8.3 above. Relink so the pinned version wins.
