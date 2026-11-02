@@ -6,9 +6,13 @@
 # every zsh rather than only interactive ones. pnpm's installer had written it
 # here directly, through the stow symlink.
 
-# nvm is slow to source, so it stays out of .zshenv (which runs for every
-# script and ssh one-liner) and loads only for interactive shells.
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+# mise (Node manager; replaced nvm). Interactive shells get `mise activate`
+# (PATH swaps per directory, honours .nvmrc). Every other zsh gets the shims dir
+# from common.sh instead, so activation stays out of .zshenv (which runs for
+# every script and ssh one-liner). ROLLBACK to nvm: restore the two nvm lines
+# from git history, drop the shims entry in common.sh, `restow`; ~/.nvm stays
+# installed.
+command -v mise >/dev/null 2>&1 && eval "$(mise activate zsh --quiet)"
 
 # Claude context wrappers, mirroring fish's __claude_ctx (common.fish). Bare
 # `claude` uses the personal CLAUDE_CONFIG_DIR context, never the default

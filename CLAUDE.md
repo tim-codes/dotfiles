@@ -55,7 +55,7 @@ which sources `local.sh` and builds PATH:
 ```
 zsh:   .zshenv > common.sh > local.sh          (EVERY zsh, incl. non-interactive)
        [login]       /etc/zprofile (path_helper) > .zprofile > common.sh again
-       [interactive] .zshrc  (nvm only)
+       [interactive] .zshrc  (mise activate + extras)
 bash:  .bashrc > common.sh > local.sh, then interactive-only aliases/prompt
 ```
 
@@ -66,7 +66,7 @@ bash:  .bashrc > common.sh > local.sh, then interactive-only aliases/prompt
   `.zshrc`.
 - zsh is the redundant fallback, brought **toward** fish parity for the cheap
   parts only. Variables and PATH (including the gcloud SDK bin and
-  `LSCOLORS`) live in `common.sh`; `.zshrc` (interactive only) carries nvm,
+  `LSCOLORS`) live in `common.sh`; `.zshrc` (interactive only) carries `mise activate` (non-interactive zsh gets the mise shims dir from `common.sh` instead),
   the Claude context wrappers (`claude`, `claude-personal`, `claude-reserve`, `claude-exxo`,
   `claude-exxo-personal`, `claude-exxo-openrouter`, `claude-default`, one
   `_claude_ctx` helper and one context-dir list, mirroring fish's

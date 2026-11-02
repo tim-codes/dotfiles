@@ -13,12 +13,20 @@ $DOTFILES_ROOT/scripts/tmux-plugins --update
 # todo (#244): this is only working from native terminal, not emulator
 # fish -c "fisher update"
 
-# see: https://github.com/nvm-sh/nvm?tab=readme-ov-file#migrating-global-packages-while-installing
-# todo (#244): why does this not get executed by .zshrc?
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-if command -v nvm >/dev/null; then
-  nvm install-latest-npm
+# Node comes from mise, pinned to the 24 major in ~/.config/mise/config.toml
+# (src/.config/mise/). `mise install` fetches 24.x if missing; `mise upgrade`
+# stays inside the configured range, so it never crosses to a newer major (that
+# needs `--bump`, deliberately not used). mise re-points the stable
+# ~/.local/share/mise/installs/node/24 symlink on upgrade. --prune drops the
+# superseded 24.x builds.
+if command -v mise >/dev/null; then
+  mise install
+  mise upgrade --prune
+  mise reshim
 fi
+# nvm is no longer on PATH, but ~/.nvm/versions/node/v24.21.0 must STAY on disk:
+# the squad launchd jobs (~/Library/LaunchAgents/dev.tim.squad-*.plist) name that
+# path. Do not uninstall it until those plists move to the mise path.
 
 # install global pnpm packages; ~/.npmrc (private @exxo-labs registry auth)
 # must be rendered first

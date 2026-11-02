@@ -26,7 +26,6 @@ brewDeps=(
   dotnet
   fd
   fish
-  fish-lsp
   fzf
   gh
   glab
@@ -55,13 +54,15 @@ brewDeps=(
   libpq
   lsd
   mdcat
+  # Node version manager (replaced nvm). Node installs at a stable path,
+  # ~/.local/share/mise/installs/node/24, that IntelliJ's interpreter config and
+  # launchd can point at; fnm's per-shell multishell symlinks could not offer
+  # that. Config: src/.config/mise/config.toml.
+  mise
   mysql-client
   ncdu
   fastfetch
   neovim
-  # keg-only, deliberately not linked: squad members get /opt/homebrew/opt/node@24/bin first
-  # on [broker] launch_path (src/.config/squad/config.toml, dotfiles#281); the default node is 26
-  "node@24"
   pandoc
   # pinned: h2gc-legacy requires 8.3. Must be linked AFTER composer, which pulls
   # in the unversioned php formula as a dependency and auto-links it on top.
@@ -101,7 +102,6 @@ brewDeps=(
   # is what this list silently installed for months while `tf` stayed broken
   opentofu
   tree
-  vercel
   webp
   websocat
   wget
@@ -171,6 +171,16 @@ brewCasks=(
 
 # homebrew dependencies
 brew install $brewDeps
+
+# Node 26 is banned (it SIGABRTs in native code inside ParsePackageJSON, which
+# broke opencommit); Node comes from mise (24 only). Nothing above may depend on
+# the unversioned `node` formula — node-based CLIs live in scripts/pnpm-globals.
+# Covers the unversioned `node` and every versioned `node@N` formula (a stray
+# `node@24` once sat next to nvm's 24 as a second runtime). Idempotent: no-op
+# once removed. Uninstall fails loudly if something still depends on one.
+for f in $(brew list --formula -1 | grep -E '^node(@[0-9]+)?$'); do
+  brew uninstall "$f"
+done
 
 # composer pulls in the unversioned php formula and auto-links it, silently
 # overriding php@8.3 above. Relink so the pinned version wins.

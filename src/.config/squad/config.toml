@@ -9,12 +9,10 @@
 member_settings = "~/.config/squad/member-settings.json"
 
 # PATH the broker launches members with (replaces the built-in default). The default
-# list plus the pnpm global bin dir, where the playwright-mcp shim lives, and Node 24
-# first: the Homebrew default node is 26, which broke member vitest runs (tim-codes/squad#233,
-# tim-codes/dotfiles#281) while the repos' engines say 24. This `launch_path` is the supported
-# place for it (member-settings.json is the deny overlay only and carries no env or PATH).
-# Applies at the next broker restart.
-launch_path = ["/opt/homebrew/opt/node@24/bin", "~/.cargo/bin", "~/.local/bin", "~/Library/pnpm/bin", "~/.orbstack/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+# list plus the pnpm global bin dir, where the playwright-mcp shim lives. Applies at
+# the next broker restart. The node entry is the mise Node 24 major symlink, stable across
+# patch upgrades.
+launch_path = ["~/.cargo/bin", "~/.local/bin", "~/Library/pnpm/bin", "~/.local/share/mise/installs/node/24/bin", "~/.orbstack/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
 
 # Personal and exxo-personal are the same account; listing both dirs lets the
 # watcher dedupe their caches. The first dir is the one whose keychain token
@@ -102,13 +100,8 @@ mem_per_slot_mb = 3072
 max_slots = 6
 
 [heavy]
-# Grants used to wait for the broker's calm clock to reach 300 s, and that clock resets whenever
-# CPU is at or above 65%; with six members running their own fast checks the host never calmed and
-# the heavy queue never drained (tim-codes/squad#228, 2026-10-31). The derived slot count already
-# follows live CPU and memory headroom, so keep only a short dwell here. Patterns keep the defaults.
-# Workaround: the squad fix lands with the attended broker rebuild (tim-codes/squad#292); after that
-# rebuild this line can go back to the default (300) or be dropped.
-heavy_slot_min_calm_s = 20
+# heavy_slot_min_calm_s is omitted so the built-in 300 s dwell applies: the broker's calm-dwell gate now follows live CPU/memory headroom (squad #257, live from v0.5.11 on 2026-11-02).
+# The 20 s workaround of October is no longer needed.
 
 [orchestrator]
 # Stable URL of the 7790 GUI tunnel that src/bin/squad-tunnel hosts (persistent dev tunnel
