@@ -130,6 +130,17 @@ check "dry_run_no_window_line" bash -c '! printf "%s\n" "$1" | grep -q "^window:
 check "dry_run_no_new_window" test "$(newwin)" = 0
 check "dry_run_kickoff_ran" grep -q -- '--dry-run' "$T/kick.log"
 
+# short_rejects_bad_slugs
+for s in '../x' 'a b' 'A' ''; do
+    reset
+    run start --target http://h/ --scope s --builder b --cwd "$T/app" --brief-dir "$T/briefs" --short "$s" --dry-run
+    expect_rc "short_rejects_bad_slug_rc [$s]" 2
+    check "short_rejects_bad_slug_usage [$s]" grep -q -- '--short must match' <<<"$err"
+done
+reset
+run start --target http://h/ --scope s --builder b --cwd "$T/app" --brief-dir "$T/briefs" --short ok-1 --dry-run
+expect_rc "short_accepts_slug_rc" 0
+
 # stop_kills_by_id
 reset
 run stop @7

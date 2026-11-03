@@ -1,6 +1,6 @@
 ---
 name: ux-designer
-description: Experimental: Use when Tim says /ux-designer start <target-url> <scope> or /ux-designer stop, or asks for a design review or redesign of a running web UI with a designer peer: a UX/UI designer Claude session in a sibling tmux window that critiques, drafts and reviews while this session (the builder) prototypes in the real app.
+description: 'Experimental: Use when Tim says /ux-designer start <target-url> <scope> or /ux-designer stop, or asks for a design review or redesign of a running web UI with a designer peer: a UX/UI designer Claude session in a sibling tmux window that critiques, drafts and reviews while this session (the builder) prototypes in the real app.'
 ---
 
 # ux-designer (builder side)

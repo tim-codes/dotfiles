@@ -42,7 +42,7 @@ if [ -f "$U" ]; then
              mcp__playwright__browser_navigate mcp__playwright__browser_take_screenshot mcp__claude_ai_Figma__whoami mcp__claude_ai_Figma__use_figma; do
         printf '%s\n' "$utools" | grep -qx "$t" || err "ux-designer: tools lacks $t"
     done
-    for t in Edit NotebookEdit Agent mcp__playwright__browser_type mcp__playwright__browser_fill_form mcp__playwright__browser_evaluate mcp__playwright__browser_run_code_unsafe; do
+    for t in Edit NotebookEdit Agent mcp__playwright__browser_type mcp__playwright__browser_fill_form mcp__playwright__browser_evaluate mcp__playwright__browser_run_code_unsafe mcp__claude_ai_Figma__create_new_file; do
         printf '%s\n' "$utools" | grep -qx "$t" && err "ux-designer: tools must not include $t"
     done
     for s in 'ux-designer ready:' 'exxo-common:claude-design-workflow' 'exxo-common:working-with-figma' \
