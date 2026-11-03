@@ -117,3 +117,8 @@ trailers = ["Co-Authored-By: Claude <noreply@anthropic.com>"]
 # Run once per member when a task is done or its land is finally refused (execFile, no shell, so an
 # absolute path). Tears down the lane previews the member owns.
 teardown = ["just", "-f", "/Users/tim/dev/squad/deploy/Justfile", "preview-prune", "{member}"]
+
+[exclusions]
+# Every present and future h2gc production stack needs Tim's approval (Tim, 2026-11-03).
+# Intent only in v0.5.15: nothing enforces it at land time yet (ENG-536); exxo-infra stays unregistered.
+approval_stack_patterns = ["exxo/h2gc*/*prod*"]
