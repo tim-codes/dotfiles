@@ -9,19 +9,57 @@ the 2026-10-31 baseline the next rounds are measured against.
 | # | Function | What the leader does by hand today | Retired by | Log as |
 |---|---|---|---|---|
 | L1 | Unblock classifier and permission refusals [about 18] | Hands the refused action to Tim with the exact command; files the squad issue that removes the need. Not logged as its own row: a refusal is logged under the function it blocked (L2, L3, L9, …) with `outcome: handed_to_tim`, and L1 is the count of those rows | #287 (trunk service owns merges and issue close-out), #288 (host-job for sandbox-blocked commands); items carry an exact one-line command | the blocked function, `outcome: handed_to_tim`, `command` |
-| L2 | Merges outside the trunk service [27] | Merges framework, release and checkpoint PRs with its own `gh pr merge` when permitted (logged, `outcome: done`); when the classifier refuses, the PR goes to Tim (`handed_to_tim`). The nested merge-runner (ruling 38, "for today") is retired | #287 | `pr`, `reason` citing `managed_repos` |
+| L2 | Merges outside the trunk service [27] | Merges framework and release PRs with its own `gh pr merge` when permitted (logged, `outcome: done`); when the classifier refuses, the PR goes to Tim (`handed_to_tim`). Milestones are always Tim's (`policy:land:<task>:milestone:<id>`); the leader records them with `tasks.markLanded {milestone: true}` only after his merge. The nested merge-runner (ruling 38) is retired | #287; milestones stay by hand (v0.5.14) | `pr`, `reason` citing `managed_repos` |
 | L3 | Run sandbox-blocked work unsandboxed [75 renders, 13 items] | Runs an allow-listed render or repo gate script (`verify.sh`, `format.sh`, `node --check`) outside the member sandbox and returns the result to the member by `inbox.send` | #288 (broker host-job with a fixed allowlist); Node 24 pinned for members | `member`, `task_id`, `command` |
 | L4 | Decide items [59] | `items.decide` under a ruling it can cite | #290 (rulings in the DB, routine kinds auto-decided) | `item_id`, `reason: ruling <id>` |
-| L5 | Nudge and brief members [61 notes] | `inbox.send` a note: a fix landed, a new ruling, a protocol change, "your watch may not have woken you" | #290 (ruling broadcast), #289 (idle nudge), #285 (wind-down only after land) | `member`, `task_id` |
+| L5 | Brief members [61 notes] | `inbox.send` a note: a fix landed, a new ruling, a protocol change; a nudge only in answer to a `stuck-<m>` item | #290 (ruling broadcast); idle nudges retired by supervision (v0.5.14, ENG-505) | `member`, `task_id`, `item_id` |
 | L6 | Session control | `sessions.resume` after a restart or a refused land; `sessions.close` a revived idle session; a policy pause | #291 (resume lost and refused-land sessions after restart), #285 | `member`, `session_id` |
 | L7 | Rebuild and restart [10 orchestrator, 2 broker] | `deploy/ops.Justfile restart-orchestrator` (fallback: procedures.md) | #291 (verified release and restart job); #292 keeps only the attended broker re-grant | `reason`, `command` |
-| L8 | Cut releases, checkpoints and tags [6] | Release PR on the trunk, checkpoint PR trunk→main with a merge commit, tag | #293 (release task kind queued at milestone completion) | `pr` |
+| L8 | Cut squad releases and tags [6] | Release PR squash-merged onto squad `main` (`direct`), tag; one re-run of a transiently failed release job. Product releases on `release_kind = tag` repos are the orchestrator's (v0.5.14, ENG-522) | #293 (release task kind) | `pr`, `command` |
 | L9 | File and close issues [11 filed, 20 closes] | `gh issue create/close -R tim-codes/squad`; refused closes go to Tim | #287 (closes `Closes #n` at land); members raise bugs as items the orchestrator files | `command` |
 | L10 | Hygiene [35 worktrees, 20 windows] | `worktree-closedown` skill; tmux windows by name or `@id` | #239 (teardown at land; partial) plus transcript relocation in the trunk service | `task_id` |
 | L11 | Plan and approve rounds [7 approvals, 3 planner lanes] | Launches a planner lane over open issues; `tasks.approve` under ruling 29 | #294 (when-idle planning under standing rulings); agentic plan review already live | `task_id`, `reason: ruling 29` |
 | L12 | Operator-only legs [15 decks, 15 Slack sends] | Figma, Boards, Slack, Notion, Linear legs members cannot reach | #295 (Figma and Boards via `needs`/`provides`; concierge sends status and pairing links) | `task_id`, `item_id` |
-| L13 | Watch for trouble [1,137 monitor events] | The monitors in the skill's Operating section | #289 (orchestrator watchers), #286 (CI-green watch kind), #284 (notify on `blocks_launch` preflight items) | one row per monitor-triggered action, not per poll |
+| L13 | Watch for trouble [1,137 monitor events] | The watch list in the skill's Operating section (items, activity line, dependency strip, tunnel, quota) | supervision, deps watcher and doctor rows (v0.5.14); #286 (CI-green watch kind), ENG-513 (orchestrator alerting) | one row per monitor-triggered action, not per poll |
 
 Look a title up with `gh issue view <n> -R tim-codes/squad`. When an issue
 closes, the function is retired only once a round's `interventions.csv`
 shows zero for it; until then it stays in the table with the new count.
+
+## What the orchestrator does on its own (v0.5.14): not the leader's job
+
+Each of these was a hand-done intervention in the 2026-11-02/03 round. Doing
+it by hand now duplicates the orchestrator and hides whether it worked.
+
+- **Idle members.** Supervision (`[policy.supervision]`) nudges a member
+  idle 10 min with nothing to wake it, nudges again after 10 more, then
+  raises `stuck-<member>` (`blocking: now`); a silent `running` session with
+  a heavy grant or a Bash call in flight is escalated, never interrupted.
+  Do not hand-nudge. Act only on a `stuck-<m>` item, after reading the
+  activity line and the mirror log.
+- **Blocked members.** A member going `blocked` promotes its own items to
+  `blocking: now` or raises `blocked-<member>` (closed when it leaves
+  `blocked`). Do not rank or re-flag items.
+- **The secret cache.** The deps watcher (`[policy.deps]`) starts OrbStack
+  and `exxo-1p-cache`, raises `policy:deps:cache:*`, and holds launches
+  (`deps_down`) while a failed auto-start item stands. Do not start the
+  cache by hand: read the item. It starts an empty cache; it does not warm
+  it (re-warm: procedures.md, Item handling).
+- **Milestones.** Every milestone land raises
+  `policy:land:<task>:milestone:<id>`; the trunk service never merges one.
+  Tim always merges it; then `tasks.markLanded {milestone: true}`.
+- **Releases.** On a `release_kind = tag` repo the orchestrator merges,
+  verifies staging, cuts the annotated `v<date>-<n>` tag and verifies
+  production before the task is `done`. Never tag by hand while a land is
+  `landing`; a hold raises `policy:release:<land>` with the choices.
+- **Gaps.** The heal guard (`[policy.heal]`) auto-creates a missing
+  prerequisite only in a managed, not `operator_only` repo, as an
+  `evaluating` task (through plan review; never from a heal-created task);
+  otherwise it raises `policy:heal:<task>:<ref>` with a proposal.
+- **Descopes.** Wording never parks. The leader parks with `submit_task
+  {task_id, park: [exact deliverable name]}` on the running task, or the
+  ruling `descope <name>` / `park <name>` on the heal item (exactly one
+  name, else the item stays open listing them); `scope_directive` is the
+  concierge's tool.
+- **Close-out.** A task's items close at `task.done`; a decision for a gone
+  member is dropped with a note; a batch closes itself.
