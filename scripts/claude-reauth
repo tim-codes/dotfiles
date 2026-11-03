@@ -153,12 +153,12 @@ fix_docker() {
 
 # --- secret caches (see the exxo-common run-with-secrets skill and homelab's
 # run-with-secrets skill; never stopped here — only started) ----------------------
-container_running() { [ -n "$(docker ps -q -f "name=$1" 2>/dev/null)" ]; }
+container_running() { [ -n "$(docker ps -q -f "name=^$1$" 2>/dev/null)" ]; }
 check_exxo_cache() {
     if ! docker_up; then S=skipped; N="Docker down — fix docker first"; return; fi
     if ! container_running exxo-1p-cache; then
         S=needs-auth; N="exxo-1p-cache not running"
-        FIX="docker run -d --rm --name exxo-1p-cache -p 127.0.0.1:6380:6379 redis:7-alpine redis-server --save '' --appendonly no"
+        FIX="docker start exxo-1p-cache 2>/dev/null || docker run -d --restart unless-stopped --name exxo-1p-cache -p 127.0.0.1:6380:6379 redis:7-alpine redis-server --save '' --appendonly no"
         return
     fi
     # Captured, not piped into grep -q: under pipefail an early grep exit
@@ -175,7 +175,7 @@ check_exxo_cache() {
 }
 fix_exxo_cache() {
     # The reference invocation from the exxo-common cache contract (idempotent).
-    container_running exxo-1p-cache || docker run -d --rm --name exxo-1p-cache \
+    container_running exxo-1p-cache || docker start exxo-1p-cache >/dev/null 2>&1 || docker run -d --restart unless-stopped --name exxo-1p-cache \
         -p 127.0.0.1:6380:6379 redis:7-alpine redis-server --save '' --appendonly no >/dev/null 2>&1
 }
 check_homelab_cache() {
