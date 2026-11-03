@@ -151,7 +151,10 @@ Grounding: exxo, exxo-personal and exxo-openrouter already get exxo-common from 
 
 Run: `comm -12 <(ls ~/dev/exxo/skills/common/skills | sort) <(ls /Users/tim/dev/dotfiles-feat-ux-designer-peer/files/claude/skills | sort)`
 Expected: exactly `run-with-secrets`. Check exxo-common for agents too: `ls ~/dev/exxo/skills/common/agents 2>/dev/null` should print nothing. If the list has any other name, stop and report it.
-Decision for `run-with-secrets` (pending Tim's veto, see report): both copies coexist in personal/reserve. The plugin copy loads as `exxo-common:run-with-secrets` and the repo copy as bare `run-with-secrets`. Their descriptions are already disjoint: the homelab one says zima/ragnar/op, the Exxo one says agent/run + agent.env. The agents' Environment block (`files/claude/agents/implementer.md:16-24`) already picks per context. No skill file is edited.
+Decision for `run-with-secrets` (Claude's call, after Tim accepted exxo-common everywhere on 2026-11-03, superseding ENG-20): both copies coexist in personal/reserve (plugin copy `exxo-common:run-with-secrets`, repo copy bare `run-with-secrets`), and their descriptions are made mutually exclusive so a session can't pick the wrong credential guidance (the 2026-08-18 failure):
+- In this branch, `files/claude/skills/run-with-secrets/SKILL.md` description gains "Homelab repo only (zima/ragnar, onepassword lookups); NOT for Exxo repos, which use exxo-common:run-with-secrets." Keep it within the repo's description limits; `tests/claude-skills-lint.sh` must pass.
+- In Exxo-Labs/skills, a separate small PR (own worktree via `wt -C ~/dev/exxo/skills switch --create fix/run-with-secrets-scope --base origin/main --no-cd -y`, gate `scripts/verify.sh` + `scripts/format.sh --check`, draft PR, do not merge) makes `common/skills/run-with-secrets/SKILL.md`'s description say "Exxo repos only (agent/run, agent.env); NOT for the homelab repo, which has its own run-with-secrets." ≤400 chars, single-quoted, starts "Use when". No rename (renames break consumers).
+- The agents' Environment block (`files/claude/agents/implementer.md:16-24`) already picks per context; unchanged.
 
 - [ ] **Step 2: Flip the tests first**
 
@@ -188,7 +191,7 @@ Expected: no output.
 
 ```bash
 git -C /Users/tim/dev/dotfiles-feat-ux-designer-peer add files/claude/settings.shared.json files/claude/settings.exxo.json tests/claude-sync-permissions.sh tests/claude-sync-reserve.sh files/claude/README.md files/claude/skills/claude-workstation-setup/SKILL.md scripts/claude-sync
-git -C /Users/tim/dev/dotfiles-feat-ux-designer-peer commit -m "claude-sync: enable exxo-common in every context" -m "Collision check: only run-with-secrets (coexists namespaced; descriptions disjoint). exxo-mantine stays exxo-only.
+git -C /Users/tim/dev/dotfiles-feat-ux-designer-peer commit -m "claude-sync: enable exxo-common in every context" -m "Collision check: only run-with-secrets (coexists namespaced; descriptions made mutually exclusive here and in Exxo-Labs/skills). exxo-mantine stays exxo-only.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01Fb4jhg5BH2iRtC6sb91kA3"
