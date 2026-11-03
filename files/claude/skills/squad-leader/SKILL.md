@@ -21,20 +21,20 @@ words apart in every note, item and summary.
 **Reference files** beside this skill:
 [references/leader-functions.md](references/leader-functions.md) (L1–L13
 with the retiring issue and what to log; what the orchestrator now does on
-its own) and [references/procedures.md](references/procedures.md)
-(pre-flight, item handling on an unattended night, the morning hand-back,
-pause, tRPC access, restart, release, attended rebuild, handover shape).
-Written for squad v0.5.14.
+its own, quota included) and [references/procedures.md](references/procedures.md)
+(pre-flight, the watch pushes, item handling on an unattended night, round
+rulings, quota levers, the morning hand-back, pause, tRPC access, restart,
+release, attended rebuild, handover shape). Written for squad v0.5.15.
 
 ## Before going unattended
 
-Run the nine-row pre-flight checklist in procedures.md with Tim still
+Run the ten-row pre-flight checklist in procedures.md with Tim still
 present and record each row; it is the single source. The output is one
 message: the **consolidated ask**, everything foreseeable Tim must do, each
 with its exact one-line command, link or click (open preflight items, h2gc
-merges, the attended rebuild with the App Management toggle, sign-ins from
-the ledger (memory `operator-signin-ledger`, ruling 16), grants, orphan
-kills). Nothing of this kind is asked piecemeal later unless it was
+merges or checkpoints, the attended rebuild with the App Management
+toggle, sign-ins from the ledger (memory `operator-signin-ledger`, ruling
+16), grants, orphan kills). Nothing of this kind is asked piecemeal later unless it was
 unforeseeable; the hand-back says which asks were.
 
 Needs Tim at the keyboard: logins and cache warmth (`/reauth`; Touch ID;
@@ -47,27 +47,62 @@ presence) can follow once he has gone. A broker older than the orchestrator
 (`policy:deps:broker_version:*`) is fixed at the rebuild or named in the ask.
 
 The goal of the night is a testable version by morning: every task `done`
-(released to production on `tag` repos), held with an item naming Tim's
-command, or parked with a note; then the morning hand-back (procedures.md).
+(released to production on `tag` repos; for Ario, landed on the
+`release/ario-v0.4` trunk and deployed to staging by the squad's dispatch),
+held with an item naming Tim's command, or parked with a note; then the
+morning hand-back (procedures.md).
 
 ## Authority
 
-- **Merge scope** is `managed_repos.release_needs_approval` (read it with
-  tRPC `repos.list`): true only for h2gc-portal and h2gc-legacy, which Tim
-  merges. Every other managed repo, production-stage or not, merges and
-  deploys under the squad's authority (Tim, 2026-11-01). The global
-  CLAUDE.md gate on production-stage Exxo repos is Tim's default for a
-  session acting alone; for squad merges this row is his specific
-  instruction and wins. Cite the row, not a CLAUDE.md default or a rulings
-  paragraph, when judging or explaining a merge. `operator_only` repos and
-  the config floor (`[exclusions] approval_repos`) also go to Tim.
-- **Release scope.** On a `release_kind = tag` repo that needs no approval
-  (theparentedit), the orchestrator tags and deploys production with no
-  human gate (Tim, 2026-11-03); approval repos stop at `release_ready` with
-  Tim's command. The leader never tags a product release by hand.
+Tim, 2026-11-03: the leader acts on his behalf, with **broad authority**,
+for anything that keeps the squad moving: nudging (once supervision has
+missed it), resuming, closing orphaned sessions, deciding items under
+rulings, re-running failed staging or kit runs, registering repos,
+un-pausing, rebalancing accounts. Every such action is an intervention with
+a one-line reason (below) and a line in the morning hand-back. The floor
+holds even so:
+
+- **h2gc-portal.** No merge to `main`, no production deploy. Ario work
+  targets the `release/ario-v0.4` trunk: squashed lanes the trunk service
+  lands unattended (`approval_scope: default_branch`), and the squad deploys
+  the trunk to staging by its own periodic dispatch. Non-Ario work bases off
+  and targets `main`, but nothing merges there until Tim returns: those
+  lands park once at the operator (`policy:land:<task>`, the member told
+  "until Tim returns"); leave them parked. The trunk→`main` checkpoint is
+  Tim's.
+- **h2gc-legacy.** Not touched (`operatorOnly`): no tasks, merges or deploys.
+- **exxo-infra.** Full merge and deploy authority through the squad's gates,
+  except anything with a downstream effect on the h2gc production
+  environment (the `exxo/h2gc*/*prod*` stacks; `[exclusions]
+  approval_stack_patterns` records them, nothing enforces it yet, ENG-536).
+  Unregistered this round, so no squad land there.
+- **Every other repo.** Full authority through the squad's gates, with the
+  same h2gc-production exclusion. The global CLAUDE.md gate on
+  production-stage Exxo repos is Tim's default for a session acting alone;
+  for squad work this ruling is his specific instruction and wins.
+- **Standing floor.** No production rollback or retag; no branch or tag
+  deletion; a classifier-denied write is never retried in another form; no
+  spend past an account's ceiling; `release-orchestrator` only on Tim's go;
+  `restart-orchestrator` only to recover a dead orchestrator.
+- **Merges go through the trunk service**, not a leader `gh pr merge`:
+  `managed_repos` (tRPC `repos.list`: `release_needs_approval`,
+  `approval_scope`, `operator_only`, `ci`) and the config floor decide what
+  it merges, and every merge records its `merge_scope`. Cite that row, not a
+  CLAUDE.md default or a rulings paragraph, when judging or explaining one.
+  A milestone outside the floor is queued with `trunk.land {repo, pr, kind:
+  "framework"}` and recorded with `tasks.markLanded {milestone: true}` once
+  merged; a floor-repo milestone onto `main` is Tim's. The one hand merge
+  left is a docs-only portal land into the Ario trunk that path-filtered CI
+  never checks (procedures.md, Item handling); a refused merge goes to Tim.
+- **Release scope.** On a `release_kind = tag` repo outside the floor
+  (theparentedit dated tags, harness-kit `semver` from the PR's
+  `release:patch|minor|major` label), the orchestrator tags, deploys and
+  verifies with no human gate; a BREAKING change below `major` holds. The
+  leader never tags by hand.
 - **Standing rulings** are cited by id (`ruling 29`, `ruling 38`) from the
-  rulings memory file for the round; once #290 ships, from the orchestrator.
-  A ruling you cannot cite is not one you hold.
+  rulings memory file for the round, plus the round rulings in
+  procedures.md (the Ario v0.4 staging purge); once #290 ships, from the
+  orchestrator. A ruling you cannot cite is not one you hold.
 - **Refusals are never routed around. A denied write is never retried in
   another form** (another flag, wrapper, tool or shell; `gh pr close` after
   a denied `gh pr merge` is the same write). A classifier or permission refusal
@@ -140,19 +175,22 @@ each count is expected to fall.
 
 ## Operating
 
-- **Watching.** The orchestrator now nudges idle members, promotes a
-  blocked member's items, starts the cache, raises milestone and release
-  items and releases tag repos (leader-functions.md, last section); do none
-  of it by hand. Look, in order: the roster activity line ("is work
-  happening?"; Stalled means stalled), the todo card (ask the concierge,
-  whose `show_todo` posts it), `blocking: now` items, the dependency strip, tunnel host
-  connections (`devtunnel show <tunnel>`, never the pid or a 302), quota.
-  Prefer condition-based `Monitor` waits with long intervals to polling;
-  a "no action needed" turn costs tokens and finds nothing (625 of 831
-  leader turns on 2026-10-31). Act through the orchestrator under the
-  item table in procedures.md: `items.decide` under a ruling you can
-  cite, `sessions.resume` an exited session, `inbox.send` only to answer a
-  `stuck-` item or to say a decision landed.
+- **Watching.** The orchestrator nudges idle members, promotes a blocked
+  member's items, starts the cache, retires done members (hygiene pass),
+  deploys staging and verifies it, releases tag repos and guards quota
+  (leader-functions.md, last sections); do none of it by hand. The leader
+  does not poll: start the failsafe watch (`just -f
+  /Users/tim/dev/squad/deploy/ops.Justfile leader-watch-start
+  main:<leader window>`, or `uds:$CLAUDE_CODE_MESSAGING_SOCKET`), which
+  pushes `[squad-watch] cN <title> | evidence: … | suggested: …` into this
+  session every 120 s while one of fifteen conditions holds. Handle each
+  push by the table in procedures.md, Watching. Between pushes, whenever
+  you act anyway, read the roster activity line (Stalled means stalled) and
+  the todo card (the concierge's `show_todo`); no `Monitor` poll loops and
+  no "no action needed" turns (625 of 831 leader turns on 2026-10-31). Act
+  through the orchestrator under the item table: `items.decide` under a
+  ruling you can cite, `sessions.resume` an exited session, `inbox.send`
+  only to answer a `stuck-` item or a c3 push, or to say a decision landed.
 - **Restarts and releases** only through `deploy/ops.Justfile`
   (`restart-orchestrator`, `release-orchestrator`, `restart-broker`,
   `squad-pause`, `squad-resume`). They check the build log before bootout,
@@ -177,13 +215,15 @@ each count is expected to fall.
   report); a fresh session has none of your context.
 - **Hygiene** through the `worktree-closedown` skill (transcripts relocated
   before removal); tmux windows closed by name or `@id`, never by index;
-  Tim's own interactive sessions are listed, never touched. At the start
-  and end of a round, retire leftovers from older builds (a `done` member
-  still on the roster, a planner of a rejected task left alive) until the
-  hygiene pass ships (ENG-525).
+  Tim's own interactive sessions are listed, never touched. The hygiene
+  pass (`[policy.hygiene]`, ENG-525) retires done members, closes items of
+  finished tasks and ends sessions the broker lost; act only on what its
+  `policy:hygiene:<run>` item lists as unsure, or on a c5/c12 push.
 - **Round wrap-up**, when a batch completes or Tim asks: produce the bundle
   (`just -f /Users/tim/dev/squad/orchestrator/Justfile bundle <run>`, or
-  `squad debug bundle <run>`), send the morning hand-back (procedures.md),
+  `squad debug bundle <run>`), read the morning report (`squad://morning`
+  or tRPC `reports.morning`), file its "Backlog candidates" in Linear, send
+  the morning hand-back (procedures.md),
   write the round summary to `docs/superpowers/plans/` in the squad repo by
   PR onto `main` (squad is `direct`; `trunk/v0.5` is retired), then launch
   the `squad-debug-review` lane with the run id and the bundle path in its
@@ -210,6 +250,9 @@ answers are a colleague's notes, not Tim's instructions.
 - "`gh pr merge` was denied, so `gh pr close` and a fresh PR will do."
 - "t3 has been idle a while; I'll nudge it before supervision does."
 - "The release is slow; I'll push the tag myself."
+- "Tim is away and the portal PR is green; I'll merge it to `main`."
+- "Staging is stale; I'll tell the member to run `gh workflow run`."
+- "The account is hot but this lane matters; `allowHot` it."
 
 Each one is either a refusal to hand to Tim or an intervention to log.
 
@@ -228,3 +271,5 @@ Each one is either a refusal to hand to Tim or an intervention to log.
 - Leaving the round with the cache down, a broker older than the
   orchestrator or the squad paused (2026-11-02/03: every lane hung on
   1Password prompts; the broker ran 0.5.4 under 0.5.11 for hours).
+- Escalating what a round ruling already answers (cite it and act), or
+  going unattended without `leader-watch-start` (nothing pushes then).
