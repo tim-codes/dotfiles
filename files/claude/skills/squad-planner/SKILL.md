@@ -210,7 +210,15 @@ omitted, never `null`.
   `name` 1–200 characters, `check` 1–2000 characters, something a reviewer
   can run or observe. In a multi-repo plan, give each deliverable its `repo`
   (`owner/name`, the anchor or one of `resources.repos`) so the plan says
-  where it lands.
+  where it lands. A deliverable may carry `stage: merge | staging |
+  production` (absent means checked at the merge). `production` is accepted at
+  plan approval only for a repo whose `managed_repos.release_kind` is not
+  `none`: the orchestrator then takes the land through staging, cuts the
+  release by the repo's convention and verifies production before the task is
+  `done`. Check the context brief's `release_kind`, `release_tag_pattern` and
+  `verify_recipe`, and name post-deploy acceptance checks (e.g. "deploy log
+  shows Sync topics succeeding") as `production` deliverables, since they are
+  only observable after the release.
 - `depends_on` (optional): up to 50 task ids, only ids present in the
   brief's `tasks`, never the task's own id.
 - `resources`: `repo` (`owner/name`); `base` (a branch or a `trunk/...` named
@@ -259,8 +267,30 @@ omitted, never `null`.
   accounts, access) or `blocks_step` when it is needed at a named point
   mid-work.
 - `infra` (optional): up to 10 `{stacks, summary}` (1–20 stacks, summary
-  1–2000 characters) whenever supporting infra is needed, so the orchestrator
-  creates the exxo-infra dependency task that lands first (spec §8).
+  1–2000 characters) describing the supporting infra. It creates nothing: each
+  entry must be covered by a `task` or `ticket` prerequisite, or `submit_task`
+  refuses the plan.
+- `prerequisites` (optional): `[{kind: task|ticket|external, for: <deliverable
+  name>, ref?, repo?, title, note?, create?: true, step?: <operator step
+  title>}]`. Every "lands first", "depends on", "waits on", "blocked on/by" or
+  "needs X in <repo>" in the plan body becomes an entry here; prose alone is
+  refused.
+  - `task`: `ref` is an existing task id, or `create: true` with a managed
+    `repo` (at plan approval, not submit, the orchestrator creates an
+    `evaluating` task there, sequenced before this one, through the normal
+    plan review). A task that was itself created this way may not use
+    `create: true` (one level only).
+  - `ticket`: `ref` is a `[A-Z]+-\d+` id whose prefix is one of the plan's
+    `tickets` prefixes or in `[policy.heal] ticket_prefixes` (default ENG).
+    Create the Linear ticket first with the Linear MCP, then list it.
+  - A bare `#45` or `t2` is informational and never refuses; a managed repo
+    short name counts alone only if it contains a hyphen, else write
+    `owner/name`.
+  - `external`: `step` names an operator step.
+  - Bind each `blocks_step` operator step to its deliverable (`for`) or name
+    it from a prerequisite's `step`; an unbound one is refused. For a plan
+    approved before v0.5.14 these and the `infra` check give `warnings`, not
+    refusals; read the `submit_task` result's `warnings` and act on them.
 - `kickoff_brief`: 1–50000 characters, `kickoff-template.md` in this
   directory filled in: replace every `<…>`; keep the merge-authority line
   that applies, remove its brackets and delete the other. A new task with no
@@ -417,7 +447,11 @@ interactive shows Tim the problems and asks how to proceed.
 - From Tim's interactive session, a resubmission for a `running` task becomes
   a scope-change directive to the member (spec §6.2–§6.3). Do it only when
   Tim asks for it, and quote his words verbatim, with the date, under
-  `## Scope change`; never paraphrase them.
+  `## Scope change`; never paraphrase them. To drop a deliverable mid-task,
+  pass `park: [<exact deliverable name>]` to `scope_directive` or
+  `submit_task`: wording alone never parks (the result may carry a
+  `suggestion` of deliverables that look descoped), and a parked deliverable
+  is listed to the land reviewer as "parked, not judged".
 - `squad://me` lists the tasks this session submitted with their state and
   revision, to see whether a plan was approved, amended or rejected.
 

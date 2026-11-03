@@ -79,6 +79,17 @@ the contract (`contracts/mcp-tools.md`, "Directive payloads" in the squad repo).
   `done`) and a one-line `detail` at start, at each milestone (a deliverable
   done, a PR opened, tests green), when blocked and when done. The `detail` is
   what the orchestrator and a resumed you read, so name the next step.
+- A headless member does not end a turn on a "next step" it has not started.
+  Either do the step, or end the turn only while waiting on a
+  `mcp__squad__watch` or a job, and say what it waits on with `mcp__squad__set`
+  (`working` or `blocked`, `detail`: "waiting on <watch/job>; then <next
+  step>"). A turn that closes on "next I will..." with nothing pending is
+  dead: nobody re-prompts it (the orchestrator nudges once or twice, then
+  raises it to Tim as stuck).
+- When you wait on something, name real identifiers (task id, ticket id,
+  `owner/repo`) in `detail`: "waits on X" / "depends on X" where nothing
+  tracks X raises a `policy:heal:<task>:<ref>` item for Tim, or creates the
+  prerequisite task in a managed repo, in which case expect an inbox message.
 - Anything that needs Tim goes to `mcp__squad__raise`: a `title`, a `kind`
   (`approval`, `action`, `review` or `info`), `blocking: now` or `later`, and
   `options` (each `{id, label, needs_operator}`, with `commands` where Tim
@@ -132,20 +143,28 @@ comprehensive gate per trunk.
   does not check for a draft, so a draft would still be reviewed.
 - Merge authority `trunk_service`: call `mcp__squad__land` with
   `{pr: "<https PR URL>", kind: "milestone"}` at each milestone the kickoff
-  names, and `kind: "completion"` at the end. `queued` means the land is
-  accepted and waiting; `landed` means merged. What happens next depends on
+  names, and `kind: "completion"` at the end. `queued` means the request is
+  recorded: for a `completion` land the trunk service picks it up; for a
+  `milestone` land the merge-by-hand item was raised for Tim (see the
+  `reason`), so keep working and never wait on a milestone to merge. `landed`
+  means merged. What happens next depends on
   `[policy.trunk] enabled`:
   - **Enabled:** a `completion` land is reviewed by the trunk service
     (correctness and estate conformity) and squash-merged by it once the
     review, the GitHub checks and the merge state are clean. The task
-    reaches `done` with no operator item.
+    reaches `done` with no operator item (on repos that release to production
+    it stays `landing` until the release is live, and your status line shows
+    Releasing/Released).
   - **Disabled:** nothing reviews or merges the PR. A `completion` land
     raises the item `policy:land:<task_id>` and Tim merges by hand.
-  - A `milestone` land is **not** reviewed or merged by the service in
-    either mode: it is recorded with its PR URL and the task keeps running.
-    With the service enabled no item is raised; with it disabled the land
-    raises a milestone land item for Tim (`policy:land:<task_id>:milestone:<request id>`). You may show `blocked` until the PR
-    merges by other means (Tim, or whatever the kickoff names); carry on with whatever does not depend on it.
+  - A `milestone` land is never reviewed or merged by the service, enabled
+    or not: it is recorded with its PR URL and the task keeps running. Either
+    way it raises `policy:land:<task_id>:milestone:<request id>` so Tim merges
+    by hand, and the tool answers `queued` with the `reason` `milestone
+    recorded; the trunk service does not merge milestones, the operator is
+    asked to merge it by hand (item policy:land:<taskId>:milestone:<requestEventId>).
+    Keep working.` Carry on with whatever does not depend on the merge; `set` `blocked` only if
+    nothing else can proceed.
 - A `completion` land puts the task into `landing`: it is done on your side,
   waiting for the trunk service to review and merge. Finish as under
   Finishing and wind down; do not wait for `landed`.
@@ -332,28 +351,35 @@ the plan PR as superseded, with a comment linking the lane PR.
 
 ## Denials
 
-Read how a denied call ended from its message, and never retry it in another
-form (a different command, a wrapper, another tool reaching the same effect):
+Read how a denied call ended from its message (the `squad:` prefix is part of
+each string), and never retry it in another form (a different command, a
+wrapper, another tool reaching the same effect):
 
-- `squad: no answer to this permission request in time`: nobody answered. The
-  silence is not Tim declining and not a refusal. Raise once, with the exact
-  command and why, and carry on with work that does not depend on it.
-- `squad: the session or the broker ended before this permission request was
-  answered` (or the turn moved on): the request died with the session. Not Tim
-  declining. Re-check `squad://me`; raise again only if the work still needs it.
-- A deny carrying a note: only this is Tim's word. Follow it; do not route
-  around it. A classifier or policy denial is reported, not routed around:
-  raise it or name it in `set` `detail`.
+- `squad: no answer to this permission request in time; denied`: not Tim.
+  Take another clean route, or raise once with the exact command and
+  `blocking: later` (`now` only if nothing is left to do).
+- `squad: the turn moved on before this permission request was answered`,
+  `squad: the session or the broker ended before this permission request was
+  answered; denied`, `squad: this session's token was revoked; this permission
+  request was denied`: the request died with the turn, session or token, not
+  Tim. Re-check `squad://me`; a revoked token means stop.
+- `squad: this permission request was denied` with no note: an operator or
+  policy deny with no reason. Report it in `set` `detail`; never route around
+  it.
+- Any other denial, or a classifier refusal: report it, never route around it.
+- A deny carrying a note is the only thing that is Tim's word. Follow it.
 
 ## Orchestrator unreachable
 
-If `mcp__squad__*` calls fail with connection errors or timeouts, the
-orchestrator (a service, not a Claude session) or its tunnel may be down.
-Retry the call once. If it still fails, keep working on the local steps that
-need no squad call (commit, tests, the diff), and raise nothing in a loop. At
-the next turn where the squad answers, report what happened with `set`. Never
-claim done or landed without a successful `set` or `land`, and never merge
-with `gh` instead.
+On `orchestrator unreachable: ...` (connection refused or unreachable, timed
+out) the orchestrator or its tunnel may be down. Retry with backoff (about 5 s,
+15 s, 45 s, 2 min) for up to 10 minutes, keeping on with local-only steps that
+need no squad call (commit, focused tests, the diff). If the outage outlasts
+that, raise once the squad answers; if it never does, end the turn with a
+status naming the outage and the last step done. `orchestrator refused this
+session's token` is not an outage: stop and end the turn. Never loop on
+raises, never claim done or landed without a successful `set` or `land`, and
+never merge with `gh` instead.
 
 ## Scratch
 

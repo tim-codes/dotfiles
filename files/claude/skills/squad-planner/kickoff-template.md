@@ -24,7 +24,7 @@ Repo: <owner/name>   Base: <base branch or trunk>   Priority (suggested): <1-5>
 <blocks_step items by title; "none">
 
 ## Dependencies
-<task ids this waits on, and infra tasks; "none">
+<the plan's `prerequisites` (task ids, tickets, external steps); "none">
 
 ## Notes
 <anything the member must know that the deliverables do not say; where a plan PR or OpenSpec change exists, its URL and change id, and "Run the staleness pass first (squad-member, Starting from a plan PR): rebase onto the base above before the first push only; after pushing, merge the base in.">
