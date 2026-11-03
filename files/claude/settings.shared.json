@@ -325,6 +325,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook stop) && printf '%s\\n' \"$o\"; exit 0",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PermissionDenied": [
