@@ -210,7 +210,15 @@ omitted, never `null`.
   `name` 1–200 characters, `check` 1–2000 characters, something a reviewer
   can run or observe. In a multi-repo plan, give each deliverable its `repo`
   (`owner/name`, the anchor or one of `resources.repos`) so the plan says
-  where it lands.
+  where it lands. A deliverable may carry `stage: merge | staging |
+  production` (absent means checked at the merge). `production` is accepted at
+  plan approval only for a repo whose `managed_repos.release_kind` is not
+  `none`: the orchestrator then takes the land through staging, cuts the
+  release by the repo's convention and verifies production before the task is
+  `done`. Check the context brief's `release_kind`, `release_tag_pattern` and
+  `verify_recipe`, and name post-deploy acceptance checks (e.g. "deploy log
+  shows Sync topics succeeding") as `production` deliverables, since they are
+  only observable after the release.
 - `depends_on` (optional): up to 50 task ids, only ids present in the
   brief's `tasks`, never the task's own id.
 - `resources`: `repo` (`owner/name`); `base` (a branch or a `trunk/...` named

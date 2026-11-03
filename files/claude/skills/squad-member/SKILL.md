@@ -152,7 +152,9 @@ comprehensive gate per trunk.
   - **Enabled:** a `completion` land is reviewed by the trunk service
     (correctness and estate conformity) and squash-merged by it once the
     review, the GitHub checks and the merge state are clean. The task
-    reaches `done` with no operator item.
+    reaches `done` with no operator item (on repos that release to production
+    it stays `landing` until the release is live, and your status line shows
+    Releasing/Released).
   - **Disabled:** nothing reviews or merges the PR. A `completion` land
     raises the item `policy:land:<task_id>` and Tim merges by hand.
   - A `milestone` land is never reviewed or merged by the service, enabled
