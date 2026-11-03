@@ -84,7 +84,10 @@ review to run on the Postgres fallback.
   issue close, L3 for a sandbox run) with `outcome: handed_to_tim`. No
   nested session to re-run the denied command, no `claude -p
   --allowedTools` merge runner, no telling a member to retry what you were
-  refused. The member continues on other work.
+  refused. The member continues on other work. A denied write is never
+  retried in another form (another flag, wrapper, tool or shell): it goes to
+  Tim as the exact command and the reason it is needed, and waits for his
+  ruling (ENG-519).
 - **Handing to Tim** means: a line on *Tim's list* (a file in your
   scratchpad that the consolidated ask and the round summary are built
   from: what, the one-line command, the issue, since when), plus a Slack
