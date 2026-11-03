@@ -5,10 +5,18 @@ trial, not yet prescribed anywhere (see Constraints).
 
 ## Intent
 
-Tim wants a UX/UI designer working beside his builder session. The first
-use is the squad GUI (Mantine 9, `~/dev/squad/gui`, live on
-`localhost:7797`): it shows a lot of information, and he wants to simplify
-how it is presented and iterate layouts and navigation quickly.
+Tim wants a UX/UI designer working beside his builder session, for
+design review and iteration of **any web UI he is building**: a running
+app (local dev server, preview build or deployed URL), a given scope
+(a screen, a flow, navigation, information density, copy, accessibility,
+a redesign), and whatever stack the repo uses. Everything in the agent
+and skill is generic: target, scope and stack come from the launch
+arguments and the repo, never from hard-coded examples.
+
+**Example use (not a special case):** the squad GUI (Mantine 9,
+`~/dev/squad/gui`, live on `localhost:7797`) shows a lot of information;
+Tim wants to simplify its presentation and iterate layouts and
+navigation.
 
 The designer critiques, proposes and drafts; the builder session
 prototypes in the real app; Tim reviews real builds. The designer never
@@ -61,14 +69,16 @@ subagent. Why:
 
 ### Launch (skill, run in the builder session)
 
-`/ux-designer start <scope>` (exact argument shape is the builder's call):
+`/ux-designer start <target-url> <scope>` (exact argument shape is the
+builder's call; the target and scope are always arguments, the repo is the
+builder's cwd unless given):
 
 1. Resolve the builder's own `ListAgents` name and the current tmux
    session (`tmux display-message -p '#S'`).
 2. Write a kickoff brief (scratch dir) with frontmatter: `cwd` = the app
    repo, `context` = the builder's context (same context is mandatory:
-   native `SendMessage` cannot cross contexts), `model: sonnet` (opus
-   when Tim asks for a direction-setting pass), `effort`, plus the new
+   native `SendMessage` cannot cross contexts), `model: opus` by default
+   (Tim's decision; a lighter model only when Tim asks), `effort`, plus the new
    keys `agent: ux-designer` and `name: ux-designer-<short>` (see
    claude-kickoff changes). Body: scope, app URL, builder's name,
    preview convention, and the round protocol below.
@@ -93,11 +103,13 @@ builder raises it with Tim.
 
 ### Round
 
-1. **Critique.** The designer browses the live GUI in scope read-only with
-   Playwright (no sign-in needed on localhost; claude-in-chrome only when
+1. **Critique.** The designer browses the target in scope read-only with
+   Playwright (claude-in-chrome via `agent-chrome-screenshots` only when
    a signed-in page is in scope), takes scratch screenshots (never
-   committed), may read the GUI code read-only to fit Mantine components
-   and the theme, and sends the builder a concise critique.
+   committed), reads the repo's UI code read-only to learn its component
+   library, theme and conventions (e.g. `mantine-docs` and
+   `frontend/styling` when the repo is Mantine), and sends the builder a
+   concise critique.
 2. **Draft.** One Claude Design canvas per scope (Design type via
    `Artifact` quickstart; title `<scope>`), one artboard per direction;
    tight scope: one draft artboard and skip options. Plus a
@@ -131,14 +143,17 @@ direction goes on new artboards.
 ## Parts to build
 
 1. **Agent definition** `files/claude/agents/ux-designer.md`: frontmatter
-   `name`, `description`, `model: sonnet`, and a `tools:` allowlist (the
+   `name`, `description`, `model: opus` (Tim's decision 2026-11-03, a
+   deliberate departure from the estate's sonnet pin for dedicated
+   agents: design judgment is the job), and a `tools:` allowlist (the
    parentedit `ui.md` precedent) with no Write/Edit, so "never writes app
    code" is enforced. Bash stays for read-only commands and tmux/kickoff
    is not needed by the designer. Body: the estate Environment block
    (copied from the existing agents), the role, the round protocol, the
    rules above, and pointers (not copies) to `claude-design-workflow`,
-   `working-with-figma`, `design:*` skills, `mantine-docs`,
-   `frontend/styling`. Writing scratch files (screenshots, hand-off
+   `working-with-figma`, `design:*` skills, and stack-specific skills
+   chosen from what the repo uses. No app, repo, port or stack is named in
+   the agent or skill except as a labelled example. Writing scratch files (screenshots, hand-off
    files, canvas files under the scratchpad) needs some write path:
    builder's call how (e.g. allow Write but forbid repo paths in the
    body, or Bash-only into the scratchpad).
@@ -192,16 +207,18 @@ direction goes on new artboards.
 - Disclosure through skills, not product CLAUDE.md; no project/agent
   prescription until trialled.
 - Exxo skills plugin enabled in all contexts.
+- `model: opus` by default.
+- Generic agent and skill: any web UI, any scope, any stack; the squad GUI
+  is one example.
 
 ## My calls (Claude's; Tim to check)
 
 - Personal-only dotfiles placement rather than a project agent in the
   squad repo (squad is managed by its own sessions).
-- `model: sonnet` pin; opus per launch for direction-setting.
 - Native `SendMessage` + idle notification for comms; no squad broker,
   sockets or send-keys.
-- Live 7797 for the critique (read-only); the builder's preview for the
-  review pass.
+- The launch target (read-only) for the critique; the builder's preview
+  for the review pass.
 
 ## Settled after the builder check (Claude's calls)
 
