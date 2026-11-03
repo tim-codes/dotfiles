@@ -1,0 +1,180 @@
+#!/bin/bash
+# Start or stop the ux-designer peer: a Claude Code session running the
+# `ux-designer` agent in its own tmux window, briefed to review a running UI
+# (a builder session's work) and talk to that builder through the squad tools.
+# The /ux-designer skill calls this launcher, so the interface and exit codes
+# below are a stable contract.
+#
+#   ux-designer-peer start --target <http(s)-url> --scope <text> --builder <ListAgents name>
+#                          [--cwd DIR] [--context CTX] [--session S] [--model M]
+#                          [--effort E] [--short SLUG] [--brief-dir DIR] [--dry-run]
+#   ux-designer-peer stop <@window-id>
+#
+# start writes a brief, validates it with `claude-kickoff <brief> --dry-run`, then
+# runs `tmux new-window -d -P -F '#{window_id}' -t <session>: -n ux-designer
+# -c <cwd> "claude-kickoff <brief>"`. stdout is exactly three `key: value` lines:
+# `brief: <path>`, `name: ux-designer-<short>`, `window: @N`. With --dry-run the
+# brief is still written and validated, but no tmux window is made and `window:`
+# is replaced by `tmux: <the command line it would run>`.
+# stop runs `tmux kill-window -t @N` and prints `closed: @N`. It accepts only a
+# window id (^@[0-9]+$); it never kills a session.
+#
+# Defaults: --cwd the git toplevel of $PWD, else $PWD. --context the basename of
+# $CLAUDE_CONFIG_DIR without its `.claude-` prefix. --session the current tmux
+# session (needs $TMUX). --model opus, --effort high. --brief-dir
+# ${XDG_STATE_HOME:-~/.local/state}/ux-designer. --short a slug of the scope
+# (lowercase, non-alphanumeric runs become `-`, cut to 24 characters, `scope`
+# when empty). The brief template is files/claude/skills/ux-designer/brief-template.md
+# in this repo (found through the script's real path); UX_DESIGNER_TEMPLATE
+# overrides it. Its {{SCOPE}} {{TARGET}} {{BUILDER}} {{NAME}} {{CONTEXT}} markers
+# are replaced verbatim; user text goes only in the brief body, never in the
+# frontmatter.
+#
+# Exit codes: 0 ok. 2 usage (unknown option, missing --target/--scope/--builder,
+# a target that is not http(s)://, a stop argument that is not @<digits>).
+# 3 environment (no $TMUX and no --session, no context, unreadable template,
+# tmux or claude-kickoff not on PATH). 4 claude-kickoff --dry-run refused the
+# brief (its stderr is passed through). 5 tmux new-window failed or printed no @N.
+set -uo pipefail
+
+usage() { sed -n '2,/^set -uo/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//' >&2; }
+die() { local rc="$1"; shift; printf 'ux-designer-peer: %s\n' "$*" >&2; exit "$rc"; }
+usage_die() { printf 'ux-designer-peer: %s\n\n' "$*" >&2; usage; exit 2; }
+
+[ $# -ge 1 ] || usage_die "missing subcommand (start|stop)"
+sub="$1"; shift
+
+case "$sub" in
+-h | --help) usage; exit 0 ;;
+stop)
+    [ $# -eq 1 ] || usage_die "stop takes exactly one window id"
+    [[ "$1" =~ ^@[0-9]+$ ]] || usage_die "stop accepts only a tmux window id like @7, got: $1"
+    command -v tmux >/dev/null 2>&1 || die 3 "tmux is not on PATH"
+    tmux kill-window -t "$1" || die 5 "tmux kill-window failed for $1"
+    printf 'closed: %s\n' "$1"
+    exit 0
+    ;;
+start) ;;
+*) usage_die "unknown subcommand: $sub" ;;
+esac
+
+target="" scope="" builder="" cwd="" context="" session="" model=opus effort=high
+short="" brief_dir="" dry_run=0 have_scope=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+    --target | --scope | --builder | --cwd | --context | --session | --model | --effort | --short | --brief-dir)
+        [ $# -ge 2 ] || usage_die "$1 needs a value"
+        case "$1" in
+        --target) target="$2" ;;
+        --scope) scope="$2"; have_scope=1 ;;
+        --builder) builder="$2" ;;
+        --cwd) cwd="$2" ;;
+        --context) context="$2" ;;
+        --session) session="$2" ;;
+        --model) model="$2" ;;
+        --effort) effort="$2" ;;
+        --short) short="$2" ;;
+        --brief-dir) brief_dir="$2" ;;
+        esac
+        shift 2
+        ;;
+    --dry-run) dry_run=1; shift ;;
+    -h | --help) usage; exit 0 ;;
+    *) usage_die "unknown option: $1" ;;
+    esac
+done
+
+[ -n "$target" ] || usage_die "--target is required"
+[ "$have_scope" -eq 1 ] && [ -n "$scope" ] || usage_die "--scope is required"
+[ -n "$builder" ] || usage_die "--builder is required"
+[[ "$target" =~ ^https?:// ]] || usage_die "--target must be an http(s) URL, got: $target"
+# Single-line values go into frontmatter; refuse anything that could break it.
+for v in "$cwd" "$context" "$model" "$effort" "$short"; do
+    case "$v" in *$'\n'*) usage_die "option values for --cwd/--context/--model/--effort/--short must be single-line" ;; esac
+done
+
+command -v tmux >/dev/null 2>&1 || die 3 "tmux is not on PATH"
+command -v claude-kickoff >/dev/null 2>&1 || die 3 "claude-kickoff is not on PATH"
+
+if [ -z "$context" ]; then
+    [ -n "${CLAUDE_CONFIG_DIR:-}" ] || die 3 "no context: set CLAUDE_CONFIG_DIR or pass --context"
+    context="$(basename "$CLAUDE_CONFIG_DIR")"
+    context="${context#.claude-}"
+    [ -n "$context" ] && [ "$context" != .claude ] || die 3 "cannot derive a context from CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR; pass --context"
+fi
+
+if [ -z "$session" ]; then
+    [ -n "${TMUX:-}" ] || die 3 "not inside tmux: run from a tmux pane or pass --session"
+    session="$(tmux display-message -p '#S')" || die 3 "tmux display-message failed"
+    [ -n "$session" ] || die 3 "could not resolve the current tmux session"
+fi
+
+if [ -z "$cwd" ]; then
+    cwd="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null)" || cwd="$PWD"
+    [ -n "$cwd" ] || cwd="$PWD"
+fi
+
+# Template: next to this repo's skill, found through the script's real path.
+template="${UX_DESIGNER_TEMPLATE:-}"
+if [ -z "$template" ]; then
+    self="${BASH_SOURCE[0]}"
+    while [ -L "$self" ]; do # src/bin/ux-designer-peer is a symlink: follow it to scripts/
+        link=$(readlink "$self")
+        case "$link" in /*) self="$link" ;; *) self="$(dirname "$self")/$link" ;; esac
+    done
+    template="$(cd "$(dirname "$self")/.." && pwd -P)/files/claude/skills/ux-designer/brief-template.md"
+fi
+[ -r "$template" ] || die 3 "brief template not found or unreadable: $template"
+
+if [ -z "$short" ]; then
+    short=$(printf '%s' "$scope" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' | tr -s '-' | sed 's/^-//; s/-$//' | cut -c1-24 | sed 's/-$//')
+    [ -n "$short" ] || short=scope
+fi
+name="ux-designer-$short"
+
+[ -n "$brief_dir" ] || brief_dir="${XDG_STATE_HOME:-$HOME/.local/state}/ux-designer"
+mkdir -p "$brief_dir" || die 3 "cannot create brief dir: $brief_dir"
+brief="$brief_dir/$(date +%y%m%d-%H%M%S)-$short.md"
+
+{
+    printf -- '---\ncwd: %s\ncontext: %s\nmodel: %s\neffort: %s\nagent: ux-designer\nname: %s\n---\n' \
+        "$cwd" "$context" "$model" "$effort" "$name"
+    UXP_SCOPE="$scope" UXP_TARGET="$target" UXP_BUILDER="$builder" UXP_NAME="$name" UXP_CONTEXT="$context" \
+        awk '
+        # Replace each marker by a literal value, scanning left to right so a
+        # value that itself contains a marker is never substituted again.
+        BEGIN {
+            n = split("SCOPE TARGET BUILDER NAME CONTEXT", keys, " ")
+            for (i = 1; i <= n; i++) val["{{" keys[i] "}}"] = ENVIRON["UXP_" keys[i]]
+        }
+        {
+            rest = $0; outl = ""
+            while (1) {
+                best = 0; bk = ""
+                for (m in val) {
+                    p = index(rest, m)
+                    if (p > 0 && (best == 0 || p < best)) { best = p; bk = m }
+                }
+                if (best == 0) break
+                outl = outl substr(rest, 1, best - 1) val[bk]
+                rest = substr(rest, best + length(bk))
+            }
+            print outl rest
+        }' "$template"
+} >"$brief" || die 3 "cannot write brief: $brief"
+
+claude-kickoff "$brief" --dry-run >/dev/null || die 4 "claude-kickoff refused the brief: $brief"
+
+wincmd="claude-kickoff $(printf '%q' "$brief")"
+printf 'brief: %s\nname: %s\n' "$brief" "$name"
+
+if [ "$dry_run" -eq 1 ]; then
+    printf 'tmux: tmux new-window -d -P -F %q -t %q -n ux-designer -c %q %q\n' \
+        '#{window_id}' "$session:" "$cwd" "$wincmd"
+    exit 0
+fi
+
+win=$(tmux new-window -d -P -F '#{window_id}' -t "$session:" -n ux-designer -c "$cwd" "$wincmd") \
+    || die 5 "tmux new-window failed"
+[[ "$win" =~ ^@[0-9]+$ ]] || die 5 "tmux new-window printed no window id (got: $win)"
+printf 'window: %s\n' "$win"
