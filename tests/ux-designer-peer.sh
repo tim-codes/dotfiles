@@ -147,4 +147,18 @@ check "stop_refuses_non_window_id_log_unchanged" test ! -s "$TMUX_LOG"
 
 check "never_kill_session" bash -c '! grep -q kill-session "$1"' _ "$PEER"
 
+# real_template_substitutes: the skill's own brief-template.md, found through the
+# launcher's default path (no UX_DESIGNER_TEMPLATE), leaves no marker behind.
+reset
+out=$(env -i PATH="$BIN:/usr/bin:/bin" HOME="$T/home" TMUX=x TMUX_LOG="$TMUX_LOG" KICK_LOG="$KICK_LOG" \
+    CLAUDE_CONFIG_DIR="$T/.claude-personal" "$PEER" start --target https://app.test/ --scope 'Real scope' \
+    --builder builder-9 --cwd "$T/app" --brief-dir "$T/briefs" --dry-run 2>"$T/err")
+rc=$?
+expect_rc "real_template_rc" 0
+brief=$(printf '%s\n' "$out" | sed -n 's/^brief: //p')
+check "real_template_no_marker_left" bash -c '! grep -nE "\{\{[A-Z]+\}\}" "$1"' _ "$brief"
+check "real_template_one_frontmatter" test "$(grep -c '^---$' "$brief")" = 2
+check "real_template_values_present" bash -c 'grep -qF "You are ux-designer-real-scope, the ux-designer peer of builder-9 (context personal)." "$1" &&
+    grep -qxF "Target: https://app.test/" "$1" && grep -qxF "Scope: Real scope" "$1" && grep -qxF "ux-designer ready: ux-designer-real-scope" "$1"' _ "$brief"
+
 exit "$fail"

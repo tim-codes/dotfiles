@@ -160,5 +160,19 @@ check "kickoff template opens with the squad-member invocation and states merge 
     sh -c '[ "$(sed -n 1p "$1")" = "/squad-member" ] && [ "$(sed -n 2p "$1")" = "Invoke the squad-member skill first." ] &&
         grep -qxF "## Merge authority" "$1" && grep -qxF "## Test policy" "$1"' _ "$K"
 
+# --- ux-designer (experimental, personal-only) -------------------------------
+U="$SKILLS/ux-designer/SKILL.md"; UB="$SKILLS/ux-designer/brief-template.md"
+generic_only() { ! grep -nE '7797|squad/gui|localhost:[0-9]+|[Mm]antine' "$@" | grep -viE 'e\.g\.|example'; }
+check "ux-designer exists" test -f "$U" -a -f "$UB"
+check "ux-designer is personal-only" bash -c '! (source <(sed -n "/^shared_skills()/,/^}/p" "$1/scripts/claude-sync"); shared_skills | grep -qx ux-designer)' _ "$REPO_DIR"
+check "ux-designer carries the section headings" has_headings "$U" \
+    '## Start' '## Handshake' '## Round (builder side)' '## One review pass' '## Wrap-up' '## Stop' '## Rules'
+check "ux-designer names the launcher contract" contains "$U" \
+    'ux-designer-peer start' 'ux-designer-peer stop @' 'ListAgents' 'window: @N' 'ux-designer ready:' 'kill-session'
+check "ux-designer description is marked experimental" sh -c 'case "$1" in Experimental:*) ;; *) exit 1;; esac' _ "$(fm "$U" description)"
+check "brief template carries every placeholder" contains "$UB" '{{SCOPE}}' '{{TARGET}}' '{{BUILDER}}' '{{NAME}}' '{{CONTEXT}}' 'SendMessage'
+check "ux-designer skill and template are generic" generic_only "$U" "$UB"
+check "ux-designer names no context directory" no_context_dirs "$SKILLS/ux-designer"
+
 [ "$fail" = 0 ] && echo "ok: skills lint clean"
 exit "$fail"
