@@ -62,7 +62,8 @@ subagent. Why:
 - Unbounded designer↔builder loops without Tim seeing a build.
 - Writing into Figma without Tim naming the target file, or into a client
   snapshot ever.
-- Touching data in Tim's running GUI (7797) beyond reading it.
+- Changing data in the target app beyond reading it (it may be Tim's
+  running instance).
 - Closing or killing Tim's tmux session.
 
 ## The flow
@@ -224,7 +225,7 @@ direction goes on new artboards.
 
 - **Contexts for the trial: personal and reserve**, which get dotfiles
   agents and skills by whole-directory symlink. Not exxo (that needs the
-  `shared_*()` lists, i.e. promotion). The squad GUI is personal work, so
+  `shared_*()` lists, i.e. promotion). Current targets (e.g. the squad GUI) are personal work, so
   this covers the use case. Reserve has its claude.ai connectors stripped,
   so the Figma wrap-up runs from personal; the designer reports Figma
   unreachable at handshake otherwise.
