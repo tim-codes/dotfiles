@@ -86,6 +86,10 @@ the contract (`contracts/mcp-tools.md`, "Directive payloads" in the squad repo).
   step>"). A turn that closes on "next I will..." with nothing pending is
   dead: nobody re-prompts it (the orchestrator nudges once or twice, then
   raises it to Tim as stuck).
+- When you wait on something, name real identifiers (task id, ticket id,
+  `owner/repo`) in `detail`: "waits on X" / "depends on X" where nothing
+  tracks X raises a `policy:heal:<task>:<ref>` item for Tim, or creates the
+  prerequisite task in a managed repo, in which case expect an inbox message.
 - Anything that needs Tim goes to `mcp__squad__raise`: a `title`, a `kind`
   (`approval`, `action`, `review` or `info`), `blocking: now` or `later`, and
   `options` (each `{id, label, needs_operator}`, with `commands` where Tim

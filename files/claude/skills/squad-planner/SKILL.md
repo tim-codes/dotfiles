@@ -268,13 +268,21 @@ omitted, never `null`.
   "needs X in <repo>" in the plan body becomes an entry here; prose alone is
   refused.
   - `task`: `ref` is an existing task id, or `create: true` with a managed
-    `repo` (the orchestrator creates an `evaluating` task there, sequenced
-    before this one, through the normal plan review).
-  - `ticket`: `ref` is a `[A-Z]+-\d+` id listed in `tickets`. Create the Linear
-    ticket first with the Linear MCP, then list it.
+    `repo` (at plan approval, not submit, the orchestrator creates an
+    `evaluating` task there, sequenced before this one, through the normal
+    plan review). A task that was itself created this way may not use
+    `create: true` (one level only).
+  - `ticket`: `ref` is a `[A-Z]+-\d+` id whose prefix is one of the plan's
+    `tickets` prefixes or in `[policy.heal] ticket_prefixes` (default ENG).
+    Create the Linear ticket first with the Linear MCP, then list it.
+  - A bare `#45` or `t2` is informational and never refuses; a managed repo
+    short name counts alone only if it contains a hyphen, else write
+    `owner/name`.
   - `external`: `step` names an operator step.
   - Bind each `blocks_step` operator step to its deliverable (`for`) or name
-    it from a prerequisite's `step`; an unbound one is refused.
+    it from a prerequisite's `step`; an unbound one is refused. For a plan
+    approved before v0.5.14 these and the `infra` check give `warnings`, not
+    refusals; read the `submit_task` result's `warnings` and act on them.
 - `kickoff_brief`: 1–50000 characters, `kickoff-template.md` in this
   directory filled in: replace every `<…>`; keep the merge-authority line
   that applies, remove its brackets and delete the other. A new task with no
@@ -431,7 +439,11 @@ interactive shows Tim the problems and asks how to proceed.
 - From Tim's interactive session, a resubmission for a `running` task becomes
   a scope-change directive to the member (spec §6.2–§6.3). Do it only when
   Tim asks for it, and quote his words verbatim, with the date, under
-  `## Scope change`; never paraphrase them.
+  `## Scope change`; never paraphrase them. To drop a deliverable mid-task,
+  pass `park: [<exact deliverable name>]` to `scope_directive` or
+  `submit_task`: wording alone never parks (the result may carry a
+  `suggestion` of deliverables that look descoped), and a parked deliverable
+  is listed to the land reviewer as "parked, not judged".
 - `squad://me` lists the tasks this session submitted with their state and
   revision, to see whether a plan was approved, amended or rejected.
 
