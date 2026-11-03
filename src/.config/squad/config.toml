@@ -110,6 +110,7 @@ max_slots = 6
 public_url = "https://j9fsc30w-7790.uks1.devtunnels.ms"
 
 [policy.trunk]
+review_timeout_s = 1800                     # raised from 900 on 2026-11-03: portal land reviews that run the gate take 10-20 min (4 operator holds)
 # Appended to each squash-merge body after the PR body.
 trailers = ["Co-Authored-By: Claude <noreply@anthropic.com>"]
 
@@ -122,3 +123,9 @@ teardown = ["just", "-f", "/Users/tim/dev/squad/deploy/Justfile", "preview-prune
 # Every present and future h2gc production stack needs Tim's approval (Tim, 2026-11-03).
 # Intent only in v0.5.15: nothing enforces it at land time yet (ENG-536); exxo-infra stays unregistered.
 approval_stack_patterns = ["exxo/h2gc*/*prod*"]
+
+[policy.operator]
+plan_review_timeout_s = 1800               # raised from 900 on 2026-11-03, same reason as review_timeout_s
+
+[policy.release]
+verify_timeout_s = 3600                    # raised from 1800 on 2026-11-03: the staging verifier runs e2e + smoke and gave no report in 1800 s
