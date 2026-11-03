@@ -65,8 +65,10 @@ hand now duplicates the orchestrator and hides whether it worked.
   ("Backlog candidates" in the morning report). Members never run
   `gh workflow run`.
 - **Releases.** On a `release_kind = tag` repo the orchestrator merges,
-  verifies staging, cuts the tag (`v<date>-<n>`, or `semver` from the
-  `release:` label) and verifies production (publish-only repos: the green
+  verifies staging, cuts the tag (`v<date>-<n>` for publication sites such as
+  theparentedit and therenaway; `semver` from the `release:` label for
+  anything consumed by version, such as harness-kit, agent-tooling and
+  mailkit) and verifies production (publish-only repos: the green
   tag run) before the task is `done`. Never tag by hand; a hold raises
   `policy:release:<land>` with the choices.
 - **Hygiene.** At start-up and hourly the hygiene pass retires done members,
