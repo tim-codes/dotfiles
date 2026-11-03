@@ -151,8 +151,10 @@ comprehensive gate per trunk.
   - A `milestone` land is never reviewed or merged by the service, enabled
     or not: it is recorded with its PR URL and the task keeps running. Either
     way it raises `policy:land:<task_id>:milestone:<request id>` so Tim merges
-    by hand, and the tool answers `queued` with a `reason` saying so. Carry on
-    with whatever does not depend on the merge; `set` `blocked` only if
+    by hand, and the tool answers `queued` with the `reason` `milestone
+    recorded; the trunk service does not merge milestones, the operator is
+    asked to merge it by hand (item policy:land:<taskId>:milestone:<requestEventId>).
+    Keep working.` Carry on with whatever does not depend on the merge; `set` `blocked` only if
     nothing else can proceed.
 - A `completion` land puts the task into `landing`: it is done on your side,
   waiting for the trunk service to review and merge. Finish as under

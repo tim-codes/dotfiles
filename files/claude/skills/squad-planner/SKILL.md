@@ -259,8 +259,22 @@ omitted, never `null`.
   accounts, access) or `blocks_step` when it is needed at a named point
   mid-work.
 - `infra` (optional): up to 10 `{stacks, summary}` (1–20 stacks, summary
-  1–2000 characters) whenever supporting infra is needed, so the orchestrator
-  creates the exxo-infra dependency task that lands first (spec §8).
+  1–2000 characters) describing the supporting infra. It creates nothing: each
+  entry must be covered by a `task` or `ticket` prerequisite, or `submit_task`
+  refuses the plan.
+- `prerequisites` (optional): `[{kind: task|ticket|external, for: <deliverable
+  name>, ref?, repo?, title, note?, create?: true, step?: <operator step
+  title>}]`. Every "lands first", "depends on", "waits on", "blocked on/by" or
+  "needs X in <repo>" in the plan body becomes an entry here; prose alone is
+  refused.
+  - `task`: `ref` is an existing task id, or `create: true` with a managed
+    `repo` (the orchestrator creates an `evaluating` task there, sequenced
+    before this one, through the normal plan review).
+  - `ticket`: `ref` is a `[A-Z]+-\d+` id listed in `tickets`. Create the Linear
+    ticket first with the Linear MCP, then list it.
+  - `external`: `step` names an operator step.
+  - Bind each `blocks_step` operator step to its deliverable (`for`) or name
+    it from a prerequisite's `step`; an unbound one is refused.
 - `kickoff_brief`: 1–50000 characters, `kickoff-template.md` in this
   directory filled in: replace every `<…>`; keep the merge-authority line
   that applies, remove its brackets and delete the other. A new task with no
