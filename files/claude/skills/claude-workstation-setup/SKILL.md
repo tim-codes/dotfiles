@@ -373,7 +373,11 @@ them). Same allow-list and adoption rules as skills: a new agent is
 personal-only until named there, and a real file created in a curated
 `agents/` dir is adopted into the repo on the next sync. Verified 2026-10-23
 that Claude Code follows both a symlinked `agents/` dir and symlinked agent
-files. `claude-sync --diff` reports each agent's link state.
+files. `claude-sync --diff` reports each agent's link state. The experimental
+`ux-designer` is deliberately personal-only (not in `shared_agents()`), pinned
+to opus with a `tools:` allowlist (no Edit), and runs as a peer main session
+through `claude --agent ux-designer`, launched by the `ux-designer` skill
+rather than as a subagent.
 
 The delegation policy in `CLAUDE.md.shared` routes to these first, with
 `general-purpose` as the stated-reason fallback. Progress is measured with
