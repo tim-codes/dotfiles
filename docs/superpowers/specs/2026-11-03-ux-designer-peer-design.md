@@ -149,6 +149,18 @@ direction goes on new artboards.
    `--agent` and `name` → `--name`, with tests in
    `tests/claude-kickoff*.sh`.
 
+4. **Enable the exxo-common plugin in every context** (personal, reserve,
+   exxo, exxo-personal, exxo-openrouter) through the repo's plugin/settings
+   fragments and `claude-sync` (see the `claude-workstation-setup` skill),
+   so `claude-design-workflow`, `working-with-figma` and the other common
+   skills are loadable by name. Tim's decision (2026-11-03). Check for
+   name collisions with dotfiles-delivered skills first. `exxo-mantine` is
+   not part of this: its skills duplicate the dotfiles-vendored `mantine-*`
+   skills by name (Claude's call; revisit separately).
+5. **Dependency**: the designer relies on the claude-design-workflow
+   refresh in Exxo-Labs/skills#79; that PR merges (on Tim's direction)
+   before the trial.
+
 ## Constraints
 
 - **Experimental, personal-only.** Not in `shared_agents()`, not in the
@@ -179,6 +191,7 @@ direction goes on new artboards.
   export stage once drafting is final.
 - Disclosure through skills, not product CLAUDE.md; no project/agent
   prescription until trialled.
+- Exxo skills plugin enabled in all contexts.
 
 ## My calls (Claude's; Tim to check)
 
