@@ -67,6 +67,15 @@ needs_mcp = { playwright = "playwright", boards = "boards" }
 # Up to ten live members while unattended (Tim, 2026-10-31: use up to 80-90% of the host).
 max_live_members = 10
 
+[policy.supervision]
+# Idle-member ladder (v0.5.14, ENG-505): nudge after idle_nudge_s, again after recheck_s, then raise stuck-<member>.
+# Enabled explicitly on 2026-11-03: members sat idle for an hour with no nudge recorded (squad leader, Ario v0.4 round).
+enabled = true
+idle_nudge_s = 600
+silent_nudge_s = 1200
+recheck_s = 600
+max_nudges = 2
+
 [host]
 # Unattended operation may use up to 80-90% of CPU and memory (Tim, 2026-10-31); warn only above that.
 cpu_warn = 90
