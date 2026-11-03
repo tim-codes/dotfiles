@@ -139,8 +139,11 @@ comprehensive gate per trunk.
   does not check for a draft, so a draft would still be reviewed.
 - Merge authority `trunk_service`: call `mcp__squad__land` with
   `{pr: "<https PR URL>", kind: "milestone"}` at each milestone the kickoff
-  names, and `kind: "completion"` at the end. `queued` means the land is
-  accepted and waiting; `landed` means merged. What happens next depends on
+  names, and `kind: "completion"` at the end. `queued` means the request is
+  recorded: for a `completion` land the trunk service picks it up; for a
+  `milestone` land the merge-by-hand item was raised for Tim (see the
+  `reason`), so keep working and never wait on a milestone to merge. `landed`
+  means merged. What happens next depends on
   `[policy.trunk] enabled`:
   - **Enabled:** a `completion` land is reviewed by the trunk service
     (correctness and estate conformity) and squash-merged by it once the
