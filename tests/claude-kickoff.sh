@@ -327,6 +327,30 @@ kick "$T/deny.md" --no-member-deny
 check "deny rules become --disallowedTools flags, before --model" bash -c '[ "$(sed -n 1,5p "$1" | tr "\n" " ")" = "arg<--disallowedTools> arg<Bash(curl:*)> arg<--disallowedTools> arg<WebFetch(domain:localhost)> arg<--model> " ]' _ "$REC"
 kick "$T/nokeys.md" --dry-run
 check "deny defaults to none" has "deny: none"
+# agent / name: --agent and --name before --model; model optional with agent
+sed 's|^model: .*|&\nagent: ux-designer\nname: ux-designer-nav|' "$T/fixture.md" >"$T/agent.md"
+kick "$T/agent.md" --dry-run
+check "agent_and_name_echoed" bash -c 'printf "%s\n" "$1" | grep -qx "agent: ux-designer" && printf "%s\n" "$1" | grep -qx "name: ux-designer-nav"' _ "$out"
+check "agent_name_lines_follow_deny" bash -c 'printf "%s\n" "$1" | grep -oE "^(deny|agent|name):" | tr "\n" " " | grep -qx "deny: agent: name: "' _ "$out"
+kick "$T/fixture.md" --dry-run
+check "agent_name_default_none" bash -c 'printf "%s\n" "$1" | grep -qx "agent: none" && printf "%s\n" "$1" | grep -qx "name: none"' _ "$out"
+kick "$T/agent.md" --no-member-deny
+check "agent_name_argv_before_model" bash -c '[ "$(sed -n 1,8p "$1" | tr "\n" " ")" = "arg<--agent> arg<ux-designer> arg<--name> arg<ux-designer-nav> arg<--model> arg<opus> arg<--effort> arg<high> " ]' _ "$REC"
+grep -v '^model:' "$T/agent.md" >"$T/agent-nomodel.md"
+kick "$T/agent-nomodel.md" --dry-run
+check "agent_without_model_dry_run" bash -c '[ "$2" -eq 0 ] && printf "%s\n" "$1" | grep -qx "model: none (agent default)"' _ "$out" "$rc"
+kick "$T/agent-nomodel.md" --no-member-deny
+check "agent_without_model_omits_model_flag" bash -c '! grep -qx "arg<--model>" "$1" && grep -qx "arg<--agent>" "$1" && grep -qx "arg<--effort>" "$1"' _ "$REC"
+grep -v '^effort:' "$T/agent-nomodel.md" >"$T/agent-noeffort.md"
+expect_rc "agent_without_effort_exits_4" 4 "$T/agent-noeffort.md" --dry-run
+sed 's|^agent: .*|agent: ux;designer|' "$T/agent.md" >"$T/badagent.md"
+expect_rc "bad_agent_value_exits_5" 5 "$T/badagent.md" --dry-run
+sed 's|^name: .*|name: ux designer nav|' "$T/agent.md" >"$T/spacename.md"
+kick "$T/spacename.md" --no-member-deny
+check "name_with_spaces_is_one_arg" grep -qx "arg<ux designer nav>" "$REC"
+kick "$T/agent-nomodel.md" --resume sess-a --account exxo --cwd "$W" --no-member-deny
+check "resume_with_agent_passes_no_agent_name_or_model" bash -c '! grep -qxE "arg<--(agent|name|model)>" "$1" && grep -qx "arg<--resume>" "$1"' _ "$REC"
+expect_rc "missing_model_without_agent_still_exits_4" 4 "$T/no-model.md" --dry-run
 # context env: applied unless the caller set it
 cat >"$BIN/claude" <<'EOF'
 #!/bin/bash
