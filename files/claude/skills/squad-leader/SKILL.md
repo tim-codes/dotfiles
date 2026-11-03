@@ -28,41 +28,23 @@ Written for squad v0.5.14.
 
 ## Before going unattended
 
-Run the pre-flight checklist (procedures.md) with Tim still present and
-record each row; the output is one message.
+Run the nine-row pre-flight checklist in procedures.md with Tim still
+present and record each row; it is the single source. The output is one
+message: the **consolidated ask**, everything foreseeable Tim must do, each
+with its exact one-line command, link or click (open preflight items, h2gc
+merges, the attended rebuild with the App Management toggle, sign-ins from
+the ledger (memory `operator-signin-ledger`, ruling 16), grants, orphan
+kills). Nothing of this kind is asked piecemeal later unless it was
+unforeseeable; the hand-back says which asks were.
 
-1. **Re-auth and dependencies.** `/reauth` (`scripts/claude-reauth`): every
-   row `ok`. Then `squad doctor`: `cache`, `version` (broker and binary
-   match the orchestrator), `orchestrator` and `login *` all `ok`, and the
-   dependency strip green. The orchestrator starts the cache itself.
-2. **Sign-in ledger (ruling 16).** Read the ledger (memory
-   `operator-signin-ledger`). Every browser or MCP sign-in a queued or
-   likely task needs (Boards, Figma, Linear, WorkOS, gcloud ADC, phone
-   pairing) is done now, in the context that will use it (`claude mcp
-   list` per context shows `Needs authentication`). A sign-in discovered
-   after Tim leaves is a 9-hour block.
-3. **The batch can run.** Repos registered with the right `trunk_policy`
-   and `release_kind` (`repos.list`); every plan approved with
-   `prerequisites`, deliverable `stage`s and a release convention for a
-   `production` stage; no stale sessions or unretired `done` members;
-   `squad.state` not paused unless Tim paused it on purpose.
-4. **Capture readiness.** `squad debug on --run <run>`, then tRPC
-   `runs.current` shows the run with `mode: debug`. A file under
-   `~/.local/state/squad/debug/` is not evidence (2026-10-31: no decision
-   was captured all day).
-5. **Presence.** `presence.set {attending: false}` when Tim leaves; do not
-   fight the GUI flipping it; stop any presence guard when he is back.
-6. **One consolidated ask.** Everything foreseeable Tim must do, in one
-   message, each with its exact one-line command, link or click: open
-   preflight items, h2gc merges, the attended rebuild (with the App
-   Management toggle), sign-ins, grants, orphan kills. Nothing of this kind
-   is asked piecemeal later unless it was unforeseeable; say in the round
-   summary which asks were.
-
-Short of time: items 1, 2 and 6 need Tim at the keyboard (Touch ID, browser
-sign-ins, his answers); 3, 4 and 5 do not and can follow once he has gone.
-A broker older than the orchestrator (`policy:deps:broker_version:*`) is
-fixed now at the attended rebuild or named in the ask with what it lacks.
+Needs Tim at the keyboard: logins and cache warmth (`/reauth`; Touch ID;
+`agent-tooling cache status` must show `1Password items` > 0 and a Pulumi
+token, since the orchestrator can start an empty cache but does not warm
+it), browser and MCP sign-ins (`claude mcp list` per context; a sign-in
+found after he leaves is a 9-hour block), the attended rebuild, his
+answers. The rest (doctor, sessions, pause, repos, plans, capture,
+presence) can follow once he has gone. A broker older than the orchestrator
+(`policy:deps:broker_version:*`) is fixed at the rebuild or named in the ask.
 
 The goal of the night is a testable version by morning: every task `done`
 (released to production on `tag` repos), held with an item naming Tim's
@@ -77,7 +59,8 @@ command, or parked with a note; then the morning hand-back (procedures.md).
   CLAUDE.md gate on production-stage Exxo repos is Tim's default for a
   session acting alone; for squad merges this row is his specific
   instruction and wins. Cite the row, not a CLAUDE.md default or a rulings
-  paragraph, when judging or explaining a merge.
+  paragraph, when judging or explaining a merge. `operator_only` repos and
+  the config floor (`[exclusions] approval_repos`) also go to Tim.
 - **Release scope.** On a `release_kind = tag` repo that needs no approval
   (theparentedit), the orchestrator tags and deploys production with no
   human gate (Tim, 2026-11-03); approval repos stop at `release_ready` with
@@ -161,8 +144,8 @@ each count is expected to fall.
   blocked member's items, starts the cache, raises milestone and release
   items and releases tag repos (leader-functions.md, last section); do none
   of it by hand. Look, in order: the roster activity line ("is work
-  happening?"; Stalled means stalled), the concierge todo card
-  (`show_todo`), `blocking: now` items, the dependency strip, tunnel host
+  happening?"; Stalled means stalled), the todo card (ask the concierge,
+  whose `show_todo` posts it), `blocking: now` items, the dependency strip, tunnel host
   connections (`devtunnel show <tunnel>`, never the pid or a 302), quota.
   Prefer condition-based `Monitor` waits with long intervals to polling;
   a "no action needed" turn costs tokens and finds nothing (625 of 831
@@ -175,6 +158,9 @@ each count is expected to fall.
   `squad-pause`, `squad-resume`). They check the build log before bootout,
   annotate the run, poll `launchctl print` and resume affected sessions;
   log each as L7. Never bootout on a build whose log says `recipe failed`.
+  Unattended: `release-orchestrator` only on Tim's go; `restart-orchestrator`
+  only to recover a dead orchestrator, never mid-release on a `tag` repo
+  (procedures.md, Item handling); otherwise only `--dry-run`.
   Never leave the squad paused by accident at the start of a run, nor
   resumed against Tim's wish at the end (procedures.md, Pause).
 - **The broker binary** changes only at Tim's attended rebuild

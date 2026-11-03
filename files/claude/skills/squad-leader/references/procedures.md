@@ -12,12 +12,16 @@ scratchpad (one line per row: `ok`, or what is wrong and the fix) and copy
 it into the consolidated ask and the round summary. A row you could not
 check is not `ok`.
 
-1. **Logins.** `/reauth` (`scripts/claude-reauth`): every row `ok`, the
-   exxo cache warmed for the window.
+1. **Logins and cache warmth.** `/reauth` (`scripts/claude-reauth`):
+   every row `ok`. `agent-tooling cache status` shows `1Password items` > 0
+   and a Pulumi token present: doctor's `cache` row is `ok` for a reachable
+   but empty cache, and the orchestrator can start an empty cache but does
+   not warm it.
 2. **Doctor.** `squad doctor`: `cache`, `version` (broker and binary both
-   match the orchestrator), `orchestrator` (connected, no outage duration)
-   and every `login gh|gcloud|pulumi` row `ok`. The dashboard's dependency
-   strip is green and no `policy:deps:*` item is open.
+   match the orchestrator) and `orchestrator` (connected, no outage
+   duration) `ok`; no `login gh|gcloud|pulumi` row `warn` (they are
+   `info`/`warn` only). The dashboard's dependency strip is green and no
+   `policy:deps:*` item is open.
 3. **Build.** `squad --version` is the build that was tested; after any
    rebuild, App Management and Full Disk Access were re-toggled (Attended
    rebuild, below).
@@ -41,25 +45,51 @@ check is not `ok`.
 ## Item handling on an unattended night
 
 Where to look first: the roster activity line ("is work happening?"; the
-GUI member card, `roster.list`, or ask the concierge), then the concierge
-todo card (`show_todo`: `Todo: N new, M can wait, K blocking`), then the
+GUI member card, `roster.list`), then the todo card (ask the concierge;
+`show_todo` is its tool: `Todo: N new, M can wait, K blocking`), then the
 `blocking: now` items. "Alone" means under Tim's standing rules or a
 ruling you cite; "park" means a line on Tim's list with the ready
 proposal and exact command, the item left open. Log every action.
 
 | Item | The leader decides alone | Parks for Tim | Never unattended |
 |---|---|---|---|
-| `stuck-<m>`, `blocked-<m>` | Read the activity line and the member's mirror log first; then one concrete `inbox.send` naming the next step, `sessions.resume` an exited session, or decide the item the member waits on. The item closes itself on progress [L5, L6] | A wait only Tim can end (sign-in, grant, a decision no ruling covers) | Interrupt a session holding a heavy grant or mid-Bash; loosen a threshold |
-| `policy:heal:<task>:<ref>` | Approve a heal-created task once its plan review passed (ruling 29) [L11] | The create-or-descope choice, with the item's proposal; a descope goes in as the ruling `park <deliverable>` | Descope by wording or by editing the plan |
-| `policy:deps:cache:*` (blocking now) | Check `squad doctor` and `agent-tooling cache status`; leave the hold (`deps_down`) standing | The item's commands (Touch ID is Tim's) | Lift `hold_launches`; `docker rm` the cache; ad hoc `op` |
+| `stuck-<m>`, `blocked-<m>` | One concrete action (below) [L5, L6] | A wait only Tim can end (sign-in, grant, a decision no ruling covers) | Interrupt a session holding a heavy grant or mid-Bash; loosen a threshold |
+| `policy:heal:<task>:<ref>` | Approve a heal-created task once its plan review passed (ruling 29) [L11] | The create-or-descope choice, with the item's proposal | Descope by wording or by editing the plan |
+| `policy:deps:cache:*` (blocking now) | Check `squad doctor` and `agent-tooling cache status`; leave the hold (`deps_down`) standing | The item's commands and the re-warm (below) | Lift `hold_launches`; `docker rm` the cache; ad hoc `op` |
 | other `policy:deps:*` | Tunnel kickstart (Tunnel check) [L7]; a `login` warn onto the morning list | A broker link down for three ticks, with `launchctl print` output | Restart the broker with sessions mid-turn |
 | `policy:deps:broker_version:*` | Record which side is old | The attended rebuild, first on the morning list | `cargo install` or `restart-broker` unattended |
-| `policy:release:<land>` (blocking now) | One re-run of the failed jobs when the failure is transient (runner, network, timeout): `gh run rerun <run> -R <repo> --failed` [L8] | A real failure: the run, failed jobs, previous tag and its run, and the rollback command ready | Roll back, retag, delete a tag, set `release_kind` to `none` |
+| `policy:release:<land>` (blocking now) | A `staging`-stage failure only (below) [L8] | A production (tag-run) failure, with re-run and rollback commands ready | Roll back, retag, delete a tag, set `release_kind` to `none` |
 | `policy:release:<land>` (blocking later) | Nothing: `release_ready` is the approval repo's stop | The exact `git tag -a … && git push …` command | Run it |
-| `policy:land:<task>` | Pass a fixable refusal to the member; `tasks.markLanded` after a merge Tim made | Third refusal, review timeout, approval-repo merge, with the PR and reasons | Merge an approval repo (h2gc); delete a branch; force-push |
-| `policy:land:<task>:milestone:<id>` | Merge only if the item says the leader may; then `tasks.markLanded {milestone: true}` [L2] | The merge, by default | Merge a milestone on an approval repo |
+| `policy:land:<task>` | Pass a fixable refusal on (below) | Third refusal, review timeout, `operator_only` or approval-repo merge | Merge an approval repo (h2gc); delete a branch; force-push |
+| `policy:land:<task>:milestone:<id>` | `tasks.markLanded {milestone: true}` after Tim's merge [L2] | The merge, always | Merge a milestone |
 | `pf-*` (preflight steps) | Deliver a step you can (deck, Boards publish) and `items.decide` with the result [L12] | Sign-ins, grants, anything needing Tim's hands | Grant TCC or a permission yourself |
 | `r-*` (member raises) | `items.decide` under a cited ruling; the member acks [L4] | Anything needing Tim's judgment, with a proposal | Decide outside the rulings; re-ask a denied write in another form |
+
+- **`stuck-`/`blocked-`.** Read the activity line and the member's mirror
+  log first; then one concrete `inbox.send` naming the next step,
+  `sessions.resume` an exited session, or decide the item the member waits
+  on. `stuck-<m>` closes on progress; `blocked-<m>` when the member leaves
+  `blocked`.
+- **Cache outage.** After any outage or auto-start the cache is empty, even
+  when the `info` item closed at once as `restarted by the squad`. Re-warm
+  with `/reauth` (Tim at the keyboard); otherwise put it first on the
+  morning list and expect lanes to hang on 1Password. Known gap: land-refusal
+  and account-switch resumes are not held by `deps_down` (ENG-507).
+- **Release re-run.** Only when the item names the `staging` stage: one
+  `gh run rerun <run> -R <repo> --failed`; the service carries on when it
+  is green. Tim may widen this.
+- **Land refusals.** A fixable refusal goes to the member; `tasks.markLanded`
+  only after a merge Tim made.
+- **Descope** (with Tim's ruling): `submit_task {task_id, park: [exact
+  deliverable name]}` on the running task, or the ruling `descope <name>` /
+  `park <name>` on the heal item, which parks only when it names exactly one
+  deliverable (otherwise the item stays open and lists the names).
+  `scope_directive` is the concierge's tool.
+- **Orchestrator recipes.** `release-orchestrator` only on Tim's go.
+  `restart-orchestrator` only to recover a dead orchestrator (doctor
+  `orchestrator` row failing), after counting sessions, and never while a
+  `tag` repo's task is `landing` mid-release. Otherwise only the
+  `--dry-run`s (the ops.Justfile header: agents run only the dry run).
 
 Anything a classifier or permission check denied is never retried
 unattended in any form: it goes on Tim's list as the exact command.
@@ -69,9 +99,12 @@ unattended in any form: it goes on Tim's list as the exact command.
 The goal of an overnight batch: every task ends in one of three states.
 
 - `done`: released to production on a `tag` repo (the concierge's
-  "released to production" notice names tag and run), merged on the others.
-- `release_ready` or `landing`, with an open item for Tim naming the exact
-  command (approval repos, a held release, a milestone).
+  "released to production" notice names tag and run), merged on the
+  others; a `tag` repo needing approval also finishes `done`, with a
+  `blocking: later` `release_ready` item on the land row naming the command.
+- `landing`, with an open item for Tim naming the exact command (a merge
+  Tim makes, a held release); a milestone waits on its merge item while
+  the task runs on.
 - Parked: a clear note on the task (what is parked, why, what unblocks it).
 
 Nothing ends silently `running` or `blocked`. **Morning hand-back**, one
@@ -84,10 +117,13 @@ message, in this order:
 4. Stalls and escalations: each `stuck-`/`blocked-` item, how long, how it
    cleared (supervision alone, or a leader action with its L-function).
 5. Dependency incidents: each `policy:deps:*` item, the outage length,
-   auto-start or not.
-6. Interventions L1–L13 with counts, and the `squad debug` bundle name
+   auto-start or not; the cache's `1Password items` count now and any
+   re-warm done.
+6. Open `blocking: now` items by id, and the asks that were unforeseeable.
+7. Interventions L1–L13 with counts, and the `squad debug` bundle name
    (`debug/<run>/bundle/`) for the `squad-debug-review` lane.
-7. The squad's state as left (paused or not, and why).
+8. State as left: paused or not (and why); `squad --version` and doctor's
+   `version` row.
 
 ## Pause and resume
 

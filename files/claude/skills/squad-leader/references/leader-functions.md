@@ -9,7 +9,7 @@ the 2026-10-31 baseline the next rounds are measured against.
 | # | Function | What the leader does by hand today | Retired by | Log as |
 |---|---|---|---|---|
 | L1 | Unblock classifier and permission refusals [about 18] | Hands the refused action to Tim with the exact command; files the squad issue that removes the need. Not logged as its own row: a refusal is logged under the function it blocked (L2, L3, L9, …) with `outcome: handed_to_tim`, and L1 is the count of those rows | #287 (trunk service owns merges and issue close-out), #288 (host-job for sandbox-blocked commands); items carry an exact one-line command | the blocked function, `outcome: handed_to_tim`, `command` |
-| L2 | Merges outside the trunk service [27] | Merges framework and release PRs with its own `gh pr merge` when permitted (logged, `outcome: done`); when the classifier refuses, the PR goes to Tim (`handed_to_tim`). Milestones are Tim's by default (`policy:land:<task>:milestone:<id>`). The nested merge-runner (ruling 38) is retired | #287; milestones stay by hand (v0.5.14) | `pr`, `reason` citing `managed_repos` |
+| L2 | Merges outside the trunk service [27] | Merges framework and release PRs with its own `gh pr merge` when permitted (logged, `outcome: done`); when the classifier refuses, the PR goes to Tim (`handed_to_tim`). Milestones are always Tim's (`policy:land:<task>:milestone:<id>`); the leader records them with `tasks.markLanded {milestone: true}` only after his merge. The nested merge-runner (ruling 38) is retired | #287; milestones stay by hand (v0.5.14) | `pr`, `reason` citing `managed_repos` |
 | L3 | Run sandbox-blocked work unsandboxed [75 renders, 13 items] | Runs an allow-listed render or repo gate script (`verify.sh`, `format.sh`, `node --check`) outside the member sandbox and returns the result to the member by `inbox.send` | #288 (broker host-job with a fixed allowlist); Node 24 pinned for members | `member`, `task_id`, `command` |
 | L4 | Decide items [59] | `items.decide` under a ruling it can cite | #290 (rulings in the DB, routine kinds auto-decided) | `item_id`, `reason: ruling <id>` |
 | L5 | Brief members [61 notes] | `inbox.send` a note: a fix landed, a new ruling, a protocol change; a nudge only in answer to a `stuck-<m>` item | #290 (ruling broadcast); idle nudges retired by supervision (v0.5.14, ENG-505) | `member`, `task_id`, `item_id` |
@@ -38,21 +38,28 @@ it by hand now duplicates the orchestrator and hides whether it worked.
   Do not hand-nudge. Act only on a `stuck-<m>` item, after reading the
   activity line and the mirror log.
 - **Blocked members.** A member going `blocked` promotes its own items to
-  `blocking: now` or raises `blocked-<member>`. Do not rank or re-flag items.
+  `blocking: now` or raises `blocked-<member>` (closed when it leaves
+  `blocked`). Do not rank or re-flag items.
 - **The secret cache.** The deps watcher (`[policy.deps]`) starts OrbStack
   and `exxo-1p-cache`, raises `policy:deps:cache:*`, and holds launches
   (`deps_down`) while a failed auto-start item stands. Do not start the
-  cache by hand: read the item.
+  cache by hand: read the item. It starts an empty cache; it does not warm
+  it (re-warm: procedures.md, Item handling).
 - **Milestones.** Every milestone land raises
   `policy:land:<task>:milestone:<id>`; the trunk service never merges one.
-  Tim merges it unless the item says otherwise.
+  Tim always merges it; then `tasks.markLanded {milestone: true}`.
 - **Releases.** On a `release_kind = tag` repo the orchestrator merges,
   verifies staging, cuts the annotated `v<date>-<n>` tag and verifies
   production before the task is `done`. Never tag by hand while a land is
   `landing`; a hold raises `policy:release:<land>` with the choices.
-- **Gaps and descopes.** The heal guard (`[policy.heal]`) raises
-  `policy:heal:<task>:<ref>` or creates the prerequisite task. A
-  deliverable is parked only by `scope_directive` with `park: [name]` (or
-  the ruling `park <deliverable>` on the heal item); wording never parks.
+- **Gaps.** The heal guard (`[policy.heal]`) auto-creates a missing
+  prerequisite only in a managed, not `operator_only` repo, as an
+  `evaluating` task (through plan review; never from a heal-created task);
+  otherwise it raises `policy:heal:<task>:<ref>` with a proposal.
+- **Descopes.** Wording never parks. The leader parks with `submit_task
+  {task_id, park: [exact deliverable name]}` on the running task, or the
+  ruling `descope <name>` / `park <name>` on the heal item (exactly one
+  name, else the item stays open listing them); `scope_directive` is the
+  concierge's tool.
 - **Close-out.** A task's items close at `task.done`; a decision for a gone
   member is dropped with a note; a batch closes itself.
