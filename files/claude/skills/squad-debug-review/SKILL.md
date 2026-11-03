@@ -302,8 +302,8 @@ say so. Section-to-column map and the carried-over pass/fail targets in
     column that will show it worked).
 
 Write nothing else into the squad state dir. When the brief asks for a copy
-in the repo: a branch off the squad trunk in its own worktree
-(`wt -C /Users/tim/dev/squad switch --create docs/debug-review-<run> --base origin/trunk/v0.5 --no-cd -y`),
+in the repo: a branch off `main` (squad lands on `main`) in its own worktree
+(`wt -C /Users/tim/dev/squad switch --create docs/debug-review-<run> --base origin/main --no-cd -y`),
 file `docs/superpowers/plans/<date>-squad-debug-review-<run>.md`, draft PR
 with the brief's trailers. Never commit to `main`.
 
