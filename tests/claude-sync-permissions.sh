@@ -73,8 +73,14 @@ check "personal never gets the Exxo cloud grants" \
     test "$(jq '[.permissions.allow[] | select(test("agent-tooling|gcloud|pulumi"))] | length' "$FAKE/.claude-personal/settings.json")" -eq 0
 check "personal never gets the Exxo gcloud ssh deny" \
     test "$(jq '[.permissions.deny[] | select(test("gcloud compute ssh"))] | length' "$FAKE/.claude-personal/settings.json")" -eq 0
-check "personal never gets the exxo marketplace" \
-    test "$(jq '.extraKnownMarketplaces | has("exxo-skills")' "$FAKE/.claude-personal/settings.json")" = false
+check "personal gets the exxo-skills marketplace" \
+    jq -e '.extraKnownMarketplaces["exxo-skills"].source.url == "git@github.com:Exxo-Labs/skills.git"' "$FAKE/.claude-personal/settings.json"
+check "personal enables exxo-common" jq -e '.enabledPlugins["exxo-common@exxo-skills"] == true' "$FAKE/.claude-personal/settings.json"
+check "personal never gets exxo-mantine" jq -e '.enabledPlugins | has("exxo-mantine@exxo-skills") | not' "$FAKE/.claude-personal/settings.json"
+for ctx in exxo exxo-personal; do
+    check "$ctx still enables exxo-common and exxo-mantine" \
+        jq -e '.enabledPlugins["exxo-common@exxo-skills"] and .enabledPlugins["exxo-mantine@exxo-skills"]' "$FAKE/.claude-$ctx/settings.json"
+done
 
 out="$(sync --diff 2>&1)"
 check "diff after apply: settings identical" test "$(grep -c '^  identical' <<<"$out")" -ge 3

@@ -35,8 +35,8 @@ sync >"$T/apply.log" 2>&1 || { bad "apply exited non-zero"; cat "$T/apply.log"; 
 R="$FAKE/.claude-reserve"; P="$FAKE/.claude-personal"
 
 check "reserve settings.json equals personal's" cmp -s "$R/settings.json" "$P/settings.json"
-check "reserve settings carry no exxo marketplace" \
-    jq -e '(.extraKnownMarketplaces // {}) | has("exxo-skills") | not' "$R/settings.json"
+check "reserve settings carry the exxo marketplace and exxo-common, not exxo-mantine" \
+    jq -e '(.extraKnownMarketplaces | has("exxo-skills")) and .enabledPlugins["exxo-common@exxo-skills"] and (.enabledPlugins | has("exxo-mantine@exxo-skills") | not)' "$R/settings.json"
 check "reserve CLAUDE.md equals personal's" cmp -s "$R/CLAUDE.md" "$P/CLAUDE.md"
 check "reserve CLAUDE.md differs from exxo's" bash -c '! cmp -s "$1" "$2"' _ "$R/CLAUDE.md" "$FAKE/.claude-exxo/CLAUDE.md"
 
@@ -69,6 +69,7 @@ for ctx in exxo exxo-personal exxo-openrouter; do
     check "$ctx skills is a real dir (curated)" test -d "$d/skills" -a ! -L "$d/skills"
     check "$ctx has no personal-only skill" test ! -e "$d/skills/run-with-secrets"
     check "$ctx settings carry exxo marketplace" jq -e '.extraKnownMarketplaces | has("exxo-skills")' "$d/settings.json"
+    check "$ctx enables exxo-common" jq -e '.enabledPlugins["exxo-common@exxo-skills"] == true' "$d/settings.json"
 done
 check "exxo-personal projects links into exxo" test "$(readlink "$FAKE/.claude-exxo-personal/projects")" = "$FAKE/.claude-exxo/projects"
 check "exxo-openrouter plugins links into exxo" test "$(readlink "$FAKE/.claude-exxo-openrouter/plugins")" = "$FAKE/.claude-exxo/plugins"

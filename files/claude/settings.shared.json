@@ -410,7 +410,8 @@
     "frontend-design@claude-plugins-official": true,
     "linear@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
-    "worktrunk@worktrunk": true
+    "worktrunk@worktrunk": true,
+    "exxo-common@exxo-skills": true
   },
   "extraKnownMarketplaces": {
     "dotfiles": {
@@ -423,6 +424,12 @@
       "source": {
         "source": "git",
         "url": "git@github.com:max-sixty/worktrunk.git"
+      }
+    },
+    "exxo-skills": {
+      "source": {
+        "source": "git",
+        "url": "git@github.com:Exxo-Labs/skills.git"
       }
     }
   },

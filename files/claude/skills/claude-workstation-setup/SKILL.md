@@ -85,8 +85,10 @@ and a symlink kept the repo dirty. Drift is backed up to
 
 Consequence: never hand-edit `~/.claude-*/settings.json` for anything meant
 to last — it reverts on the next sync. Put it in the right fragment instead.
-Account-specific keys (the exxo-skills marketplace, its plugin) live only in
-`settings.exxo.json`; `~/.claude-personal` must never receive Exxo config.
+Account-specific keys (`exxo-mantine`, the Exxo cloud grants) live only in
+`settings.exxo.json`; `~/.claude-personal` must never receive them. The
+exxo-skills marketplace and `exxo-common` are in `settings.shared.json`, so
+every context has them (Tim's decision, 2026-11-03, superseding ENG-20).
 The one carve-out is OAuth-only MCP servers (`datadog`, `boards`, `workos`, `vercel`):
 they hold no credential and access is gated by the provider's own login, so
 they live in `mcp.shared.json` and reach every context, as does the stdio
@@ -297,15 +299,17 @@ carried no MCP servers at all while `~/.claude-exxo` had four.
    but personal-only, so it vanishes from the exxo context until promoted
    via `shared_skills()`. (A name the repo already has is warned about and
    left in place.) Org content belongs in the Exxo-Labs/skills repo instead.
-2. **Plugins** via marketplaces declared in the settings fragments: exxo
-   enables `exxo-common@exxo-skills` (org skills: secret handling, CI runner
-   targeting). The marketplace source is the SSH remote
+2. **Plugins** via marketplaces declared in the settings fragments: every
+   context enables `exxo-common@exxo-skills` (org skills: secret handling, CI
+   runner targeting, design workflow); exxo also enables `exxo-mantine`. The marketplace source is the SSH remote
    `git@github.com:Exxo-Labs/skills.git` — SSH, not HTTPS, because the
    background plugin refresh disables git credential helpers and HTTPS fails
    on private repos. Plugin installs are SNAPSHOTS pinned to a commit SHA,
    not live reads: authoring in the skills repo reaches exxo only after the
    change lands on main and `claude plugin update exxo-common@exxo-skills`
-   runs under the exxo CLAUDE_CONFIG_DIR (restart the session to apply).
+   runs under each CLAUDE_CONFIG_DIR (restart the session to apply).
+   Personal and reserve need `claude plugin install exxo-common@exxo-skills`
+   once under their own CLAUDE_CONFIG_DIR.
    Changing a marketplace's source in settings does not re-source an
    already-registered context — that takes `plugin marketplace remove` +
    `add`, then `plugin install`.
@@ -320,6 +324,9 @@ an Exxo session following homelab credential guidance. Under the allow-list,
 `run-with-secrets` is simply absent from `shared_skills()`, so exxo's
 curated dir never contains the repo copy — leaving only
 `exxo-common:run-with-secrets` there, while personal keeps the homelab one.
+Since 2026-11-03 personal and reserve also load `exxo-common:run-with-secrets`
+beside the homelab copy; the descriptions are disjoint and the agents'
+Environment block names the right one per context.
 When promoting a skill to cross-account, check the plugin side for a name
 collision first.
 
@@ -340,7 +347,7 @@ two contexts by DIFFERENT paths. The `mantine-*` skills are absent from
 `exxo-mantine@exxo-skills` plugin. That is the `run-with-secrets` rule
 generalised — one capability, one delivery path per context, never two at once
 — with a second reason on top: the personal context must never depend on a
-private Exxo repo, so it vendors from upstream directly. Both repos pull from
+private Exxo repo for the mantine skills, so it vendors from upstream directly. Both repos pull from
 `mantinedev/skills` and never from each other, so the copies cannot
 chain-drift.
 
