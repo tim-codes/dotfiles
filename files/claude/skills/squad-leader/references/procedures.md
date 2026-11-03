@@ -1,13 +1,109 @@
 # Leader procedures
 
 Everything here is the fallback for something the squad should do itself.
-Each use is an intervention (L-function in brackets).
+Each use is an intervention (L-function in brackets). Written for squad
+v0.5.14: orchestrator and broker both on it (`squad --version`, the
+`squad doctor` version row).
+
+## Pre-flight before an unattended round
+
+Run it with Tim present; write the result to `preflight-<run>.md` in your
+scratchpad (one line per row: `ok`, or what is wrong and the fix) and copy
+it into the consolidated ask and the round summary. A row you could not
+check is not `ok`.
+
+1. **Logins.** `/reauth` (`scripts/claude-reauth`): every row `ok`, the
+   exxo cache warmed for the window.
+2. **Doctor.** `squad doctor`: `cache`, `version` (broker and binary both
+   match the orchestrator), `orchestrator` (connected, no outage duration)
+   and every `login gh|gcloud|pulumi` row `ok`. The dashboard's dependency
+   strip is green and no `policy:deps:*` item is open.
+3. **Build.** `squad --version` is the build that was tested; after any
+   rebuild, App Management and Full Disk Access were re-toggled (Attended
+   rebuild, below).
+4. **Sessions.** `squad sessions`: no stale alive session (a planner of a
+   rejected task, an exited member's mirror). Roster: no `done` member left
+   unretired (ENG-525 automates this; until then, by hand, start and end).
+5. **Pause.** tRPC `squad.state` is `{paused: null}`, or paused
+   deliberately with a note Tim gave; never paused by accident.
+6. **Repos.** tRPC `repos.list`: each repo of the batch registered with
+   the right `trunk_policy` (squad and theparentedit `direct`) and
+   `release_kind` (theparentedit `tag`, with workflow and URLs; others
+   `none` unless a convention was registered).
+7. **Plans.** Every task of the batch `approved`, its plan with structured
+   `prerequisites` (no dependency in prose only), a `stage` on each
+   deliverable, and a release convention for any `production` stage.
+8. **Capture.** `squad debug on --run <run>`, then `runs.current` shows the
+   run with `mode: debug` (Capture readiness, below).
+9. **Presence and the ask.** `presence.set {attending: false}` as Tim
+   leaves; the consolidated ask sent and answered.
+
+## Item handling on an unattended night
+
+Where to look first: the roster activity line ("is work happening?"; the
+GUI member card, `roster.list`, or ask the concierge), then the concierge
+todo card (`show_todo`: `Todo: N new, M can wait, K blocking`), then the
+`blocking: now` items. "Alone" means under Tim's standing rules or a
+ruling you cite; "park" means a line on Tim's list with the ready
+proposal and exact command, the item left open. Log every action.
+
+| Item | The leader decides alone | Parks for Tim | Never unattended |
+|---|---|---|---|
+| `stuck-<m>`, `blocked-<m>` | Read the activity line and the member's mirror log first; then one concrete `inbox.send` naming the next step, `sessions.resume` an exited session, or decide the item the member waits on. The item closes itself on progress [L5, L6] | A wait only Tim can end (sign-in, grant, a decision no ruling covers) | Interrupt a session holding a heavy grant or mid-Bash; loosen a threshold |
+| `policy:heal:<task>:<ref>` | Approve a heal-created task once its plan review passed (ruling 29) [L11] | The create-or-descope choice, with the item's proposal; a descope goes in as the ruling `park <deliverable>` | Descope by wording or by editing the plan |
+| `policy:deps:cache:*` (blocking now) | Check `squad doctor` and `agent-tooling cache status`; leave the hold (`deps_down`) standing | The item's commands (Touch ID is Tim's) | Lift `hold_launches`; `docker rm` the cache; ad hoc `op` |
+| other `policy:deps:*` | Tunnel kickstart (Tunnel check) [L7]; a `login` warn onto the morning list | A broker link down for three ticks, with `launchctl print` output | Restart the broker with sessions mid-turn |
+| `policy:deps:broker_version:*` | Record which side is old | The attended rebuild, first on the morning list | `cargo install` or `restart-broker` unattended |
+| `policy:release:<land>` (blocking now) | One re-run of the failed jobs when the failure is transient (runner, network, timeout): `gh run rerun <run> -R <repo> --failed` [L8] | A real failure: the run, failed jobs, previous tag and its run, and the rollback command ready | Roll back, retag, delete a tag, set `release_kind` to `none` |
+| `policy:release:<land>` (blocking later) | Nothing: `release_ready` is the approval repo's stop | The exact `git tag -a … && git push …` command | Run it |
+| `policy:land:<task>` | Pass a fixable refusal to the member; `tasks.markLanded` after a merge Tim made | Third refusal, review timeout, approval-repo merge, with the PR and reasons | Merge an approval repo (h2gc); delete a branch; force-push |
+| `policy:land:<task>:milestone:<id>` | Merge only if the item says the leader may; then `tasks.markLanded {milestone: true}` [L2] | The merge, by default | Merge a milestone on an approval repo |
+| `pf-*` (preflight steps) | Deliver a step you can (deck, Boards publish) and `items.decide` with the result [L12] | Sign-ins, grants, anything needing Tim's hands | Grant TCC or a permission yourself |
+| `r-*` (member raises) | `items.decide` under a cited ruling; the member acks [L4] | Anything needing Tim's judgment, with a proposal | Decide outside the rulings; re-ask a denied write in another form |
+
+Anything a classifier or permission check denied is never retried
+unattended in any form: it goes on Tim's list as the exact command.
+
+## Landing a testable version by morning
+
+The goal of an overnight batch: every task ends in one of three states.
+
+- `done`: released to production on a `tag` repo (the concierge's
+  "released to production" notice names tag and run), merged on the others.
+- `release_ready` or `landing`, with an open item for Tim naming the exact
+  command (approval repos, a held release, a milestone).
+- Parked: a clear note on the task (what is parked, why, what unblocks it).
+
+Nothing ends silently `running` or `blocked`. **Morning hand-back**, one
+message, in this order:
+
+1. Landed: per repo, task, PR, merge sha, and the tag plus run link (tag
+   repos) or the merge (others).
+2. Held: each item, why, and the exact command Tim runs.
+3. Parked: deliverables and tasks, with the ruling or note.
+4. Stalls and escalations: each `stuck-`/`blocked-` item, how long, how it
+   cleared (supervision alone, or a leader action with its L-function).
+5. Dependency incidents: each `policy:deps:*` item, the outage length,
+   auto-start or not.
+6. Interventions L1–L13 with counts, and the `squad debug` bundle name
+   (`debug/<run>/bundle/`) for the `squad-debug-review` lane.
+7. The squad's state as left (paused or not, and why).
+
+## Pause and resume
+
+`just -f /Users/tim/dev/squad/deploy/ops.Justfile squad-pause <note>`
+holds launches and messages (live sessions finish their task);
+`squad-resume <note>` lets admission run at once. At the start of an
+unattended run, pre-flight row 5 must find the squad unpaused or paused on
+purpose. At the end, leave it as Tim asked: a pause you set for a restart
+is lifted before you hand back; a pause he wants for his review is set with
+a note and named in the hand-back.
 
 ## tRPC access
 
 The orchestrator listens on `http://127.0.0.1:7790`. Sign in locally with
-the leader label (v0.5.10, tim-codes/squad#307; the label must match
-`^[a-z][a-z0-9_-]{0,31}$`) so mutations record actor `gui:leader`:
+the leader label (the label must match `^[a-z][a-z0-9_-]{0,31}$`) so
+mutations record actor `gui:leader`:
 
 ```bash
 JAR=/path/in/scratchpad/leader.jar
@@ -25,18 +121,15 @@ the input itself. Recording an intervention:
 ```bash
 curl -sS -b "$JAR" -X POST http://127.0.0.1:7790/trpc/operator.intervene \
   -H 'content-type: application/json' \
-  -d '{"function":"L2","action":"checkpoint tim-codes/squad#277 refused by the classifier; command on Tim'"'"'s list","reason":"trunk service does not land framework PRs (#287)","outcome":"handed_to_tim","pr":"tim-codes/squad#277"}'
+  -d '{"function":"L2","action":"milestone tim-codes/squad#277 refused by the classifier; command on Tim'"'"'s list","reason":"milestones are merged by hand (policy:land milestone item)","outcome":"handed_to_tim","pr":"tim-codes/squad#277"}'
 ```
 
 Mutations the leader uses: `tasks.approve`, `tasks.markLanded`,
 `items.decide`, `inbox.send`
 (`{to: {member}, priority: 'now', kind: 'note', text}`), `sessions.resume`,
-`sessions.close`, `presence.set`, `repos.put`; from v0.5.10 `runs.current`
-(a query; `runs.live` is the GUI subscription), `runs.list`,
-`ops.annotate`, `operator.intervene`; `repos.list` for `managed_repos`.
-Both `operator.intervene` and `mcp__squad__intervene` arrive with the
-v0.5.10 orchestrator restart (no broker rebuild); older builds use the
-file log below.
+`sessions.close`, `presence.set`, `repos.put`, `ops.annotate`,
+`operator.intervene`; queries `runs.current`, `runs.list`, `repos.list`,
+`roster.list`, `squad.state`.
 
 ## Capture readiness check
 
@@ -45,88 +138,69 @@ squad debug on --run <run>    # writes <state>/debug.on (src/cmd/debug.rs: --run
 ```
 
 Then `runs.current` through tRPC: the run id with `mode: debug` and
-`started_at` is the proof, and until the attended rebuild (lane R) the
-only one. After the rebuild `squad debug on` also polls the orchestrator
-and prints `orchestrator: recording`, and `squad doctor` gains a debug row
-(run id, mode, recording). If `runs.current` shows the implicit `auto-<date>`
-run or nothing, the orchestrator did not notice the switch: check it is the
-v0.5.10 build (`orchestrator.started` event, `squad doctor` version), and
-fix that before declaring the round started. An orchestrator older than
-v0.5.10 has no `runs` at all: capture cannot be verified, say so, and the
-review runs on the Postgres fallback. The broker sinks (`host.jsonl`,
-`quota.jsonl`) prove nothing about the orchestrator.
+`started_at` is the proof. After the attended rebuild `squad debug on` also
+prints `orchestrator: recording` and `squad doctor` has a debug row. If
+`runs.current` shows the implicit `auto-<date>` run or nothing, the
+orchestrator did not notice the switch: fix that before declaring the
+round started. The broker sinks (`host.jsonl`, `quota.jsonl`) prove
+nothing about the orchestrator.
 
 ## Intervention log file (orchestrator older than v0.5.10)
 
-Path: `~/.local/state/squad/debug/<run>/interventions.jsonl`, where `<run>`
-is the basename of `squad debug dir`. One JSON object per line, appended
-with `>>`; the bundle merges it into `interventions.csv` with `source`
-`leader-file` (the reviewer never merges it again). Fields match the
-`leader.intervention` event:
-
-```json
-{"ts":"2026-11-02T10:12:00Z","function":"L2","action":"merged tim-codes/squad#277 (checkpoint)","reason":"trunk service does not land framework PRs; ruling 38","outcome":"done","pr":"tim-codes/squad#277","item_id":null,"task_id":null,"member":null,"command":null,"session_id":"<leader session id>","actor":"leader"}
-```
-
-`ts` is UTC ISO-8601; `outcome` is `done`, `parked` or `handed_to_tim`;
-unused ids are `null`, not omitted. Never put a token, cookie, password
-or secret value in `action`, `reason` or `command`: the line is exported
-in every review bundle.
+Only if `operator.intervene` is missing: one JSON line per action appended
+to `~/.local/state/squad/debug/<run>/interventions.jsonl` with the
+`leader.intervention` fields (`ts` UTC ISO-8601, `function`, `action`,
+`reason`, `outcome`, `pr`, `item_id`, `task_id`, `member`, `command`,
+`session_id`, `actor: "leader"`; unused ids `null`). The bundle merges it.
+Never a token, cookie, password or secret value in any field.
 
 ## Restart and release the orchestrator [L7, L8]
 
-Preferred: `just -f /Users/tim/dev/squad/deploy/ops.Justfile
-restart-orchestrator` and `release-orchestrator` (lane HI; #291). They run
-the build on Node 24 with `pnpm install --frozen-lockfile` first, refuse on
-a failed build log, annotate the run (`ops.annotate`), bootout, poll
-`launchctl print` until the job is gone, bootstrap, wait for `/metrics`,
-and resume sessions the restart cut.
+`just -f /Users/tim/dev/squad/deploy/ops.Justfile restart-orchestrator`
+(this checkout) and `release-orchestrator` (the primary checkout on `main`,
+level with `origin/main`). They build on Node 24 after `pnpm install
+--frozen-lockfile`, refuse on a failed build log, annotate the run, bootout,
+poll `launchctl print`, bootstrap, wait for `/metrics`, run doctor and
+resume the sessions the restart cut. `--dry-run` first when unsure. If a
+recipe fails, stop and read its log; do not finish the restart by hand
+with live sessions uncounted (`squad sessions`, every kind) or on a build
+whose log says `recipe failed`. Log the restart (L7) with the log path.
 
-Fallback (the v0.5.9 procedure, by hand, each step checked), only after
-`just -f /Users/tim/dev/squad/deploy/ops.Justfile --list` confirms the
-recipe is absent rather than mistyped:
+Release (L8): squad is `direct` (lands on `main`; `trunk/v0.5` is retired).
+The release PR `chore(release): v0.5.x` (Cargo.toml, Cargo.lock, both
+`package.json`, `tests/cli_broker.rs`, README, CHANGELOG with a Rollout
+line naming broker parts not yet live) squash-merges onto `main`; tag; then
+`release-orchestrator`. The broker is not rebuilt here: that is Tim's
+attended slot.
 
-1. Count live sessions of every kind (`squad sessions`, not members only:
-   on 2026-10-31 a restart "with busy=0" cut three planners and a
-   reviewer). Prefer a moment when nothing is mid-turn; otherwise expect to
-   resume them.
-2. In `/Users/tim/dev/squad` on the release commit: `pnpm install
-   --frozen-lockfile` in `orchestrator/` and `gui/` on Node 24 (a new
-   dependency with stale `node_modules` broke the v0.5.5 restart).
-3. `just -f /Users/tim/dev/squad/orchestrator/Justfile build` and
-   `just -f /Users/tim/dev/squad/gui/Justfile build`, output to a log file;
-   grep the log for `recipe failed`, `Rollup`, `ERR_MODULE_NOT_FOUND`. Any
-   hit: stop, no bootout (v0.5.5 build 055 was booted out on a failed
-   build; a member idled 55 min).
-4. `launchctl bootout gui/501/<orchestrator label>` (both labels and their
-   state: `just -f /Users/tim/dev/squad/deploy/Justfile check-launchd`).
-5. Poll `launchctl print gui/501/<orchestrator label>` until it reports
-   not found (bootout returns early; a bootstrap 3 s later failed with
-   "Input/output error 5" and left the job down).
-6. `launchctl bootstrap gui/501 ~/Library/LaunchAgents/<orchestrator label>.plist`.
-7. `squad doctor` exit 0; migrations applied at start; GUI answers on 7790;
-   `runs.current` still shows the debug run.
-8. `sessions.resume` every session the restart ended (`lost`, or a member
-   whose land was refused during the gap); send each a one-line note on
-   what changed.
-9. Log the restart (L7) with the build log path and the version.
+## Attended rebuild (broker) [L7]
 
-Release (L8): release PR `chore(release): v0.5.x` on the trunk (Cargo.toml,
-Cargo.lock, both `package.json`, `tests/cli_broker.rs`, README, CHANGELOG
-with a Rollout line naming merged-not-live broker parts); checkpoint PR
-trunk→main with a merge commit, never a squash; tag; then the restart
-above. The broker binary is not rebuilt: that is Tim's attended slot
-(#292). `cargo install --path . --locked` no longer resets the macOS App
-Management / Full Disk Access grant (verified 2 Nov 2026); if the broker
-reports a permission error after a rebuild (`squad doctor` or the broker),
-re-grant it then; otherwise leave the grant alone.
+With Tim at the keyboard, in this order, from `/Users/tim/dev/squad` on
+`main`:
+
+1. The orchestrator first: `just -f deploy/ops.Justfile
+   release-orchestrator` (an orchestrator-only change stops here). The old
+   orchestrator rejects the new broker's session list, so never rebuild the
+   broker ahead of it.
+2. `cargo install --path . --locked`.
+3. Re-toggle App Management and Full Disk Access for the new binary in
+   System Settings, Privacy & Security. The grants reset lazily (ENG-503):
+   they reappear only when the binary first uses them, so check, do not
+   assume. A throwaway task cannot prime the folder grants (a planner plans,
+   it runs no commands).
+4. `just -f deploy/Justfile install-launchd --yes` (the plists).
+5. `just -f deploy/ops.Justfile restart-broker`: refuses while any session
+   of any kind is mid-turn; `--force` only when the only busy session is
+   the one running it. It prints sessions resumed against lost.
+6. `squad doctor` all `ok`, `squad --version` the new build.
 
 ## Tunnel check
 
 `devtunnel show <tunnel name> | grep "Host connections"`: 0 means the relay
 is gone even when the pid lives and the public URL answers 302.
 `launchctl kickstart -k gui/501/dev.tim.squad-tunnel` recovers it in about
-12 s; log it (L7) and note it for #289.
+12 s; log it (L7). The deps watcher raises a `policy:deps:tunnel:*` item
+for the same outage.
 
 ## Kickoff brief shape
 
@@ -142,10 +216,10 @@ results from the report file or `SendMessage`; close the window by name.
 
 ## Handover summary shape (memory, under about 60 lines)
 
-Live build and trunk sha; every task and its state with what blocks it;
+Live build and `main` sha; every task and its state with what blocks it;
 every live delegate (tmux window, brief path, what it does, what to do
 with its report); open PRs with the next step each; authorities in force
 by ruling id and the merge scope row; what only Tim can do, with the exact
-line each; monitors to re-arm; report file locations; a numbered resume
-order (Tim's standing preference: hygiene first). Correct it as the last
-reports land, then copy the memory dir again.
+line each; open `blocking: now` items; report file locations; a numbered
+resume order (Tim's standing preference: hygiene first). Correct it as the
+last reports land, then copy the memory dir again.
