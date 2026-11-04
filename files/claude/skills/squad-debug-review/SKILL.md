@@ -53,9 +53,9 @@ With a `[run]` argument, use it. Otherwise:
 
 1. `just -f /Users/tim/dev/squad/orchestrator/Justfile debug-runs [limit]`
    (loopback `GET /debug/runs`: one row per `runs` row with id, mode,
-   window, events, decisions, interventions, bundle present), or tRPC
-   `runs.list` / `runs.current` (cookie from
-   `GET http://127.0.0.1:7790/auth/local`, local only). After the attended
+   window, events, decisions, interventions, bundle present), or the BFF
+   `runs.list` / `runs.current` (`GET http://127.0.0.1:7780/bff/runs.list`,
+   cookie from `GET http://127.0.0.1:7780/auth/local`, local only). After the attended
    rebuild `squad debug list` prints the same rows. A run before the `runs`
    table has no row: it is bundled from a window (section 2).
 2. Attended: ask with `AskUserQuestion`, newest first, at most 4 options,

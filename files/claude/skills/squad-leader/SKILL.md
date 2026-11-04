@@ -88,7 +88,7 @@ holds even so:
   spend past an account's ceiling; `release-orchestrator` only on Tim's go;
   `restart-orchestrator` only to recover a dead orchestrator.
 - **Merges go through the trunk service**, not a leader `gh pr merge`:
-  `managed_repos` (tRPC `repos.list`: `release_needs_approval`,
+  `managed_repos` (BFF `repos.list`: `release_needs_approval`,
   `approval_scope`, `operator_only`, `ci`) and the config floor decide what
   it merges, and every merge records its `merge_scope`. Cite that row, not a
   CLAUDE.md default or a rulings paragraph, when judging or explaining one.
@@ -146,6 +146,9 @@ script is tRPC `operator.intervene` (procedures.md). On an orchestrator
 older than v0.5.10, append one JSON line of the same fields to
 `~/.local/state/squad/debug/<run>/interventions.jsonl` (shape in
 procedures.md); the bundle merges it into `interventions.csv`.
+
+Reads: `GET http://127.0.0.1:7780/bff/<name>`; actions: `POST
+http://127.0.0.1:7790/trpc/<action>`; 7790 refuses reads.
 
 Sign in to the orchestrator **with the label** `leader`
 (`/auth/local?label=leader`, or a pairing with `{"label":"leader"}`;
@@ -232,7 +235,7 @@ each count is expected to fall.
 - **Round wrap-up**, when a batch completes or Tim asks: produce the bundle
   (`just -f /Users/tim/dev/squad/orchestrator/Justfile bundle <run>`, or
   `squad debug bundle <run>`), read the morning report (`squad://morning`
-  or tRPC `reports.morning`), file its "Backlog candidates" in Linear, send
+  or BFF `reports.morning`), file its "Backlog candidates" in Linear, send
   the morning hand-back (procedures.md),
   write the round summary to `docs/superpowers/plans/` in the squad repo by
   PR onto `main` (squad is `direct`; `trunk/v0.5` is retired), then launch

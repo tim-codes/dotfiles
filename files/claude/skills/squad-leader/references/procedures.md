@@ -34,9 +34,9 @@ check is not `ok`.
    rejected task, an exited member's mirror). The hygiene pass ran (the
    Overview's Processes card); act on what its `policy:hygiene:<run>` item
    lists as unsure.
-5. **Pause.** tRPC `squad.state` is `{paused: null}`, or paused
+5. **Pause.** BFF `squad.state` is `{paused: null}`, or paused
    deliberately with a note Tim gave; never paused by accident.
-6. **Repos.** tRPC `repos.list` shows the batch's repos registered as the
+6. **Repos.** BFF `repos.list` shows the batch's repos registered as the
    v0.5.15 Rollout gives them (task 38's `blocks_launch` step). The calls,
    with the leader cookie (tRPC access, below; omit `checkoutPath`, which
    `repos.put` keeps):
@@ -67,7 +67,7 @@ check is not `ok`.
    harness-kit release" fallback `blocks_step` items (tasks 38, 39, 40, 41)
    stay open until the squad has cut the kit tag itself; then the leader
    drops each with `items.decide` naming the tag and run [L12].
-8. **Capture.** `squad debug on --run <run>`, then `runs.current` shows the
+8. **Capture.** `squad debug on --run <run>`, then BFF `runs.current` shows the
    run with `mode: debug` (Capture readiness, below).
 9. **Leader watch.** `just -f /Users/tim/dev/squad/deploy/ops.Justfile
    leader-watch-dry-run` (what it would push now), then `leader-watch-start
@@ -96,7 +96,7 @@ todo card only when you act anyway.
 | c4 member with no live session | `squad sessions` and the mirror log for why; `sessions.resume` [L6] |
 | c5 orphan planner or reviewer | `sessions.close` it [L6] |
 | c6 session running without events | Mirror log; wedged: one `inbox.send`, then `sessions.resume` (a planner or reviewer: close it) [L6]; never interrupt a heavy grant or mid-Bash |
-| c7 land stuck in a stage | `trunk.lands {repo}` and the land's item; act by the item table (a queued land: its wait reason) |
+| c7 land stuck in a stage | BFF `trunk.lands {repo}` and the land's item; act by the item table (a queued land: its wait reason) |
 | c8 release failed or release item | The `policy:release` / `policy:staging` rows below [L8] |
 | c9 cache down or empty | Doctor and `agent-tooling cache status`; leave `deps_down` standing; re-warm first on Tim's list |
 | c10 squad paused | Nobody meant it: `squad-resume <note>` [L6]; a pause Tim set stays, named in the hand-back |
@@ -109,7 +109,7 @@ todo card only when you act anyway.
 ## Item handling on an unattended night
 
 Where to look first: the roster activity line ("is work happening?"; the
-GUI member card, `roster.list`), then the todo card (ask the concierge;
+GUI member card, BFF `roster.list`), then the todo card (ask the concierge;
 `show_todo` is its tool: `Todo: N new, M can wait, K blocking`), then the
 `blocking: now` items. "Alone" means under Tim's standing rules or a
 ruling you cite; "park" means a line on Tim's list with the ready
@@ -135,7 +135,7 @@ proposal and exact command, the item left open. Log every action.
 | `policy:backlog:<batch_id>` (approval) | Options approve or deny. An operator ruling on `policy:backlog:*` approves it. Approve acts only on plans that passed plan review (`plan_review.approve` held for the backlog); unreviewed ones wait for their verdict [L11] | Whether the backlog is worth running when no ruling covers it | Approve a plan that has not passed plan review; launch a planner lane by hand. Deny rejects the tasks and closes the batch |
 | `policy:self-release:<id>` (blocking now) | Raised when a self-release's build, kickstart, health check or rollback fails. Read the log path in the item text, then run the recipe it names: `just -f deploy/ops.Justfile restart-orchestrator`, or `release-orchestrator --rollback` after a failed rollback kickstart, or `launchctl bootstrap gui/<uid> ~/Library/LaunchAgents/dev.tim.squad-release.plist` when the job is not loaded [L7] | A rollback that also fails | Bootout on a build whose log says `recipe failed` |
 | `policy:denied:<task>` | Read it; the member works on [L1] | The denied write as the exact command | Retry it in another form |
-| `policy:quota:exhausted:<group>` (blocking now) | Nothing moves: confirm with `policy.pools`; the squad waits for the reset | Note the reset time on the morning list | Spend past a ceiling; `allowHot` onto the wall |
+| `policy:quota:exhausted:<group>` (blocking now) | Nothing moves: confirm with BFF `policy.pools`; the squad waits for the reset | Note the reset time on the morning list | Spend past a ceiling; `allowHot` onto the wall |
 | `policy:hygiene:<run>` (info) | Retire or close what it lists once checked [L10] | Anything of Tim's (his sessions, worktrees) | Remove a worktree without `worktree-closedown` |
 | `pf-*` (preflight steps) | Deliver a step you can (deck, Boards publish, kit fallback once the tag exists) and `items.decide` with the result [L12] | Sign-ins, grants, anything needing Tim's hands | Grant TCC or a permission yourself |
 | `r-*` (member raises) | `items.decide` under a cited ruling (round rulings below); the member acks [L4] | Anything needing Tim's judgment, with a proposal | Decide outside the rulings; re-ask a denied write in another form |
@@ -210,7 +210,7 @@ The goal of an overnight batch: every task ends in one of three states.
 - Parked: a clear note on the task (what is parked, why, what unblocks it).
 
 Nothing ends silently `running` or `blocked`. **Morning hand-back**, one
-message, built from the morning report (`squad://morning`, tRPC
+message, built from the morning report (`squad://morning`, BFF
 `reports.morning`, or the concierge's `show_morning`), in this order:
 
 1. Landed: per repo, task, PR, merge sha, and the tag plus run link (tag
@@ -239,7 +239,7 @@ The orchestrator guards quota alone (leader-functions.md, Quota guarding);
 act only on a c13–c15 push, a `policy:quota:exhausted:*` item or a member
 stuck on a limit. tRPC with the leader cookie:
 
-- Read: `policy.pools` (levels, normalised use, ladder rung per account;
+- Read (BFF): `policy.pools` (levels, normalised use, ladder rung per account;
   also the concierge's `read_state pools`) and `policy.switches`.
 - Move a member: `policy.switch.request {member, toAccount}`; a target that
   is not green is refused (`target_not_green`). `allowHot` only to rescue a
@@ -273,8 +273,11 @@ a note and named in the hand-back.
 The orchestrator's action API listens on `http://127.0.0.1:7790`. From
 0.6.0 the dashboard's read API is no longer served there: the GUI is the
 BFF at `http://127.0.0.1:7780` (bookmark that one), reading Postgres
-through a read-only role, and 7790 keeps only the action API. Sign in
-locally with
+through a read-only role, and 7790 keeps only the action API.
+
+Reads: `GET http://127.0.0.1:7780/bff/<name>`; actions: `POST
+http://127.0.0.1:7790/trpc/<action>`; 7790 refuses reads. The BFF forwards
+`/auth/*`, so the same cookie works on both. Sign in locally with
 the leader label (the label must match `^[a-z][a-z0-9_-]{0,31}$`) so
 mutations record actor `gui:leader`:
 
@@ -302,9 +305,11 @@ Mutations the leader uses: `tasks.approve`, `tasks.markLanded`,
 (`{to: {member}, priority: 'now', kind: 'note', text}`), `sessions.resume`,
 `sessions.close`, `presence.set`, `repos.put`, `trunk.register`,
 `trunk.land`, `trunk.deployStaging`, the quota levers above,
-`ops.annotate`, `operator.intervene`; queries `runs.current`, `runs.list`,
-`repos.list`, `roster.list`, `squad.state`, `trunk.lands`, `policy.pools`,
-`policy.switches`, `reports.morning`.
+`operator.intervene`. Annotating a run is not a tRPC procedure: use the ops
+recipes (or the loopback `POST http://127.0.0.1:7790/ops/annotate`, no cookie).
+Reads go to the BFF, not `/trpc`: `runs.current`, `runs.list`, `repos.list`,
+`roster.list`, `squad.state`, `trunk.lands`, `policy.pools`, `policy.switches`,
+`reports.morning` (GET `http://127.0.0.1:7780/bff/<name>`).
 
 ## Capture readiness check
 
@@ -312,7 +317,7 @@ Mutations the leader uses: `tasks.approve`, `tasks.markLanded`,
 squad debug on --run <run>    # writes <state>/debug.on (src/cmd/debug.rs: --run is a flag)
 ```
 
-Then `runs.current` through tRPC: the run id with `mode: debug` and
+Then `runs.current` from the BFF: the run id with `mode: debug` and
 `started_at` is the proof. After the attended rebuild `squad debug on` also
 prints `orchestrator: recording` and `squad doctor` has a debug row. If
 `runs.current` shows the implicit `auto-<date>` run or nothing, the
