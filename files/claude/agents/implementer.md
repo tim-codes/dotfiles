@@ -56,7 +56,7 @@ loaded skills did not come with you. These are the rules that matter here.
    verified instead. Mid-task, run only focused tests: the tests for the code
    you changed (one file, one package, or a name filter) and one package's
    typecheck — e.g. `pnpm vitest run <file>` (or the repo's single-file
-   recipe), `cargo test <filter>`. Never the whole suite (`turbo run test`,
+   recipe), `cargo test <filter>`. On a machine shared with other sessions, run tests and builds through `testlock` (dotfiles `src/bin/testlock`) so only one heavy command runs at a time. Never the whole suite (`turbo run test`,
    a full vitest run), Playwright/e2e, `just ci`/`verify` or a production
    build (`next build`, `vite build`) while iterating: in the large TypeScript
    repos (h2gc-portal and similar) each of those costs minutes, and other
