@@ -9,11 +9,14 @@ description: Use when a session is briefed as the squad leader or "master operat
 develops, builds, deploys, runs and tests the squad while the squad cannot
 yet do those things itself. It is not part of the squad design. Every
 function it performs by hand is an **intervention**: recorded each time, and
-mapped to the squad issue that retires it. The goal is a leader that asks
+mapped to the squad issue that retires it (Linear ENG-n; the v0.6.0
+plan builds them). The goal is a leader that asks
 Tim for nothing and then disappears.
 
 **Terms.** *Orchestrator* = the v0.5 TypeScript service (policy, items,
-trunk service, tRPC at `http://127.0.0.1:7790`). *Broker* = the Rust daemon
+trunk service, action API (tRPC) at `http://127.0.0.1:7790`; from
+0.6.0 7790 keeps only the action API, and the GUI is the BFF at
+`http://127.0.0.1:7797`). *Broker* = the Rust daemon
 (launchd `dev.tim.squad-broker`). *Leader* = this session. *Member*,
 *planner*, *reviewer* = headless sessions the broker launches. Keep these
 words apart in every note, item and summary.
@@ -89,11 +92,10 @@ holds even so:
   `approval_scope`, `operator_only`, `ci`) and the config floor decide what
   it merges, and every merge records its `merge_scope`. Cite that row, not a
   CLAUDE.md default or a rulings paragraph, when judging or explaining one.
-  A milestone outside the floor is queued with `trunk.land {repo, pr, kind:
-  "framework"}` and recorded with `tasks.markLanded {milestone: true}` once
-  merged; a floor-repo milestone onto `main` is Tim's. The one hand merge
-  left is a docs-only portal land into the Ario trunk that path-filtered CI
-  never checks (procedures.md, Item handling); a refused merge goes to Tim.
+  From 0.6.0 the trunk service lands milestones itself, and a docs-only or
+  path-filtered PR merges on review alone (R3); a floor-repo milestone onto
+  `main` is Tim's. The leader hand-merges nothing; a refused merge goes to
+  Tim.
 - **Release scope.** On a `release_kind = tag` repo outside the floor
   (theparentedit dated tags, harness-kit `semver` from the PR's
   `release:patch|minor|major` label), the orchestrator tags, deploys and
@@ -101,8 +103,9 @@ holds even so:
   leader never tags by hand.
 - **Standing rulings** are cited by id (`ruling 29`, `ruling 38`) from the
   rulings memory file for the round, plus the round rulings in
-  procedures.md (the Ario v0.4 staging purge); once #290 ships, from the
-  orchestrator. A ruling you cannot cite is not one you hold.
+  procedures.md (the Ario v0.4 staging purge); from 0.6.0 also the
+  orchestrator's `rulings` table (ENG-476: `rulings.put`, concierge
+  `add_ruling`), whose routine kinds it auto-decides. A ruling you cannot cite is not one you hold.
 - **Refusals are never routed around. A denied write is never retried in
   another form** (another flag, wrapper, tool or shell; `gh pr close` after
   a denied `gh pr merge` is the same write). A classifier or permission refusal
@@ -119,7 +122,7 @@ holds even so:
   scratchpad that the consolidated ask and the round summary are built
   from: what, the one-line command, the issue, since when), plus a Slack
   DM when a task is blocked on it. Operator sessions cannot raise squad
-  items today (`not_allowed_for_kind`); when they can (#284, #290), the
+  items today (`not_allowed_for_kind`); when they can (#284, ENG-476), the
   item replaces the list entry.
 
 ## Interventions
@@ -128,7 +131,7 @@ After **each** hand-done action, in the same turn:
 
 ```
 mcp__squad__intervene({ function: "L5", action: "told t3 the pnpm alias fix is live (inbox note)",
-                        reason: "no confirmation note when an item's fix lands (#290)",
+                        reason: "no confirmation note when an item's fix lands (ENG-476)",
                         outcome: "done", member: "t3", item_id: "r-20261031053635-1a2b3c" })
 ```
 
@@ -169,7 +172,8 @@ open after its deck was built (tim-codes/squad#301). An `intervene` with
 `task.done`, so a step still owed after that (a sign-off, the attended
 rebuild) goes on Tim's list.
 
-The per-function count is the round's KPI: the round summary and the
+A round is unattended when L1 to L12 total zero interventions and only the
+leader watch runs. The per-function count is the round's KPI: the round summary and the
 `squad-debug-review` lane report it L1–L13 against the previous round, and
 each count is expected to fall.
 
@@ -177,7 +181,10 @@ each count is expected to fall.
 
 - **Watching.** The orchestrator nudges idle members, promotes a blocked
   member's items, starts the cache, retires done members (hygiene pass),
-  deploys staging and verifies it, releases tag repos and guards quota
+  deploys staging and verifies it, releases tag repos, guards quota and,
+  from 0.6.0, broadcasts decisions, auto-decides ruled kinds, lands
+  milestones and path-filtered PRs, holds lands through a GitHub incident,
+  restarts itself on a release land and plans when idle
   (leader-functions.md, last sections); do none of it by hand. The leader
   does not poll: start the failsafe watch (`just -f
   /Users/tim/dev/squad/deploy/ops.Justfile leader-watch-start
@@ -198,7 +205,10 @@ each count is expected to fall.
   log each as L7. Never bootout on a build whose log says `recipe failed`.
   Unattended: `release-orchestrator` only on Tim's go; `restart-orchestrator`
   only to recover a dead orchestrator, never mid-release on a `tag` repo
-  (procedures.md, Item handling); otherwise only `--dry-run`.
+  (procedures.md, Item handling); otherwise only `--dry-run`. From 0.6.0 a
+  squad release land restarts the orchestrator itself (R5) with a health
+  check and a rollback: after one, check the health result and any
+  rollback item rather than running the recipe.
   Never leave the squad paused by accident at the start of a run, nor
   resumed against Tim's wish at the end (procedures.md, Pause).
 - **The broker binary** changes only at Tim's attended rebuild

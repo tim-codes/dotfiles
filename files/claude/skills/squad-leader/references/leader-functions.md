@@ -8,28 +8,35 @@ the 2026-10-31 baseline the next rounds are measured against.
 
 | # | Function | What the leader does by hand today | Retired by | Log as |
 |---|---|---|---|---|
-| L1 | Unblock classifier and permission refusals [about 18] | Hands the refused action to Tim with the exact command; files the squad issue that removes the need. Not logged as its own row: a refusal is logged under the function it blocked (L2, L3, L9, …) with `outcome: handed_to_tim`, and L1 is the count of those rows | #287 (trunk service owns merges and issue close-out), #288 (host-job for sandbox-blocked commands); items carry an exact one-line command | the blocked function, `outcome: handed_to_tim`, `command` |
-| L2 | Merges outside the trunk service [27] | Queues framework, release and (outside the floor) milestone PRs with `trunk.land` so the service reviews and merges them; `tasks.markLanded {milestone: true}` after a milestone merges. No leader `gh pr merge`; floor-repo merges onto `main` (h2gc-portal, h2gc-legacy) wait for Tim. The nested merge-runner (ruling 38) is retired | #287; milestones not yet a member land kind the service merges | `pr`, `reason` citing `managed_repos` / `merge_scope` |
-| L3 | Run sandbox-blocked work unsandboxed [75 renders, 13 items] | Runs an allow-listed render or repo gate script (`verify.sh`, `format.sh`, `node --check`) outside the member sandbox and returns the result to the member by `inbox.send` | #288 (broker host-job with a fixed allowlist); Node 24 pinned for members | `member`, `task_id`, `command` |
-| L4 | Decide items [59] | `items.decide` under a ruling it can cite | #290 (rulings in the DB, routine kinds auto-decided) | `item_id`, `reason: ruling <id>` |
-| L5 | Brief members [61 notes] | `inbox.send` a note: a fix landed, a new ruling, a protocol change; a nudge only in answer to a `stuck-<m>` item or a c3 watch push | #290 (ruling broadcast); idle nudges retired by supervision (v0.5.14, ENG-505), review follow-ups and verify fixes reach members by themselves (v0.5.15) | `member`, `task_id`, `item_id` |
-| L6 | Session control | `sessions.resume` after a restart or a refused land; `sessions.close` an orphan (c5); a member pause or resume, an account switch (quota levers, procedures.md) | #291 (resume lost and refused-land sessions after restart), #285; the hygiene pass (v0.5.15) ends lost sessions | `member`, `session_id` |
-| L7 | Rebuild and restart [10 orchestrator, 2 broker] | `deploy/ops.Justfile restart-orchestrator` (fallback: procedures.md) | #291 (verified release and restart job); #292 keeps only the attended broker re-grant | `reason`, `command` |
+| L1 | Unblock classifier and permission refusals [about 18] | Hands the refused action to Tim with the exact command; files the squad issue that removes the need. Not logged as its own row: a refusal is logged under the function it blocked (L2, L3, L9, …) with `outcome: handed_to_tim`, and L1 is the count of those rows | #287 (trunk service owns merges and issue close-out), ENG-484 (broker host job for sandbox-blocked commands, R7); items carry an exact one-line command | the blocked function, `outcome: handed_to_tim`, `command` |
+| L2 | Merges outside the trunk service [27] | Queues framework and release PRs with `trunk.land` so the service reviews and merges them. Milestones are the trunk service's from 0.6.0, and a docs-only or path-filtered PR merges on review alone (R3). No leader `gh pr merge`; floor-repo merges onto `main` (h2gc-portal, h2gc-legacy) wait for Tim. The nested merge-runner (ruling 38) is retired | #287; the trunk service lands milestones and path-filtered PRs (v0.6.0 R3) | `pr`, `reason` citing `managed_repos` / `merge_scope` |
+| L3 | Run sandbox-blocked work unsandboxed [75 renders, 13 items] | Runs an allow-listed render or repo gate script (`verify.sh`, `format.sh`, `node --check`) outside the member sandbox and returns the result to the member by `inbox.send` | ENG-484 (broker host job with a fixed allowlist, R7); Node 24 pinned for members | `member`, `task_id`, `command` |
+| L4 | Decide items [59] | `items.decide` under a ruling it can cite | ENG-476 (standing rulings in the database, routine kinds auto-decided, R2) | `item_id`, `reason: ruling <id>` |
+| L5 | Brief members [61 notes] | `inbox.send` a note: a fix landed, a new ruling, a protocol change; a nudge only in answer to a `stuck-<m>` item or a c3 watch push | ENG-476 (decision and ruling broadcast to the member, R1, R2); idle nudges retired by supervision (v0.5.14, ENG-505), review follow-ups and verify fixes reach members by themselves (v0.5.15) | `member`, `task_id`, `item_id` |
+| L6 | Session control | `sessions.resume` after a restart or a refused land; `sessions.close` an orphan (c5); a member pause or resume, an account switch (quota levers, procedures.md) | ENG-475 (resume lost and refused-land sessions after restart), #285; the hygiene pass (v0.5.15) ends lost sessions | `member`, `session_id` |
+| L7 | Rebuild and restart [10 orchestrator, 2 broker] | `deploy/ops.Justfile restart-orchestrator` (fallback: procedures.md) | ENG-475, ENG-477 (verified release and restart job, R5); #292 keeps only the attended broker re-grant | `reason`, `command` |
 | L8 | Cut squad releases and tags [6] | Release PR queued with `trunk.land {kind: "release"}` onto squad `main` (`direct`, `ci: none`), tag; one re-run of a failed staging or kit (harness-kit `publish.yml`) run. Product and kit releases on `release_kind = tag` repos are the orchestrator's (v0.5.14 ENG-522, semver v0.5.15) | #293 (release task kind) | `pr`, `command` |
 | L9 | File and close issues [11 filed, 20 closes] | `gh issue create/close -R tim-codes/squad`; refused closes go to Tim | #287 (closes `Closes #n` at land); members raise bugs as items the orchestrator files | `command` |
 | L10 | Hygiene [35 worktrees, 20 windows] | `worktree-closedown` skill; tmux windows by name or `@id` | #239 (teardown at land; partial) plus transcript relocation in the trunk service | `task_id` |
-| L11 | Plan and approve rounds [7 approvals, 3 planner lanes] | Launches a planner lane over open issues; `tasks.approve` under ruling 29 | #294 (when-idle planning under standing rulings); agentic plan review already live | `task_id`, `reason: ruling 29` |
-| L12 | Operator-only legs [15 decks, 15 Slack sends] | Figma, Boards, Slack, Notion, Linear legs members cannot reach | #295 (Figma and Boards via `needs`/`provides`; concierge sends status and pairing links) | `task_id`, `item_id` |
+| L11 | Plan and approve rounds [7 approvals, 3 planner lanes] | Launches a planner lane over open issues; `tasks.approve` under ruling 29 | ENG-485 (when-idle planning under standing rulings, R8); agentic plan review already live | `task_id`, `reason: ruling 29` |
+| L12 | Operator-only legs [15 decks, 15 Slack sends] | Figma, Boards, Slack, Notion, Linear legs members cannot reach | ENG-486 (operator-only surfaces as member-reachable reads or `needs`/`provides`, R9; concierge sends status and pairing links) | `task_id`, `item_id` |
 | L13 | Watch for trouble [1,137 monitor events] | Acts on `[squad-watch] cN` pushes (procedures.md, Watching); no polling | supervision, deps watcher, doctor rows (v0.5.14); the leader watch (v0.5.15, ENG-534); #286, ENG-513 (orchestrator alerting) | one row per push acted on (`reason: c<N>`), never per push read |
 
-Look a title up with `gh issue view <n> -R tim-codes/squad`. When an issue
-closes, the function is retired only once a round's `interventions.csv`
-shows zero for it; until then it stays in the table with the new count.
+The GitHub issues #288, #290, #291, #294 and #295 were closed in the 2 Nov
+sweep without being built; they reappeared in Linear as the ENG-n above,
+and v0.6.0 builds them: plan
+`docs/superpowers/plans/2026-11-04-squad-v0.6.0-retirement-plan.md`, spec
+`2026-11-04-squad-v0.6.0-retirement-spec.md` (squad repo; R1 to R13 there).
+Look a Linear issue up through the Linear MCP; the other `#n` are GitHub
+issues (`gh issue view <n> -R tim-codes/squad`). When an issue ships, the
+function is retired only once a round's `interventions.csv` shows zero for
+it; until then it stays in the table with the new count. A round is
+unattended when L1 to L12 total zero interventions.
 
 Every function above is now done under Tim's broad authority (SKILL.md,
 Authority): the floor there bounds them, and each instance is still logged.
 
-## What the orchestrator does on its own (v0.5.15): not the leader's job
+## What the orchestrator does on its own (v0.5.15, v0.6.0): not the leader's job
 
 Each of these was a hand-done intervention in an earlier round. Doing it by
 hand now duplicates the orchestrator and hides whether it worked.
@@ -48,9 +55,9 @@ hand now duplicates the orchestrator and hides whether it worked.
   (`deps_down`) while a failed auto-start item stands. Do not start the
   cache by hand: read the item. It starts an empty cache; it does not warm
   it (re-warm: procedures.md, Item handling).
-- **Milestones.** Every milestone land raises
-  `policy:land:<task>:milestone:<id>`; the trunk service never merges one by
-  itself (queue it, SKILL.md, Authority; floor repos onto `main`: Tim).
+- **Milestones.** From 0.6.0 the trunk service lands a milestone itself
+  (R2 rules `policy:land:<task>:milestone`); only a floor-repo milestone
+  onto `main` waits for Tim. Never merge one by hand.
 - **Review gates.** Plan review can answer `revise` (back to the planner, at
   most `max_plan_revisions`, then `policy:plan:<task>`); land review judges
   each deliverable `met | not_met | not_judged`, scales its model by diff
@@ -87,6 +94,63 @@ hand now duplicates the orchestrator and hides whether it worked.
   concierge's tool.
 - **Close-out.** A task's items close at `task.done`; a decision for a gone
   member is dropped with a note; a batch closes itself.
+
+### New in v0.6.0 (retirement plan R1 to R11)
+
+Check the event or item named here, not the member's inbox; do not repeat
+the action by hand.
+
+- **Decision notes (R1).** `items.decide`, and every auto-decide path below,
+  writes the decision and its reason to the inbox of the member that raised
+  the item, in one tick. Do not send a "your raise is decided" note (L5).
+- **Standing rulings (R2).** An `items.raise` whose kind matches an active
+  ruling is decided at once with `reason: ruling <id>` (event
+  `item.auto_decided`); routine kinds are seeded. Add a ruling through
+  `rulings.put` or the concierge `add_ruling`; it is broadcast to live
+  members once. Cite the id; do not decide the same kind by hand (L4).
+- **Docs-only and path-filtered PRs (R3).** A land whose changed files all
+  match `ci_paths_ignored` (or the workflow's `paths-ignore`) merges on
+  review alone and records `checks: skipped_by_paths`. No hand merge.
+- **GitHub incidents (R4).** The deps watcher's `forge` dependency holds
+  pushes and lands that fail with the incident's signature `retry_later`
+  with a backoff and no item, and tells members once. Do not decide or
+  resume around it; the hold lifts when the probe is green.
+- **Release and restart (R5).** A squad release land restarts the
+  orchestrator itself (pull, migrate, build, launchd restart, health check,
+  session resume) and rolls back to the previous build on a failed check;
+  `restart-orchestrator` calls the same code. A failed staging deploy or kit
+  publish run is rerun once by the service before it raises an item. The
+  leader checks the health result and the rollback item, and does not run
+  `gh run rerun` first (L7, L8).
+- **Refusal classes (R6).** Refusals are classed A to I; class C is the
+  reviewer's `just ci` in a scratch worktree, answered by the `review-ci`
+  recipe grant, and a known-safe `policy:denied:<task>` kind is ruled by R2.
+  A class that still needs Tim carries the exact command in its item (L1).
+- **Host jobs (R7).** The broker runs allow-listed jobs (`verify.sh`,
+  `format.sh`, `node --check`, repo render scripts in
+  `managed_repos.host_jobs`) outside the member sandbox on the member's
+  `mcp__squad__host_job` request, with the result returned to the member;
+  every run is a `broker.host_job` event. Do not run a render for a member
+  (L3). Needs the attended broker rebuild.
+- **When-idle planning (R8).** With capacity and an empty batch queue the
+  orchestrator launches one backlog planner over Linear and GitHub issues
+  under the standing rulings and the planning rule; the batch waits for
+  approval unless a ruling approves it. Off by default
+  (`[policy.backlog] enabled`) until the planner skill with the `--backlog`
+  form is installed. Do not launch a planner lane by hand (L11).
+- **Member-reachable surfaces (R9).** Read-only surfaces members could not
+  reach have a read path; a human or helper step is declared as a `needs`
+  in the plan, so it arrives as a planned item, not a surprise. Usage rows
+  in a client project's ClickHouse are a `needs` a human supplies. Deliver
+  only what a `needs` item asks of you (L12).
+- **Verifier (R10).** The staging verifier runs in a prepared worktree (env
+  copied in, `just` on PATH) with a heavy slot, reads staging data and runs
+  the live flows a `stage: staging` deliverable names.
+- **Session hygiene (R11).** The leader watch pushes a `blocking: later`
+  item once per instance (c8), then only on change; background shell jobs a
+  member starts are on its roster row and in the mirror; headless mirror
+  windows are closed when their session ends. Close a window by hand only on
+  a c5 or c12 push.
 
 ## Quota guarding (v0.5.15, ENG-535)
 

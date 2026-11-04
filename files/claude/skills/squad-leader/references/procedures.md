@@ -54,10 +54,11 @@ check is not `ok`.
    Re-derive `expectedChecks` from a recent PR whenever a workflow changes:
    `gh pr checks <pr> -R <repo> --json name,workflow` (portal: the `CI`
    workflow's PR jobs; harness-kit: `ci`, since `publish.yml` runs on tags).
-   The portal's CI is path-filtered, so a docs-only land registers no check
-   and reaches the operator after `checks_register_timeout_s` (Item
-   handling); register `ci: "unknown"` instead if many docs-only lanes are
-   expected. Squad and theparentedit stay `direct`; exxo-infra stays
+   The portal's CI is path-filtered. From 0.6.0 a land whose changed files
+   all match `ci_paths_ignored` (or the workflow's `paths-ignore`) merges on
+   review alone and records `checks: skipped_by_paths` (R3); set
+   `ci_paths_ignored` on the repo row rather than registering `ci:
+   "unknown"`. Squad and theparentedit stay `direct`; exxo-infra stays
    unregistered. Registering repos is within the leader's authority [L4].
 7. **Plans.** Every task of the batch `approved`, its plan with structured
    `prerequisites` (no dependency in prose only), a `stage` on each
@@ -128,9 +129,9 @@ proposal and exact command, the item left open. Log every action.
 | `policy:release:<land>:verify` (info) | Note the broker rebuild is pending | The rebuild | — |
 | `policy:verify:<task>` | Read the finding; approve its fix task through plan review (ruling 29) [L11] | A fix that failed twice | Edit the deliverable to pass |
 | `policy:review:<task>` (blocking later) | `tasks.setFollowup {id, status, note}` where the record shows it; a real gap becomes a fix task or a Linear issue [L4] | Follow-ups needing Tim's judgment | Mark `done` what was not done |
-| `policy:land:<task>` | Pass a fixable refusal on; a docs-only portal trunk land (below) | Third refusal, review timeout, `operator_only`; a floor-repo land onto `main` ("until Tim returns") | Merge onto h2gc `main`; re-aim a PR to dodge the floor; delete a branch; force-push |
+| `policy:land:<task>` | Pass a fixable refusal on | Third refusal, review timeout, `operator_only`; a floor-repo land onto `main` ("until Tim returns") | Merge onto h2gc `main`; re-aim a PR to dodge the floor; delete a branch; force-push |
 | `policy:land:<task>:queued` | Read the wait reason; `no pool`: rebalance (Quota) [L6] | — | — |
-| `policy:land:<task>:milestone:<id>` | Outside the floor: `trunk.land {kind: "framework"}`, then `tasks.markLanded {milestone: true}` [L2] | A floor-repo milestone onto `main` | `gh pr merge` it yourself |
+| `policy:land:<task>:milestone:<id>` | Nothing from 0.6.0: the trunk service lands it under the ruling (R2); confirm the land recorded | A floor-repo milestone onto `main` | `gh pr merge` it yourself |
 | `policy:denied:<task>` | Read it; the member works on [L1] | The denied write as the exact command | Retry it in another form |
 | `policy:quota:exhausted:<group>` (blocking now) | Nothing moves: confirm with `policy.pools`; the squad waits for the reset | Note the reset time on the morning list | Spend past a ceiling; `allowHot` onto the wall |
 | `policy:hygiene:<run>` (info) | Retire or close what it lists once checked [L10] | Anything of Tim's (his sessions, worktrees) | Remove a worktree without `worktree-closedown` |
@@ -147,21 +148,21 @@ proposal and exact command, the item left open. Log every action.
   with `/reauth` (Tim at the keyboard); otherwise put it first on the
   morning list and expect lanes to hang on 1Password. Known gap: land-refusal
   and account-switch resumes are not held by `deps_down` (ENG-507).
-- **Release and staging re-runs.** A `staging`-stage failure, a
-  `policy:staging:*` red run, or a failed harness-kit `publish.yml` tag run:
-  one `gh run rerun <run> -R <repo> --failed`; the service carries on when
-  it is green. A product production failure goes to Tim.
+- **Release and staging re-runs.** From 0.6.0 the service reruns a failed
+  staging deploy or kit publish run once (`--failed`) before it raises an
+  item (R5). A `policy:staging:*` red run, or a failed harness-kit
+  `publish.yml` tag run, that still stands is a second red: one `gh run
+  rerun <run> -R <repo> --failed` and look at `gh run view`. A product
+  production failure goes to Tim.
 - **Land refusals.** A fixable refusal goes to the member (review
   follow-ups and verify fixes reach it by themselves); `tasks.markLanded`
   only after a merge was made.
-- **Docs-only portal land.** The portal's path-filtered CI registers no
-  check, so a docs-only land into `release/ario-v0.4` reaches the operator
-  with `expected checks never registered`. Confirm with `gh pr checks <pr>
-  -R Exxo-Labs/h2gc-portal` and `gh pr diff <pr> -R Exxo-Labs/h2gc-portal
-  --name-only` that nothing is code, merge it into the trunk (`gh pr merge
-  <pr> -R Exxo-Labs/h2gc-portal --squash --match-head-commit <head>`; base
-  must be the trunk, never `main`; a denial goes to Tim), then
-  `tasks.markLanded` [L2].
+- **Docs-only portal land.** From 0.6.0 the orchestrator merges it on
+  review alone (`checks: skipped_by_paths`, R3). The leader checks that the
+  land recorded that and that `ci_paths_ignored` covers the repo's filter;
+  a docs-only land still reaching the operator with `expected checks never
+  registered` means the filter is missing from the repo row: fix the row,
+  do not hand merge.
 - **Descope** (with Tim's ruling): `submit_task {task_id, park: [exact
   deliverable name]}` on the running task, or the ruling `descope <name>` /
   `park <name>` on the heal item, which parks only when it names exactly one
@@ -202,8 +203,8 @@ The goal of an overnight batch: every task ends in one of three states.
   others; a `tag` repo needing approval also finishes `done`, with a
   `blocking: later` `release_ready` item on the land row naming the command.
 - `landing`, with an open item for Tim naming the exact command (a merge
-  Tim makes, a held release); a milestone waits on its merge item while
-  the task runs on.
+  Tim makes, a held release); a floor-repo milestone onto `main` waits on
+  its merge item while the task runs on.
 - Parked: a clear note on the task (what is parked, why, what unblocks it).
 
 Nothing ends silently `running` or `blocked`. **Morning hand-back**, one
@@ -267,7 +268,11 @@ a note and named in the hand-back.
 
 ## tRPC access
 
-The orchestrator listens on `http://127.0.0.1:7790`. Sign in locally with
+The orchestrator's action API listens on `http://127.0.0.1:7790`. From
+0.6.0 the dashboard's read API is no longer served there: the GUI is the
+BFF at `http://127.0.0.1:7797` (bookmark that one), reading Postgres
+through a read-only role, and 7790 keeps only the action API. Sign in
+locally with
 the leader label (the label must match `^[a-z][a-z0-9_-]{0,31}$`) so
 mutations record actor `gui:leader`:
 
@@ -287,7 +292,7 @@ the input itself. Recording an intervention:
 ```bash
 curl -sS -b "$JAR" -X POST http://127.0.0.1:7790/trpc/operator.intervene \
   -H 'content-type: application/json' \
-  -d '{"function":"L2","action":"milestone tim-codes/squad#277 refused by the classifier; command on Tim'"'"'s list","reason":"milestones are merged by hand (policy:land milestone item)","outcome":"handed_to_tim","pr":"tim-codes/squad#277"}'
+  -d '{"function":"L2","action":"floor-repo merge tim-codes/squad#277 refused by the classifier; command on Tim'"'"'s list","reason":"land refused by the classifier, command on the list","outcome":"handed_to_tim","pr":"tim-codes/squad#277"}'
 ```
 
 Mutations the leader uses: `tasks.approve`, `tasks.markLanded`,
