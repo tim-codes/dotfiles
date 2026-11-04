@@ -240,6 +240,29 @@ stale; under `## Recommended model and effort` give your recommendation (Sonnet 
 Record each assumption and each unresolved question under
 `## Open questions`.
 
+### The task's domain (v0.6.0, R15)
+
+The dashboard groups work by domain, not repo. Resolution order, so you can
+predict what it will show: batch, then plan, then the first Linear ticket's
+team, then the anchor repo match, then `unsorted`. A batch's domain is fixed
+at its creation in 0.6.0, and a batch created by the planner or the operator
+carries `domain`; its tasks inherit it.
+
+- **Interactive.** Read `domains` (id, label, kind, colour, match hints;
+  seeds `h2gc`, `exxo-internal`, `personal`, `unsorted`) and `repo_domain`
+  from the context brief. Propose the task's domain: the batch's, if the
+  task joins a batch, else the best match by Linear team or anchor repo.
+  Confirm it with Tim at plan time, and record `domain: <id>` in the plan.
+- **No domain fits.** Propose a new one to Tim as `{id, label, kind
+  client|internal|personal|none, colour '#rrggbb', match: {linear_teams,
+  repos}}`. Only on his yes, create it with the operator-session tool
+  `upsert_domain` (his own session only), before `submit_task`: a plan
+  naming a domain that is not in the registry is refused.
+- **Headless, including the backlog form.** Set `domain` only when the task
+  file or the batch names one. `upsert_domain` is refused to a `planner`
+  session: name a proposed new domain in the plan text, where the approval
+  item shows it.
+
 ### The shape of a round
 
 Tim ruled on 4 Nov 2026, from the v0.6.0 velocity report
@@ -338,6 +361,8 @@ omitted, never `null`.
   each repo, not only the anchor. The orchestrator tells the member how to
   cut a worktree per repo; the member opens one PR per repo and lands each
   with its `repo`, and the task is done only when every repo has landed.
+- `domain` (optional): a registry id matching `^[a-z][a-z0-9-]{0,31}$`; the
+  batch's own domain wins over it (`### The task's domain`).
 - `operator_steps`: up to 50 (may be empty), each `{title, class}` plus
   `instructions`, `commands` and `est_minutes` where known. `class` is
   `blocks_launch` when it must be done before the member starts (credentials,
