@@ -160,6 +160,12 @@ Commands the session runs itself through the Bash tool stay bash: Claude
 Code's sandbox is bash, not fish. Say which shell a snippet targets only when
 it is not fish.
 
+A script handed to Tim that runs longer than a few seconds prints what it is
+doing as it goes, prints a progress line (an elapsed counter, a step n of m, a
+file size or line count) at least every ten seconds during any wait, and
+prints every error to the terminal with the command that failed, never only
+to a log file. A wait with no output is the failure mode to design against.
+
 **Why:** on 4 Nov 2026 a bash capture script handed to Tim ran `claude` by
 bare PATH lookup and so used the default `~/.claude` context (expired login)
 instead of the personal context his fish `claude` function pins; two runs
