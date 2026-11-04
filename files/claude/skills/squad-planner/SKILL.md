@@ -1,7 +1,7 @@
 ---
 name: squad-planner
-description: Plan one squad task into a TaskPlan and submit it to the squad orchestrator with submit_task — headless over a task file when the broker launches a planner, or interactively with Tim, resuming a local draft when given one. Reads the squad context brief for the repo, drives brainstorming and plan-writing, composes the task markdown with its plan frontmatter, and handles validation problems, resubmission and scope changes. Use for "/squad-planner", "plan this for the squad", or a headless launch carrying --headless --task-id.
-argument-hint: "[--headless --task-id N --repo owner/name --task-file PATH] | [draft, task file or description]"
+description: Plan one squad task into a TaskPlan and submit it to the squad orchestrator with submit_task — headless over a task file when the broker launches a planner, or interactively with Tim, resuming a local draft when given one. Reads the squad context brief for the repo, drives brainstorming and plan-writing, composes the task markdown with its plan frontmatter, and handles validation problems, resubmission and scope changes. Use for "/squad-planner", "plan this for the squad", or a headless launch carrying --headless --task-id or --headless --backlog --batch-id.
+argument-hint: "[--headless --task-id N --repo owner/name --task-file PATH] | [--headless --backlog --batch-id N --repo owner/name] | [draft, task file or description]"
 ---
 
 # Squad planner
@@ -16,12 +16,16 @@ orchestrator never needs to know which way a plan was made.
 | Form | Session | Arguments |
 |---|---|---|
 | Headless | `planner` kind, launched by the broker, nobody watching | `/squad-planner --headless --task-id <int> --repo <owner/name> --task-file <abs path>` |
+| Headless backlog | `planner` kind, launched by the orchestrator when the squad is idle (v0.6.0, R8) | `/squad-planner --headless --backlog --batch-id <int> --repo <owner/name>` |
 | Interactive | Tim's own session (`operator` kind) | `/squad-planner [<draft path> \| <task file path> \| <description>]` |
 
 - `--headless` selects the headless form; all three of its other arguments
   are required. A headless session **never asks anyone anything**: no
   `AskUserQuestion`, and no turn ends with a question. Every assumption and
   every unresolved question goes under `## Open questions` in the content.
+- `--backlog` is a headless-only form (`## Backlog form`). It requires
+  `--batch-id`; `--backlog` without it is refused with one line (below), and
+  `--backlog` without `--headless` is not a form at all.
 - Interactive disambiguation: if the argument names an
   existing readable file (after `~` expansion) under
   `~/.local/state/squad/plans/`, it is a draft to resume (`## Drafts`); any
@@ -79,6 +83,38 @@ orchestrator never needs to know which way a plan was made.
   `implementer` for the interactive plan documents); `general-purpose` only with an
   explicit `model` (a PreToolUse guard rejects it otherwise); no forks. A
   subagent brief restates what it needs, since skills do not travel.
+
+## Backlog form (headless, v0.6.0 R8)
+
+`/squad-planner --headless --backlog --batch-id <id> --repo <repo>` plans an
+open backlog, not one task. The orchestrator launches it when the squad has
+capacity and no batch is queued; `[policy.backlog] enabled` stays `false`
+until this skill is installed, so an old skill never receives the flag.
+
+- **Refusal.** `--backlog` with no `--batch-id`: end the turn at once with
+  the one line `squad-planner: --backlog needs --batch-id <id>; refusing.`
+  followed by the `failed` hand-back (code `no_submission`). Read and
+  submit nothing.
+- **The brief.** Its added dirs hold `backlog-<run>.md`: the GitHub issues
+  it names, the Linear label to read through the Linear MCP, the active
+  standing rulings and the planning rule. Read it first; it is the task file
+  of this form. Unreadable: `failed`, as in step 1.
+- **Plan under the planning rule, verbatim:** "One land per task; dependency
+  depth two or less, with the gating change as a small first task and
+  dependants stacked on it." (`### The shape of a round`.) Group issues into
+  tasks of one land each; a gating change is its own small first task and
+  the rest declare `depends_on` on it. Honour the rulings the brief lists.
+- **Submit.** `mcp__squad__submit_task` once per task, each with **no
+  `task_id`** (they are new tasks in batch `--batch-id`), `draft: true` as
+  for any headless planner, and the content and `plan` of steps 3 and 4. Run
+  the problem handling of step 6 per task. **Never approve** a task or the
+  batch: the batch waits for the operator unless a ruling approves it.
+- **Hand back.** Last line:
+  `{"squad_planner":"submitted","batch_id":<int>,"tasks":[<task ids>]}`, or
+  the `failed` object (step 8) with `batch_id` in place of `task_id`.
+  Nothing plannable in the backlog is `submitted` with an empty `tasks`.
+- Everything else under `## What a planner does` applies: read-only, no
+  questions, assumptions under `## Open questions`.
 
 ## 1. Repo and context brief
 
@@ -547,7 +583,7 @@ shape, kept current on every revision, and the text `submit_task` sends.
   without `## Approval` is a plan in progress: carry on drafting from it.
 - **Submit later** when the squad was unreachable, either way: re-run
   `/squad-planner <draft path>` once the orchestrator is up (above); or, in
-  the GUI at `http://127.0.0.1:7790`, Batches → New batch, upload the draft
+  the GUI at `http://127.0.0.1:7797` (the BFF; before 0.6.0, `:7790`), Batches → New batch, upload the draft
   with the repository set to its `owner/name`. An upload enters as an intake
   task, and a plan equal to the intake frontmatter is approved without a
   review run.
