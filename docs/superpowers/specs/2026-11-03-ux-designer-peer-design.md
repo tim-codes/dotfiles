@@ -14,7 +14,7 @@ and skill is generic: target, scope and stack come from the launch
 arguments and the repo, never from hard-coded examples.
 
 **Example use (not a special case):** the squad GUI (Mantine 9,
-`~/dev/squad/gui`, live on `localhost:7797`) shows a lot of information;
+`~/dev/squad/gui`, live on `localhost:7780`) shows a lot of information;
 Tim wants to simplify its presentation and iterate layouts and
 navigation.
 

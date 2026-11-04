@@ -270,7 +270,7 @@ a note and named in the hand-back.
 
 The orchestrator's action API listens on `http://127.0.0.1:7790`. From
 0.6.0 the dashboard's read API is no longer served there: the GUI is the
-BFF at `http://127.0.0.1:7797` (bookmark that one), reading Postgres
+BFF at `http://127.0.0.1:7780` (bookmark that one), reading Postgres
 through a read-only role, and 7790 keeps only the action API. Sign in
 locally with
 the leader label (the label must match `^[a-z][a-z0-9_-]{0,31}$`) so

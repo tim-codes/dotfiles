@@ -104,10 +104,10 @@ max_slots = 6
 # The 20 s workaround of October is no longer needed.
 
 [orchestrator]
-# Stable URL of the 7797 GUI tunnel (BFF, v0.6.0; was 7790) that src/bin/squad-tunnel hosts (persistent dev tunnel
+# Stable URL of the 7780 GUI tunnel (BFF, v0.6.0; was 7790) that src/bin/squad-tunnel hosts (persistent dev tunnel
 # exxo-tfo-squad; the hostname survives restarts, and only changes if the tunnel is deleted and
 # recreated, when this must be updated from `squad-tunnel url`). Takes effect at the next orchestrator restart.
-public_url = "https://j9fsc30w-7797.uks1.devtunnels.ms"
+public_url = "https://j9fsc30w-7780.uks1.devtunnels.ms"
 
 [policy.trunk]
 # Appended to each squash-merge body after the PR body.

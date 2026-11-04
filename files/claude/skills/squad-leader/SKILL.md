@@ -16,7 +16,7 @@ Tim for nothing and then disappears.
 **Terms.** *Orchestrator* = the v0.5 TypeScript service (policy, items,
 trunk service, action API (tRPC) at `http://127.0.0.1:7790`; from
 0.6.0 7790 keeps only the action API, and the GUI is the BFF at
-`http://127.0.0.1:7797`). *Broker* = the Rust daemon
+`http://127.0.0.1:7780`). *Broker* = the Rust daemon
 (launchd `dev.tim.squad-broker`). *Leader* = this session. *Member*,
 *planner*, *reviewer* = headless sessions the broker launches. Keep these
 words apart in every note, item and summary.

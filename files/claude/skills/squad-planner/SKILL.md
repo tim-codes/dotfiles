@@ -583,7 +583,7 @@ shape, kept current on every revision, and the text `submit_task` sends.
   without `## Approval` is a plan in progress: carry on drafting from it.
 - **Submit later** when the squad was unreachable, either way: re-run
   `/squad-planner <draft path>` once the orchestrator is up (above); or, in
-  the GUI at `http://127.0.0.1:7797` (the BFF; before 0.6.0, `:7790`), Batches → New batch, upload the draft
+  the GUI at `http://127.0.0.1:7780` (the BFF; before 0.6.0, `:7790`), Batches → New batch, upload the draft
   with the repository set to its `owner/name`. An upload enters as an intake
   task, and a plan equal to the intake frontmatter is approved without a
   review run.
