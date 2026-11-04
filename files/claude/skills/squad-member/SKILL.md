@@ -149,8 +149,7 @@ the head sha.
 - Open lane PRs against the base the kickoff names (a branch or a
   `trunk/...`) as drafts. Never push to a trunk branch.
 - On either merge path, mark the PR ready (`gh pr ready <n> -R <owner/name>`)
-  before landing or handing it to Tim and before you watch its checks (a draft
-  PR's checks may not run, and a watch on it idles for nothing), and have the branch up to date with
+  before landing or handing it to Tim and before you watch its checks, and have the branch up to date with
   its base (merge `origin/<base>` in once pushed; see the pushed-branch rule below), with CI green or the failure explained in the PR. The
   trunk service pre-gates only a closed PR and a dirty or behind branch; it
   does not check for a draft, so a draft would still be reviewed.
