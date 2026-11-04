@@ -121,6 +121,17 @@ check "squad-member carries the section headings" has_headings "$M" \
 check "squad-member teaches the plan PR staleness pass" contains "$M" rebase stale 'openspec validate' \
     "onto the kickoff's base (main or the active trunk"
 
+# --- build-lead (multi-lane build procedure) --------------------------------
+B="$SKILLS/build-lead/SKILL.md"
+check "build-lead exists and is shared" exists_and_shared build-lead
+check "build-lead SKILL.md is at most 250 lines" sh -c '[ "$(wc -l < "$1")" -le 250 ]' _ "$B"
+check "build-lead has its sections and references" has_headings "$B" \
+    '## 1. Setup' '## 2. Lane briefs' '## 3. Review loop per checkpoint' '## 4. Merging' \
+    '## 5. Cross-plan seams' '## 6. Scope changes mid-build' '## 7. Final'
+check "build-lead carries its key rules" contains "$B" subagent-driven-development testlock \
+    'Ruling:' 'cost if wrong' '--no-ff' 'Never touch the integration worktree' worktree-closedown
+check "build-lead references exist" test -f "$SKILLS/build-lead/references/dispatch-templates.md" -a -f "$SKILLS/build-lead/references/lessons.md"
+
 # --- squad-planner and the kickoff template (P7 Task 3) ----------------------
 P="$SKILLS/squad-planner/SKILL.md"
 K="$SKILLS/squad-planner/kickoff-template.md"
