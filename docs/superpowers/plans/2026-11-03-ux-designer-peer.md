@@ -310,7 +310,7 @@ SKILL.md frontmatter: `name: ux-designer`. `description:` is one line of at most
 ```bash
 # --- ux-designer (experimental, personal-only) -------------------------------
 U="$SKILLS/ux-designer/SKILL.md"; UB="$SKILLS/ux-designer/brief-template.md"
-generic_only() { ! grep -nE '7780|squad/gui|localhost:[0-9]+|[Mm]antine' "$@" | grep -viE 'e\.g\.|example'; }
+generic_only() { ! grep -nE '7797|squad/gui|localhost:[0-9]+|[Mm]antine' "$@" | grep -viE 'e\.g\.|example'; }
 check "ux-designer exists" test -f "$U" -a -f "$UB"
 check "ux-designer is personal-only" bash -c '! (source <(sed -n "/^shared_skills()/,/^}/p" "$1/scripts/claude-sync"); shared_skills | grep -qx ux-designer)' _ "$REPO_DIR"
 check "ux-designer carries the section headings" has_headings "$U" \
@@ -402,7 +402,7 @@ if [ -f "$U" ]; then
              'ux-designer-<your name>' '## Handshake' '## Round' '## Wrap-up'; do
         grep -qF -- "$s" "$U" || err "ux-designer: body lacks $s"
     done
-    grep -nE '7780|squad/gui|localhost:[0-9]+|[Mm]antine' "$U" | grep -viE 'e\.g\.|example' && err "ux-designer: names a concrete app/stack outside an example"
+    grep -nE '7797|squad/gui|localhost:[0-9]+|[Mm]antine' "$U" | grep -viE 'e\.g\.|example' && err "ux-designer: names a concrete app/stack outside an example"
 else
     err "missing agent ux-designer.md"
 fi

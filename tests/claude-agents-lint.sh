@@ -50,7 +50,7 @@ if [ -f "$U" ]; then
              'ux-designer-<your name>' '## Handshake' '## Round' '## Wrap-up'; do
         grep -qF -- "$s" "$U" || err "ux-designer: body lacks $s"
     done
-    grep -nE '7780|squad/gui|localhost:[0-9]+|[Mm]antine' "$U" | grep -viE 'e\.g\.|example' && err "ux-designer: names a concrete app/stack outside an example"
+    grep -nE '7797|squad/gui|localhost:[0-9]+|[Mm]antine' "$U" | grep -viE 'e\.g\.|example' && err "ux-designer: names a concrete app/stack outside an example"
 else
     err "missing agent ux-designer.md"
 fi

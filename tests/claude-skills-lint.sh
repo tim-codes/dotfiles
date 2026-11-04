@@ -167,7 +167,7 @@ check "kickoff template opens with the squad-member invocation and states merge 
 
 # --- ux-designer (experimental, personal-only) -------------------------------
 U="$SKILLS/ux-designer/SKILL.md"; UB="$SKILLS/ux-designer/brief-template.md"
-generic_only() { ! grep -nE '7780|squad/gui|localhost:[0-9]+|[Mm]antine' "$@" | grep -viE 'e\.g\.|example'; }
+generic_only() { ! grep -nE '7797|squad/gui|localhost:[0-9]+|[Mm]antine' "$@" | grep -viE 'e\.g\.|example'; }
 check "ux-designer exists" test -f "$U" -a -f "$UB"
 check "ux-designer is personal-only" bash -c '! (source <(sed -n "/^shared_skills()/,/^}/p" "$1/scripts/claude-sync"); shared_skills | grep -qx ux-designer)' _ "$REPO_DIR"
 check "ux-designer carries the section headings" has_headings "$U" \
