@@ -24,11 +24,11 @@
     <string>/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/Users/tim/.cargo/bin</string>
     <key>HOME</key>
     <string>/Users/tim</string>
-    <!-- Must match [orchestrator] http_addr in ~/.config/squad/config.toml
-         (v0.5 orchestrator GUI on 127.0.0.1:7790; v0.4's dashboard on 7780
-         is retired). -->
+    <!-- The tunnel fronts the GUI BFF on 127.0.0.1:7780 (v0.6.0). The
+         orchestrator on 7790 ([orchestrator] http_addr) keeps only the
+         action API, which the BFF forwards to. -->
     <key>SQUAD_TUNNEL_PORT</key>
-    <string>7790</string>
+    <string>7780</string>
   </dict>
 
   <key>RunAtLoad</key>

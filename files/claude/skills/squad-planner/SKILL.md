@@ -106,13 +106,17 @@ until this skill is installed, so an old skill never receives the flag.
   the rest declare `depends_on` on it. Honour the rulings the brief lists.
 - **Submit.** `mcp__squad__submit_task` once per task, each with **no
   `task_id`** (they are new tasks in batch `--batch-id`), `draft: true` as
-  for any headless planner, and the content and `plan` of steps 3 and 4. Run
+  for any headless planner (a planner's submission never approves; the flag
+  is only recorded), and the content and `plan` of steps 3 and 4. Run
   the problem handling of step 6 per task. **Never approve** a task or the
   batch: the batch waits for the operator unless a ruling approves it.
 - **Hand back.** Last line:
   `{"squad_planner":"submitted","batch_id":<int>,"tasks":[<task ids>]}`, or
-  the `failed` object (step 8) with `batch_id` in place of `task_id`.
-  Nothing plannable in the backlog is `submitted` with an empty `tasks`.
+  the `failed` object (step 8) with `batch_id` in place of `task_id`. The
+  line is advisory: what counts is the tasks submitted into the run's batch
+  in the database. An empty batch is recorded as `failed` (nothing plannable
+  is not an accepted `submitted` with an empty `tasks`); otherwise the run
+  is `proposed` and the orchestrator raises `policy:backlog:<batch_id>`.
 - Everything else under `## What a planner does` applies: read-only, no
   questions, assumptions under `## Open questions`.
 

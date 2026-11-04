@@ -56,7 +56,7 @@ hand now duplicates the orchestrator and hides whether it worked.
   cache by hand: read the item. It starts an empty cache; it does not warm
   it (re-warm: procedures.md, Item handling).
 - **Milestones.** From 0.6.0 the trunk service lands a milestone itself
-  (R2 rules `policy:land:<task>:milestone`); only a floor-repo milestone
+  (`[policy.trunk] milestone_lands = 'service'`, the default); only a floor-repo milestone
   onto `main` waits for Tim. Never merge one by hand.
 - **Review gates.** Plan review can answer `revise` (back to the planner, at
   most `max_plan_revisions`, then `policy:plan:<task>`); land review judges
@@ -120,7 +120,7 @@ the action by hand.
   session resume) and rolls back to the previous build on a failed check;
   `restart-orchestrator` calls the same code. A failed staging deploy or kit
   publish run is rerun once by the service before it raises an item. The
-  leader checks the health result and the rollback item, and does not run
+  leader checks the health result and any `policy:self-release:<id>` item (procedures.md, Item handling), and does not run
   `gh run rerun` first (L7, L8).
 - **Refusal classes (R6).** Refusals are classed A to I; class C is the
   reviewer's `just ci` in a scratch worktree, answered by the `review-ci`
@@ -135,7 +135,8 @@ the action by hand.
 - **When-idle planning (R8).** With capacity and an empty batch queue the
   orchestrator launches one backlog planner over Linear and GitHub issues
   under the standing rulings and the planning rule; the batch waits for
-  approval unless a ruling approves it. Off by default
+  approval (`policy:backlog:<batch_id>`, procedures.md) unless a ruling on
+  `policy:backlog:*` approves it. Off by default
   (`[policy.backlog] enabled`) until the planner skill with the `--backlog`
   form is installed. Do not launch a planner lane by hand (L11).
 - **Member-reachable surfaces (R9).** Read-only surfaces members could not

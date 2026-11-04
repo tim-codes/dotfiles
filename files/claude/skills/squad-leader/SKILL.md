@@ -208,7 +208,7 @@ each count is expected to fall.
   (procedures.md, Item handling); otherwise only `--dry-run`. From 0.6.0 a
   squad release land restarts the orchestrator itself (R5) with a health
   check and a rollback: after one, check the health result and any
-  rollback item rather than running the recipe.
+  `policy:self-release:<id>` item rather than running the recipe.
   Never leave the squad paused by accident at the start of a run, nor
   resumed against Tim's wish at the end (procedures.md, Pause).
 - **The broker binary** changes only at Tim's attended rebuild
