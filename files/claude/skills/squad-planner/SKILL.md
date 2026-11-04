@@ -200,6 +200,41 @@ stale; under `## Recommended model and effort` give your recommendation (Sonnet 
 Record each assumption and each unresolved question under
 `## Open questions`.
 
+### The shape of a round
+
+Tim ruled on 4 Nov 2026, from the v0.6.0 velocity report
+(`docs/superpowers/plans/2026-11-03-squad-v0.6.0-velocity.md` in the squad
+repo), that a plan is cut for one land per task, no milestone lands and a
+shallow round. The pipeline charges per land and per level of dependency, not
+per line of work, so:
+
+- **One land per task; no milestones by default.** The kickoff's
+  `## Milestones` reads `none`. An intermediate release that a later task
+  needs (a package version the next task installs) is its own small task with
+  an explicit `depends_on` edge (the `task_deps` row), as harness-kit task 51
+  was, never a milestone land inside a larger task. A task that would want a
+  milestone to see its work on staging gets a `stage: staging` deliverable
+  instead. A milestone appears only when Tim asks for one by name.
+- **Dependency depth two or less per round.** Keep the graph at two levels.
+  Put the gating change (a package cutover, a schema move) in a small first
+  task; the tasks that need it start on stacked branches off its PR rather
+  than waiting for it to merge.
+- **Cross-task ordering is a `depends_on` edge**, never "lands after #PR" in
+  a deliverable or in the notes. A member never watches another task's PR, so
+  an ordering that lives only in prose is an ordering nobody enforces.
+- **Size a task to one PR a reviewer can read in about ten minutes.** A
+  cutover that deletes thousands of lines, or a task that touches a hundred
+  files, is split, not landed whole.
+- **Post-deploy checks are `stage: staging` deliverables**, judged by the
+  verifier after the one deploy. The full gate, a staging smoke, a live or
+  paid scenario, "verified on staging" and screenshots from a deployed
+  environment are never merge-stage checks: the merge-stage land reviewer
+  reads CI and the member's evidence and runs nothing itself. A paid or live
+  scenario is written once, as one deliverable, and runs once.
+- A deliverable's merge-stage `check` is something the member can show before
+  the land: focused tests, the repo's fast check, a diff property, or CI green
+  on the head sha.
+
 ## 3. Fill the TaskPlan
 
 The plan is strict: no fields beyond these, and an absent optional field is
@@ -220,7 +255,9 @@ omitted, never `null`.
   shows Sync topics succeeding") as `production` deliverables, since they are
   only observable after the release.
 - `depends_on` (optional): up to 50 task ids, only ids present in the
-  brief's `tasks`, never the task's own id.
+  brief's `tasks`, never the task's own id. This is how cross-task order is
+  expressed, and the round stays at depth two or less (see "The shape of a
+  round").
 - `resources`: `repo` (`owner/name`); `base` (a branch or a `trunk/...` named
   in the brief, else the default branch); `capabilities` (up to 16 tags,
   each matching `^[a-z0-9][a-z0-9-]{0,31}$`, may be empty); known tags include `playwright` and `browser`, plus `figma` (the task reads or writes Figma through the Figma MCP, so the member needs it signed in), plus `1password` (the task resolves 1Password references via agent/run, available on every account) and `vercel` (the task needs the Vercel MCP server, exxo account only)); `heavy_jobs` (up to 20 `{command,
