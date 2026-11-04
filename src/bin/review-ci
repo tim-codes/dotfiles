@@ -1,0 +1,63 @@
+#!/bin/bash
+# review-ci <checkout> <sha>: a reviewer's one CI run, for a head with no CI to read.
+# Fetches <sha> (a full 40-hex commit sha) into <checkout>, adds a detached worktree of it at
+# $REVIEW_CI_SCRATCH_DIR/review-ci (a leftover one from an earlier run is removed first),
+# copies the checkout's local env in when `worktree-copy-local-env` is on PATH, and runs
+# `just install` then `just ci` there, the output going to $REVIEW_CI_SCRATCH_DIR/review-ci.log.
+# Prints the last 40 lines and `review-ci: exit <n>`, exits with ci's status, and always removes
+# the worktree. Nothing is written outside the scratch dir apart from the package install: no
+# push, no tag, no gh.
+#
+# REVIEW_CI_SCRATCH_DIR must name an existing directory; SQUAD_SCRATCH_DIR is accepted as a
+# fallback (squad reviewer sessions set it). Pair with testlock on a shared machine:
+#   testlock review-ci <checkout> <sha>
+# Tested by tests/review-ci.sh (fakes only).
+set -uo pipefail
+
+if [ $# -ne 2 ]; then
+  echo "usage: review-ci <checkout> <sha>" >&2
+  exit 64
+fi
+checkout=$1
+sha=$2
+scratch=${REVIEW_CI_SCRATCH_DIR:-${SQUAD_SCRATCH_DIR:-}}
+if [ -z "$scratch" ] || [ ! -d "$scratch" ]; then
+  echo "review-ci: REVIEW_CI_SCRATCH_DIR (or SQUAD_SCRATCH_DIR) is not set to a directory; refused" >&2
+  exit 64
+fi
+# A full sha only: `git fetch origin <sha>` cannot fetch an abbreviated one.
+if ! [[ $sha =~ ^[0-9a-f]{40}$ ]]; then
+  echo "review-ci: <sha> must be a full commit sha (40 hex characters); refused" >&2
+  exit 64
+fi
+if [ ! -d "$checkout" ]; then
+  echo "review-ci: no checkout at $checkout; refused" >&2
+  exit 64
+fi
+
+wt=$scratch/review-ci
+log=$scratch/review-ci.log
+
+remove_worktree() {
+  git -C "$checkout" worktree remove --force "$wt" >/dev/null 2>&1 || true
+  rm -rf "${wt:?}"
+}
+
+# A leftover worktree of an earlier run.
+if [ -e "$wt" ]; then remove_worktree; fi
+trap remove_worktree EXIT
+
+git -C "$checkout" fetch --quiet origin "$sha" || { echo "review-ci: fetch of $sha failed" >&2; exit 1; }
+git -C "$checkout" worktree add --detach "$wt" "$sha" >/dev/null || {
+  echo "review-ci: worktree add of $sha failed" >&2
+  exit 1
+}
+if command -v worktree-copy-local-env >/dev/null 2>&1; then
+  worktree-copy-local-env "$wt" >/dev/null 2>&1 || true
+fi
+
+(cd "$wt" && just install && just ci) > "$log" 2>&1
+rc=$?
+tail -n 40 "$log"
+echo "review-ci: exit $rc"
+exit "$rc"
