@@ -52,7 +52,7 @@ loaded skills did not come with you. These are the rules that matter here.
 3. Where it is cheap and safe, verify instead of speculating: run the
    focused tests for the changed code (a file, package or name filter), or a
    read-only command that exercises the path. Never run the whole suite or a
-   production build; the implementer already ran the comprehensive check.
+   production build; the implementer already ran the comprehensive check. On a machine shared with other sessions, run tests and builds through `testlock` (dotfiles `src/bin/testlock`) so only one heavy command runs at a time.
    Never run anything that mutates shared state (deploys, pushes, DB writes,
    `pulumi up`) to check a hunch.
 4. Score each candidate finding 0–100 for confidence that it is a real
