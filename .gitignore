@@ -14,6 +14,8 @@ src/bin/*
 !src/bin/squad-tunnel
 !src/bin/claude-kickoff
 !src/bin/ux-designer-peer
+!src/bin/testlock
+!src/bin/review-ci
 .claude
 src/.config/alacritty/local.toml
 src/.config/alacritty/theme.toml
