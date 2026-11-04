@@ -28,6 +28,19 @@
     <string>cd ~ &amp;&amp; { tmux has-session -t scratch 2>/dev/null || exec tmux new-session -d -s scratch; }</string>
   </array>
 
+  <!-- ENG-542: raise the server's open-file soft limit. macOS gives launchd
+       jobs 256 (`launchctl limit maxfiles`), and tmux never raises
+       RLIMIT_NOFILE itself - the server inherits it from whatever starts it.
+       Each pane holds a /dev/ptmx fd, so ~250 panes exhausted it and every
+       status-bar #() job failed with "didn't start". The hard limit is
+       unlimited, so no root is needed; if it were lower, launchd would
+       clamp the soft limit to it. -->
+  <key>SoftResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>65536</integer>
+  </dict>
+
   <key>RunAtLoad</key>
   <true/>
   <!-- One-shot: the job exits as soon as the server has forked. The server
