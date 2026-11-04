@@ -87,9 +87,13 @@ effort is used):
            the git checkout of that name under ~/dev, at most three
            levels deep (the shallowest wins; a tie is an error).
   context  a context `name` in the contexts file (a trailing comment is ignored)
-  model    passed as --model
+  model    passed as --model (optional when `agent` is set: the agent's own model applies)
   effort   passed as --effort
   Optional keys, all echoed by --dry-run:
+  agent    first word passed as --agent (a subagent definition run as the main
+           session; letters, digits, _ - and :, else exit 5); new launches only,
+           a resumed session keeps what it had
+  name     the whole value passed as --name (display name); new launches only
   harness  must equal the context's harness (default claude-code; else exit 5)
   role     client (default) | orchestrator | infra
   lifetime run | task; the default is task for a client, else run
@@ -166,7 +170,7 @@ Exit codes (stable):
   3   prompt file unusable: missing, unreadable, no `---` terminator, empty body
       for a new session, or an add_dirs path that is not a directory; or the cwd is
       not trusted in the context (--no-trust, and --check-trust)
-  4   frontmatter lacks a required key (cwd, context, model or effort); the message
+  4   frontmatter lacks a required key (cwd, context, effort, or model when no agent is set); the message
       names it
   5   invalid value: unknown context, a harness other than the context's, an unknown
       role or lifetime, or cwd that does not resolve to one directory
@@ -358,6 +362,8 @@ first_word() { # first whitespace-separated word of stdin
 cwd_raw=$(fm_get cwd)
 context_raw=$(fm_get context)
 model=$(fm_get model | first_word)
+session_agent=$(fm_get agent | first_word)
+session_name=$(fm_get name)
 effort=$(fm_get effort | first_word)
 needs_raw=$(fm_get needs)
 harness_raw=$(fm_get harness | first_word)
@@ -381,7 +387,7 @@ else
     [ -n "$cwd_raw" ] || die 4 "frontmatter key 'cwd' is missing or empty in $prompt"
 fi
 [ -n "$account" ] || [ -n "$context_raw" ] || die 4 "frontmatter key 'context' is missing or empty in $prompt (or pass --account)"
-[ -n "$model" ] || die 4 "frontmatter key 'model' is missing or empty in $prompt"
+[ -n "$model" ] || [ -n "$session_agent" ] || die 4 "frontmatter key 'model' is missing or empty in $prompt"
 [ -n "$effort" ] || die 4 "frontmatter key 'effort' is missing or empty in $prompt"
 
 # --- context -> config dir (mirrors claude-exxo / claude-exxo-personal / claude-personal / claude-reserve)
@@ -404,6 +410,24 @@ if [ -z "$lifetime" ]; then
     if [ "$role" = client ]; then lifetime=task; else lifetime=run; fi
 fi
 case "$lifetime" in run|task) ;; *) die 5 "unknown lifetime '$lifetime' (expected run or task)" ;; esac
+if [ -n "$session_agent" ]; then
+    case "$session_agent" in
+        [A-Za-z0-9]*) ;;
+        *) die 5 "invalid agent '$session_agent' (expected letters, digits, _ - and :, starting with a letter or digit)" ;;
+    esac
+    case "$session_agent" in
+        *[!A-Za-z0-9_:-]*) die 5 "invalid agent '$session_agent' (expected letters, digits, _ - and :, starting with a letter or digit)" ;;
+    esac
+fi
+agent_args=()
+if [ -n "$session_agent" ]; then
+    agent_args=(--agent "$session_agent")
+    [ -z "$session_name" ] || agent_args+=(--name "$session_name")
+elif [ -n "$session_name" ]; then
+    agent_args=(--name "$session_name")
+fi
+model_args=()
+[ -z "$model" ] || model_args=(--model "$model")
 
 # --- needs: what the context cannot provide -----------------------------------
 # An account_bound need is satisfied only by a context that provides it (claude.ai
@@ -580,7 +604,7 @@ if [ "$dry" -eq 1 ]; then
     printf 'context: %s\n'    "$ctx"
     printf 'config_dir: %s\n' "$config_dir"
     printf 'cwd: %s\n'        "$cwd"
-    printf 'model: %s\n'      "$model"
+    printf 'model: %s\n'      "${model:-none (agent default)}"
     printf 'effort: %s\n'     "$effort"
     if [ "$mode" = resume ]; then
         printf 'resume: %s\n' "$resume"
@@ -604,6 +628,8 @@ if [ "$dry" -eq 1 ]; then
     printf 'before_launch: %s\n' "${before_launch_raw:-none}"
     printf 'add_dirs: %s\n'      "${add_dirs[*]:-none}"
     printf 'deny: %s\n'          "${deny_raw:-none}"
+    printf 'agent: %s\n'         "${session_agent:-none}"
+    printf 'name: %s\n'          "${session_name:-none}"
     printf 'trust: %s\n'         "$trust_line"
     if [ "$member_deny" -eq 1 ]; then
         printf 'member_deny: %s\n'       "$member_deny_file"
@@ -628,8 +654,8 @@ if [ "$(ctx_get "$ctx" '.openrouter // false')" != true ]; then
 fi
 mark_pane
 if [ "$mode" = resume ]; then
-    exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" "${member_deny_args[@]+"${member_deny_args[@]}"}" "${deny_args[@]+"${deny_args[@]}"}" --resume "$resume" --model "$model" --effort "$effort" "$body"
+    exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" "${member_deny_args[@]+"${member_deny_args[@]}"}" "${deny_args[@]+"${deny_args[@]}"}" --resume "$resume" "${model_args[@]+"${model_args[@]}"}" --effort "$effort" "$body"
 fi
 # --add-dir is variadic in claude, so its flags go first: the next option ends the
 # list and the body stays a lone positional.
-exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" "${member_deny_args[@]+"${member_deny_args[@]}"}" "${deny_args[@]+"${deny_args[@]}"}" --model "$model" --effort "$effort" "$body"
+exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" "${member_deny_args[@]+"${member_deny_args[@]}"}" "${deny_args[@]+"${deny_args[@]}"}" "${agent_args[@]+"${agent_args[@]}"}" "${model_args[@]+"${model_args[@]}"}" --effort "$effort" "$body"

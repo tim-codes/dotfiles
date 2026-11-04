@@ -18,8 +18,10 @@
 #    one-way baseline, and drift is promoted deliberately (see `diff` below)
 #    instead of landing in git by accident. The fragments exist because some
 #    settings — enabledPlugins, extraKnownMarketplaces — must differ per
-#    account (the exxo-skills marketplace and its plugin belong only in the
-#    exxo context; homelab issue #76, Linear ENG-20). The merge is what lets
+#    account (exxo-mantine and the Exxo cloud grants belong only in the exxo
+#    context; exxo-common and the exxo-skills marketplace were widened to
+#    every context by Tim on 2026-11-03, superseding homelab #76 / Linear
+#    ENG-20). The merge is what lets
 #    those account-specific keys layer on top of one shared baseline instead
 #    of forking the whole file.
 # 2. It targets the real contexts, never ~/.claude. The default context is
@@ -84,7 +86,8 @@
 # here: composition inside a folded directory would mean gitignored symlinks
 # in the middle of the tracked one. They belong in a plugin instead, enabled
 # per account via enabledPlugins — which is exactly how exxo-common's
-# run-with-secrets reaches the exxo context.
+# run-with-secrets reaches every context since 2026-11-03 (personal and
+# reserve need a one-off `claude plugin install exxo-common@exxo-skills`).
 #
 # exxo-personal is an OVERLAY context, not a fourth account: ~/.claude-exxo
 # with the login swapped to the personal subscription, for when exxo quota is

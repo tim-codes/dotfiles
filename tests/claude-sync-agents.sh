@@ -48,6 +48,7 @@ check "diff: unmanaged file reported for adoption" grep -q 'unmanaged, would ado
 sync >"$T/apply1.log" 2>&1 || { bad "apply exited non-zero"; cat "$T/apply1.log"; }
 check "personal agents is a symlink to the repo dir" \
     test "$(readlink "$FAKE/.claude-personal/agents")" = "$AG"
+check "personal sees ux-designer" test -e "$FAKE/.claude-personal/agents/ux-designer.md"
 for ctx in exxo exxo-personal; do
     d="$FAKE/.claude-$ctx/agents"
     check "$ctx agents is a real dir" test -d "$d" -a ! -L "$d"
@@ -55,6 +56,7 @@ for ctx in exxo exxo-personal; do
         check "$ctx/$n.md links to repo" test "$(readlink "$d/$n.md")" = "$AG/$n.md"
     done
     check "$ctx: private-probe not linked" test ! -e "$d/private-probe.md" -a ! -L "$d/private-probe.md"
+    check "$ctx: ux-designer not linked (personal-only)" test ! -e "$d/ux-designer.md" -a ! -L "$d/ux-designer.md"
 done
 check "prunes stale and broken links" test ! -L "$FAKE/.claude-exxo/agents/gone.md"
 check "adopts unmanaged real agent file (moved into repo)" test -f "$AG/handmade.md"

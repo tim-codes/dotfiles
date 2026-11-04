@@ -9,9 +9,11 @@ to that file, so the repo was perpetually dirty.
 
 - `settings.shared.json` — the baseline applied to every context.
 - `settings.personal.json` — the personal-context fragment, currently `{}`.
-- `settings.exxo.json` — Exxo-only: enables the `exxo-common@exxo-skills`
-  plugin, registers the `exxo-skills` marketplace under
-  `extraKnownMarketplaces`, and adds the Exxo read-only cloud grants.
+- `settings.shared.json` also enables `exxo-common@exxo-skills` and registers
+  the `exxo-skills` marketplace in every context (Tim, 2026-11-03, so
+  `claude-design-workflow` / `working-with-figma` reach personal).
+- `settings.exxo.json` — Exxo-only: enables `exxo-mantine@exxo-skills` and adds
+  the Exxo read-only cloud grants.
 
 Permissions are the one place the merge is not "account wins": `allow`,
 `deny` and `ask` are concatenated across the fragments (`SETTINGS_MERGE` in
@@ -21,9 +23,12 @@ deny floor; repos carry only repo-specific grants (the `claude-repo-config`
 skill, checked by `scripts/claude-config-audit`, which also runs as a
 SessionStart hook in every session).
 
-The split exists because the Exxo context must receive the Exxo skills
-marketplace/plugin while `~/.claude-personal` must never get it (homelab #76,
-Linear ENG-20).
+The split now holds only for `exxo-mantine` and the Exxo cloud grants, which
+`~/.claude-personal` must never get. The earlier rule that personal must never
+get the exxo marketplace/plugin (homelab #76, Linear ENG-20) was widened by Tim
+on 2026-11-03: `exxo-common` is enabled in every context. Personal and reserve
+still need `claude plugin install exxo-common@exxo-skills` once under each
+`CLAUDE_CONFIG_DIR` (plugin installs are snapshots).
 
 ## Language servers (LSP)
 

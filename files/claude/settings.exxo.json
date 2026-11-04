@@ -1,15 +1,6 @@
 {
   "enabledPlugins": {
-    "exxo-common@exxo-skills": true,
     "exxo-mantine@exxo-skills": true
-  },
-  "extraKnownMarketplaces": {
-    "exxo-skills": {
-      "source": {
-        "source": "git",
-        "url": "git@github.com:Exxo-Labs/skills.git"
-      }
-    }
   },
   "permissions": {
     "allow": [

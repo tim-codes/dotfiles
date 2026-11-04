@@ -1,6 +1,6 @@
 ---
 name: run-with-secrets
-description: Use before running any command in this repo that touches 1Password — Ansible against zima/ragnar, playbooks with onepassword lookups, unifi just recipes, or ad-hoc op reads — to minimize Touch ID approval prompts via the secret cache and SSH multiplexing.
+description: Use before running any command in this repo that touches 1Password — Ansible against zima/ragnar, playbooks with onepassword lookups, unifi just recipes, or ad-hoc op reads — to minimize Touch ID approval prompts via the secret cache and SSH multiplexing. Homelab repo only (zima/ragnar, onepassword lookups); NOT for Exxo repos, which use exxo-common:run-with-secrets.
 ---
 
 # Running homelab tasks that need 1Password secrets

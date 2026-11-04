@@ -31,6 +31,10 @@ check() {
 }
 # fm <file> <key>: the single-line frontmatter value of <key>.
 fm() { awk 'NR==1{next} /^---$/{exit} {print}' "$1" | sed -n "s/^$2: *//p" | head -1; }
+# fmq <file> <key>: like fm, with one pair of surrounding single quotes stripped.
+fmq() { fm "$1" "$2" | sed "s/^'\(.*\)'\$/\1/"; }
+# strict_yaml <file>: the frontmatter parses as strict YAML (yq) and is a mapping.
+strict_yaml() { awk 'NR==1{next} /^---$/{exit} {print}' "$1" | yq -e '. | type == "!!map"' >/dev/null; }
 shared_skills_list() {
     bash -c 'source <(sed -n "/^shared_skills()/,/^}/p" "$1/scripts/claude-sync"); shared_skills' _ "$REPO_DIR"
 }
@@ -90,7 +94,8 @@ for dir in "$SKILLS"/*/; do
     name="$(fm "$f" name)"
     check "$s: name equals directory" test "$name" = "$s"
     check "$s: name is 1-64 of [a-z0-9-]" sh -c 'printf "%s" "$1" | grep -qE "^[a-z0-9-]{1,64}$"' _ "$name"
-    desc="$(fm "$f" description)"
+    check "$s: frontmatter is valid strict YAML" strict_yaml "$f"
+    desc="$(fmq "$f" description)"
     check "$s: description is one non-empty line of at most 1024 characters" \
         sh -c '[ -n "$1" ] && case "$1" in ">"*|"|"*) exit 1;; esac && [ "$(printf "%s" "$1" | wc -m)" -le 1024 ]' _ "$desc"
 done
@@ -159,6 +164,20 @@ check "squad-planner has no claims directory or claim file" sh -c \
 check "kickoff template opens with the squad-member invocation and states merge authority and test policy" \
     sh -c '[ "$(sed -n 1p "$1")" = "/squad-member" ] && [ "$(sed -n 2p "$1")" = "Invoke the squad-member skill first." ] &&
         grep -qxF "## Merge authority" "$1" && grep -qxF "## Test policy" "$1"' _ "$K"
+
+# --- ux-designer (experimental, personal-only) -------------------------------
+U="$SKILLS/ux-designer/SKILL.md"; UB="$SKILLS/ux-designer/brief-template.md"
+generic_only() { ! grep -nE '7797|squad/gui|localhost:[0-9]+|[Mm]antine' "$@" | grep -viE 'e\.g\.|example'; }
+check "ux-designer exists" test -f "$U" -a -f "$UB"
+check "ux-designer is personal-only" bash -c '! (source <(sed -n "/^shared_skills()/,/^}/p" "$1/scripts/claude-sync"); shared_skills | grep -qx ux-designer)' _ "$REPO_DIR"
+check "ux-designer carries the section headings" has_headings "$U" \
+    '## Start' '## Handshake' '## Round (builder side)' '## One review pass' '## Wrap-up' '## Stop' '## Rules'
+check "ux-designer names the launcher contract" contains "$U" \
+    'ux-designer-peer start' 'ux-designer-peer stop @' 'ListAgents' 'window: @N' 'ux-designer ready:' 'kill-session'
+check "ux-designer description is marked experimental" sh -c 'case "$1" in Experimental:*) ;; *) exit 1;; esac' _ "$(fmq "$U" description)"
+check "brief template carries every placeholder" contains "$UB" '{{SCOPE}}' '{{TARGET}}' '{{BUILDER}}' '{{NAME}}' '{{CONTEXT}}' 'SendMessage'
+check "ux-designer skill and template are generic" generic_only "$U" "$UB"
+check "ux-designer names no context directory" no_context_dirs "$SKILLS/ux-designer"
 
 [ "$fail" = 0 ] && echo "ok: skills lint clean"
 exit "$fail"

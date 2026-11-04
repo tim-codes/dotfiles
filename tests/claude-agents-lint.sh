@@ -33,5 +33,27 @@ for f in "$AGENTS"/*.md; do
     done
 done
 
+U="$AGENTS/ux-designer.md"
+if [ -f "$U" ]; then
+    ufm="$(awk 'NR==1{next} /^---$/{exit} {print}' "$U")"
+    utools="$(printf '%s\n' "$ufm" | sed -n 's/^tools: *//p' | tr -d ' ' | tr ',' '\n')"
+    [ "$(printf '%s\n' "$ufm" | sed -n 's/^model: *//p')" = opus ] || err "ux-designer: model must be opus"
+    for t in Read Grep Glob Bash Write Skill SendMessage ListAgents ToolSearch Artifact ArtifactComments \
+             mcp__playwright__browser_navigate mcp__playwright__browser_take_screenshot mcp__claude_ai_Figma__whoami mcp__claude_ai_Figma__use_figma; do
+        printf '%s\n' "$utools" | grep -qx "$t" || err "ux-designer: tools lacks $t"
+    done
+    for t in Edit NotebookEdit Agent mcp__playwright__browser_type mcp__playwright__browser_fill_form mcp__playwright__browser_evaluate mcp__playwright__browser_run_code_unsafe mcp__claude_ai_Figma__create_new_file; do
+        printf '%s\n' "$utools" | grep -qx "$t" && err "ux-designer: tools must not include $t"
+    done
+    for s in 'ux-designer ready:' 'exxo-common:claude-design-workflow' 'exxo-common:working-with-figma' \
+             'design:design-critique' 'design:accessibility-review' 'design:design-handoff' 'ArtifactComments' \
+             'ux-designer-<your name>' '## Handshake' '## Round' '## Wrap-up'; do
+        grep -qF -- "$s" "$U" || err "ux-designer: body lacks $s"
+    done
+    grep -nE '7797|squad/gui|localhost:[0-9]+|[Mm]antine' "$U" | grep -viE 'e\.g\.|example' && err "ux-designer: names a concrete app/stack outside an example"
+else
+    err "missing agent ux-designer.md"
+fi
+
 [ "$fail" = 0 ] && echo "ok: $(ls "$AGENTS"/*.md | wc -l | tr -d ' ') agents lint clean"
 exit "$fail"

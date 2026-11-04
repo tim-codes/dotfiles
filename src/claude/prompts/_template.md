@@ -35,6 +35,9 @@ Values may run long. A comment after `context` is fine: only its first word coun
                 (overridable with `--account`)
   model         passed as `--model`
   effort        passed as `--effort`
+  agent         optional: passed as `--agent` (a subagent definition run as the main
+                session; `model` may then be omitted)
+  name          optional: passed as `--name` (display / ListAgents name)
   needs         optional, state it as this key (the join line is not read): each need the
                 contexts file lists in `account_bound` (m365, figma, notion, agent-run,
                 datadog, boards) must be provided by the context; an unmet one exits 9
