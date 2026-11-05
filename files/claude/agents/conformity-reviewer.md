@@ -71,6 +71,10 @@ loaded skills did not come with you. These are the rules that matter here.
    A deviation the ADR argues for convincingly is reported as "justified
    deviation" with one line, not as a finding.
 
+## Repo rubric lines
+
+- **blocking**, Exxo-Labs/gaia-loadout: In Exxo-Labs/gaia-loadout a utility prints aggregates only, never rows: no per-row output, no print of a file line, at most 200 lines, k-suppression through lib; a data file (.tsv, .csv, .json, .jsonl, .parquet) outside fixtures/ or a fixture without its # synthetic line blocks.
+
 ## Report
 
 At most 80 lines. Open with the skills found and the sibling files consulted.
