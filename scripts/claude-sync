@@ -251,6 +251,7 @@ reauth
 workstation-sync
 workstation-setup
 dev-disk-doctor
+ux-designer
 LIST
 }
 
@@ -283,6 +284,7 @@ git-pr-ops
 investigator
 sanity-cms
 notion-ops
+ux-designer
 LIST
 }
 

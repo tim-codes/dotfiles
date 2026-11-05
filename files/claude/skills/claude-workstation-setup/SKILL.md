@@ -289,7 +289,7 @@ carried no MCP servers at all while `~/.claude-exxo` had four.
    `scripts/claude-sync` get linked in (currently `claude-workstation-setup`,
    `worktree-closedown`, `dotfiles-repo`, `claude-repo-config`, `squad-member`,
    `squad-planner`, `squad-debug-review`, `reauth`, `workstation-sync`,
-   `workstation-setup`, `dev-disk-doctor`). Every other repo skill is
+   `workstation-setup`, `dev-disk-doctor`, `ux-designer`). Every other repo skill is
    personal-only by default and must be explicitly promoted — add its name to
    `shared_skills()` to make it cross-account.
    Authoring asymmetry (verified against claude-sync): author new skills in
@@ -368,13 +368,14 @@ environment mechanics a subagent doesn't inherit). The personal-account contexts
 `agents` as a whole-directory symlink to that dir; exxo and
 exxo-personal get a real `agents/` directory of per-file symlinks for the
 names in `shared_agents()` in `scripts/claude-sync` (currently `implementer`,
-`reviewer`, `git-pr-ops`, `investigator`, `sanity-cms`, `notion-ops` — all of
-them). Same allow-list and adoption rules as skills: a new agent is
+`reviewer`, `git-pr-ops`, `investigator`, `sanity-cms`, `notion-ops`, `ux-designer` — all
+of them). Same allow-list and adoption rules as skills: a new agent is
 personal-only until named there, and a real file created in a curated
 `agents/` dir is adopted into the repo on the next sync. Verified 2026-10-23
 that Claude Code follows both a symlinked `agents/` dir and symlinked agent
 files. `claude-sync --diff` reports each agent's link state. The experimental
-`ux-designer` is deliberately personal-only (not in `shared_agents()`), pinned
+`ux-designer` (promoted to exxo on 2026-11-05 at Tim's request, so it is in
+`shared_agents()` and `shared_skills()`) is pinned
 to opus with a `tools:` allowlist (no Edit), and runs as a peer main session
 through `claude --agent ux-designer`, launched by the `ux-designer` skill
 rather than as a subagent.
