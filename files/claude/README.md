@@ -147,7 +147,7 @@ a real directory of per-skill symlinks maintained by `claude-sync`, built
 from an allow list: a `shared_skills()` list in `scripts/claude-sync` names
 the repo skills that are cross-account — currently `claude-workstation-setup`,
 `worktree-closedown`, `dotfiles-repo`, `claude-repo-config` and the squad skills (`squad-member`,
-`squad-planner`, `squad-debug-review`), `reauth`, `workstation-sync`, `workstation-setup` and `dev-disk-doctor` — and only those are linked into exxo;
+`squad-planner`, `squad-debug-review`), `reauth`, `workstation-sync`, `workstation-setup`, `dev-disk-doctor` and `ux-designer` — and only those are linked into exxo;
 every other repo skill is personal-only by default. The allow-list replaced an
 earlier exclusion list after `run-with-secrets` — homelab guidance (op-shim,
 Ansible, zima/ragnar) — turned up alongside the `exxo-common` plugin's own
@@ -171,9 +171,10 @@ procedure, including the environment mechanics a fresh subagent context does
 not inherit). `~/.claude-personal/agents` (and `~/.claude-reserve/agents`) is a
 whole-directory symlink to `files/claude/agents`; the curated contexts get a real `agents/` directory of
 per-file symlinks for the names in `shared_agents()` in `scripts/claude-sync`
-— currently all six round-one agents (`implementer`, `reviewer`,
+— currently the round-one agents (`implementer`, `reviewer`,
 `git-pr-ops`, `investigator`, `sanity-cms`, `notion-ops`), because 92% of the
-subagent spend they target is in exxo. A real file dropped into a curated
+subagent spend they target is in exxo, plus the experimental `ux-designer`
+(promoted to exxo 2026-11-05 at Tim's request). A real file dropped into a curated
 `agents/` dir is adopted into the repo as personal-only, same as skills.
 Rationale and the measurement baseline:
 `docs/superpowers/specs/2026-10-23-subagent-plugin-hygiene-design.md`;

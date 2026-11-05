@@ -5,7 +5,7 @@ description: 'Experimental: Use when Tim says /ux-designer start <target-url> <s
 
 # ux-designer (builder side)
 
-Experimental and personal-only. The designer is a peer Claude session running
+Experimental; available in the personal and exxo contexts. The designer is a peer Claude session running
 the `ux-designer` agent in its own tmux window. It critiques, drafts on a
 Claude Design canvas and reviews builds; it never writes app code. This
 session is the builder: it launches the designer, prototypes in the real app
@@ -117,5 +117,5 @@ and ask Tim which window to close.
 - Opus by default; one automatic review pass; Figma only at wrap-up, into the
   file Tim names.
 - Window targeted by id only; the tmux session is Tim's and is never closed.
-- Experimental and personal-only: not prescribed in product repos, the shared
-  roster or other contexts until Tim promotes it.
+- Experimental: available in the personal and exxo contexts, but not
+  prescribed in product repos or the shared roster until Tim promotes it.
