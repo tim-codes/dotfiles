@@ -61,6 +61,7 @@ projection_horizon_minutes = 60
 
 [policy.launch]
 # Squad-owned verification (R20): task branches the squad creates are gaia/task-<member>.
+# Applies only to repos whose trunk policy is `trunk`; `direct` repos keep squad/<member> lanes.
 branch_prefix = "gaia/task-"
 # Replaces the built-in needs_mcp. `browser` has no server on purpose: the Chrome
 # integration (claude-in-chrome) is a Claude Code settings flag, not an mcpServers entry.
