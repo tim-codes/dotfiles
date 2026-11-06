@@ -166,17 +166,18 @@ check "kickoff template opens with the squad-member invocation and states merge 
         grep -qxF "## Merge authority" "$1" && grep -qxF "## Test policy" "$1"' _ "$K"
 
 # --- ux-designer (experimental, shared to exxo contexts) -------------------------------
-U="$SKILLS/ux-designer/SKILL.md"; UB="$SKILLS/ux-designer/brief-template.md"
+U="$SKILLS/ux-designer/SKILL.md"
 generic_only() { ! grep -nE '7797|squad/gui|localhost:[0-9]+|[Mm]antine' "$@" | grep -viE 'e\.g\.|example'; }
-check "ux-designer exists" test -f "$U" -a -f "$UB"
+check "ux-designer exists" test -f "$U"
 check "ux-designer is shared" bash -c '(source <(sed -n "/^shared_skills()/,/^}/p" "$1/scripts/claude-sync"); shared_skills | grep -qx ux-designer)' _ "$REPO_DIR"
 check "ux-designer carries the section headings" has_headings "$U" \
-    '## Start' '## Handshake' '## Round (builder side)' '## One review pass' '## Wrap-up' '## Stop' '## Rules'
-check "ux-designer names the launcher contract" contains "$U" \
-    'ux-designer-peer start' 'ux-designer-peer stop @' 'ListAgents' 'window: @N' 'ux-designer ready:' 'kill-session'
+    '## Inputs' '## Setup' '## 1. Critique' '## 2. Draft directions' '## 3. Tim chooses' '## 4. Build and review (optional)' '## 5. Wrap-up' '## Figma' '## Rules'
+check "ux-designer names the scratchpad, SharePoint and Figma create_new_file" contains "$U" \
+    'scratchpad' 'Microsoft 365 connector' 'create_new_file' 'client snapshot' 'design:design-handoff'
+check "ux-designer has no peer or launcher flow" sh -c '! grep -nE "ux-designer-peer|SendMessage|ListAgents|window: @|kill-session|handshake|builder" "$1"' _ "$U"
+check "ux-designer has no brief template in the skill dir" test ! -e "$SKILLS/ux-designer/brief-template.md"
 check "ux-designer description is marked experimental" sh -c 'case "$1" in Experimental:*) ;; *) exit 1;; esac' _ "$(fmq "$U" description)"
-check "brief template carries every placeholder" contains "$UB" '{{SCOPE}}' '{{TARGET}}' '{{BUILDER}}' '{{NAME}}' '{{CONTEXT}}' 'SendMessage'
-check "ux-designer skill and template are generic" generic_only "$U" "$UB"
+check "ux-designer skill is generic" generic_only "$U"
 check "ux-designer names no context directory" no_context_dirs "$SKILLS/ux-designer"
 
 [ "$fail" = 0 ] && echo "ok: skills lint clean"

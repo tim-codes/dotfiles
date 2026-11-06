@@ -375,10 +375,10 @@ personal-only until named there, and a real file created in a curated
 that Claude Code follows both a symlinked `agents/` dir and symlinked agent
 files. `claude-sync --diff` reports each agent's link state. The experimental
 `ux-designer` (promoted to exxo on 2026-11-05 at Tim's request, so it is in
-`shared_agents()` and `shared_skills()`) is pinned
-to opus with a `tools:` allowlist (no Edit), and runs as a peer main session
-through `claude --agent ux-designer`, launched by the `ux-designer` skill
-rather than as a subagent.
+`shared_agents()` and `shared_skills()`) agent is a thin
+definition pinned to opus with no `tools:` allowlist (so the Figma connector
+is unrestricted) that loads the `ux-designer` skill; the skill itself runs in
+whichever session invokes it and launches nothing (revised 2026-11-06).
 
 The delegation policy in `CLAUDE.md.shared` routes to these first, with
 `general-purpose` as the stated-reason fallback. Progress is measured with

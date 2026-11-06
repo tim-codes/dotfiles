@@ -255,3 +255,40 @@ direction goes on new artboards.
 Skill argument syntax; brief template wording; how the designer gets a
 scratch write path; window naming beyond `ux-designer`; test approach for
 the skill (kickoff keys get unit tests); exact hand-off file location.
+
+## Revised 2026-11-06
+
+Tim's decisions after a live run. They override the sections above, which
+are left as written.
+
+1. **The skill runs in the session where it is invoked.** That session
+   becomes the designer. The skill no longer creates a session, tmux window
+   or peer: `start`/`stop`, the handshake, builder/designer messaging, the
+   brief template and window ids are gone from it. `scripts/ux-designer-peer`,
+   `src/bin/ux-designer-peer` and `tests/ux-designer-peer.sh` stay, unreferenced
+   by the skill, for a possible future provisioning skill (which would be a
+   separate second skill). The brief template moved next to the script
+   (`scripts/ux-designer-peer-brief.md`) so the script still finds it.
+2. **The designer procedure lives in SKILL.md:** critique, draft directions,
+   Tim chooses, optional build and review, wrap-up. One session does it all;
+   when it is also prototyping in the app it does so itself, following repo
+   conventions (the "never writes app code" rule existed only for the peer
+   split). `design:*` and `exxo-common:*` skills stay as pointers. The agent
+   file is reduced to a thin definition (opus, no `tools:` allowlist) that
+   loads the skill.
+3. **Figma:** drafting happens on a Claude Design canvas and Figma is not
+   needed until later, but an explicit Figma or FigJam request from Tim is
+   done at once, including `create_new_file` (ask for name and team if not
+   given). Guards stay: never write to a file Tim did not name or ask to be
+   created, never to a client snapshot. The "builder only" and "wrap-up only"
+   rules are removed. The old allowlist omitted `create_new_file`,
+   `generate_diagram`, `get_figjam` and `get_design_context`.
+4. **Scope is wider than a running web UI:** design-only work such as
+   architecture diagrams with variants from a reference board plus repo and
+   SharePoint material. A target URL is optional; the input is a scope plus
+   references.
+5. **Fixes from the 2026-11-06 live run:** scratch files live in the
+   session's scratchpad directory (the Artifact tool publishes only from
+   there), not `${TMPDIR}/ux-designer-<name>`; source gathering may include
+   SharePoint through the Microsoft 365 connector, read-only; the
+   "Experimental" framing stays.
