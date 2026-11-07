@@ -393,6 +393,8 @@ are missing. Otherwise it is new text. Body headings, in this order:
 
 ## 5. Submit
 
+Scratch survives a pause only under the session scratchpad: a `SessionStart` hook links it to `~/scratch/claude/<project-slug>/<session-id>/scratchpad` (quote that durable path, not `/private/tmp/...`), `.superpowers/sdd` ledgers are mirrored to `<session>/sdd/` on Stop, and nothing that must outlive a pause (local drafts, briefs, logs) goes in `/tmp/<name>`. Collection is `claude-scratch-gc` (`.pin` keeps a session), never the OS.
+
 Call `mcp__squad__submit_task` with `content`, `plan`, and:
 
 - Interactive, `content` is the draft file's content, read back from the file

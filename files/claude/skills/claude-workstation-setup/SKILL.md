@@ -216,6 +216,28 @@ restating global CLAUDE.md blocks):
   primary-checkout path (`$HOME/dev/dotfiles/scripts/…`), like the other
   dotfiles hooks, so it tracks `main`.
 
+### Scratch persistence
+
+Session scratch is kept off the OS tmp dir (added 7 Nov 2026, after work
+pauses lost files from `/tmp`). Durable root `~/scratch/claude/<project-slug>/<session-id>/`
+mirrors Claude Code's `/private/tmp/claude-<uid>/<slug>/<session>/scratchpad`:
+
+- `scripts/claude-scratch-persist` is a `SessionStart` hook (`startup|resume`,
+  marker `# claude-scratch-persist`) that migrates any existing tmp scratchpad
+  into the durable dir and leaves a symlink (or creates the symlink when the
+  scratchpad does not exist yet); a foreign symlink is never touched. The `Stop`
+  hook (same script, `stop`) copies a still-real tmp scratchpad as a fallback and
+  mirrors `<cwd>/.superpowers/sdd` to `<session>/sdd/`. It logs one line per
+  run to `~/.local/state/claude-scratch/persist.log`, prints nothing and always
+  exits 0. Like the audit hook it is referenced by its primary-checkout path.
+- `scripts/claude-scratch-gc` lists sessions with age and size and deletes
+  unpinned ones older than `--older-than <days>` (default 30) only with
+  `--apply` (dry run by default; `.pin` in a session dir pins it). Nothing
+  schedules it. The global rule is in CLAUDE.md ("Scratch files are persisted,
+  never trusted to /tmp").
+- Tests: `tests/claude-scratch-persist.sh` (fake HOME and tmp root via
+  `CLAUDE_SCRATCH_TMP_ROOT`, `CLAUDE_SCRATCH_ROOT`).
+
 ## Global instructions (CLAUDE.md): shared baseline + optional per-account fragment
 
 Same shape as settings, one level simpler. `claude-sync` concatenates

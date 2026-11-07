@@ -310,6 +310,8 @@ so raise it as a question for Tim rather than polling the other task's PR.
 
 ## Repo conventions
 
+Scratch survives a pause only under the session scratchpad: a `SessionStart` hook links it to `~/scratch/claude/<project-slug>/<session-id>/scratchpad` (quote that durable path, not `/private/tmp/...`), `.superpowers/sdd` ledgers are mirrored to `<session>/sdd/` on Stop, and nothing that must outlive a pause goes in `/tmp/<name>`. Collection is `claude-scratch-gc` (`.pin` keeps a session), never the OS.
+
 - If the kickoff names repo preparation (`git pull --ff-only`, a rebase
   before the first push), do it first.
 - Stay in the worktree the broker started you in and use absolute paths into
