@@ -1,6 +1,6 @@
 ---
 name: claude-workstation-setup
-description: Full disclosure of how Claude Code is set up on Tim's workstations — per-account contexts (personal, reserve, exxo, exxo-personal, and the exxo-openrouter (OpenRouter/Kimi K3) context), OpenRouter worker setup, shell wrappers, settings/CLAUDE.md fragment merge (incl. the global permission allow set and deny floor), the repo-config audit hook, repo-managed MCP servers, the two skill-delivery paths (including vendored upstream skills), and where approvals/memory live. Use when asked how the Claude setup/context segregation works, when changing any part of it (claude-sync, settings/CLAUDE.md/MCP fragments, skills, plugins), or when a session behaves as if it's in the wrong account, or when adding/updating a global (cross-session) instruction.
+description: Full disclosure of how Claude Code is set up on Tim's workstations — per-account contexts (personal, reserve, exxo, exxo-personal, and the exxo-openrouter (OpenRouter/DeepSeek) context), OpenRouter worker setup, shell wrappers, settings/CLAUDE.md fragment merge (incl. the global permission allow set and deny floor), the repo-config audit hook, repo-managed MCP servers, the two skill-delivery paths (including vendored upstream skills), and where approvals/memory live. Use when asked how the Claude setup/context segregation works, when changing any part of it (claude-sync, settings/CLAUDE.md/MCP fragments, skills, plugins), or when a session behaves as if it's in the wrong account, or when adding/updating a global (cross-session) instruction.
 ---
 
 # How Claude Code is set up on these workstations
@@ -47,7 +47,7 @@ repo — prefer reading those before modifying anything they govern.
   claude-sync warns and leaves them, orphaning that history from exxo.
 - `~/.claude-exxo-openrouter` — FOURTH context, a worker sandbox: the exxo
   fragments plus `settings.overlay.exxo-openrouter.json`, running Claude Code
-  against OpenRouter (model `moonshotai/kimi-k3`, "K3") instead of an Anthropic
+  against OpenRouter (model `deepseek/deepseek-v4.1-flash-1017`) instead of an Anthropic
   subscription. Built for unattended or batch jobs; it is not a way to reach
   Exxo's connectors. Unlike `exxo-personal` it shares almost nothing (see
   "Sharing" below) and carries extra guard rails (see "The OpenRouter
@@ -95,7 +95,7 @@ they live in `mcp.shared.json` and reach every context, as does the stdio
 `playwright`. `exxo-openrouter` denies all five via `deniedMcpServers` in its
 overlay: workers cannot authenticate, and get no browser automation. The same
 overlay sets `superpowers@claude-plugins-official` to `false`, because its
-process skills stop and ask the user questions, which an unattended K3 worker
+process skills stop and ask the user questions, which an unattended overlay worker
 cannot answer (2026-10-30).
 
 One exception to "account fragment wins": the permission rule arrays
@@ -126,12 +126,14 @@ of `shared * exxo`, applied only to this context (naming: `settings.overlay.
 - **env**: `ANTHROPIC_BASE_URL` (OpenRouter), an EMPTY `ANTHROPIC_API_KEY`
   (so no Anthropic credential is ever used), every tier variable
   (`ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU,FABLE}_MODEL`) and
-  `CLAUDE_CODE_SUBAGENT_MODEL` all set to `moonshotai/kimi-k3@preset/tim-k3`
-  (an OpenRouter preset named tim-k3: provider order inference-net then Wafer,
-  fallbacks on, chosen for cost and cache hits; Moonshot first-party was
-  rejected as about 12× the price), and `ENABLE_TOOL_SEARCH=false`. The `claude-exxo-*`, `claude` and `claude-default` wrappers unset these
+  `CLAUDE_CODE_SUBAGENT_MODEL` all set to `deepseek/deepseek-v4.1-flash-1017@preset/tim-ds`
+  (a dated snapshot pinned through an OpenRouter preset named tim-ds, created
+  in the OpenRouter UI: provider order DeepSeek first-party then Cloudflare,
+  fallbacks on; the alias `~deepseek/deepseek-flash-latest` is not used
+  because it drifts; this replaced the Kimi K3 trial, whose saving was not
+  worth it), and `ENABLE_TOOL_SEARCH=false`. The `claude-exxo-*`, `claude` and `claude-default` wrappers unset these
   variables (and `ANTHROPIC_AUTH_TOKEN`) for any non-openrouter launch, so a
-  nested launch from a K3 session cannot inherit the OpenRouter backend. One
+  nested launch from a overlay session cannot inherit the OpenRouter backend. One
   session has one backend, hence the
   subagent-model exception to the global "unset" rule in `CLAUDE.md.shared`.
 - **Key helper**: `apiKeyHelper` runs `scripts/claude-openrouter-key`, which
@@ -165,9 +167,11 @@ Write tool, and obfuscated command names; behaviour under
 `bypassPermissions` is unverified (smoke test). Job branches must avoid
 "main" and "master" in their names or the push rules block them.
 
-K3 facts (as of build): 1,048,576 context, $0.239 per M input, $10.80 per M
-output; K3.1-pro is a later trial. Model ids carry no `[1m]` suffix yet
-(ruling R-C7), and a smoke row tests that.
+DeepSeek facts: the model id is `deepseek/deepseek-v4.1-flash-1017`, pinned
+through the preset as `@preset/tim-ds`. Pricing and context length are per
+provider on OpenRouter; see the OpenRouter model page. The preset pins the
+provider order (DeepSeek first-party, then Cloudflare). Model ids carry no
+`[1m]` suffix (ruling R-C7), and a smoke row tests that.
 
 ### The member deny overlay (`claude-kickoff`)
 
@@ -183,7 +187,7 @@ context overlay: claude-sync never merges it, it is read from the repo at launch
 (the path is resolved through the `src/bin` symlink), and Tim's own sessions
 through the fish wrappers never get it. `claude-kickoff --no-member-deny` skips
 it for an attended launch; a missing or invalid file refuses the launch (exit
-6). `tests/claude-kickoff-member-deny.sh` covers it. The K3 workers keep their
+6). `tests/claude-kickoff-member-deny.sh` covers it. The overlay workers keep their
 own rule and guard above.
 
 ## Repo config: conventions skill, audit script, SessionStart hook

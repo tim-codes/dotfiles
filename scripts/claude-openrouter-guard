@@ -1,7 +1,7 @@
 #!/usr/bin/env -S python3 -I
 """PreToolUse hook (Bash) for the exxo-openrouter context.
 
-Kimi K3 workers in ~/.claude-exxo-openrouter must never merge a PR or push to
+DeepSeek workers in ~/.claude-exxo-openrouter must never merge a PR or push to
 the default branch, in any form. The overlay's permission deny rules match
 command text only; this hook tokenises the command. There is no GitHub branch
 protection behind it, so it fails closed.

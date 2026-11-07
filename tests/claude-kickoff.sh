@@ -480,9 +480,9 @@ tkick() { # tkick <pane, or empty for none> <args...>: kick with TMUX_PANE set o
 }
 trec_has() { grep -qxF -- "$1" "$TMUX_REC"; }
 trec_empty() { [ ! -s "$TMUX_REC" ]; }
-# The openrouter context maps every tier to K3 in its own settings.json (fixture here).
+# The openrouter context maps every tier to the overlay model in its own settings.json (fixture here).
 cat >"$FAKE/.claude-exxo-openrouter/settings.json" <<'EOF'
-{ "env": { "ANTHROPIC_DEFAULT_SONNET_MODEL": "moonshotai/kimi-k3@preset/tim-k3" } }
+{ "env": { "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek/deepseek-v4.1-flash-1017@preset/tim-ds" } }
 EOF
 sed 's|^model: .*|model: sonnet|' "$T/fixture.md" >"$T/kimi.md"
 cat >"$BIN/claude" <<'EOF'
@@ -492,7 +492,7 @@ EOF
 rm -f "$REC"
 tkick %7 "$T/kimi.md" --account exxo-openrouter
 check "tmux marker: openrouter sets @agent kimi" trec_has "tmux set-option -p -t %7 @agent kimi"
-check "tmux marker: openrouter resolves the sonnet alias via settings.json" trec_has "tmux set-option -p -t %7 @agent_model moonshotai/kimi-k3@preset/tim-k3"
+check "tmux marker: openrouter resolves the sonnet alias via settings.json" trec_has "tmux set-option -p -t %7 @agent_model deepseek/deepseek-v4.1-flash-1017@preset/tim-ds"
 check "tmux marker: claude is still launched with the alias as --model" bash -c 'grep -qx "arg<--model>" "$1" && grep -qx "arg<sonnet>" "$1"' _ "$REC"
 rm -f "$REC"
 tkick %7 "$T/fixture.md" --account exxo
@@ -507,7 +507,7 @@ tkick "" "$T/fixture.md" --account exxo
 check "tmux marker: no TMUX_PANE, no tmux call" trec_empty
 tkick %7 "$T/kimi.md" --account exxo-openrouter --dry-run
 check "tmux marker: dry-run prints @agent" has "tmux set-option -p -t %7 @agent kimi"
-check "tmux marker: dry-run prints @agent_model" has "tmux set-option -p -t %7 @agent_model moonshotai/kimi-k3@preset/tim-k3"
+check "tmux marker: dry-run prints @agent_model" has "tmux set-option -p -t %7 @agent_model deepseek/deepseek-v4.1-flash-1017@preset/tim-ds"
 check "tmux marker: dry-run does not call tmux" trec_empty
 
 # --- every kickoff prompt of the 261024 batch, real HOME, stub claude ---

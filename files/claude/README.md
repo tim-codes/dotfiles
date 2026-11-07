@@ -378,7 +378,7 @@ entries, with a `.bak`).
   2. **Pin the few local controls that exist.** `syncClaudeAiSkills` /
      `syncClaudeAiPlugins` (pull account skills and plugins into Claude Code)
      in the settings fragments. `disableClaudeAiConnectors: true` in the
-     `exxo-openrouter` overlay, so claude.ai connectors never reach K3 workers.
+     `exxo-openrouter` overlay, so claude.ai connectors never reach overlay workers.
      Claude Code's own `theme`/`viewMode`/`claudeInChromeDefaultEnabled` are
      already managed (`prefs.personal.json`). They do not sync to claude.ai.
   3. **Account hygiene from the same review, done by hand:**
@@ -413,7 +413,7 @@ entries, with a `.bak`).
   (`https://mcp.vercel.com`), which are OAuth-only HTTP and so need a
   per-context login. The separate `vercel@claude-plugins-official` plugin
   stays `false`. `exxo-openrouter` denies all three in its overlay: the
-  unattended K3 workers get no browser automation and cannot complete an
+  unattended overlay workers get no browser automation and cannot complete an
   OAuth login. The legacy user-scope `notion` server is retired everywhere.
   Notion reaches a context through the claude.ai `Notion` connector, which
   follows the logged-in account rather than these fragments. A
@@ -423,7 +423,7 @@ entries, with a `.bak`).
   `settings.shared.json` for every context, and the `exxo-openrouter` overlay
   sets it to `false`. Its SessionStart hook makes every session invoke process
   skills before responding, and some of those (such as brainstorming) ask
-  clarifying questions and wait for approval. An unattended K3 worker cannot
+  clarifying questions and wait for approval. An unattended overlay worker cannot
   answer them, and would also pay OpenRouter rates for the injected text
   (decided 2026-10-30).
 - The `notion` entry holds a plaintext bearer token in each context's
