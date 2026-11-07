@@ -11,10 +11,10 @@ Repo: <owner/name>   Base: <base branch or trunk>   Priority (suggested): <1-5>
 <one line per deliverable: name: how "done" is checked>
 
 ## Milestones
-<one line per milestone where the lane lands with land kind milestone; "none" if the work lands once>
+<"none": the work lands once, at the completion land. A milestone only where Tim named one.>
 
 ## Merge authority
-[trunk_service: land each milestone and the completion with mcp__squad__land; never gh pr merge.]
+[trunk_service: land the completion with mcp__squad__land (and any milestone named above); never gh pr merge.]
 [operator: open the PR against the base and raise a review item; Tim merges.]
 
 ## Test policy
