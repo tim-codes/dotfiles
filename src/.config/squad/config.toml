@@ -60,6 +60,9 @@ levels = [50, 75, 85, 90, 95, 100]
 projection_horizon_minutes = 60
 
 [policy.launch]
+# Squad-owned verification (R20): task branches the squad creates are gaia/task-<member>.
+# Applies only to repos whose trunk policy is `trunk`; `direct` repos keep squad/<member> lanes.
+branch_prefix = "gaia/task-"
 # Replaces the built-in needs_mcp. `browser` has no server on purpose: the Chrome
 # integration (claude-in-chrome) is a Claude Code settings flag, not an mcpServers entry.
 # `browser` still gates placement through `provides`.
@@ -110,6 +113,8 @@ max_slots = 6
 public_url = "https://j9fsc30w-7790.uks1.devtunnels.ms"
 
 [policy.trunk]
+# Squad-owned verification (R20): trunk branches are gaia/trunk-<name>.
+branch_prefix = "gaia/trunk-"
 # Appended to each squash-merge body after the PR body.
 trailers = ["Co-Authored-By: Claude <noreply@anthropic.com>"]
 
@@ -122,3 +127,40 @@ teardown = ["just", "-f", "/Users/tim/dev/squad/deploy/Justfile", "preview-prune
 # Every present and future h2gc production stack needs Tim's approval (Tim, 2026-11-03).
 # Intent only in v0.5.15: nothing enforces it at land time yet (ENG-536); exxo-infra stays unregistered.
 approval_stack_patterns = ["exxo/h2gc*/*prod*"]
+
+# Project data access (R18). Tim's baseline: rows for ceiling deliverables.
+[[policy.data_access.rule]]
+repo = "Exxo-Labs/h2gc-portal"
+env = "staging"
+dataset = "ario_usage_events"
+effect = "allow"
+note = "Tim, 4 Nov 2026: usage rows for ceiling deliverables (#354)"
+
+# Per-context Chrome for the squad's browser sign-ins (R19). Launch with `chrome-squad <context>`
+# (src/.config/fish/functions/chrome-squad.fish); the cdp_url must stay loopback.
+[browser.contexts.reserve]
+user_data_dir = "~/Library/Application Support/Google/Chrome-Squad-reserve"
+cdp_url = "http://127.0.0.1:9231"
+
+[browser.contexts.exxo]
+user_data_dir = "~/Library/Application Support/Google/Chrome-Squad-exxo"
+cdp_url = "http://127.0.0.1:9232"
+
+[browser.contexts.personal]
+user_data_dir = "~/Library/Application Support/Google/Chrome-Squad-personal"
+cdp_url = "http://127.0.0.1:9233"
+
+[auth]
+# The squad's own manifest of login credential names (SQUAD_LOGIN_<SITE>_USER=1p:<vault>/<item>:username
+# and so on, plus EXXO_1P_ACCOUNT). References only, never real item ids in a repo.
+agent_env = "~/.config/squad/agent.env"
+
+# Squad-owned verification on buildlab (R20). The key file is a path reference; its content is never in this repo.
+[broker.buildlab]
+credentials_file = "~/.config/squad/gaia-broker.json"
+machine_cpu = 16
+machine_mem_gi = 64
+max_nodes = 2
+min_nodes = 0
+warm_idle_s = 1200
+scale_ahead = true

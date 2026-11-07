@@ -68,8 +68,8 @@ holds even so:
   the trunk to staging by its own periodic dispatch. Non-Ario work bases off
   and targets `main`, but nothing merges there until Tim returns: those
   lands park once at the operator (`policy:land:<task>`, the member told
-  "until Tim returns"); leave them parked. The trunk→`main` checkpoint is
-  Tim's.
+  "until Tim returns"); leave them parked. The trunk→`main` release is
+  Tim's choice (procedures.md, Releasing the round's trunk).
 - **h2gc-legacy.** Not touched (`operatorOnly`): no tasks, merges or deploys.
 - **exxo-infra.** Full merge and deploy authority through the squad's gates,
   except anything with a downstream effect on the h2gc production

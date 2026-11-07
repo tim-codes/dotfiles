@@ -144,6 +144,12 @@ for a subagent restates this policy in one line: focused tests only, the
 repo's local fast check before every land, CI runs the comprehensive gate on
 the head sha.
 
+### Verification on buildlab (repos on `ci: squad`)
+
+In a repo on `ci: squad`, do not run full suites locally and do not take heavy slots for them. Push your commit, then call `run_tests` with no arguments: it runs the suites your change selects, on buildlab, at the sha you pushed. It returns at once with a run id, and you are told when the run finishes. Call `test_status {run_id, log_lines: 200}` only to read why something failed. Fix, push and call `run_tests` again; each sha allows three attempts, and infrastructure retries do not count. Integration suites are not yours to run: the trunk's periodic CI and the release cut run them. If your plan relies on particular suites, name them in `verify_suites`. A land waits for its suites, and the service starts them itself if you forgot, but a land whose head moves is verified again at the new head.
+
+Branches you push for squad-owned verification are named `gaia/task-<id>` (the squad's `[policy.launch] branch_prefix`); the trunk is `gaia/trunk-<name>` (`[policy.trunk] branch_prefix`). Keep to the names the launch gave you; do not rename a branch after the first push. The `gaia/` prefixes (and the rule that `gaia/*` never lands straight on main) apply only to repos whose trunk policy is `trunk`; in `direct` repos you keep `squad/<member>` lanes landing on main as before.
+
 ## Landing
 
 - Open lane PRs against the base the kickoff names (a branch or a
@@ -365,6 +371,22 @@ pass:
 
 The plan documents land with the work, in the lane PR. When it opens, close
 the plan PR as superseded, with a comment linking the lane PR.
+
+## Auth
+
+When your command prints a device code, opens a browser login or waits for Touch ID, raise it with `signin` and give `site`: the CLI name (`gh`, `az`, `gcloud`) or the host. The squad records it so the next round's preflight prepares it. Never record or note a sign-in any other way.
+
+Before raising a browser sign-in for a site the squad has approved, call `auth_login {site}`. `signed_in` or `already_signed_in`: carry on. `needs_operator`: set waiting on the `item_id` if it blocks you, else carry on with the rest; a note tells you when it is signed in. `refused` or `failed`: raise once with `signin`; never try the login yourself, never open the debugging port, never pass a context.
+
+## Project data
+
+- Read a project dataset only with `data_read {repo?, dataset, read, args}`, as your brief's Project data section names it. Outcomes: `ok` (the file's path, row and byte counts, columns), `needs_operator` (an item asks Tim), `denied`, `refused` (your call was wrong: fix the arguments), `over_cap`, `failed`.
+- `needs_operator`: if the data blocks you, set waiting on the item; otherwise carry on with the rest and report the gap. When the item is decided allow, call `data_read` again.
+- `denied`: do not look for another route (no recipe, query, credential or script of your own); report the deliverable as unmet.
+- Never print, `cat`, `head`, Read or paste rows. Raw means any line of the file and any value of an identifying column (ids of users, participants, conversations, runs, events). Rows go only to the file.
+- Analyse with a script in your scratch directory that reads the file and prints aggregates only: counts, percentiles, maxima, per-group totals. For `test_user` and `personal` data, suppress any group with fewer than 5 members (k ≥ 5). Only those aggregates go into your work, PRs and raises.
+- Before you reuse an analysis script, persist it in Exxo-Labs/gaia-loadout (`projects/<owner>__<repo>/<dataset>/<util>.py`, header naming the dataset, the reads it accepts, what it prints, and your task), landed as a second repo of your task or as a fix task. Never put data in gaia-loadout.
+- The squad checks PRs, raises and your transcript for values from your files; a match refuses the land.
 
 ## Denials
 

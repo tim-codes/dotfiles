@@ -34,8 +34,8 @@ run's own hand review and leaks the conclusions. Never overwrite one.
 
 **Authority inputs.** The bundle's `repos.csv` (the `managed_repos`
 snapshot with `release_needs_approval`) and the leader's rulings memory,
-read-only: in the reserve context
-`~/.claude-reserve/projects/-Users-tim-claude/memory/tim-rulings-*.md` and
+read-only: in the leader's memory directory
+(`projects/-Users-tim-claude/memory/tim-rulings-*.md` under its account context) and
 `unattended-delegate-watch.md`, or whatever files the round's handover
 brief names. Every merge into a `release_needs_approval` repo and every
 leader workaround is judged against the ruling it cites.

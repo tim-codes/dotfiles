@@ -18,7 +18,15 @@
       "Bash(gcloud secrets versions access*)",
       "Bash(* gcloud secrets versions access*)",
       "Read(**/.claude.json)",
-      "Read(**/.credentials.json)"
+      "Read(**/.credentials.json)",
+      "Bash(*just*data-*)",
+      "Bash(* just*data-*)",
+      "Read(~/.local/state/squad/data/**)",
+      "Read(~/.local/state/squad/data-fingerprint.key)",
+      "Bash(*127.0.0.1:92*)",
+      "Bash(*localhost:92*)",
+      "Bash(*connectOverCDP*)",
+      "Bash(*remote-debugging*)"
     ]
   }
 }

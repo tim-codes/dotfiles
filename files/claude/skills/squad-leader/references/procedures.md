@@ -193,6 +193,30 @@ Cite these by name when a member raises the case; do not escalate it.
   purges. Staging only; production is never touched. A purge without the
   dump, or of anything else, is outside the ruling: park it.
 
+## Releasing the round's trunk (v0.6.0 R17)
+
+1. `trunk.release {repo}` (tRPC, the leader's cookie). It answers `{releaseId, state: planning}`; the
+   service plans, builds, checks, pushes `release/<name>` over SSH and opens the release PR. Refusals:
+   NOT_FOUND (no open trunk), PRECONDITION_FAILED (compaction off, chunk merges, repo settings, the
+   name taken: pass `name`), CONFLICT (a release is already live).
+2. Skim the group table on the item `policy:trunk-release:<id>` (and `trunk.releasePlan {releaseId}`).
+   No code review: the nine checks prove the content is the trunk's.
+3. Choose `merge:<tip10>` on that item once you are content. The service merges when the release
+   PR's checks are green, through the trunk service (one merge commit). If the trunk moved, the
+   release re-cuts and the item comes back without its decision: choose again for the new tip.
+   `hold` waits; `abandon` closes the PR and deletes the branch (or `trunk.abandonRelease {releaseId}`).
+4. `publish_failed`: follow the item's `squad-compact` path (the trunk-compaction skill) by hand.
+   `sync-by-hand`: main does not merge into the trunk cleanly — merge it into the trunk by hand; the
+   release re-cuts.
+5. A trunk that reached main through checkpoint merges is refused (B8): finish it the old way with
+   `trunk.land {kind: checkpoint}`; its successor is released by compaction.
+
+In a floor repo (h2gc-portal) the choice of `merge:<tip10>` stays Tim's.
+
+## Trunk CI (R20)
+
+`trunk.ciDispatch {repo}` runs the repo's full CI against its trunk on demand; the squad also runs it every 10 lands or 6 hours. A red run is the item `policy:trunk-ci:<repo>` and marks the trunk `ci_red`: lands continue, but open a fix lane before the release cut. The release PR's CI is mandatory and is checked by GitHub. `buildlab` has a gauge and a `squad doctor` row. When it is unreachable, lands queue and `policy:verify-run:<repo>` names the cause (auth, key file, plugin path); fix it and the lands resume.
+
 ## Landing a testable version by morning
 
 The goal of an overnight batch: every task ends in one of three states.
