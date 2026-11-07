@@ -364,7 +364,7 @@ end
 function claude-exxo-personal --wraps claude --description 'claude in the exxo context on the personal subscription'
     __claude_ctx "$HOME/.claude-exxo-personal" $argv
 end
-# exxo-openrouter context (Kimi K3 workers). The key comes from the overlay's
+# exxo-openrouter context (DeepSeek workers). The key comes from the overlay's
 # apiKeyHelper, so only the config dir is set here. Anti-goal: sets no env
 # that could route any other context.
 function claude-exxo-openrouter --wraps claude --description 'claude in the exxo-openrouter context'

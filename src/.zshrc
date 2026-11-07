@@ -33,7 +33,7 @@ if [ -d "$HOME/.claude-personal" ]; then
     _claude_ctx() {
         local dir="$1" here="$PWD" d
         shift
-        # The exxo-openrouter overlay env is inherited by anything a K3 session
+        # The exxo-openrouter overlay env is inherited by anything a overlay session
         # spawns; every other context must not see it, so it is unset for the
         # launched process only. The openrouter wrapper is left untouched.
         local -a scrub=()
@@ -61,7 +61,7 @@ if [ -d "$HOME/.claude-personal" ]; then
     claude-exxo() { _claude_ctx "$HOME/.claude-exxo" "$@"; }
     # The exxo overlay on the personal subscription (see common.fish).
     claude-exxo-personal() { _claude_ctx "$HOME/.claude-exxo-personal" "$@"; }
-    # exxo-openrouter context (Kimi K3 workers). The key comes from the
+    # exxo-openrouter context (DeepSeek workers). The key comes from the
     # overlay's apiKeyHelper, so only the config dir and start directory are
     # set here. Anti-goal: sets no env that could route any other context.
     claude-exxo-openrouter() { _claude_ctx "$HOME/.claude-exxo-openrouter" "$@"; }
