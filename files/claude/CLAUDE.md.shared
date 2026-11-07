@@ -175,6 +175,32 @@ failed before the cause was seen. His interactive shells are always fish
 (`src/.config/fish/`), and the wrapper functions that pin accounts, scrub env
 and jump directories live only there.
 
+## Scratch files are persisted, never trusted to /tmp
+
+The OS and reboots clear `/tmp` (and Claude Code's `/private/tmp/claude-<uid>/`)
+while a session is paused, and files made for later were lost that way. Durable
+scratch lives under `~/scratch/claude/<project-slug>/<session-id>/`, which is
+user-owned, outside macOS tmp cleaning, and garbage-collected only by us. A
+`SessionStart` hook (`scripts/claude-scratch-persist`) replaces the session's tmp
+`scratchpad` directory with a symlink to `~/scratch/claude/<slug>/<session>/scratchpad`,
+so writes to the scratchpad directory the harness names land on durable storage;
+a `Stop` hook copies it as a fallback if the symlink could not be made and mirrors
+the cwd's `.superpowers/sdd` ledgers into `<session>/sdd/`.
+
+Scripts, briefs, logs, drafts and anything else a session makes for later go
+under the scratchpad, not `/tmp/<name>`. The `/tmp/<name>.fish` hand-off in the
+shells section stays for one-shot commands Tim runs straight away; anything
+that must survive a pause goes under the scratchpad, and the durable path
+(`~/scratch/claude/...`, not the `/private/tmp` alias) is the one quoted to Tim.
+
+Collection is `scripts/claude-scratch-gc` (list with age and size; dry run by
+default; `--older-than <days>`, default 30; `--apply` to delete; a `.pin` file in
+a session dir pins it). Tim runs it, or a session does when asked; nothing
+schedules it and the OS never does.
+
+**Why:** Tim, 7 Nov 2026: work pauses kept losing files from `/tmp`; scratch is to
+persist, with collection on our own mechanisms at our own pace.
+
 ## Installing a missing dependency on the workstation: fine ad hoc, persist the rest
 
 If a task needs a dependency that isn't installed on the local workstation

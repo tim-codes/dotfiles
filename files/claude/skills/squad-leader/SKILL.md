@@ -175,6 +175,8 @@ each count is expected to fall.
 
 ## Operating
 
+Scratch survives a pause only under the session scratchpad: a `SessionStart` hook links it to `~/scratch/claude/<project-slug>/<session-id>/scratchpad` (quote that durable path, not `/private/tmp/...`), `.superpowers/sdd` ledgers are mirrored to `<session>/sdd/` on Stop, and nothing that must outlive a pause goes in `/tmp/<name>`. Collection is `claude-scratch-gc` (`.pin` keeps a session), never the OS.
+
 - **Watching.** The orchestrator nudges idle members, promotes a blocked
   member's items, starts the cache, retires done members (hygiene pass),
   deploys staging and verifies it, releases tag repos and guards quota

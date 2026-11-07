@@ -1,0 +1,124 @@
+#!/bin/bash
+# Keep a Claude Code session's scratchpad on durable storage.
+#
+# Claude Code keeps a session's scratchpad under the OS tmp dir
+#   <tmp-root>/<project-slug>/<session-id>/scratchpad
+# (macOS: /private/tmp/claude-<uid>/...), which the OS or a reboot may clear
+# while a session is paused. This hook mirrors that layout under a durable
+# root we control and garbage-collect ourselves (scripts/claude-scratch-gc):
+#   ~/scratch/claude/<project-slug>/<session-id>/scratchpad
+#
+# Usage (hook stdin JSON carries session_id and cwd):
+#   claude-scratch-persist start   SessionStart (startup|resume): create the durable
+#                                  dir; migrate an existing tmp scratchpad into it and
+#                                  replace it with a symlink; or create the symlink.
+#   claude-scratch-persist stop    Stop: fallback copy of the tmp scratchpad when it
+#                                  is still a real directory (symlink could not be
+#                                  made); also mirror <cwd>/.superpowers/sdd to
+#                                  <session>/sdd/ when the cwd has one.
+# Never prints file contents, never overwrites or follows a foreign symlink, never
+# fails the session (always exit 0, silent on stdout). One line per run goes to
+# ~/.local/state/claude-scratch/persist.log.
+# Env overrides (tests): CLAUDE_SCRATCH_TMP_ROOT, CLAUDE_SCRATCH_ROOT.
+set -u
+
+mode="${1:-start}"
+root="${CLAUDE_SCRATCH_ROOT:-$HOME/scratch/claude}"
+if [ -n "${CLAUDE_SCRATCH_TMP_ROOT:-}" ]; then
+    tmp_root="$CLAUDE_SCRATCH_TMP_ROOT"
+elif [ -d /private/tmp ]; then
+    tmp_root="/private/tmp/claude-$(id -u)"
+else
+    tmp_root="/tmp/claude-$(id -u)"
+fi
+logfile="$HOME/.local/state/claude-scratch/persist.log"
+
+log() {
+    mkdir -p "$(dirname "$logfile")" 2>/dev/null || return 0
+    printf '%s %s session=%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$mode" "${session:-?}" "$*" >>"$logfile" 2>/dev/null
+    return 0
+}
+
+input="$(cat 2>/dev/null || true)"
+field() { # field <name>: a top-level string field of the hook JSON
+    if command -v jq >/dev/null 2>&1; then
+        printf '%s' "$input" | jq -r --arg k "$1" '.[$k] // empty' 2>/dev/null
+    else
+        printf '%s' "$input" | sed -n 's/.*"'"$1"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1
+    fi
+}
+session="$(field session_id)"
+cwd="$(field cwd)"
+[ -n "$cwd" ] || cwd="${CLAUDE_PROJECT_DIR:-$PWD}"
+
+case "$session" in
+    '' | */* | . | ..) log "skip: no usable session_id"; exit 0 ;;
+esac
+
+# Project slug as Claude Code derives it: every non-alphanumeric of the cwd becomes '-'.
+slug="$(printf '%s' "$cwd" | sed 's/[^A-Za-z0-9]/-/g')"
+tmp_pad="$tmp_root/$slug/$session/scratchpad"
+if [ ! -e "$tmp_pad" ] && [ ! -L "$tmp_pad" ]; then
+    # The harness may have used a different slug (e.g. a resolved cwd): find it by session id.
+    for cand in "$tmp_root"/*/"$session"/scratchpad; do
+        if [ -e "$cand" ] || [ -L "$cand" ]; then
+            tmp_pad="$cand"
+            slug="$(basename "$(dirname "$(dirname "$cand")")")"
+            break
+        fi
+    done
+fi
+dur_session="$root/$slug/$session"
+dur_pad="$dur_session/scratchpad"
+
+mkdir -p "$dur_pad" 2>/dev/null || { log "error: cannot create $dur_pad"; exit 0; }
+
+copy_tree() { # copy_tree <src-dir> <dst-dir>
+    if command -v rsync >/dev/null 2>&1; then
+        rsync -a "$1"/ "$2"/ 2>/dev/null
+    else
+        cp -a "$1"/. "$2"/ 2>/dev/null
+    fi
+}
+
+mirror_sdd() {
+    [ "$mode" = stop ] || return 0
+    [ -d "$cwd/.superpowers/sdd" ] && [ ! -L "$cwd/.superpowers/sdd" ] || return 0
+    mkdir -p "$dur_session/sdd" 2>/dev/null && copy_tree "$cwd/.superpowers/sdd" "$dur_session/sdd" \
+        && log "sdd mirrored to $dur_session/sdd" || log "warn: sdd mirror failed"
+}
+
+if [ -L "$tmp_pad" ]; then
+    target="$(readlink "$tmp_pad")"
+    if [ "$target" = "$dur_pad" ]; then
+        log "ok: already linked to $dur_pad"
+    else
+        log "foreign symlink left alone: $tmp_pad -> $target"
+    fi
+elif [ -d "$tmp_pad" ]; then
+    if [ "$mode" = start ]; then
+        # Move entries across without clobbering anything already durable.
+        find "$tmp_pad" -mindepth 1 -maxdepth 1 -exec mv -n {} "$dur_pad"/ \; 2>/dev/null
+        if rmdir "$tmp_pad" 2>/dev/null && ln -s "$dur_pad" "$tmp_pad" 2>/dev/null; then
+            log "migrated: $tmp_pad -> $dur_pad (symlinked)"
+        else
+            copy_tree "$tmp_pad" "$dur_pad"
+            log "warn: could not replace $tmp_pad with a symlink (conflicts or race); copied instead"
+        fi
+    else
+        copy_tree "$tmp_pad" "$dur_pad" && log "fallback copy: $tmp_pad -> $dur_pad" || log "warn: fallback copy failed"
+    fi
+elif [ ! -e "$tmp_pad" ]; then
+    if [ "$mode" = start ]; then
+        if mkdir -p "$(dirname "$tmp_pad")" 2>/dev/null && ln -s "$dur_pad" "$tmp_pad" 2>/dev/null; then
+            log "linked: $tmp_pad -> $dur_pad"
+        else
+            log "warn: could not create symlink at $tmp_pad"
+        fi
+    fi
+else
+    log "skip: $tmp_pad is not a directory or symlink"
+fi
+
+mirror_sdd
+exit 0
