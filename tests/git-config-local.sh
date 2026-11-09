@@ -82,5 +82,23 @@ run Linux "$H2" >/dev/null
 ls "$H2"/.gpg.gitconfig.superseded-* >/dev/null 2>&1 && ok "g: retired by rename, not deletion" || bad "g: no superseded file"
 [ "$(cat "$H2/.gitconfig.private")" = "mine" ] && ok "g: .gitconfig.private untouched" || bad "g: .private modified"
 
+# h: wsl with a Windows-side checkout present -> allowedSignersFile as a
+# WINDOWS path (the signer binary is a Windows exe and cannot read /home/...)
+WC="$T/mntc"; mkdir -p "$WC/Users/tim/dev/dotfiles/src/.config/git"
+echo "tim@exxo.sh ssh-ed25519 AAAA" > "$WC/Users/tim/dev/dotfiles/src/.config/git/allowed_signers"
+mkdir -p "$WC/Users/tim/AppData/Local/Microsoft/WindowsApps"
+: > "$WC/Users/tim/AppData/Local/Microsoft/WindowsApps/op-ssh-sign-wsl.exe"
+HW="$T/wslhome"; mkdir -p "$HW"
+OUT="$(GIT_CONFIG_LOCAL_PLATFORM=wsl WSL_WINDOWS_USER=tim WSL_WIN_C="$WC" HOME="$HW" bash "$SCRIPT" 2>&1)"
+grep -q 'op-ssh-sign-wsl.exe' "$HW/.gitconfig.local" && ok "h: wsl signer" || bad "h: wsl signer"
+grep -q 'allowedSignersFile = C:/Users/tim/dev/dotfiles' "$HW/.gitconfig.local"     && ok "h: allowedSignersFile is a windows path" || bad "h: $(cat "$HW/.gitconfig.local")"
+[ -e "$HW/.gitconfig" ] && bad "h: wsl wrote ~/.gitconfig (stow owns it)" || ok "h: left ~/.gitconfig to stow"
+
+# i: wsl without a Windows-side checkout -> omitted, and it says so
+HW2="$T/wslhome2"; mkdir -p "$HW2"
+OUT="$(GIT_CONFIG_LOCAL_PLATFORM=wsl WSL_WINDOWS_USER=tim WSL_WIN_C="$T/absent" HOME="$HW2" bash "$SCRIPT" 2>&1)"
+grep -q 'allowedSignersFile' "$HW2/.gitconfig.local" && bad "i: emitted an unreadable path" || ok "i: omitted when absent"
+case "$OUT" in *"no Windows-side checkout"*) ok "i: warns why verification will read U";; *) bad "i: no warning: $OUT";; esac
+
 [ "$fail" = 0 ] && echo "ok: git-config-local tests clean"
 exit "$fail"
