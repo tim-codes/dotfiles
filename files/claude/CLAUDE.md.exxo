@@ -69,6 +69,24 @@ subdirectories.
 - No bare `print`/`echo`/`dd()`/`console.*` as production logging — go
   through the project's logger.
 
+## Configuration: fail loudly, no fallbacks
+
+Required configuration has no default and no fallback: config keys, env vars
+and CLI flags that drive core behaviour, or that the invoker or deployment is
+expected to supply (especially at deploy time). That includes no legacy-name
+aliases and no "best guess" values. Validate at start-up, or as early as
+possible, and exit non-zero with a message that names the missing key. If a
+legacy name is present, say it was renamed and to what, but don't use it.
+Renames are clean breaks: readers and writers change together in one change,
+with no dual-read transition period. Genuinely optional tuning knobs (widths,
+intervals, timeouts with a sensible value) may keep defaults, and are
+documented as optional. This sits beside "Logging": unexpected failures are
+never silent.
+
+**Why:** Tim, 10 Nov 2026 — a silent fallback turns a missing deploy-time
+value into wrong behaviour that surfaces later and elsewhere, while a loud
+start-up failure names the gap at the moment and place it can be fixed.
+
 ## Prefer the platform's native mechanism for UI behaviour
 
 Reach for the CSS/HTML capability before writing JavaScript to reproduce
