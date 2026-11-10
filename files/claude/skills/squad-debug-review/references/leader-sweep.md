@@ -63,7 +63,7 @@ One `grep -c` per pattern per transcript, then read only the hits (the
 | `cargo install`, `tag v0.`, `chore(release)`, checkpoint PR | L8 |
 | `items.decide`, `tasks.approve` | L4, L11 |
 | `inbox.send` | L5 |
-| `sessions.resume`, `sessions.close`, `policy.pause` | L6 |
+| `sessions.resume`, `sessions.close`, `squad.pause`, `policy.members.pause` | L6 |
 | `wt remove`, `worktree remove`, `tmux kill-window` | L10 |
 | `Figma`, `Boards`, `slack_send_message`, `notion`, Linear updates | L12 |
 | `Monitor`, `no action needed`, `monitor` scripts in the scratchpad | L13 (count turns, not polls) |
