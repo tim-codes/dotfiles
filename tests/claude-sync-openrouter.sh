@@ -57,6 +57,7 @@ for v in ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_SONNET_MODEL ANTHROPIC_D
     check "$v is deepseek/deepseek-v4.1-flash-1017@preset/tim-ds" jqeq exxo-openrouter ".env.$v" 'deepseek/deepseek-v4.1-flash-1017@preset/tim-ds'
 done
 check "ENABLE_TOOL_SEARCH is false" jqeq exxo-openrouter '.env.ENABLE_TOOL_SEARCH' 'false'
+check "CLAUDE_CODE_MAX_CONTEXT_TOKENS declares the 1M window" jqeq exxo-openrouter '.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS' '1048576'
 check "model pinned to sonnet" jqeq exxo-openrouter '.model' 'sonnet'
 check "apiKeyHelper names the helper, holds no key" \
     jq -e '.apiKeyHelper | type == "string" and length > 0 and contains("claude-openrouter-key") and (contains("sk-") | not)' \

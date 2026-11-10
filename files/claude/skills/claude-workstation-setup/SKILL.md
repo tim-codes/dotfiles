@@ -131,7 +131,10 @@ of `shared * exxo`, applied only to this context (naming: `settings.overlay.
   in the OpenRouter UI: provider order DeepSeek first-party then Cloudflare,
   fallbacks on; the alias `~deepseek/deepseek-flash-latest` is not used
   because it drifts; this replaced the Kimi K3 trial, whose saving was not
-  worth it), and `ENABLE_TOOL_SEARCH=false`. The `claude-exxo-*`, `claude` and `claude-default` wrappers unset these
+  worth it), `CLAUDE_CODE_MAX_CONTEXT_TOKENS=1048576` (Claude Code does not
+  recognise the id, so without it assumes 200k and compacts there; the
+  preset model has a 1M window; model-config docs, "Correct the window for a
+  gateway or custom model ID"), and `ENABLE_TOOL_SEARCH=false`. The `claude-exxo-*`, `claude` and `claude-default` wrappers unset these
   variables (and `ANTHROPIC_AUTH_TOKEN`) for any non-openrouter launch, so a
   nested launch from a overlay session cannot inherit the OpenRouter backend. One
   session has one backend, hence the

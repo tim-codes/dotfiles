@@ -7,6 +7,7 @@
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek/deepseek-v4.1-flash-1017@preset/tim-ds",
     "ANTHROPIC_DEFAULT_FABLE_MODEL": "deepseek/deepseek-v4.1-flash-1017@preset/tim-ds",
     "CLAUDE_CODE_SUBAGENT_MODEL": "deepseek/deepseek-v4.1-flash-1017@preset/tim-ds",
+    "CLAUDE_CODE_MAX_CONTEXT_TOKENS": "1048576",
     "ENABLE_TOOL_SEARCH": "false"
   },
   "apiKeyHelper": "$HOME/dev/dotfiles/scripts/claude-openrouter-key",
