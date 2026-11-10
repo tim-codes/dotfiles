@@ -1,6 +1,7 @@
 # squad (~/dev/squad): accounts the quota watcher tracks and the broker maps
 # sessions onto. Everything else is the built-in default; see the repo's
-# config.example.toml for the knobs.
+# config.example.toml for the knobs. Why these values: tim-codes/squad
+# docs/runbooks/deployment-profile.md (dated decisions live there).
 
 [broker]
 # Deny overlay merged into every member launch's --settings (permissions.deny: the
@@ -67,11 +68,11 @@ branch_prefix = "gaia/task-"
 # integration (claude-in-chrome) is a Claude Code settings flag, not an mcpServers entry.
 # `browser` still gates placement through `provides`.
 needs_mcp = { playwright = "playwright", boards = "boards" }
-# Up to ten live members while unattended (Tim, 2026-10-31: use up to 80-90% of the host).
+# Ten live members while unattended (Tim, 2026-10-31).
 max_live_members = 10
 
 [host]
-# Unattended operation may use up to 80-90% of CPU and memory (Tim, 2026-10-31); warn only above that.
+# Warn only above 80-90% (Tim, 2026-10-31).
 cpu_warn = 90
 cpu_critical = 97
 
@@ -93,29 +94,24 @@ name = "quota"
 name = "host"
 
 [policy.heavy]
-# Slots are derived from live host headroom (Tim, 2026-10-30). The one-minute load average on this
-# 12-core host overstates CPU use while many idle sessions exist, so per-slot CPU and the reserved
-# headroom are set low enough that measured CPU, not load, decides (code fix tracked in squad).
+# Slots derive from live host headroom; low per-slot CPU so measured CPU, not load, decides (Tim, 2026-10-30).
 cpu_per_slot_pct = 10
 min_headroom_pct = 8
 mem_per_slot_mb = 3072
-# Cap raised from the default floor(cores/4)=3 so the host can run at 80-90% while unattended (Tim, 2026-10-31).
+# Raised from the default 3 (Tim, 2026-10-31).
 max_slots = 6
 
 [heavy]
-# heavy_slot_min_calm_s is omitted so the built-in 300 s dwell applies: the broker's calm-dwell gate now follows live CPU/memory headroom (squad #257, live from v0.5.11 on 2026-11-02).
-# The 20 s workaround of October is no longer needed.
+# heavy_slot_min_calm_s omitted: the built-in 300 s dwell applies (squad #257, v0.5.11).
 
 [orchestrator]
-# Stable URL of the 7780 GUI tunnel (BFF, v0.6.0; was 7790) that src/bin/squad-tunnel hosts (persistent dev tunnel
-# exxo-tfo-squad; the hostname survives restarts, and only changes if the tunnel is deleted and
-# recreated, when this must be updated from `squad-tunnel url`). Takes effect at the next orchestrator restart.
+# Stable URL of the 7780 GUI tunnel (squad docs/runbooks/tunnel.md); update from `squad-tunnel url` if the tunnel is recreated.
 public_url = "https://j9fsc30w-7780.uks1.devtunnels.ms"
 
 [policy.trunk]
 # Squad-owned verification (R20): trunk branches are gaia/trunk-<name>.
 branch_prefix = "gaia/trunk-"
-review_timeout_s = 1800                     # raised from 900 on 2026-11-03: portal land reviews that run the gate take 10-20 min (4 operator holds)
+review_timeout_s = 1800                     # was 900; raised 2026-11-03 (portal land reviews take 10-20 min)
 # Appended to each squash-merge body after the PR body.
 trailers = ["Co-Authored-By: Claude <noreply@anthropic.com>"]
 
@@ -125,8 +121,7 @@ trailers = ["Co-Authored-By: Claude <noreply@anthropic.com>"]
 teardown = ["just", "-f", "/Users/tim/dev/squad/deploy/Justfile", "preview-prune", "{member}"]
 
 [exclusions]
-# Every present and future h2gc production stack needs Tim's approval (Tim, 2026-11-03).
-# Intent only in v0.5.15: nothing enforces it at land time yet (ENG-536); exxo-infra stays unregistered.
+# h2gc production stacks need Tim's approval (2026-11-03); intent only, not yet enforced (ENG-536).
 approval_stack_patterns = ["exxo/h2gc*/*prod*"]
 
 # Project data access (R18). Tim's baseline: rows for ceiling deliverables.
@@ -166,7 +161,7 @@ min_nodes = 0
 warm_idle_s = 1200
 scale_ahead = true
 [policy.operator]
-plan_review_timeout_s = 1800               # raised from 900 on 2026-11-03, same reason as review_timeout_s
+plan_review_timeout_s = 1800               # was 900; raised 2026-11-03, as review_timeout_s
 
 [policy.release]
-verify_timeout_s = 3600                    # raised from 1800 on 2026-11-03: the staging verifier runs e2e + smoke and gave no report in 1800 s
+verify_timeout_s = 3600                    # was 1800; raised 2026-11-03 (staging e2e + smoke)
