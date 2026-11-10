@@ -58,5 +58,12 @@ function kk -d "k9s on a named cluster (homelab, buildlab); no cluster picks one
             return 2
     end
 
+    # Title the pane after the resolved cluster (the picker leaves fish's own
+    # title at just "kk"); same shape as fish_title, which tmux shows as #T.
+    # fish puts its usual title back when k9s exits.
+    if isatty stdout
+        printf '\e]2;%s\a' (fish_prompt_pwd_dir_length=1 prompt_pwd)": "(string join -- " " kk $target $rest)
+    end
+
     k9s -A --splashless --context $ctx $rest
 end
