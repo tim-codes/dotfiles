@@ -140,8 +140,11 @@ trailers = ["Co-Authored-By: Claude <noreply@anthropic.com>"]
 # key_env is the NAME of the variable holding the key file's PATH; it is read from deploy/.env in the squad
 # checkout (exported by the launchd wrapper), never from this repo. The key itself stays in 1Password.
 [policy.trunk.github_app]
-app_id = 5535358
-installation_ids = { "Exxo-Labs" = 176738832, "tim-codes" = 176739219 }  # tim-codes id from the squad master plan, unverified: confirm
+# gaia-tfo: Exxo-Labs-owned App (created 2026-11-10; replaces the tim-codes-owned squad-tfo),
+# installed on Exxo-Labs, all repositories. Its key lives in ESC exxo/gaia/main gaia.githubApp.*;
+# the broker host copy is ~/.local/state/squad/keys/gaia-tfo.pem (0600), named by key_env.
+app_id = 5704284
+installation_ids = { "Exxo-Labs" = 180689949 }
 key_env = "SQUAD_GITHUB_APP_KEY_FILE"
 
 [policy.preview]
