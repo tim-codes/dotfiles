@@ -375,7 +375,7 @@ entries, with a `.bak`).
      Keep the file in a PRIVATE repo (homelab, say), not dotfiles, which is
      public. Today's run also found account emails in dotfiles'
      `src/.config/squad/config.toml`; move those out too.
-     Tracked on the squad side too: tim-codes/squad `docs/backlog.md`,
+     Tracked on the squad side too: Exxo-Labs/gaia `docs/backlog.md`,
      "Decoupling from dotfiles" (account emails in the public config).
   2. **Pin the few local controls that exist.** `syncClaudeAiSkills` /
      `syncClaudeAiPlugins` (pull account skills and plugins into Claude Code)

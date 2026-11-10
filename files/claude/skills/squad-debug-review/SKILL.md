@@ -312,10 +312,10 @@ with the brief's trailers. Never commit to `main`.
 Attended: show the ranked list in chat (rank, change, where, cost, benefit),
 the `review.md` path and the three biggest findings in a line each. Then
 ask with `AskUserQuestion` whether to file the top items as GitHub issues in
-`tim-codes/squad` (top 3, top 5, none; Other for a chosen set). Only on a
+`Exxo-Labs/gaia` (top 3, top 5, none; Other for a chosen set). Only on a
 yes: create the label if it is missing (`gh label create
-"debug-review:<run>" -R tim-codes/squad`), then for each item
-`gh issue create -R tim-codes/squad --title "<change>" --label
+"debug-review:<run>" -R Exxo-Labs/gaia`), then for each item
+`gh issue create -R Exxo-Labs/gaia --title "<change>" --label
 "debug-review:<run>" --body "<where, cost, benefit, evidence, review.md
 path>"` (prefix the title with `[<run>]` if the label cannot be created),
 then list the URLs.

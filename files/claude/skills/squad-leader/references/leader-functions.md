@@ -1,6 +1,6 @@
 # Leader functions L1–L13 and what retires each
 
-Taxonomy from the 2026-10-31 debug review §3 (tim-codes/squad,
+Taxonomy from the 2026-10-31 debug review §3 (Exxo-Labs/gaia,
 `docs/superpowers/plans/2026-10-31-squad-v05-debug-review.md`), pinned in
 the orchestrator's `leader.intervention` contract. Log every instance with
 `intervene` (or the file log) using the function id. Counts in brackets are
@@ -16,7 +16,7 @@ the 2026-10-31 baseline the next rounds are measured against.
 | L6 | Session control | `sessions.resume` after a restart or a refused land; `sessions.close` an orphan (c5); a member pause or resume, an account switch (quota levers, procedures.md) | ENG-475 (resume lost and refused-land sessions after restart), #285; the hygiene pass (v0.5.15) ends lost sessions | `member`, `session_id` |
 | L7 | Rebuild and restart [10 orchestrator, 2 broker] | `deploy/ops.Justfile restart-orchestrator` (fallback: procedures.md) | ENG-475, ENG-477 (verified release and restart job, R5); #292 keeps only the attended broker re-grant | `reason`, `command` |
 | L8 | Cut squad releases and tags [6] | Release PR queued with `trunk.land {kind: "release"}` onto squad `main` (`direct`, `ci: none`), tag; one re-run of a failed staging or kit (harness-kit `publish.yml`) run. Product and kit releases on `release_kind = tag` repos are the orchestrator's (v0.5.14 ENG-522, semver v0.5.15) | #293 (release task kind) | `pr`, `command` |
-| L9 | File and close issues [11 filed, 20 closes] | `gh issue create/close -R tim-codes/squad`; refused closes go to Tim | #287 (closes `Closes #n` at land); members raise bugs as items the orchestrator files | `command` |
+| L9 | File and close issues [11 filed, 20 closes] | `gh issue create/close -R Exxo-Labs/gaia`; refused closes go to Tim | #287 (closes `Closes #n` at land); members raise bugs as items the orchestrator files | `command` |
 | L10 | Hygiene [35 worktrees, 20 windows] | `worktree-closedown` skill; tmux windows by name or `@id` | #239 (teardown at land; partial) plus transcript relocation in the trunk service | `task_id` |
 | L11 | Plan and approve rounds [7 approvals, 3 planner lanes] | Launches a planner lane over open issues; `tasks.approve` under ruling 29 | ENG-485 (when-idle planning under standing rulings, R8); agentic plan review already live | `task_id`, `reason: ruling 29` |
 | L12 | Operator-only legs [15 decks, 15 Slack sends] | Figma, Boards, Slack, Notion, Linear legs members cannot reach | ENG-486 (operator-only surfaces as member-reachable reads or `needs`/`provides`, R9; concierge sends status and pairing links). Data legs retire to `data_read` and the `data_access:` item: the leader never runs a data query for a member (Tim decides the item, or runs `data.readFor`). Sign-in legs retire to the tracker, the preflight auth pass (`pf-auth:` steps in the pre-launch checklist) and `auth_login`; a sign-in nothing saw is recorded with `record_auth_event` (operator session) or `authEvents.record`, so the next preflight prepares it | `task_id`, `item_id` |
@@ -28,7 +28,7 @@ and v0.6.0 builds them: plan
 `docs/superpowers/plans/2026-11-04-squad-v0.6.0-retirement-plan.md`, spec
 `2026-11-04-squad-v0.6.0-retirement-spec.md` (squad repo; R1 to R13 there).
 Look a Linear issue up through the Linear MCP; the other `#n` are GitHub
-issues (`gh issue view <n> -R tim-codes/squad`). When an issue ships, the
+issues (`gh issue view <n> -R Exxo-Labs/gaia`). When an issue ships, the
 function is retired only once a round's `interventions.csv` shows zero for
 it; until then it stays in the table with the new count. A round is
 unattended when L1 to L12 total zero interventions.
