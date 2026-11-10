@@ -145,7 +145,7 @@ trailers = ["Co-Authored-By: Claude <noreply@anthropic.com>"]
 # the broker host copy is ~/.local/state/squad/keys/gaia-tfo.pem (0600), named by key_env.
 app_id = 5704284
 installation_ids = { "Exxo-Labs" = 180689949 }
-key_env = "SQUAD_GITHUB_APP_KEY_FILE"
+key_env = "GAIA_GITHUB_APP_KEY_FILE"
 
 [policy.preview]
 # Run once per member when a task is done or its land is finally refused (execFile, no shell, so an
