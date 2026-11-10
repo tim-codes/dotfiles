@@ -177,7 +177,7 @@ provider on OpenRouter; see the OpenRouter model page. The preset pins the
 provider order (DeepInfra fp8, then Cloudflare; the preset is the source of
 truth, edited in the OpenRouter UI). Model ids carry no `[1m]` suffix (ruling
 R-C7), and a smoke row tests that. What the metered route means inside the
-squad (account, share, budget, key file) is tim-codes/squad
+squad (account, share, budget, key file) is Exxo-Labs/gaia
 `docs/metered-accounts.md`; the routing rationale and measurements are its
 ADR `docs/adr/2026-11-10-metered-deepseek-routing.md`.
 

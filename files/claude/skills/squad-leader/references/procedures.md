@@ -47,7 +47,7 @@ check is not `ok`.
    t trunk.register '{"repo":"Exxo-Labs/h2gc-portal","branch":"release/ario-v0.4","base":"main"}'
    t repos.put '{"repo":"Exxo-Labs/harness-kit","trunkPolicy":"direct","releaseNeedsApproval":false,"releaseKind":"tag","releaseTagPattern":"semver","releaseWorkflow":"publish.yml","ci":"expected","expectedChecks":["ci"]}'
    t repos.put '{"repo":"Exxo-Labs/h2gc-legacy","operatorOnly":true}'
-   t repos.put '{"repo":"tim-codes/squad","ci":"none"}'
+   t repos.put '{"repo":"Exxo-Labs/gaia","ci":"none"}'
    t repos.put '{"repo":"Exxo-Labs/theparentedit","verifyRecipe":"just watch-rollout $SQUAD_RUN_ID"}'
    ```
 
@@ -379,7 +379,7 @@ Release (L8): squad is `direct` (lands on `main`; `trunk/v0.5` is retired;
 `ci: none`). The release PR `chore(release): v0.5.x` (Cargo.toml,
 Cargo.lock, both `package.json`, `tests/cli_broker.rs`, README, CHANGELOG
 with a Rollout line naming broker parts not yet live) is queued with
-`trunk.land {repo: "tim-codes/squad", pr, kind: "release"}` and
+`trunk.land {repo: "Exxo-Labs/gaia", pr, kind: "release"}` and
 squash-merged by the service; tag; then `release-orchestrator` on Tim's go. The broker is not rebuilt here: that is Tim's
 attended slot.
 

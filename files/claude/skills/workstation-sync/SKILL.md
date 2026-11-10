@@ -82,7 +82,7 @@ Driven by `git -C <dir> diff --name-only old..new`.
     (brewDeps/brewCasks), `scripts/cargo-update`, `scripts/pnpm-globals`,
     `scripts/pipx-packages`, `scripts/gcloud-setup`, `scripts/pwsh-modules`,
     `scripts/tmux-plugins` — or offer full `src/bin/deps-up` if several changed or Tim asks.
-    Always prefix `cargo-update` and `deps-up` with `CARGO_UPDATE_SKIP=tim-codes/squad`. squad
+    Always prefix `cargo-update` and `deps-up` with `CARGO_UPDATE_SKIP=Exxo-Labs/gaia`. squad
     stays in the manifest for fresh machines but is excluded from this sync.
     Warn Tim before anything that may raise a sudo or GUI prompt (brew casks) and run it
     on its own, not in a compound command.
@@ -97,7 +97,7 @@ Driven by `git -C <dir> diff --name-only old..new`.
 - **stray** changed: `scripts/cargo-update` installs it with
   `cargo install --git ssh://git@github.com/tim-codes/stray` (remote, not the local
   checkout), so the binary tracks pushed main. Re-run
-  `CARGO_UPDATE_SKIP=tim-codes/squad ~/dev/dotfiles/scripts/cargo-update` once stray's main
+  `CARGO_UPDATE_SKIP=Exxo-Labs/gaia ~/dev/dotfiles/scripts/cargo-update` once stray's main
   moved, e.g. after a merge. It reinstalls every other cargoGitDeps entry too, so althemer
   is refreshed as well.
 - **althemer, worktrunk** (no checkout): updated only when `scripts/cargo-update` /

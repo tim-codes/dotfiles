@@ -16,9 +16,9 @@ cargoGitDeps=(
   # squad: the v0.5 broker daemon (headless member supervisor, hooks and MCP
   # proxy, doctor); the quota/host watchers are folded into it. Its launchd
   # jobs dev.tim.squad-broker and dev.tim.squad-orchestrator are rendered by
-  # `just -f deploy/Justfile install-launchd` in the squad repo, not stowed
-  # from here. Installs from git HEAD (main is v0.5).
-  ssh://git@github.com/tim-codes/squad
+  # `just -f deploy/Justfile install-launchd` in the gaia repo, not stowed
+  # from here. Installs from git HEAD of Exxo-Labs/gaia (repo moved from tim-codes/squad, 10 Nov 2026).
+  ssh://git@github.com/Exxo-Labs/gaia
 )
 
 # Keep the toolchain itself current first: nothing else updates rustup's
