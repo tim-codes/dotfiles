@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# squad-tunnel — host the squad orchestrator GUI (127.0.0.1:7790) through a persistent
+# squad-tunnel — host the squad orchestrator GUI (127.0.0.1:7780, the v0.6.0 BFF) through a persistent
 # Microsoft dev tunnel so Tim can open it from his phone.
 #
 #   squad-tunnel host     ensure the tunnel, cache its URL, then run
@@ -23,7 +23,7 @@
 set -euo pipefail
 
 ID=${SQUAD_TUNNEL_ID:-exxo-tfo-squad}
-PORT=${SQUAD_TUNNEL_PORT:-7790}
+PORT=${SQUAD_TUNNEL_PORT:-7780}
 CACHE=${SQUAD_TUNNEL_CACHE:-$HOME/.config/squad/tunnel.json}
 DRY=${SQUAD_TUNNEL_DRY_RUN:-0}
 

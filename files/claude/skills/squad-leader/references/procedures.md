@@ -34,9 +34,9 @@ check is not `ok`.
    rejected task, an exited member's mirror). The hygiene pass ran (the
    Overview's Processes card); act on what its `policy:hygiene:<run>` item
    lists as unsure.
-5. **Pause.** tRPC `squad.state` is `{paused: null}`, or paused
+5. **Pause.** BFF `squad.state` is `{paused: null}`, or paused
    deliberately with a note Tim gave; never paused by accident.
-6. **Repos.** tRPC `repos.list` shows the batch's repos registered as the
+6. **Repos.** BFF `repos.list` shows the batch's repos registered as the
    v0.5.15 Rollout gives them (task 38's `blocks_launch` step). The calls,
    with the leader cookie (tRPC access, below; omit `checkoutPath`, which
    `repos.put` keeps):
@@ -54,10 +54,11 @@ check is not `ok`.
    Re-derive `expectedChecks` from a recent PR whenever a workflow changes:
    `gh pr checks <pr> -R <repo> --json name,workflow` (portal: the `CI`
    workflow's PR jobs; harness-kit: `ci`, since `publish.yml` runs on tags).
-   The portal's CI is path-filtered, so a docs-only land registers no check
-   and reaches the operator after `checks_register_timeout_s` (Item
-   handling); register `ci: "unknown"` instead if many docs-only lanes are
-   expected. Squad and theparentedit stay `direct`; exxo-infra stays
+   The portal's CI is path-filtered. From 0.6.0 a land whose changed files
+   all match `ci_paths_ignored` (or the workflow's `paths-ignore`) merges on
+   review alone and records `checks: skipped_by_paths` (R3); set
+   `ci_paths_ignored` on the repo row rather than registering `ci:
+   "unknown"`. Squad and theparentedit stay `direct`; exxo-infra stays
    unregistered. Registering repos is within the leader's authority [L4].
 7. **Plans.** Every task of the batch `approved`, its plan with structured
    `prerequisites` (no dependency in prose only), a `stage` on each
@@ -66,7 +67,7 @@ check is not `ok`.
    harness-kit release" fallback `blocks_step` items (tasks 38, 39, 40, 41)
    stay open until the squad has cut the kit tag itself; then the leader
    drops each with `items.decide` naming the tag and run [L12].
-8. **Capture.** `squad debug on --run <run>`, then `runs.current` shows the
+8. **Capture.** `squad debug on --run <run>`, then BFF `runs.current` shows the
    run with `mode: debug` (Capture readiness, below).
 9. **Leader watch.** `just -f /Users/tim/dev/squad/deploy/ops.Justfile
    leader-watch-dry-run` (what it would push now), then `leader-watch-start
@@ -95,7 +96,7 @@ todo card only when you act anyway.
 | c4 member with no live session | `squad sessions` and the mirror log for why; `sessions.resume` [L6] |
 | c5 orphan planner or reviewer | `sessions.close` it [L6] |
 | c6 session running without events | Mirror log; wedged: one `inbox.send`, then `sessions.resume` (a planner or reviewer: close it) [L6]; never interrupt a heavy grant or mid-Bash |
-| c7 land stuck in a stage | `trunk.lands {repo}` and the land's item; act by the item table (a queued land: its wait reason) |
+| c7 land stuck in a stage | BFF `trunk.lands {repo}` and the land's item; act by the item table (a queued land: its wait reason) |
 | c8 release failed or release item | The `policy:release` / `policy:staging` rows below [L8] |
 | c9 cache down or empty | Doctor and `agent-tooling cache status`; leave `deps_down` standing; re-warm first on Tim's list |
 | c10 squad paused | Nobody meant it: `squad-resume <note>` [L6]; a pause Tim set stays, named in the hand-back |
@@ -108,7 +109,7 @@ todo card only when you act anyway.
 ## Item handling on an unattended night
 
 Where to look first: the roster activity line ("is work happening?"; the
-GUI member card, `roster.list`), then the todo card (ask the concierge;
+GUI member card, BFF `roster.list`), then the todo card (ask the concierge;
 `show_todo` is its tool: `Todo: N new, M can wait, K blocking`), then the
 `blocking: now` items. "Alone" means under Tim's standing rules or a
 ruling you cite; "park" means a line on Tim's list with the ready
@@ -122,17 +123,19 @@ proposal and exact command, the item left open. Log every action.
 | `policy:deps:cache:*` (blocking now) | Check `squad doctor` and `agent-tooling cache status`; leave the hold (`deps_down`) standing | The item's commands and the re-warm (below) | Lift `hold_launches`; `docker rm` the cache; ad hoc `op` |
 | other `policy:deps:*` | Tunnel kickstart (Tunnel check) [L7]; a `login` warn onto the morning list | A broker link down for three ticks, with `launchctl print` output | Restart the broker with sessions mid-turn |
 | `policy:deps:broker_version:*` | Record which side is old | The attended rebuild, first on the morning list | `cargo install` or `restart-broker` unattended |
-| `policy:staging:<repo>:<ms>` (blocking later) | One `gh run rerun <id> -R <repo> --failed`, or `trunk.deployStaging {repo}` once the cause is fixed [L8] | A second red run, with `gh run view` | `gh workflow run` by hand or by a member |
-| `policy:release:<land>` (blocking now) | Staging stage, or a harness-kit publish run: one `gh run rerun <run> -R <repo> --failed` [L8] | A production failure, re-run and rollback commands ready; a BREAKING bump hold | Roll back, retag, delete a tag, set `release_kind` to `none` |
+| `policy:staging:<repo>:<ms>` (blocking later) | The service already reran the failed run once (R5 `rerun_failed_once`) before this item, so a `gh run rerun <id> -R <repo> --failed` is the second attempt; or `trunk.deployStaging {repo}` once the cause is fixed [L8] | A second red run, with `gh run view` | `gh workflow run` by hand or by a member |
+| `policy:release:<land>` (blocking now) | Staging stage, or a harness-kit publish run: the service already reran it once (R5 `rerun_failed_once`), so one `gh run rerun <run> -R <repo> --failed` is the second attempt [L8] | A production failure, re-run and rollback commands ready; a BREAKING bump hold | Roll back, retag, delete a tag, set `release_kind` to `none` |
 | `policy:release:<land>` (blocking later) | Nothing: `release_ready` is the approval repo's stop | The exact command | Run it |
 | `policy:release:<land>:verify` (info) | Note the broker rebuild is pending | The rebuild | — |
 | `policy:verify:<task>` | Read the finding; approve its fix task through plan review (ruling 29) [L11] | A fix that failed twice | Edit the deliverable to pass |
 | `policy:review:<task>` (blocking later) | `tasks.setFollowup {id, status, note}` where the record shows it; a real gap becomes a fix task or a Linear issue [L4] | Follow-ups needing Tim's judgment | Mark `done` what was not done |
-| `policy:land:<task>` | Pass a fixable refusal on; a docs-only portal trunk land (below) | Third refusal, review timeout, `operator_only`; a floor-repo land onto `main` ("until Tim returns") | Merge onto h2gc `main`; re-aim a PR to dodge the floor; delete a branch; force-push |
+| `policy:land:<task>` | Pass a fixable refusal on | Third refusal, review timeout, `operator_only`; a floor-repo land onto `main` ("until Tim returns") | Merge onto h2gc `main`; re-aim a PR to dodge the floor; delete a branch; force-push |
 | `policy:land:<task>:queued` | Read the wait reason; `no pool`: rebalance (Quota) [L6] | — | — |
-| `policy:land:<task>:milestone:<id>` | Outside the floor: `trunk.land {kind: "framework"}`, then `tasks.markLanded {milestone: true}` [L2] | A floor-repo milestone onto `main` | `gh pr merge` it yourself |
+| `policy:land:<task>:milestone:<id>` | Nothing from 0.6.0: the trunk service lands it (`[policy.trunk] milestone_lands = 'service'`, the default); confirm the land recorded | A floor-repo milestone onto `main` | `gh pr merge` it yourself |
+| `policy:backlog:<batch_id>` (approval) | Options approve or deny. An operator ruling on `policy:backlog:*` approves it. Approve acts only on plans that passed plan review (`plan_review.approve` held for the backlog); unreviewed ones wait for their verdict [L11] | Whether the backlog is worth running when no ruling covers it | Approve a plan that has not passed plan review; launch a planner lane by hand. Deny rejects the tasks and closes the batch |
+| `policy:self-release:<id>` (blocking now) | Raised when a self-release's build, kickstart, health check or rollback fails. Read the log path in the item text, then run the recipe it names: `just -f deploy/ops.Justfile restart-orchestrator`, or `release-orchestrator --rollback` after a failed rollback kickstart, or `launchctl bootstrap gui/<uid> ~/Library/LaunchAgents/dev.tim.squad-release.plist` when the job is not loaded [L7] | A rollback that also fails | Bootout on a build whose log says `recipe failed` |
 | `policy:denied:<task>` | Read it; the member works on [L1] | The denied write as the exact command | Retry it in another form |
-| `policy:quota:exhausted:<group>` (blocking now) | Nothing moves: confirm with `policy.pools`; the squad waits for the reset | Note the reset time on the morning list | Spend past a ceiling; `allowHot` onto the wall |
+| `policy:quota:exhausted:<group>` (blocking now) | Nothing moves: confirm with BFF `policy.pools`; the squad waits for the reset | Note the reset time on the morning list | Spend past a ceiling; `allowHot` onto the wall |
 | `policy:hygiene:<run>` (info) | Retire or close what it lists once checked [L10] | Anything of Tim's (his sessions, worktrees) | Remove a worktree without `worktree-closedown` |
 | `pf-*` (preflight steps) | Deliver a step you can (deck, Boards publish, kit fallback once the tag exists) and `items.decide` with the result [L12] | Sign-ins, grants, anything needing Tim's hands | Grant TCC or a permission yourself |
 | `r-*` (member raises) | `items.decide` under a cited ruling (round rulings below); the member acks [L4] | Anything needing Tim's judgment, with a proposal | Decide outside the rulings; re-ask a denied write in another form |
@@ -147,21 +150,21 @@ proposal and exact command, the item left open. Log every action.
   with `/reauth` (Tim at the keyboard); otherwise put it first on the
   morning list and expect lanes to hang on 1Password. Known gap: land-refusal
   and account-switch resumes are not held by `deps_down` (ENG-507).
-- **Release and staging re-runs.** A `staging`-stage failure, a
-  `policy:staging:*` red run, or a failed harness-kit `publish.yml` tag run:
-  one `gh run rerun <run> -R <repo> --failed`; the service carries on when
-  it is green. A product production failure goes to Tim.
+- **Release and staging re-runs.** From 0.6.0 the service reruns a failed
+  staging deploy or kit publish run once (`--failed`) before it raises an
+  item (R5). A `policy:staging:*` red run, or a failed harness-kit
+  `publish.yml` tag run, that still stands is a second red: one `gh run
+  rerun <run> -R <repo> --failed` and look at `gh run view`. A product
+  production failure goes to Tim.
 - **Land refusals.** A fixable refusal goes to the member (review
   follow-ups and verify fixes reach it by themselves); `tasks.markLanded`
   only after a merge was made.
-- **Docs-only portal land.** The portal's path-filtered CI registers no
-  check, so a docs-only land into `release/ario-v0.4` reaches the operator
-  with `expected checks never registered`. Confirm with `gh pr checks <pr>
-  -R Exxo-Labs/h2gc-portal` and `gh pr diff <pr> -R Exxo-Labs/h2gc-portal
-  --name-only` that nothing is code, merge it into the trunk (`gh pr merge
-  <pr> -R Exxo-Labs/h2gc-portal --squash --match-head-commit <head>`; base
-  must be the trunk, never `main`; a denial goes to Tim), then
-  `tasks.markLanded` [L2].
+- **Docs-only portal land.** From 0.6.0 the orchestrator merges it on
+  review alone (`checks: skipped_by_paths`, R3). The leader checks that the
+  land recorded that and that `ci_paths_ignored` covers the repo's filter;
+  a docs-only land still reaching the operator with `expected checks never
+  registered` means the filter is missing from the repo row: fix the row,
+  do not hand merge.
 - **Descope** (with Tim's ruling): `submit_task {task_id, park: [exact
   deliverable name]}` on the running task, or the ruling `descope <name>` /
   `park <name>` on the heal item, which parks only when it names exactly one
@@ -226,12 +229,12 @@ The goal of an overnight batch: every task ends in one of three states.
   others; a `tag` repo needing approval also finishes `done`, with a
   `blocking: later` `release_ready` item on the land row naming the command.
 - `landing`, with an open item for Tim naming the exact command (a merge
-  Tim makes, a held release); a milestone waits on its merge item while
-  the task runs on.
+  Tim makes, a held release); a floor-repo milestone onto `main` waits on
+  its merge item while the task runs on.
 - Parked: a clear note on the task (what is parked, why, what unblocks it).
 
 Nothing ends silently `running` or `blocked`. **Morning hand-back**, one
-message, built from the morning report (`squad://morning`, tRPC
+message, built from the morning report (`squad://morning`, BFF
 `reports.morning`, or the concierge's `show_morning`), in this order:
 
 1. Landed: per repo, task, PR, merge sha, and the tag plus run link (tag
@@ -260,7 +263,7 @@ The orchestrator guards quota alone (leader-functions.md, Quota guarding);
 act only on a c13–c15 push, a `policy:quota:exhausted:*` item or a member
 stuck on a limit. tRPC with the leader cookie:
 
-- Read: `policy.pools` (levels, normalised use, ladder rung per account;
+- Read (BFF): `policy.pools` (levels, normalised use, ladder rung per account;
   also the concierge's `read_state pools`) and `policy.switches`.
 - Move a member: `policy.switch.request {member, toAccount}`; a target that
   is not green is refused (`target_not_green`). `allowHot` only to rescue a
@@ -291,7 +294,14 @@ a note and named in the hand-back.
 
 ## tRPC access
 
-The orchestrator listens on `http://127.0.0.1:7790`. Sign in locally with
+The orchestrator's action API listens on `http://127.0.0.1:7790`. From
+0.6.0 the dashboard's read API is no longer served there: the GUI is the
+BFF at `http://127.0.0.1:7780` (bookmark that one), reading Postgres
+through a read-only role, and 7790 keeps only the action API.
+
+Reads: `GET http://127.0.0.1:7780/bff/<name>`; actions: `POST
+http://127.0.0.1:7790/trpc/<action>`; 7790 refuses reads. The BFF forwards
+`/auth/*`, so the same cookie works on both. Sign in locally with
 the leader label (the label must match `^[a-z][a-z0-9_-]{0,31}$`) so
 mutations record actor `gui:leader`:
 
@@ -311,7 +321,7 @@ the input itself. Recording an intervention:
 ```bash
 curl -sS -b "$JAR" -X POST http://127.0.0.1:7790/trpc/operator.intervene \
   -H 'content-type: application/json' \
-  -d '{"function":"L2","action":"milestone tim-codes/squad#277 refused by the classifier; command on Tim'"'"'s list","reason":"milestones are merged by hand (policy:land milestone item)","outcome":"handed_to_tim","pr":"tim-codes/squad#277"}'
+  -d '{"function":"L2","action":"floor-repo merge tim-codes/squad#277 refused by the classifier; command on Tim'"'"'s list","reason":"land refused by the classifier, command on the list","outcome":"handed_to_tim","pr":"tim-codes/squad#277"}'
 ```
 
 Mutations the leader uses: `tasks.approve`, `tasks.markLanded`,
@@ -319,9 +329,11 @@ Mutations the leader uses: `tasks.approve`, `tasks.markLanded`,
 (`{to: {member}, priority: 'now', kind: 'note', text}`), `sessions.resume`,
 `sessions.close`, `presence.set`, `repos.put`, `trunk.register`,
 `trunk.land`, `trunk.deployStaging`, the quota levers above,
-`ops.annotate`, `operator.intervene`; queries `runs.current`, `runs.list`,
-`repos.list`, `roster.list`, `squad.state`, `trunk.lands`, `policy.pools`,
-`policy.switches`, `reports.morning`.
+`operator.intervene`. Annotating a run is not a tRPC procedure: use the ops
+recipes (or the loopback `POST http://127.0.0.1:7790/ops/annotate`, no cookie).
+Reads go to the BFF, not `/trpc`: `runs.current`, `runs.list`, `repos.list`,
+`roster.list`, `squad.state`, `trunk.lands`, `policy.pools`, `policy.switches`,
+`reports.morning` (GET `http://127.0.0.1:7780/bff/<name>`).
 
 ## Capture readiness check
 
@@ -329,7 +341,7 @@ Mutations the leader uses: `tasks.approve`, `tasks.markLanded`,
 squad debug on --run <run>    # writes <state>/debug.on (src/cmd/debug.rs: --run is a flag)
 ```
 
-Then `runs.current` through tRPC: the run id with `mode: debug` and
+Then `runs.current` from the BFF: the run id with `mode: debug` and
 `started_at` is the proof. After the attended rebuild `squad debug on` also
 prints `orchestrator: recording` and `squad doctor` has a debug row. If
 `runs.current` shows the implicit `auto-<date>` run or nothing, the
