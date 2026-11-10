@@ -292,6 +292,11 @@ purpose. At the end, leave it as Tim asked: a pause you set for a restart
 is lifted before you hand back; a pause he wants for his review is set with
 a note and named in the hand-back.
 
+`deploy/squad-pause.sh` has no planning or building subcommands. To pause or
+resume only planning or only building, use the GUI's "Planning" and "Building"
+switches, or the actions `squad.pausePlanning`, `squad.resumePlanning`,
+`squad.pauseBuilding` and `squad.resumeBuilding`.
+
 ## tRPC access
 
 The orchestrator's action API listens on `http://127.0.0.1:7790`. From
