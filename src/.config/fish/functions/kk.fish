@@ -1,9 +1,11 @@
 # Open k9s on one of Tim's clusters, by a short name.
 #
-#   kk              pick a cluster in fzf
-#   kk homelab      the homelab k3s cluster (kube context `homelab`)
-#   kk buildlab     the buildlab GKE cluster (ci-runners, exxo-internal), the
-#                   compute Gaia's builders and the ARC runners borrow
+#   kk                     pick a cluster in fzf
+#   kk homelab             the homelab k3s cluster (kube context `homelab`)
+#   kk buildlab            the buildlab GKE cluster (ci-runners, exxo-internal),
+#                          the compute Gaia's builders and the ARC runners borrow
+#   kk buildlab -c pods    anything after the cluster goes to k9s as-is
+#   kk -c pods             no cluster but k9s flags: pick, then pass them on
 #
 # Always all namespaces (-A) and no splash screen. The context is passed per
 # invocation (k9s --context), never selected, so the kubeconfig's current
@@ -14,18 +16,20 @@
 # current context is restored straight after. It authenticates with your gcloud
 # login through gke-gcloud-auth-plugin, so an expired login means
 # `gcloud auth login` first.
-function kk -d "k9s on a named cluster (homelab, buildlab); no argument picks one"
+function kk -d "k9s on a named cluster (homelab, buildlab); no cluster picks one; extra args go to k9s"
     set -l names homelab buildlab
-    set -l target $argv[1]
+    set -l target
+    set -l rest $argv
 
-    if test (count $argv) -gt 1
-        echo "usage: kk [homelab|buildlab]" >&2
-        return 2
+    # A first argument that isn't a flag is the cluster; everything else is k9s's.
+    if test (count $argv) -gt 0; and not string match -q -- '-*' $argv[1]
+        set target $argv[1]
+        set rest $argv[2..-1]
     end
 
     if test -z "$target"
         if not command -q fzf
-            echo "kk: fzf not installed; pass a cluster: kk homelab|buildlab" >&2
+            echo "kk: fzf not installed; pass a cluster: kk homelab|buildlab [k9s args]" >&2
             return 1
         end
         set target (printf '%s\n' $names | fzf --height=~6 --prompt='cluster> ' --no-multi)
@@ -54,5 +58,5 @@ function kk -d "k9s on a named cluster (homelab, buildlab); no argument picks on
             return 2
     end
 
-    k9s -A --splashless --context $ctx
+    k9s -A --splashless --context $ctx $rest
 end
