@@ -428,7 +428,7 @@ never merge with `gh` instead.
 
 ## Scratch
 
-Each session has a durable scratch dir, `$SQUAD_SCRATCH_DIR`, exported by
+Each session has a durable scratch dir, `$GAIA_SCRATCH_DIR`, exported by
 the broker to launched sessions: `~/.local/state/squad/scratch/<session-id>/`,
 created 0700, kept on close and reused by a resume while the session id is
 unchanged (`/clear` gives a new id, so a fresh dir). If the variable is

@@ -132,10 +132,10 @@ check "guard hook, python3 missing: exits 0" test "$nop_rc" -eq 0
 check "guard hook, python3 missing: emits deny" \
     bash -c 'jq -e ".hookSpecificOutput.permissionDecision == \"deny\"" <<<"$1" >/dev/null' _ "$nop_out"
 ok_out="$(echo '{"session_id":"s","cwd":"/tmp","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls"}}' \
-    | HOME="$T/ghome" SQUAD_GUARD_LOG="$T/guard.jsonl" /bin/sh -c "$GUARD_CMD" 2>/dev/null)"; ok_rc=$?
+    | HOME="$T/ghome" GAIA_GUARD_LOG="$T/guard.jsonl" /bin/sh -c "$GUARD_CMD" 2>/dev/null)"; ok_rc=$?
 check "guard hook, python3 present: benign command passes silently" bash -c '[ "$1" -eq 0 ] && [ -z "$2" ]' _ "$ok_rc" "$ok_out"
 echo '{"session_id":"s","cwd":"/tmp","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"gh pr merge 1"}}' \
-    | HOME="$T/ghome" SQUAD_GUARD_LOG="$T/guard.jsonl" /bin/sh -c "$GUARD_CMD" >"$T/deny.out" 2>/dev/null
+    | HOME="$T/ghome" GAIA_GUARD_LOG="$T/guard.jsonl" /bin/sh -c "$GUARD_CMD" >"$T/deny.out" 2>/dev/null
 check "guard hook, python3 present: merge still denied" grep -q '"deny"' "$T/deny.out"
 check "exxo-openrouter PreToolUse = shared PreToolUse + guard" \
     test "$(jq -c '.hooks.PreToolUse' "$(S exxo-openrouter)")" = \

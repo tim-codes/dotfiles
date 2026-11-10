@@ -45,7 +45,7 @@ run() { # run <case> [env...]; sets out, rc, log
   local c=$1; shift
   export FAKE_LOG=$tmp/$c.log; : > "$FAKE_LOG"
   scratch=$tmp/scratch-$c; mkdir -p "$scratch"
-  out=$(env -u SQUAD_SCRATCH_DIR PATH="$fakes:$PATH" REVIEW_CI_SCRATCH_DIR="$scratch" "$@" "$script" "$checkout" "$SHA" 2>&1)
+  out=$(env -u GAIA_SCRATCH_DIR PATH="$fakes:$PATH" REVIEW_CI_SCRATCH_DIR="$scratch" "$@" "$script" "$checkout" "$SHA" 2>&1)
   rc=$?
   log=$(cat "$FAKE_LOG")
 }
@@ -93,7 +93,7 @@ case "$first" in *"worktree remove --force $tmp/scratch-left/review-ci"*) ok "re
 
 # 4. no scratch dir: refused before anything runs; a bad sha too
 export FAKE_LOG=$tmp/noscratch.log; : > "$FAKE_LOG"
-out=$(env -u REVIEW_CI_SCRATCH_DIR -u SQUAD_SCRATCH_DIR PATH="$fakes:$PATH" "$script" "$checkout" "$SHA" 2>&1); rc=$?
+out=$(env -u REVIEW_CI_SCRATCH_DIR -u GAIA_SCRATCH_DIR PATH="$fakes:$PATH" "$script" "$checkout" "$SHA" 2>&1); rc=$?
 if [ "$rc" != 0 ] && [ ! -s "$FAKE_LOG" ] && printf '%s' "$out" | grep -q REVIEW_CI_SCRATCH_DIR; then
   ok "review-ci refuses without REVIEW_CI_SCRATCH_DIR"
 else bad "review-ci refuses without REVIEW_CI_SCRATCH_DIR" "rc $rc, log $(cat "$FAKE_LOG"), out $out"; fi
@@ -112,13 +112,20 @@ if [ "$rc" != 0 ] && [ ! -s "$FAKE_LOG" ] && printf '%s' "$out" | grep -q '40 he
   ok "review-ci refuses a 40-character sha that is not hex"
 else bad "review-ci refuses a 40-character sha that is not hex" "rc $rc, out $out"; fi
 
-# 4c. SQUAD_SCRATCH_DIR still works as the fallback
+# 4c. GAIA_SCRATCH_DIR still works as the fallback
 export FAKE_LOG=$tmp/squadfallback.log; : > "$FAKE_LOG"
 mkdir -p "$tmp/scratch-squad"
-out=$(env -u REVIEW_CI_SCRATCH_DIR SQUAD_SCRATCH_DIR="$tmp/scratch-squad" PATH="$fakes:$PATH" "$script" "$checkout" "$SHA" 2>&1); rc=$?
+out=$(env -u REVIEW_CI_SCRATCH_DIR GAIA_SCRATCH_DIR="$tmp/scratch-squad" PATH="$fakes:$PATH" "$script" "$checkout" "$SHA" 2>&1); rc=$?
 if [ "$rc" = 0 ] && [ -s "$tmp/scratch-squad/review-ci.log" ] && grep -qF "just ci (in $tmp/scratch-squad/review-ci)" "$FAKE_LOG"; then
-  ok "review-ci falls back to SQUAD_SCRATCH_DIR"
-else bad "review-ci falls back to SQUAD_SCRATCH_DIR" "rc $rc, out $out"; fi
+  ok "review-ci falls back to GAIA_SCRATCH_DIR"
+else bad "review-ci falls back to GAIA_SCRATCH_DIR" "rc $rc, out $out"; fi
+
+# 4d. the old SQUAD_SCRATCH_DIR is never read: refused, naming the rename
+export FAKE_LOG=$tmp/squadold.log; : > "$FAKE_LOG"
+out=$(env -u REVIEW_CI_SCRATCH_DIR -u GAIA_SCRATCH_DIR SQUAD_SCRATCH_DIR="$tmp/scratch-squad" PATH="$fakes:$PATH" "$script" "$checkout" "$SHA" 2>&1); rc=$?
+if [ "$rc" = 64 ] && [ ! -s "$FAKE_LOG" ] && printf '%s' "$out" | grep -q 'SQUAD_SCRATCH_DIR is set, but it was renamed to GAIA_SCRATCH_DIR'; then
+  ok "review-ci refuses the old SQUAD_SCRATCH_DIR, naming the rename"
+else bad "review-ci refuses the old SQUAD_SCRATCH_DIR, naming the rename" "rc $rc, out $out"; fi
 
 # 5. nothing is pushed, tagged or sent to GitHub
 all=$(cat "$tmp"/*.log)

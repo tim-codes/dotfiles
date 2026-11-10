@@ -6,10 +6,10 @@
 # the `squad` stdio MCP server and the v0.5 grants, that the handler commands
 # fail open, and that the member deny overlay stays the six merge rules.
 # Usage: bash tests/squad-hooks-settings.sh
-#   SQUAD_CONTRACTS_DIR   directory holding the squad repo's contracts/README.md
-#                         (else read it from git in $SQUAD_REPO at
-#                         $SQUAD_CONTRACTS_REF)
-#   SQUAD_CONTRACTS_REQUIRED=1   turn the byte-for-byte skip into a failure
+#   GAIA_CONTRACTS_DIR   directory holding the squad repo's contracts/README.md
+#                         (else read it from git in $GAIA_REPO at
+#                         $GAIA_CONTRACTS_REF)
+#   GAIA_CONTRACTS_REQUIRED=1   turn the byte-for-byte skip into a failure
 set -uo pipefail
 
 SRC_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -90,9 +90,9 @@ done
 # Rule 8 byte for byte: extract the pinned handler objects from the squad
 # repo's contracts/README.md and compare each, whole, with the merged entry.
 README="$T/contracts-README.md"
-if [ -n "${SQUAD_CONTRACTS_DIR:-}" ] && [ -r "$SQUAD_CONTRACTS_DIR/README.md" ]; then
-    cp "$SQUAD_CONTRACTS_DIR/README.md" "$README"
-elif git -C "${SQUAD_REPO:-$HOME/dev/squad}" show "${SQUAD_CONTRACTS_REF:-origin/trunk/v0.5}:contracts/README.md" >"$README" 2>/dev/null; then
+if [ -n "${GAIA_CONTRACTS_DIR:-}" ] && [ -r "$GAIA_CONTRACTS_DIR/README.md" ]; then
+    cp "$GAIA_CONTRACTS_DIR/README.md" "$README"
+elif git -C "${GAIA_REPO:-$HOME/dev/squad}" show "${GAIA_CONTRACTS_REF:-origin/trunk/v0.5}:contracts/README.md" >"$README" 2>/dev/null; then
     :
 else
     rm -f "$README"
@@ -109,10 +109,10 @@ if [ -r "$README" ]; then
     else
         bad "hook handlers equal contracts rule 8: README rule 8 carries no pinned handler JSON (pre-amendment contracts?)"
     fi
-elif [ "${SQUAD_CONTRACTS_REQUIRED:-}" = 1 ]; then
+elif [ "${GAIA_CONTRACTS_REQUIRED:-}" = 1 ]; then
     bad "hook handlers equal contracts rule 8: no contracts source readable"
 else
-    skip "hook handlers equal contracts rule 8: no contracts source readable (set SQUAD_CONTRACTS_DIR)"
+    skip "hook handlers equal contracts rule 8: no contracts source readable (set GAIA_CONTRACTS_DIR)"
 fi
 
 check "member deny file is the six merge rules only" \

@@ -70,7 +70,7 @@ hookSpecificOutput.permissionDecision "deny" with a one-line reason and exits
 path while reading the input denies.
 
 Log (Plan E O9, always on): each block, and each allowed `git push` as a
-positive control, appends one line to $SQUAD_GUARD_LOG (default
+positive control, appends one line to $GAIA_GUARD_LOG (default
 ~/.local/state/claude-openrouter/guard.jsonl; dir 0700, file 0600):
 {ts, session_id, cwd, rule, target, form, decision}. target is a branch name
 or PR number only; form is plain|git-C|sh-c|compound|other. The command text
@@ -935,7 +935,7 @@ def analyse(text, cwd, allowed):
 def log(payload, rule, target, form, decision):
     """Append one O9 record. Never raises, never blocks; never records command text."""
     try:
-        path = os.environ.get("SQUAD_GUARD_LOG") or os.path.expanduser(
+        path = os.environ.get("GAIA_GUARD_LOG") or os.path.expanduser(
             "~/.local/state/claude-openrouter/guard.jsonl")
         d = os.path.dirname(path)
         os.makedirs(d, mode=0o700, exist_ok=True)
