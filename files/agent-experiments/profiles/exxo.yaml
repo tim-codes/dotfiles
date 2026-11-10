@@ -1,0 +1,17 @@
+version: 1
+id: exxo
+name: Exxo work profile
+policy: contract/policy.md
+audience: exxo
+capabilities:
+  - run-with-secrets
+  - agent-tooling
+exclusions:
+  - homelab-run-with-secrets
+  - mantine
+  - credential-mcp
+constraints:
+  - Select capabilities by allow-list; new catalogue entries are not exposed automatically.
+  - Deliver run-with-secrets through the Exxo source only.
+  - Do not materialise agent.env or resolved credential values.
+  - Do not copy plugin, MCP, authentication, history, or permission configuration.
