@@ -1,6 +1,6 @@
 #!/bin/bash
 # Table-driven tests for scripts/claude-openrouter-guard, the PreToolUse hook
-# that stops exxo-openrouter (Kimi K3) workers merging PRs or pushing to the
+# that stops exxo-openrouter (DeepSeek V4.1 Flash) workers merging PRs or pushing to the
 # default branch. Uses temp git repos with a local bare origin and a fake
 # $HOME; never touches the real contexts and never runs the commands under
 # test — the guard only parses them.
@@ -305,7 +305,7 @@ job|git log --grep='[Ff]ix'
 TABLE
 
 # --- guard.jsonl 2026-10-25: commands blocked as `unparseable` that were fine ---
-# The twelve real commands K3 workers ran (09:48Z-12:32Z), with paths, hashes
+# The twelve real commands overlay workers ran (09:48Z-12:32Z), with paths, hashes
 # and worktree names replaced by placeholders. The causes: quoted regex and
 # glob characters in a grep/git argument, a variable git -C directory, braces
 # in a commit message, and a risk word inside the data of a non-git command.

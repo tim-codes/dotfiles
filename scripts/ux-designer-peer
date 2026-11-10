@@ -24,7 +24,7 @@
 # session (needs $TMUX). --model opus, --effort high. --brief-dir
 # ${XDG_STATE_HOME:-~/.local/state}/ux-designer. --short a slug of the scope
 # (lowercase, non-alphanumeric runs become `-`, cut to 24 characters, `scope`
-# when empty). The brief template is files/claude/skills/ux-designer/brief-template.md
+# when empty). The brief template is scripts/ux-designer-peer-brief.md
 # in this repo (found through the script's real path); UX_DESIGNER_TEMPLATE
 # overrides it. Its {{SCOPE}} {{TARGET}} {{BUILDER}} {{NAME}} {{CONTEXT}} markers
 # are replaced verbatim; user text goes only in the brief body, never in the
@@ -121,7 +121,7 @@ if [ -z "$cwd" ]; then
     [ -n "$cwd" ] || cwd="$PWD"
 fi
 
-# Template: next to this repo's skill, found through the script's real path.
+# Template: next to this script, found through its real path.
 template="${UX_DESIGNER_TEMPLATE:-}"
 if [ -z "$template" ]; then
     self="${BASH_SOURCE[0]}"
@@ -129,7 +129,7 @@ if [ -z "$template" ]; then
         link=$(readlink "$self")
         case "$link" in /*) self="$link" ;; *) self="$(dirname "$self")/$link" ;; esac
     done
-    template="$(cd "$(dirname "$self")/.." && pwd -P)/files/claude/skills/ux-designer/brief-template.md"
+    template="$(cd "$(dirname "$self")" && pwd -P)/ux-designer-peer-brief.md"
 fi
 [ -r "$template" ] || die 3 "brief template not found or unreadable: $template"
 

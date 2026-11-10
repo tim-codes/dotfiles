@@ -121,6 +121,17 @@ check "squad-member carries the section headings" has_headings "$M" \
 check "squad-member teaches the plan PR staleness pass" contains "$M" rebase stale 'openspec validate' \
     "onto the kickoff's base (main or the active trunk"
 
+# --- build-lead (multi-lane build procedure) --------------------------------
+B="$SKILLS/build-lead/SKILL.md"
+check "build-lead exists and is shared" exists_and_shared build-lead
+check "build-lead SKILL.md is at most 250 lines" sh -c '[ "$(wc -l < "$1")" -le 250 ]' _ "$B"
+check "build-lead has its sections and references" has_headings "$B" \
+    '## 1. Setup' '## 2. Lane briefs' '## 3. Review loop per checkpoint' '## 4. Merging' \
+    '## 5. Cross-plan seams' '## 6. Scope changes mid-build' '## 7. Final'
+check "build-lead carries its key rules" contains "$B" subagent-driven-development testlock \
+    'Ruling:' 'cost if wrong' '--no-ff' 'Never touch the integration worktree' worktree-closedown
+check "build-lead references exist" test -f "$SKILLS/build-lead/references/dispatch-templates.md" -a -f "$SKILLS/build-lead/references/lessons.md"
+
 # --- squad-planner and the kickoff template (P7 Task 3) ----------------------
 P="$SKILLS/squad-planner/SKILL.md"
 K="$SKILLS/squad-planner/kickoff-template.md"
@@ -165,18 +176,19 @@ check "kickoff template opens with the squad-member invocation and states merge 
     sh -c '[ "$(sed -n 1p "$1")" = "/squad-member" ] && [ "$(sed -n 2p "$1")" = "Invoke the squad-member skill first." ] &&
         grep -qxF "## Merge authority" "$1" && grep -qxF "## Test policy" "$1"' _ "$K"
 
-# --- ux-designer (experimental, personal-only) -------------------------------
-U="$SKILLS/ux-designer/SKILL.md"; UB="$SKILLS/ux-designer/brief-template.md"
+# --- ux-designer (experimental, shared to exxo contexts) -------------------------------
+U="$SKILLS/ux-designer/SKILL.md"
 generic_only() { ! grep -nE '7797|squad/gui|localhost:[0-9]+|[Mm]antine' "$@" | grep -viE 'e\.g\.|example'; }
-check "ux-designer exists" test -f "$U" -a -f "$UB"
-check "ux-designer is personal-only" bash -c '! (source <(sed -n "/^shared_skills()/,/^}/p" "$1/scripts/claude-sync"); shared_skills | grep -qx ux-designer)' _ "$REPO_DIR"
+check "ux-designer exists" test -f "$U"
+check "ux-designer is shared" bash -c '(source <(sed -n "/^shared_skills()/,/^}/p" "$1/scripts/claude-sync"); shared_skills | grep -qx ux-designer)' _ "$REPO_DIR"
 check "ux-designer carries the section headings" has_headings "$U" \
-    '## Start' '## Handshake' '## Round (builder side)' '## One review pass' '## Wrap-up' '## Stop' '## Rules'
-check "ux-designer names the launcher contract" contains "$U" \
-    'ux-designer-peer start' 'ux-designer-peer stop @' 'ListAgents' 'window: @N' 'ux-designer ready:' 'kill-session'
+    '## Inputs' '## Setup' '## 1. Critique' '## 2. Draft directions' '## 3. Tim chooses' '## 4. Build and review (optional)' '## 5. Wrap-up' '## Figma' '## Rules'
+check "ux-designer names the scratchpad, SharePoint and Figma create_new_file" contains "$U" \
+    'scratchpad' 'Microsoft 365 connector' 'create_new_file' 'client snapshot' 'design:design-handoff'
+check "ux-designer has no peer or launcher flow" sh -c '! grep -nE "ux-designer-peer|SendMessage|ListAgents|window: @|kill-session|handshake|builder" "$1"' _ "$U"
+check "ux-designer has no brief template in the skill dir" test ! -e "$SKILLS/ux-designer/brief-template.md"
 check "ux-designer description is marked experimental" sh -c 'case "$1" in Experimental:*) ;; *) exit 1;; esac' _ "$(fmq "$U" description)"
-check "brief template carries every placeholder" contains "$UB" '{{SCOPE}}' '{{TARGET}}' '{{BUILDER}}' '{{NAME}}' '{{CONTEXT}}' 'SendMessage'
-check "ux-designer skill and template are generic" generic_only "$U" "$UB"
+check "ux-designer skill is generic" generic_only "$U"
 check "ux-designer names no context directory" no_context_dirs "$SKILLS/ux-designer"
 
 [ "$fail" = 0 ] && echo "ok: skills lint clean"

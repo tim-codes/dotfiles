@@ -82,10 +82,13 @@ the contract (`contracts/mcp-tools.md`, "Directive payloads" in the squad repo).
 - A headless member does not end a turn on a "next step" it has not started.
   Either do the step, or end the turn only while waiting on a
   `mcp__squad__watch` or a job, and say what it waits on with `mcp__squad__set`
-  (`working` or `blocked`, `detail`: "waiting on <watch/job>; then <next
-  step>"). A turn that closes on "next I will..." with nothing pending is
+  (`working`, `detail`: "waiting on <watch/job>; then <next step>"). A turn that closes on "next I will..." with nothing pending is
   dead: nobody re-prompts it (the orchestrator nudges once or twice, then
   raises it to Tim as stuck).
+- Never `set` `blocked` on a CI, deploy, PR or heavy-slot wait. Watch the run
+  (see Watches), `set` `working` with what you wait on, and go idle; `blocked`
+  is for a wait only Tim or another task can end. The service refuses
+  `blocked` on a CI wait from v0.6.0.
 - When you wait on something, name real identifiers (task id, ticket id,
   `owner/repo`) in `detail`: "waits on X" / "depends on X" where nothing
   tracks X raises a `policy:heal:<task>:<ref>` item for Tim, or creates the
@@ -108,8 +111,9 @@ the contract (`contracts/mcp-tools.md`, "Directive payloads" in the squad repo).
 ## Testing and trunks
 
 Mid-lane testing is **focused only**: fast tests for the code you changed,
-plus the repo's fast check (`just check` or its equivalent) once before
-landing. No `just ci`, `just verify`, full suites, e2e, browser runs or
+plus the repo's local fast check (`just check-ci` or its equivalent, which
+is what CI's fast job runs) before every land, the first and each re-land
+alike. No `just ci`, `just verify`, full suites, e2e, browser runs or
 production builds without a heavy slot. Heavy verification is batched by the
 trunk service, per trunk, not per lane. A red trunk is fixed forward by a
 `trunk_fix` job before any further squash lands. A kickoff whose Test policy
@@ -125,49 +129,65 @@ any exception is stated there.
 | Shell (dotfiles) | `bash tests/<file>.sh` for the touched script | — |
 
 Always heavy, whatever the stack: `just ci`, `just verify`, Docker compose
-stacks, data jobs. The repo's fast check (`just check`) is not in this list.
+stacks, data jobs. The repo's fast check (`just check` or `just check-ci`) is
+not in this list.
+
+The full gate is not a pre-land step. CI runs it on the head sha, and the land
+reviewer reads that result; do not run it yourself before landing, and do not
+re-run full gates, staging smokes or live or paid scenarios at the merge
+stage. A check that needs a deployed environment is a `stage: staging`
+deliverable the verifier judges after the one deploy, so it is none of the
+lane's business before the land.
 
 Skills do not travel into a fresh subagent context, so every brief you write
 for a subagent restates this policy in one line: focused tests only, the
-repo's fast check once before landing, the trunk service runs the
-comprehensive gate per trunk.
+repo's local fast check before every land, CI runs the comprehensive gate on
+the head sha.
+
+### Verification on buildlab (repos on `ci: squad`)
+
+In a repo on `ci: squad`, do not run full suites locally and do not take heavy slots for them. Push your commit, then call `run_tests` with no arguments: it runs the suites your change selects, on buildlab, at the sha you pushed. It returns at once with a run id, and you are told when the run finishes. Call `test_status {run_id, log_lines: 200}` only to read why something failed. Fix, push and call `run_tests` again; each sha allows three attempts, and infrastructure retries do not count. Integration suites are not yours to run: the trunk's periodic CI and the release cut run them. If your plan relies on particular suites, name them in `verify_suites`. A land waits for its suites, and the service starts them itself if you forgot, but a land whose head moves is verified again at the new head.
+
+Branches you push for squad-owned verification are named `gaia/task-<id>` (the squad's `[policy.launch] branch_prefix`); the trunk is `gaia/trunk-<name>` (`[policy.trunk] branch_prefix`). Keep to the names the launch gave you; do not rename a branch after the first push. The `gaia/` prefixes (and the rule that `gaia/*` never lands straight on main) apply only to repos whose trunk policy is `trunk`; in `direct` repos you keep `squad/<member>` lanes landing on main as before.
 
 ## Landing
 
 - Open lane PRs against the base the kickoff names (a branch or a
   `trunk/...`) as drafts. Never push to a trunk branch.
 - On either merge path, mark the PR ready (`gh pr ready <n> -R <owner/name>`)
-  before landing or handing it to Tim, and have the branch up to date with
+  before landing or handing it to Tim and before you watch its checks, and have the branch up to date with
   its base (merge `origin/<base>` in once pushed; see the pushed-branch rule below), with CI green or the failure explained in the PR. The
   trunk service pre-gates only a closed PR and a dirty or behind branch; it
   does not check for a draft, so a draft would still be reviewed.
 - Merge authority `trunk_service`: call `mcp__squad__land` with
-  `{pr: "<https PR URL>", kind: "milestone"}` at each milestone the kickoff
-  names, and `kind: "completion"` at the end. `queued` means the request is
-  recorded: for a `completion` land the trunk service picks it up; for a
-  `milestone` land the merge-by-hand item was raised for Tim (see the
-  `reason`), so keep working and never wait on a milestone to merge. `landed`
-  means merged. What happens next depends on
-  `[policy.trunk] enabled`:
+  `{pr: "<https PR URL>", kind: "completion"}` once every deliverable's
+  merge-stage check passes. **One land per task.** Land a `milestone`
+  (`kind: "milestone"`) only when the kickoff's `## Milestones` names one; the
+  planner cuts none by default, and a lane never invents one to publish
+  progress or to see its work on staging. `queued` means the request is
+  recorded and the trunk service picks it up; `landed` means merged. What
+  happens next depends on `[policy.trunk] enabled`:
   - **Enabled:** a `completion` land is reviewed by the trunk service
     (correctness and estate conformity) and squash-merged by it once the
-    review, the GitHub checks and the merge state are clean. The task
-    reaches `done` with no operator item (on repos that release to production
-    it stays `landing` until the release is live, and your status line shows
-    Releasing/Released).
+    review, the GitHub checks and the merge state are clean. The reviewer
+    reads the head sha's CI result and the evidence you attached to the land;
+    it runs no gate itself, so put the evidence in the land and the PR body.
+    The task reaches `done` with no operator item (on repos that release to
+    production it stays `landing` until the release is live, and your status
+    line shows Releasing/Released).
   - **Disabled:** nothing reviews or merges the PR. A `completion` land
     raises the item `policy:land:<task_id>` and Tim merges by hand.
-  - A `milestone` land is never reviewed or merged by the service, enabled
-    or not: it is recorded with its PR URL and the task keeps running. Either
-    way it raises `policy:land:<task_id>:milestone:<request id>` so Tim merges
-    by hand, and the tool answers `queued` with the `reason` `milestone
-    recorded; the trunk service does not merge milestones, the operator is
-    asked to merge it by hand (item policy:land:<taskId>:milestone:<requestEventId>).
-    Keep working.` Carry on with whatever does not depend on the merge; `set` `blocked` only if
-    nothing else can proceed.
+  - A named `milestone` land is queued and merged by the service itself on a
+    repo whose base is not the approval floor (`[policy.trunk]
+    milestone_lands = "service"`), with no item; on a floor repo it raises
+    `policy:land:<task_id>:milestone:<request id>` and Tim merges by hand.
+    Either way keep working and never wait on the merge.
 - A `completion` land puts the task into `landing`: it is done on your side,
   waiting for the trunk service to review and merge. Finish as under
-  Finishing and wind down; do not wait for `landed`.
+  Finishing and wind down. The lane ends at the completion land: never watch
+  your own PR for its merge, never watch another task's PR, and do not wait
+  for `landed`. Ordering between tasks is a `depends_on` edge the planner
+  wrote, not something a member waits on.
 - Push nothing to the PR while the service is reviewing it: a new head
   cancels the review and re-queues the land. If you must push, expect the
   review to start again.
@@ -175,7 +195,7 @@ comprehensive gate per trunk.
   accepted reaches you as a `message` turn carrying the reasons and review
   findings (failed checks, a reviewer finding, or a stale-branch refusal).
   Either way the reason is final: fix its cause on the same branch, push,
-  re-run the focused tests and the fast check, then call `mcp__squad__land`
+  re-run the focused tests and the local fast check, then call `mcp__squad__land`
   again. Never open a second PR for the fixes, never
   route around a refusal. A third refusal of the same PR goes to Tim.
   `operator_pending` means a land for that repo is already waiting on Tim
@@ -280,12 +300,17 @@ every required check has settled. One hit ends the watch, so re-watch after
 pushing a fix. A `github_run` watch is polled and hits when the run completes,
 with `to` set to its conclusion.
 
-When blocked on a dependency whose PR is not yet merged, `watch` that PR
-(`github_pr`, target the PR URL) rather than raising an item, `set`
-`blocked` with the PR in `detail`, and end the turn. Raise an item only if
-the watch cannot be set (the tool refuses it, or the dependency has no PR).
+Watch only what the lane itself needs to proceed: its own PR's checks
+(`filter: {checks: true}`), or a workflow run it started (a kit release
+mid-lane). Watch the run, `set` `working` (never `blocked`) with the target
+in `detail`, and end the turn. Never watch your own PR for its merge, and
+never watch another task's PR: if the lane cannot proceed without another
+task's change, that is a `depends_on` edge the planner should have written,
+so raise it as a question for Tim rather than polling the other task's PR.
 
 ## Repo conventions
+
+Scratch survives a pause only under the session scratchpad: a `SessionStart` hook links it to `~/scratch/claude/<project-slug>/<session-id>/scratchpad` (quote that durable path, not `/private/tmp/...`), `.superpowers/sdd` ledgers are mirrored to `<session>/sdd/` on Stop, and nothing that must outlive a pause goes in `/tmp/<name>`. Collection is `claude-scratch-gc` (`.pin` keeps a session), never the OS.
 
 - If the kickoff names repo preparation (`git pull --ff-only`, a rebase
   before the first push), do it first.
@@ -349,6 +374,22 @@ pass:
 The plan documents land with the work, in the lane PR. When it opens, close
 the plan PR as superseded, with a comment linking the lane PR.
 
+## Auth
+
+When your command prints a device code, opens a browser login or waits for Touch ID, raise it with `signin` and give `site`: the CLI name (`gh`, `az`, `gcloud`) or the host. The squad records it so the next round's preflight prepares it. Never record or note a sign-in any other way.
+
+Before raising a browser sign-in for a site the squad has approved, call `auth_login {site}`. `signed_in` or `already_signed_in`: carry on. `needs_operator`: set waiting on the `item_id` if it blocks you, else carry on with the rest; a note tells you when it is signed in. `refused` or `failed`: raise once with `signin`; never try the login yourself, never open the debugging port, never pass a context.
+
+## Project data
+
+- Read a project dataset only with `data_read {repo?, dataset, read, args}`, as your brief's Project data section names it. Outcomes: `ok` (the file's path, row and byte counts, columns), `needs_operator` (an item asks Tim), `denied`, `refused` (your call was wrong: fix the arguments), `over_cap`, `failed`.
+- `needs_operator`: if the data blocks you, set waiting on the item; otherwise carry on with the rest and report the gap. When the item is decided allow, call `data_read` again.
+- `denied`: do not look for another route (no recipe, query, credential or script of your own); report the deliverable as unmet.
+- Never print, `cat`, `head`, Read or paste rows. Raw means any line of the file and any value of an identifying column (ids of users, participants, conversations, runs, events). Rows go only to the file.
+- Analyse with a script in your scratch directory that reads the file and prints aggregates only: counts, percentiles, maxima, per-group totals. For `test_user` and `personal` data, suppress any group with fewer than 5 members (k ≥ 5). Only those aggregates go into your work, PRs and raises.
+- Before you reuse an analysis script, persist it in Exxo-Labs/gaia-loadout (`projects/<owner>__<repo>/<dataset>/<util>.py`, header naming the dataset, the reads it accepts, what it prints, and your task), landed as a second repo of your task or as a fix task. Never put data in gaia-loadout.
+- The squad checks PRs, raises and your transcript for values from your files; a match refuses the land.
+
 ## Denials
 
 Read how a denied call ended from its message (the `squad:` prefix is part of
@@ -406,7 +447,9 @@ When every deliverable's check passes: land `completion` (once per repo for a
 multi-repo task, each with its `repo`; or, for merge authority `operator`,
 raise the review item), stop completed subagents and background shells you
 started, `set` `done` with the PR URL (every PR URL, for a multi-repo task)
-in `detail`, and end the turn. A session of kind `infra` never calls
+in `detail`, and end the turn. The lane ends there: no watching for the merge,
+no waiting on the release, no follow-up on a review item once the land is in.
+Deploy and staging checks belong to the verifier. A session of kind `infra` never calls
 `mcp__squad__land`: its PR goes through the orchestrator's merge gate, so it
 finishes with `set` `status: "done"` (PR URL in `detail`) only. The policy
 layer winds the session down; do not wait for it.

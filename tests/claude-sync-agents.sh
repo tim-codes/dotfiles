@@ -15,7 +15,7 @@ cp "$SRC_REPO/scripts/claude-sync" "$REPO/scripts/"
 cp -R "$SRC_REPO/files/claude" "$REPO/files/"
 for c in personal exxo exxo-personal; do mkdir -p "$FAKE/.claude-$c"; done
 AG="$REPO/files/claude/agents"
-SHARED=(implementer reviewer git-pr-ops investigator sanity-cms notion-ops)
+SHARED=(implementer reviewer git-pr-ops investigator sanity-cms notion-ops ux-designer)
 printf -- '---\nname: private-probe\ndescription: x\nmodel: haiku\n---\n' > "$AG/private-probe.md"
 
 fail=0
@@ -56,7 +56,6 @@ for ctx in exxo exxo-personal; do
         check "$ctx/$n.md links to repo" test "$(readlink "$d/$n.md")" = "$AG/$n.md"
     done
     check "$ctx: private-probe not linked" test ! -e "$d/private-probe.md" -a ! -L "$d/private-probe.md"
-    check "$ctx: ux-designer not linked (personal-only)" test ! -e "$d/ux-designer.md" -a ! -L "$d/ux-designer.md"
 done
 check "prunes stale and broken links" test ! -L "$FAKE/.claude-exxo/agents/gone.md"
 check "adopts unmanaged real agent file (moved into repo)" test -f "$AG/handmade.md"

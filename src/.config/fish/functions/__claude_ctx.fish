@@ -23,7 +23,7 @@ function __claude_ctx --description 'Run claude in a per-account config context'
         pushd $home/claude
         set jumped 1
     end
-    # The exxo-openrouter overlay env is inherited by anything a K3 session
+    # The exxo-openrouter overlay env is inherited by anything a overlay session
     # spawns; every other context must not see it, so it is unset for the
     # launched process only. The openrouter wrapper is left untouched.
     set -l scrub

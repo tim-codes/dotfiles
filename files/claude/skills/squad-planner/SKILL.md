@@ -200,6 +200,41 @@ stale; under `## Recommended model and effort` give your recommendation (Sonnet 
 Record each assumption and each unresolved question under
 `## Open questions`.
 
+### The shape of a round
+
+Tim ruled on 4 Nov 2026, from the v0.6.0 velocity report
+(`docs/superpowers/plans/2026-11-03-squad-v0.6.0-velocity.md` in the squad
+repo), that a plan is cut for one land per task, no milestone lands and a
+shallow round. The pipeline charges per land and per level of dependency, not
+per line of work, so:
+
+- **One land per task; no milestones by default.** The kickoff's
+  `## Milestones` reads `none`. An intermediate release that a later task
+  needs (a package version the next task installs) is its own small task with
+  an explicit `depends_on` edge (the `task_deps` row), as harness-kit task 51
+  was, never a milestone land inside a larger task. A task that would want a
+  milestone to see its work on staging gets a `stage: staging` deliverable
+  instead. A milestone appears only when Tim asks for one by name.
+- **Dependency depth two or less per round.** Keep the graph at two levels.
+  Put the gating change (a package cutover, a schema move) in a small first
+  task; the tasks that need it start on stacked branches off its PR rather
+  than waiting for it to merge.
+- **Cross-task ordering is a `depends_on` edge**, never "lands after #PR" in
+  a deliverable or in the notes. A member never watches another task's PR, so
+  an ordering that lives only in prose is an ordering nobody enforces.
+- **Size a task to one PR a reviewer can read in about ten minutes.** A
+  cutover that deletes thousands of lines, or a task that touches a hundred
+  files, is split, not landed whole.
+- **Post-deploy checks are `stage: staging` deliverables**, judged by the
+  verifier after the one deploy. The full gate, a staging smoke, a live or
+  paid scenario, "verified on staging" and screenshots from a deployed
+  environment are never merge-stage checks: the merge-stage land reviewer
+  reads CI and the member's evidence and runs nothing itself. A paid or live
+  scenario is written once, as one deliverable, and runs once.
+- A deliverable's merge-stage `check` is something the member can show before
+  the land: focused tests, the repo's fast check, a diff property, or CI green
+  on the head sha.
+
 ## 3. Fill the TaskPlan
 
 The plan is strict: no fields beyond these, and an absent optional field is
@@ -220,7 +255,9 @@ omitted, never `null`.
   shows Sync topics succeeding") as `production` deliverables, since they are
   only observable after the release.
 - `depends_on` (optional): up to 50 task ids, only ids present in the
-  brief's `tasks`, never the task's own id.
+  brief's `tasks`, never the task's own id. This is how cross-task order is
+  expressed, and the round stays at depth two or less (see "The shape of a
+  round").
 - `resources`: `repo` (`owner/name`); `base` (a branch or a `trunk/...` named
   in the brief, else the default branch); `capabilities` (up to 16 tags,
   each matching `^[a-z0-9][a-z0-9-]{0,31}$`, may be empty); known tags include `playwright` and `browser`, plus `figma` (the task reads or writes Figma through the Figma MCP, so the member needs it signed in), plus `1password` (the task resolves 1Password references via agent/run, available on every account) and `vercel` (the task needs the Vercel MCP server, exxo account only)); `heavy_jobs` (up to 20 `{command,
@@ -270,6 +307,8 @@ omitted, never `null`.
   1–2000 characters) describing the supporting infra. It creates nothing: each
   entry must be covered by a `task` or `ticket` prerequisite, or `submit_task`
   refuses the plan.
+- `needs` (project dataset form): A project dataset is a need of its own: `{dataset: "<id>", repo: "<owner>/<name>" (default the anchor), env: "staging", action: "read", for: "<deliverable>", blocking: true|false}`. The context brief's `data:` surfaces list what is allowed now. Set `blocking: true` only when a deliverable cannot be met without the rows (it becomes a pre-launch checklist step); otherwise `false`, and the member carries on and reports the gap. A blocking deny refuses the plan: re-scope it, never plan a workaround. Never plan a member running a `data-` recipe or a query itself.
+- `verify_suites` (optional): names from the repo's `agent/verify.toml` that this task's tests live in. The squad adds the suites the diff selects; name a suite here only when the diff alone would not select it. Branches the squad creates for the task are named `gaia/task-<id>`; do not put a branch name in the plan that does not start with the repo's configured prefix. The `gaia/` prefixes apply only to repos whose trunk policy is `trunk`; in `direct` repos lanes stay `squad/<member>` onto main as before.
 - `prerequisites` (optional): `[{kind: task|ticket|external, for: <deliverable
   name>, ref?, repo?, title, note?, create?: true, step?: <operator step
   title>}]`. Every "lands first", "depends on", "waits on", "blocked on/by" or
@@ -353,6 +392,8 @@ are missing. Otherwise it is new text. Body headings, in this order:
 - `## Scope change`: only for a resubmission to a running task (step 7).
 
 ## 5. Submit
+
+Scratch survives a pause only under the session scratchpad: a `SessionStart` hook links it to `~/scratch/claude/<project-slug>/<session-id>/scratchpad` (quote that durable path, not `/private/tmp/...`), `.superpowers/sdd` ledgers are mirrored to `<session>/sdd/` on Stop, and nothing that must outlive a pause (local drafts, briefs, logs) goes in `/tmp/<name>`. Collection is `claude-scratch-gc` (`.pin` keeps a session), never the OS.
 
 Call `mcp__squad__submit_task` with `content`, `plan`, and:
 

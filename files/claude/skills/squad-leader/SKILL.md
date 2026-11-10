@@ -68,8 +68,8 @@ holds even so:
   the trunk to staging by its own periodic dispatch. Non-Ario work bases off
   and targets `main`, but nothing merges there until Tim returns: those
   lands park once at the operator (`policy:land:<task>`, the member told
-  "until Tim returns"); leave them parked. The trunk→`main` checkpoint is
-  Tim's.
+  "until Tim returns"); leave them parked. The trunk→`main` release is
+  Tim's choice (procedures.md, Releasing the round's trunk).
 - **h2gc-legacy.** Not touched (`operatorOnly`): no tasks, merges or deploys.
 - **exxo-infra.** Full merge and deploy authority through the squad's gates,
   except anything with a downstream effect on the h2gc production
@@ -174,6 +174,8 @@ The per-function count is the round's KPI: the round summary and the
 each count is expected to fall.
 
 ## Operating
+
+Scratch survives a pause only under the session scratchpad: a `SessionStart` hook links it to `~/scratch/claude/<project-slug>/<session-id>/scratchpad` (quote that durable path, not `/private/tmp/...`), `.superpowers/sdd` ledgers are mirrored to `<session>/sdd/` on Stop, and nothing that must outlive a pause goes in `/tmp/<name>`. Collection is `claude-scratch-gc` (`.pin` keeps a session), never the OS.
 
 - **Watching.** The orchestrator nudges idle members, promotes a blocked
   member's items, starts the cache, retires done members (hygiene pass),

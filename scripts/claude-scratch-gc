@@ -1,0 +1,75 @@
+#!/bin/bash
+# List and garbage-collect durable Claude session scratch under ~/scratch/claude.
+#
+# Layout: <root>/<project-slug>/<session-id>/{scratchpad,sdd,.pin}. Nothing runs this
+# automatically: Tim, or a session when asked, invokes it.
+#
+# Usage:
+#   claude-scratch-gc                       list sessions (age, size, pin) and what a
+#                                           30-day sweep would delete (dry run)
+#   claude-scratch-gc --older-than <days>   change the cutoff (default 30)
+#   claude-scratch-gc --dry-run             report only (the default)
+#   claude-scratch-gc --apply               delete unpinned sessions older than the cutoff
+# A session is pinned by an empty `.pin` file in its session dir (touch <dir>/.pin).
+# Age is days since the newest modification inside the session dir. Only directories
+# strictly inside the root are ever removed; symlinks are never followed.
+# Env override (tests): CLAUDE_SCRATCH_ROOT.
+set -u
+
+root="${CLAUDE_SCRATCH_ROOT:-$HOME/scratch/claude}"
+days=30
+apply=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --older-than) days="${2:-}"; shift 2 || { echo "claude-scratch-gc: --older-than needs a value" >&2; exit 2; } ;;
+        --dry-run) apply=0; shift ;;
+        --apply) apply=1; shift ;;
+        -h | --help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *) echo "claude-scratch-gc: unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+case "$days" in '' | *[!0-9]*) echo "claude-scratch-gc: --older-than must be a whole number of days" >&2; exit 2 ;; esac
+
+[ -d "$root" ] && [ ! -L "$root" ] || { echo "nothing to do: $root does not exist"; exit 0; }
+root="$(cd "$root" && pwd -P)"
+case "$root" in / | "$HOME" | "$(cd "$HOME" && pwd -P)") echo "claude-scratch-gc: refusing root $root" >&2; exit 2 ;; esac
+
+mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null; }
+newest() { # newest mtime (epoch seconds) of anything inside $1, links not followed
+    local best=0 m f
+    while IFS= read -r -d '' f; do
+        m="$(mtime "$f")"; [ -n "$m" ] && [ "$m" -gt "$best" ] && best="$m"
+    done < <(find "$1" -print0 2>/dev/null)
+    echo "$best"
+}
+
+now="$(date +%s)"
+doomed=0; kept=0; freed=0
+printf '%-8s %-8s %-6s %s\n' AGE_DAYS SIZE PIN SESSION
+for slugdir in "$root"/*/; do
+    [ -d "$slugdir" ] && [ ! -L "${slugdir%/}" ] || continue
+    for sdir in "$slugdir"*/; do
+        s="${sdir%/}"
+        [ -d "$s" ] && [ ! -L "$s" ] || continue
+        age=$(( (now - $(newest "$s")) / 86400 ))
+        kb="$(du -sk "$s" 2>/dev/null | cut -f1)"; kb="${kb:-0}"
+        pin=no; [ -e "$s/.pin" ] && pin=yes
+        action=""
+        if [ "$pin" = no ] && [ "$age" -ge "$days" ]; then
+            if [ "$apply" = 1 ]; then
+                case "$s" in "$root"/*/*) rm -rf -- "$s" && action=" [deleted]" ;; *) action=" [refused: outside root]" ;; esac
+            else
+                action=" [would delete]"
+            fi
+            doomed=$((doomed + 1)); freed=$((freed + kb))
+        else
+            kept=$((kept + 1))
+        fi
+        printf '%-8s %-8s %-6s %s%s\n' "$age" "${kb}K" "$pin" "${s#"$root"/}" "$action"
+    done
+    [ "$apply" = 1 ] && rmdir "${slugdir%/}" 2>/dev/null
+done
+verb="would delete"; [ "$apply" = 1 ] && verb="deleted"
+echo "$verb $doomed session(s) (${freed}K), kept $kept; cutoff ${days} days"
+[ "$apply" = 1 ] || echo "dry run: pass --apply to delete"
+exit 0

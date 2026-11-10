@@ -101,7 +101,7 @@
 # via the CONTEXTS mapping below, so the two contexts cannot skew.
 #
 # exxo-openrouter is a SECOND overlay context with different sharing: it runs
-# Claude Code against OpenRouter (Kimi K3). Its settings are built from the
+# Claude Code against OpenRouter (DeepSeek V4.1 Flash). Its settings are built from the
 # same exxo fragments, then layered with
 # files/claude/settings.overlay.exxo-openrouter.json (OpenRouter env, key
 # helper, worker deny rules; see build_settings). Unlike exxo-personal it
@@ -247,10 +247,12 @@ squad-debug-review
 squad-leader
 squad-member
 squad-planner
+build-lead
 reauth
 workstation-sync
 workstation-setup
 dev-disk-doctor
+ux-designer
 LIST
 }
 
@@ -283,6 +285,7 @@ git-pr-ops
 investigator
 sanity-cms
 notion-ops
+ux-designer
 LIST
 }
 

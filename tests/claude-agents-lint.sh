@@ -6,7 +6,7 @@ set -uo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 AGENTS="$REPO_DIR/files/claude/agents"
-EXPECTED=(implementer reviewer git-pr-ops investigator sanity-cms notion-ops)
+EXPECTED=(implementer reviewer git-pr-ops investigator sanity-cms notion-ops ux-designer)
 fail=0
 err() { printf 'FAIL: %s\n' "$*"; fail=1; }
 
@@ -27,6 +27,8 @@ for f in "$AGENTS"/*.md; do
     case "$name" in *:*) err "$base: name must not contain ':'";; esac
     [ -n "$desc" ] || err "$base: empty description"
     case "$model" in sonnet|opus|haiku|inherit) ;; *) err "$base: model '$model' not sonnet|opus|haiku|inherit";; esac
+    # ux-designer runs as a main session (claude --agent), which gets CLAUDE.md; it has its own check below.
+    [ "$base" = ux-designer ] && continue
     printf '%s\n' "$body" | grep -q '^## Environment' || err "$base: no '## Environment' section"
     for s in run-with-secrets SSH worktree; do
         printf '%s\n' "$body" | grep -q "$s" || err "$base: body does not mention $s"
@@ -36,21 +38,10 @@ done
 U="$AGENTS/ux-designer.md"
 if [ -f "$U" ]; then
     ufm="$(awk 'NR==1{next} /^---$/{exit} {print}' "$U")"
-    utools="$(printf '%s\n' "$ufm" | sed -n 's/^tools: *//p' | tr -d ' ' | tr ',' '\n')"
     [ "$(printf '%s\n' "$ufm" | sed -n 's/^model: *//p')" = opus ] || err "ux-designer: model must be opus"
-    for t in Read Grep Glob Bash Write Skill SendMessage ListAgents ToolSearch Artifact ArtifactComments \
-             mcp__playwright__browser_navigate mcp__playwright__browser_take_screenshot mcp__claude_ai_Figma__whoami mcp__claude_ai_Figma__use_figma; do
-        printf '%s\n' "$utools" | grep -qx "$t" || err "ux-designer: tools lacks $t"
-    done
-    for t in Edit NotebookEdit Agent mcp__playwright__browser_type mcp__playwright__browser_fill_form mcp__playwright__browser_evaluate mcp__playwright__browser_run_code_unsafe mcp__claude_ai_Figma__create_new_file; do
-        printf '%s\n' "$utools" | grep -qx "$t" && err "ux-designer: tools must not include $t"
-    done
-    for s in 'ux-designer ready:' 'exxo-common:claude-design-workflow' 'exxo-common:working-with-figma' \
-             'design:design-critique' 'design:accessibility-review' 'design:design-handoff' 'ArtifactComments' \
-             'ux-designer-<your name>' '## Handshake' '## Round' '## Wrap-up'; do
-        grep -qF -- "$s" "$U" || err "ux-designer: body lacks $s"
-    done
-    grep -nE '7797|squad/gui|localhost:[0-9]+|[Mm]antine' "$U" | grep -viE 'e\.g\.|example' && err "ux-designer: names a concrete app/stack outside an example"
+    # Thin definition: it loads the skill and must not restrict the Figma (or any other) connector.
+    printf '%s\n' "$ufm" | grep -q '^tools:' && err "ux-designer: must not set a tools allowlist"
+    grep -qF 'ux-designer` skill' "$U" || err "ux-designer: body does not point at the skill"
 else
     err "missing agent ux-designer.md"
 fi

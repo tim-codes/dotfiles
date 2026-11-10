@@ -144,6 +144,63 @@ run them.
 **Why:** the operator asked for this on 12 Oct 2026 after several dialogs were
 raised without warning and cancelled within seconds.
 
+## Tim's shells: fish in his terminal, bash in the Claude prompt and the sandbox
+
+Tim's interactive terminal is **fish**; a command he pastes into the Claude
+Code prompt as `! <cmd>` runs in the session's own shell (bash or zsh, the
+sandbox), so that form must be bash. An inline command or short set he is
+asked to run is printed in both forms, fish for his terminal and bash for the
+`!` prompt, unless the text is identical in both shells, in which case it is
+printed once. Fish syntax means `set`, `begin … end | cmd`, `; and` / `; or`,
+`(cmd)` substitution and `$argv`, and his wrapper functions (`claude`,
+`claude-reserve`, `claude-exxo`, `restow`) used as they are. Inline goes in a
+fenced block, one command per line when they run in sequence. Anything longer,
+or anything relying on his fish functions, is written to `/tmp/<name>.fish`
+and handed over as `source /tmp/<name>.fish`, not `fish /tmp/<name>.fish`,
+because a non-interactive `bash` or `fish script.fish` does not load those
+functions; add a bash twin (`/tmp/<name>.sh`) when he may run it from the
+prompt. Commands the session runs itself through the Bash tool stay bash.
+Say which shell a snippet targets whenever the two forms differ.
+
+A script handed to Tim that runs longer than a few seconds prints what it is
+doing as it goes, prints a progress line (an elapsed counter, a step n of m, a
+file size or line count) at least every ten seconds during any wait, and
+prints every error to the terminal with the command that failed, never only
+to a log file. A wait with no output is the failure mode to design against.
+
+**Why:** on 4 Nov 2026 a bash capture script handed to Tim ran `claude` by
+bare PATH lookup and so used the default `~/.claude` context (expired login)
+instead of the personal context his fish `claude` function pins; two runs
+failed before the cause was seen. His interactive shells are always fish
+(`src/.config/fish/`), and the wrapper functions that pin accounts, scrub env
+and jump directories live only there.
+
+## Scratch files are persisted, never trusted to /tmp
+
+The OS and reboots clear `/tmp` (and Claude Code's `/private/tmp/claude-<uid>/`)
+while a session is paused, and files made for later were lost that way. Durable
+scratch lives under `~/scratch/claude/<project-slug>/<session-id>/`, which is
+user-owned, outside macOS tmp cleaning, and garbage-collected only by us. A
+`SessionStart` hook (`scripts/claude-scratch-persist`) replaces the session's tmp
+`scratchpad` directory with a symlink to `~/scratch/claude/<slug>/<session>/scratchpad`,
+so writes to the scratchpad directory the harness names land on durable storage;
+a `Stop` hook copies it as a fallback if the symlink could not be made and mirrors
+the cwd's `.superpowers/sdd` ledgers into `<session>/sdd/`.
+
+Scripts, briefs, logs, drafts and anything else a session makes for later go
+under the scratchpad, not `/tmp/<name>`. The `/tmp/<name>.fish` hand-off in the
+shells section stays for one-shot commands Tim runs straight away; anything
+that must survive a pause goes under the scratchpad, and the durable path
+(`~/scratch/claude/...`, not the `/private/tmp` alias) is the one quoted to Tim.
+
+Collection is `scripts/claude-scratch-gc` (list with age and size; dry run by
+default; `--older-than <days>`, default 30; `--apply` to delete; a `.pin` file in
+a session dir pins it). Tim runs it, or a session does when asked; nothing
+schedules it and the OS never does.
+
+**Why:** Tim, 7 Nov 2026: work pauses kept losing files from `/tmp`; scratch is to
+persist, with collection on our own mechanisms at our own pace.
+
 ## Installing a missing dependency on the workstation: fine ad hoc, persist the rest
 
 If a task needs a dependency that isn't installed on the local workstation
@@ -360,7 +417,7 @@ that names no model inherits the orchestrator's own model, whatever that is,
 so `general-purpose` launches carry an explicit `model` instead, enforced by
 `scripts/claude-agent-model-guard`. The one
 exception: in the `exxo-openrouter` context only, `CLAUDE_CODE_SUBAGENT_MODEL`
-and every tier variable point at `moonshotai/kimi-k3@preset/tim-k3`, because one session has
+and every tier variable point at `deepseek/deepseek-v4.1-flash-1017@preset/tim-ds`, because one session has
 one backend; the overlay settings fragment sets them, never a session.
 
 ## Always set up the task tracker
