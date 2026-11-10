@@ -1,0 +1,80 @@
+#!/bin/bash
+# testlock: run ONE heavy command (a test run or a build) at a time across every
+# session on this machine, and only while the 1-minute load average is under a ceiling.
+#
+# The machine rule it enforces: one test run or build at a time, host load under N.
+# Several agent sessions share one box; unserialised, their suites and builds pile up
+# and every one of them times out. Wrap the heavy command, run from the directory it needs:
+#
+#   testlock pnpm vitest run src/foo.test.ts
+#   TESTLOCK_MAX_LOAD=12 testlock just ci
+#
+# The lock is a mkdir'd directory holding an `owner` file (pid, label, time, command).
+# A lock whose owner pid is dead is reclaimed. While waiting, testlock says what it is
+# waiting on. The command runs under timeout(1) (or gtimeout) and its exit code is passed
+# through (124 when timeout killed it).
+#
+# Env:
+#   TESTLOCK_MAX_LOAD   load-average ceiling (default 20)
+#   TESTLOCK_TIMEOUT_S  kill the command after this many seconds (default 2400)
+#   TESTLOCK_LABEL      name shown to waiters (default: basename of $PWD)
+#   TESTLOCK_DIR        lock directory (default ${XDG_RUNTIME_DIR:-/tmp}/testlock-$USER.d)
+#   TESTLOCK_POLL_S / TESTLOCK_LOAD_POLL_S   seconds between lock / load checks (5 / 20)
+# Works under macOS /bin/bash 3.2.
+set -u
+if [ $# -eq 0 ]; then
+  echo "usage: testlock <command...>" >&2
+  exit 64
+fi
+LOCKDIR="${TESTLOCK_DIR:-${XDG_RUNTIME_DIR:-/tmp}/testlock-${USER:-$(id -un)}.d}"
+MAX_LOAD="${TESTLOCK_MAX_LOAD:-20}"
+TIMEOUT_S="${TESTLOCK_TIMEOUT_S:-2400}"
+POLL_S="${TESTLOCK_POLL_S:-5}"
+LOAD_POLL_S="${TESTLOCK_LOAD_POLL_S:-20}"
+label="${TESTLOCK_LABEL:-$(basename "$PWD")}"
+
+tmo=$(command -v timeout || command -v gtimeout || true)
+
+load1() {
+  local v
+  v=$(sysctl -n vm.loadavg 2>/dev/null | awk '{print int($2)}')
+  if [ -z "$v" ] && [ -r /proc/loadavg ]; then v=$(awk '{print int($1)}' /proc/loadavg); fi
+  echo "${v:-0}"
+}
+
+waited=0
+while :; do
+  if mkdir "$LOCKDIR" 2>/dev/null; then
+    echo "$$ $label $(date -u +%FT%TZ) $*" > "$LOCKDIR/owner"
+    break
+  fi
+  owner_pid=$(cut -d' ' -f1 "$LOCKDIR/owner" 2>/dev/null)
+  if [ -n "${owner_pid:-}" ] && ! kill -0 "$owner_pid" 2>/dev/null; then
+    echo "testlock: reclaiming a stale lock (pid $owner_pid is gone)" >&2
+    rm -rf "$LOCKDIR"; continue
+  fi
+  if [ $((waited % 120)) -eq 0 ]; then
+    echo "testlock: waiting for the lock held by: $(cat "$LOCKDIR/owner" 2>/dev/null)" >&2
+  fi
+  sleep "$POLL_S"; waited=$((waited + POLL_S))
+done
+trap 'rm -rf "$LOCKDIR"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+
+while :; do
+  load=$(load1)
+  [ "$load" -lt "$MAX_LOAD" ] && break
+  echo "testlock: load $load >= $MAX_LOAD, waiting $LOAD_POLL_S s" >&2; sleep "$LOAD_POLL_S"
+done
+
+echo "testlock: running ($label): $*" >&2
+if [ -n "$tmo" ]; then
+  "$tmo" --signal=TERM --kill-after=30 "$TIMEOUT_S" "$@"
+else
+  echo "testlock: no timeout/gtimeout on PATH (brew install coreutils); running without a time limit" >&2
+  "$@"
+fi
+rc=$?
+echo "testlock: exit $rc ($label)" >&2
+exit $rc
