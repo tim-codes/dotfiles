@@ -128,8 +128,9 @@ of `shared * exxo`, applied only to this context (naming: `settings.overlay.
   (`ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU,FABLE}_MODEL`) and
   `CLAUDE_CODE_SUBAGENT_MODEL` all set to `deepseek/deepseek-v4.1-flash-1017@preset/tim-ds`
   (a dated snapshot pinned through an OpenRouter preset named tim-ds, created
-  in the OpenRouter UI: provider order DeepSeek first-party then Cloudflare,
-  fallbacks on; the alias `~deepseek/deepseek-flash-latest` is not used
+  in the OpenRouter UI: provider order DeepInfra (fp8) then Cloudflare,
+  fallbacks on; DeepSeek first-party is blocked by the account's training
+  guardrail and never serves; the alias `~deepseek/deepseek-flash-latest` is not used
   because it drifts; this replaced the Kimi K3 trial, whose saving was not
   worth it), `CLAUDE_CODE_MAX_CONTEXT_TOKENS=1048576` (Claude Code does not
   recognise the id, so without it assumes 200k and compacts there; the
@@ -173,8 +174,12 @@ Write tool, and obfuscated command names; behaviour under
 DeepSeek facts: the model id is `deepseek/deepseek-v4.1-flash-1017`, pinned
 through the preset as `@preset/tim-ds`. Pricing and context length are per
 provider on OpenRouter; see the OpenRouter model page. The preset pins the
-provider order (DeepSeek first-party, then Cloudflare). Model ids carry no
-`[1m]` suffix (ruling R-C7), and a smoke row tests that.
+provider order (DeepInfra fp8, then Cloudflare; the preset is the source of
+truth, edited in the OpenRouter UI). Model ids carry no `[1m]` suffix (ruling
+R-C7), and a smoke row tests that. What the metered route means inside the
+squad (account, share, budget, key file) is tim-codes/squad
+`docs/metered-accounts.md`; the routing rationale and measurements are its
+ADR `docs/adr/2026-11-10-metered-deepseek-routing.md`.
 
 ### The member deny overlay (`claude-kickoff`)
 
