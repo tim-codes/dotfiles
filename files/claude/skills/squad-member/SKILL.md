@@ -254,7 +254,11 @@ idle. Proceed without a slot only by skipping the heavy step (a `deny`, or a
 wait that would stall the lane) and saying so in the hand-back: name the
 command skipped in the `set` `detail` and the PR description. Ask for a slot
 beyond the fast check only when focused tests cannot show the change works (a
-migration, build or CI config, behaviour only an e2e run exercises). The
+migration, build or CI config, behaviour only an e2e run exercises). Prefer
+`run_tests` for suites (Testing and trunks): to run a named suite on buildlab,
+pass `suite = "<name>"` on the `heavy_slot` request so the run offloads there
+instead of taking a local slot. A free-text heavy request (no `suite`) still
+takes a local slot. The
 repo's fast check (`just check`) does not take a slot unless the kickoff's Test
 policy marks it heavy. The broker grants a slot on host headroom only (headroom,
 the slot cap and the grant grace), not on the quota pool's level, so an amber
