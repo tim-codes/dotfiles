@@ -23,12 +23,14 @@ name = "personal"
 # provides: capabilities this pool can satisfy; placement needs provides ⊇ task needs
 #   (empty means the pool can never be placed).
 # placement_rank: lower is preferred (reserve first, then exxo, then personal).
-# reserve_pct: floor kept back for Tim's own use (squad v0.5 P4 decision).
+# The quota reserve (floor kept back for Tim's own use) is a runtime directive from Gaia v0.6.1
+# (quota_reserve @ account:<name>; squad docs/runbooks/budgets.md), not a config key.
 # playwright/browser are capabilities for placement; only playwright has an MCP server the orchestrator passes to member launches that need it ([policy.launch] needs_mcp)
 # 1password: agent/run resolves 1Password references on this host in every context, so every account provides it; vercel: the Vercel MCP server is exxo-only, so only exxo provides it
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"]
-placement_rank = 30
-reserve_pct = 10
+# Test round (Tim, 7 Nov 2026, hand-over 7): out of placement, kept defined so it is reversible.
+# Restore: provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"], placement_rank = 30.
+provides = []
+placement_rank = 99
 email = "timoconnell1024@gmail.com"
 config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
 
@@ -36,9 +38,10 @@ config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
 # so its own account and quota.
 [[accounts]]
 name = "reserve"
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"]
-placement_rank = 10
-reserve_pct = 0
+# Test round: out of placement, kept defined so it is reversible.
+# Restore: provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"], placement_rank = 10.
+provides = []
+placement_rank = 99
 email = "tim.oc@outlook.com"
 config_dirs = ["~/.claude-reserve"]
 
@@ -46,7 +49,6 @@ config_dirs = ["~/.claude-reserve"]
 name = "exxo"
 provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "vercel", "boards"]
 placement_rank = 20
-reserve_pct = 30
 email = "tim@exxo.io"
 config_dirs = ["~/.claude-exxo"]
 
@@ -55,10 +57,21 @@ name = "openrouter"
 kind = "metered"
 provider = "openrouter"
 key_file = "~/keys/openrouter.key"
+# The metered share places a launch here only when the pool has a config dir and provides the task's needs
+# (placement.ts placeMetered). browser, playwright and vercel are left out on purpose: those tasks are excluded by exclude_needs / not placed here.
+config_dirs = ["~/.claude-exxo-openrouter"]
+provides = ["agent-run", "docker", "rust", "shell", "node", "postgres", "1password", "boards"]
+# The spend cap is a runtime directive from Gaia v0.6.1 (spend_cap @ account:openrouter: $75/month for the test round).
 
 [quota]
 levels = [50, 75, 85, 90, 95, 100]
 projection_horizon_minutes = 60
+
+[policy.launch.metered_share]
+# Some member launches on the metered OpenRouter account (DeepSeek), to compare outcomes per account.
+# The account and share are a runtime directive from Gaia v0.6.1 (metered_share @ squad: openrouter, 25 %).
+kinds = ["member"]
+exclude_needs = ["browser", "heavy"]
 
 [policy.launch]
 # Squad-owned verification (R20): task branches the squad creates are gaia/task-<member>.
@@ -100,6 +113,8 @@ min_headroom_pct = 8
 mem_per_slot_mb = 3072
 # Raised from the default 3 (Tim, 2026-10-31).
 max_slots = 6
+# Disabled until [broker.buildlab] and [policy.verification] are on (hand-over 7a); then uncomment.
+# offload_to = "buildlab"
 
 [heavy]
 # heavy_slot_min_calm_s omitted: the built-in 300 s dwell applies (squad #257, v0.5.11).
@@ -114,6 +129,17 @@ branch_prefix = "gaia/trunk-"
 review_timeout_s = 1800                     # was 900; raised 2026-11-03 (portal land reviews take 10-20 min)
 # Appended to each squash-merge body after the PR body.
 trailers = ["Co-Authored-By: Claude <noreply@anthropic.com>"]
+
+# The squad-tfo GitHub App (hand-over 3): every GitHub call of the orchestrator runs as it.
+# key_env is the NAME of the variable holding the key file's PATH; it is read from deploy/.env in the squad
+# checkout (exported by the launchd wrapper), never from this repo. The key itself stays in 1Password.
+[policy.trunk.github_app]
+# gaia-tfo: Exxo-Labs-owned App (created 2026-11-10; replaces the tim-codes-owned squad-tfo),
+# installed on Exxo-Labs, all repositories. Its key lives in ESC exxo/gaia/main gaia.githubApp.*;
+# the broker host copy is ~/.local/state/squad/keys/gaia-tfo.pem (0600), named by key_env.
+app_id = 5704284
+installation_ids = { "Exxo-Labs" = 180689949 }
+key_env = "GAIA_GITHUB_APP_KEY_FILE"
 
 [policy.preview]
 # Run once per member when a task is done or its land is finally refused (execFile, no shell, so an
@@ -151,17 +177,53 @@ cdp_url = "http://127.0.0.1:9233"
 # and so on, plus EXXO_1P_ACCOUNT). References only, never real item ids in a repo.
 agent_env = "~/.config/squad/agent.env"
 
-# Squad-owned verification on buildlab (R20). The key file is a path reference; its content is never in this repo.
+# Squad-owned verification on buildlab (R20). DISABLED for the test round until the attended buildlab-setup
+# step has printed the endpoint and written the CA (hand-over 4). The key file is outside this repo; its content is never here.
 [broker.buildlab]
-credentials_file = "~/.config/squad/gaia-broker.json"
+enabled = false
+credentials_file = "~/.local/state/squad/keys/gaia-broker.json"
+# Needed when enabled = true (`just -f deploy/ops.Justfile buildlab-setup` prints/writes them):
+# server = "https://<endpoint>"
+# ca_file = "~/.local/state/squad/keys/buildlab-ca.pem"
+image = "europe-west2-docker.pkg.dev/exxo-internal/gaia/gaia-verify@sha256:0962fbda257aa3897f400969649505ef6f2abb097e1d38c976a14888ac08eb73"  # tag mise-2026.11.1-7d46580; pinned by digest
 machine_cpu = 16
 machine_mem_gi = 64
 max_nodes = 2
 min_nodes = 0
 warm_idle_s = 1200
 scale_ahead = true
+
+# Disabled until [broker.buildlab] is on and doctor passes (hand-over 4 step 3); needs [policy.trunk.github_app].
+[policy.verification]
+enabled = false
+
 [policy.operator]
 plan_review_timeout_s = 1800               # was 900; raised 2026-11-03, as review_timeout_s
 
 [policy.release]
 verify_timeout_s = 3600                    # was 1800; raised 2026-11-03 (staging e2e + smoke)
+
+# Builder supervision (a stalled working member is nudged, then escalated); the example's defaults.
+# deploy/leader-watch.sh reads idle_nudge_s and recheck_s from here. The leader session (squad-leader, exxo context, fable,
+# failsafe only) is the push target, set with `just -f deploy/ops.Justfile leader-watch-start <target>`, not in this file.
+[policy.supervision]
+enabled = true
+idle_nudge_s = 600
+silent_nudge_s = 1200
+recheck_s = 600
+max_nudges = 2
+background_wait_max_s = 3600
+
+# Kit calls go to the providers below in order. Their caps are runtime directives from Gaia v0.6.1
+# (spend_cap @ provider:<name>, kit_token_cap @ kit:<role>), not config keys.
+[kit]
+[[kit.providers]]
+name = "anthropic"
+kind = "anthropic"
+key_file = "~/.local/state/squad/keys/anthropic.key"
+
+[[kit.providers]]
+name = "openrouter"
+kind = "openrouter"
+key_file = "~/.local/state/squad/keys/openrouter.key"
+model = "deepseek/deepseek-v4.1-flash-1017@preset/tim-ds"
