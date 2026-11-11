@@ -156,7 +156,11 @@ Branches you push for squad-owned verification are named `gaia/task-<id>` (the s
   `git config user.*`: the session env carries the bot identity. Never create a
   worktree push config (`config.worktree`, `remote.*.pushurl`) or change a
   remote URL: pushes go over HTTPS through the session env automatically, and
-  fetch stays SSH.
+  fetch stays SSH. A push that changes `.github/workflows/` is refused by
+  GitHub (the Gaia App's member token has no workflows permission): do not
+  work around it; `raise` an item asking Tim to push the lane branch himself.
+  Never run `gh pr review`, `gh auth token` or other `gh` write commands (the
+  member settings deny them).
 
 - Open lane PRs with `mcp__squad__open_pr` (`{repo?, head, base, title, body,
   draft}`, draft by default) against the base the kickoff names (a branch or a
