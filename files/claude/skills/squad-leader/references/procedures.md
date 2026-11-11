@@ -326,7 +326,7 @@ the input itself. Recording an intervention:
 ```bash
 curl -sS -b "$JAR" -X POST http://127.0.0.1:7790/trpc/operator.intervene \
   -H 'content-type: application/json' \
-  -d '{"function":"L2","action":"floor-repo merge tim-codes/squad#277 refused by the classifier; command on Tim'"'"'s list","reason":"land refused by the classifier, command on the list","outcome":"handed_to_tim","pr":"tim-codes/squad#277"}'
+  -d '{"function":"L2","action":"floor-repo merge tim-codes/squad#277 refused by the classifier; command on Tim'"'"'s list","reason":"land refused by the classifier, command on the list","outcome":"handed_to_tim","desk_class":"refusal_review","pr":"tim-codes/squad#277"}'
 ```
 
 Mutations the leader uses: `tasks.approve`, `tasks.markLanded`,
