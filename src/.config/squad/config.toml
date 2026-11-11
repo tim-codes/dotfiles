@@ -190,7 +190,7 @@ ca_file = "~/.local/state/squad/keys/buildlab-ca.pem"
 credentials_file = "~/.local/state/squad/keys/gaia-broker.json"
 # The Homebrew cask keeps the plugin in the SDK's bin dir, which is not on [broker] launch_path.
 auth_plugin = "/opt/homebrew/share/google-cloud-sdk/bin/gke-gcloud-auth-plugin"
-image = "europe-west2-docker.pkg.dev/exxo-internal/gaia/gaia-verify@sha256:0962fbda257aa3897f400969649505ef6f2abb097e1d38c976a14888ac08eb73"  # tag mise-2026.11.1-7d46580; pinned by digest
+image = "europe-west2-docker.pkg.dev/exxo-internal/gaia/gaia-verify@sha256:187842009c9bee3e2071174f56332ac16fe53ba60bd9c893596b56f1cc0665a3"  # tag mise-2026.11.1-107ac54; pinned by digest
 machine_cpu = 16
 machine_mem_gi = 64
 max_nodes = 2
