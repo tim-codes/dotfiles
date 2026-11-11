@@ -105,6 +105,9 @@ runaway_minutes = 2
 name = "quota"
 [[watchers]]
 name = "host"
+# The buildlab gauge, which also drives every run and the gaia pool scaler (R20).
+[[watchers]]
+name = "buildlab"
 
 [policy.heavy]
 # Slots derive from live host headroom; low per-slot CPU so measured CPU, not load, decides (Tim, 2026-10-30).
@@ -113,8 +116,8 @@ min_headroom_pct = 8
 mem_per_slot_mb = 3072
 # Raised from the default 3 (Tim, 2026-10-31).
 max_slots = 6
-# Disabled until [broker.buildlab] and [policy.verification] are on (hand-over 7a); then uncomment.
-# offload_to = "buildlab"
+# Heavy work naming a verify-manifest suite goes to buildlab (Gaia v0.6.1 rollout C5, 2026-11-11).
+offload_to = "buildlab"
 
 [heavy]
 # heavy_slot_min_calm_s omitted: the built-in 300 s dwell applies (squad #257, v0.5.11).
@@ -177,14 +180,16 @@ cdp_url = "http://127.0.0.1:9233"
 # and so on, plus EXXO_1P_ACCOUNT). References only, never real item ids in a repo.
 agent_env = "~/.config/squad/agent.env"
 
-# Squad-owned verification on buildlab (R20). DISABLED for the test round until the attended buildlab-setup
-# step has printed the endpoint and written the CA (hand-over 4). The key file is outside this repo; its content is never here.
+# Squad-owned verification on buildlab (R20). Enabled in the Gaia v0.6.1 rollout (C5, 2026-11-11).
+# server is the ci-runners endpoint `just -f deploy/ops.Justfile buildlab-setup` prints; ca_file is the cluster's
+# public CA it writes (moved beside the keys, outside this repo). The key file's content is never here.
 [broker.buildlab]
-enabled = false
+enabled = true
+server = "https://34.142.89.133"
+ca_file = "~/.local/state/squad/keys/buildlab-ca.pem"
 credentials_file = "~/.local/state/squad/keys/gaia-broker.json"
-# Needed when enabled = true (`just -f deploy/ops.Justfile buildlab-setup` prints/writes them):
-# server = "https://<endpoint>"
-# ca_file = "~/.local/state/squad/keys/buildlab-ca.pem"
+# The Homebrew cask keeps the plugin in the SDK's bin dir, which is not on [broker] launch_path.
+auth_plugin = "/opt/homebrew/share/google-cloud-sdk/bin/gke-gcloud-auth-plugin"
 image = "europe-west2-docker.pkg.dev/exxo-internal/gaia/gaia-verify@sha256:0962fbda257aa3897f400969649505ef6f2abb097e1d38c976a14888ac08eb73"  # tag mise-2026.11.1-7d46580; pinned by digest
 machine_cpu = 16
 machine_mem_gi = 64
@@ -193,9 +198,9 @@ min_nodes = 0
 warm_idle_s = 1200
 scale_ahead = true
 
-# Disabled until [broker.buildlab] is on and doctor passes (hand-over 4 step 3); needs [policy.trunk.github_app].
+# On with [broker.buildlab] (Gaia v0.6.1 rollout C5); needs [policy.trunk.github_app].
 [policy.verification]
-enabled = false
+enabled = true
 
 [policy.operator]
 plan_review_timeout_s = 1800               # was 900; raised 2026-11-03, as review_timeout_s
