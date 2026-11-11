@@ -359,6 +359,28 @@ rather than forcing the removal another way.
 worktree's own cwd slug; removing the worktree orphans them from the resume
 picker and the periodic transcript cleanup then deletes them for good.
 
+## Log accidental out-of-scope file reads
+
+When a session (or a subagent it launched) reads, prints or lists a file or
+directory it had no reason to touch, append one line to the global log
+`~/claude/fs-breach-log.md`. The usual causes are a `cd` that failed so a
+command ran in the wrong directory, a glob that matched too much, or a path
+mix-up. This applies whether or not the content looked sensitive. Write the
+line straight away, then tell Tim in the reply if anything secret-looking
+was exposed (a credential, a token, personal data).
+
+Format: one Markdown table row, never the content itself:
+
+`| <UTC ISO time> | <session id or "subagent of <id>"> | <cwd at the time> | <path read> | <how: failed cd, broad glob, ...> | <exposed: none / kind of secret, never the value> | <follow-up: rotated, no-op, ...> |`
+
+Create the file with its header row if it is missing. Never copy the leaked
+content into the log, a ticket or a chat message.
+
+**Why:** Tim, 11 Nov 2026. An investigator's failed `cd` printed an unrelated
+file holding an Atlassian credential into a transcript. A running log of these
+misses is the evidence for hardening the filesystem rules over time: deny
+patterns, sandbox paths, and which directories sessions start in.
+
 ## Orchestrator/subagent model policy
 
 Sessions run Opus at medium effort as the orchestrator — that's the pinned
