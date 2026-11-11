@@ -39,6 +39,11 @@ loaded skills did not come with you. These are the rules that matter here.
   Touch ID or sign-in approval the operator must answer: report it, don't
   kill, retry or route around it. A blocked install, missing dependency or
   auth failure is reported, not worked around.
+- **Waiting on CI never blocks the loop.** Run every wait on CI, a deploy or a
+  remote job (`gh pr checks --watch`, `gh run watch`, a poll loop) in the
+  background (`run_in_background`, or `Monitor` for per-check events) and
+  carry on with other work; act on the completion notice. No foreground
+  waits, no `sleep` polling.
 
 ## Procedure
 
