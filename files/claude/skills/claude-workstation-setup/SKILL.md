@@ -402,7 +402,7 @@ environment mechanics a subagent doesn't inherit). The personal-account contexts
 `agents` as a whole-directory symlink to that dir; exxo and
 exxo-personal get a real `agents/` directory of per-file symlinks for the
 names in `shared_agents()` in `scripts/claude-sync` (currently `implementer`,
-`reviewer`, `git-pr-ops`, `investigator`, `sanity-cms`, `notion-ops`, `ux-designer` — all
+`reviewer`, `conformity-reviewer`, `design-architect`, `git-pr-ops`, `investigator`, `sanity-cms`, `notion-ops`, `ux-designer` — all
 of them). Same allow-list and adoption rules as skills: a new agent is
 personal-only until named there, and a real file created in a curated
 `agents/` dir is adopted into the repo on the next sync. Verified 2026-10-23

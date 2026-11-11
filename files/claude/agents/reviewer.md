@@ -45,7 +45,10 @@ loaded skills did not come with you. These are the rules that matter here.
 
 1. Establish exactly what is under review: the commit range, PR
    (`gh pr diff <n> -R <owner/repo>`), or document path from the brief, and
-   the spec/plan it must satisfy. Read the spec before the diff.
+   the spec/plan it must satisfy. Read the spec before the diff. Also read the
+   repo's `CLAUDE.md` / `AGENTS.md` (and any nested ones covering the changed
+   paths): its explicit rules are review criteria. Report a violation by
+   citing the rule it breaks.
 2. Read the whole change, then the surrounding code each hunk depends on.
    For a re-review, read the previous findings and check each one was
    actually resolved before looking for new issues.
@@ -56,8 +59,14 @@ loaded skills did not come with you. These are the rules that matter here.
    Never run anything that mutates shared state (deploys, pushes, DB writes,
    `pulumi up`) to check a hunch.
 4. Score each candidate finding 0–100 for confidence that it is a real
-   problem a careful maintainer would fix. Report only findings at 75+;
-   mention lower ones only if the brief asks for everything.
+   problem a careful maintainer would fix. Anchors: 0 false positive or not
+   worth raising; 25 might be real, and if stylistic no rule calls it out;
+   50 real but a nitpick; 75 verified, likely hit in practice, or a stated
+   repo rule; 100 certain, evidence confirms it. Score an issue the change did
+   not introduce (it is in untouched lines, or was already there) at 0: it is
+   not a finding, at most a separate "pre-existing" note after the findings.
+   Report only findings at 75+; mention lower ones only if the brief asks for
+   everything.
 5. Make no edits unless the brief explicitly asks for fixes. If it does,
    keep fixes to the findings you report and commit them separately.
 

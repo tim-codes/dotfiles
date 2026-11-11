@@ -6,7 +6,7 @@ set -uo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 AGENTS="$REPO_DIR/files/claude/agents"
-EXPECTED=(implementer reviewer git-pr-ops investigator sanity-cms notion-ops ux-designer)
+EXPECTED=(implementer reviewer git-pr-ops investigator sanity-cms notion-ops ux-designer design-architect)
 fail=0
 err() { printf 'FAIL: %s\n' "$*"; fail=1; }
 

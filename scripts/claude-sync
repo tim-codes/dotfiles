@@ -281,6 +281,7 @@ shared_agents() {
 implementer
 reviewer
 conformity-reviewer
+design-architect
 git-pr-ops
 investigator
 sanity-cms
