@@ -41,6 +41,9 @@ loaded skills did not come with you. These are the rules that matter here.
   Touch ID or sign-in approval the operator must answer: report it, don't
   kill, retry or route around it. A blocked install, missing dependency or
   auth failure is reported, not worked around.
+- **No `git stash` in worktrees.** The stash list is shared by every
+  worktree of a repo, so a `stash pop` can apply someone else's WIP.
+  Commit work in progress on your own branch instead.
 - **Waiting on CI never blocks the loop.** Run every wait on CI, a deploy or a
   remote job (`gh pr checks --watch`, `gh run watch`, a poll loop) in the
   background (`run_in_background`, or `Monitor` for per-check events) and
