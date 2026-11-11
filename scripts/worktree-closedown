@@ -167,6 +167,12 @@ fi
 relocated="$("$relocate" "$W" 2>&1)" || refuse "transcript relocation failed:
 $relocated"
 
+# Nothing may have moved while the checks and relocation ran.
+[ "$(git -C "$P" rev-parse --verify --quiet "refs/heads/$branch")" = "$tip" ] ||
+    refuse "$branch moved during closedown (was $tip); transcripts were relocated, worktree left in place"
+[ -z "$(git -C "$W" status --porcelain)" ] ||
+    refuse "$W became dirty during closedown; transcripts were relocated, worktree left in place"
+
 removed_by=""
 if out="$(wt -C "$P" remove "$branch" -D -y --foreground 2>&1)"; then
     removed_by="wt remove"
