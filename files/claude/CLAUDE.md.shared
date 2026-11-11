@@ -144,6 +144,23 @@ run them.
 **Why:** the operator asked for this on 12 Oct 2026 after several dialogs were
 raised without warning and cancelled within seconds.
 
+## Waiting on CI goes to the background, never the main loop
+
+Any wait on something remote — PR checks (`gh pr checks --watch`), a workflow
+run (`gh run watch`), a deploy, a queue, a poll loop — runs in the background:
+Bash with `run_in_background` and a command that exits when the state is
+terminal (emitting the verdict, failures included), or `Monitor` when each
+check's result is wanted as it lands. Then carry on with other work, or end
+the turn, and act on the completion notice. Never hold the session's loop on
+a foreground `--watch` or `sleep`, and never poll it by hand. Subagents follow
+the same rule within their own loop.
+
+**Why:** Tim, 11 Nov 2026 — a foreground `gh pr checks --watch` held a session
+for nearly nine minutes while his queued question sat unanswered. A CI wait is
+pure latency with nothing to judge until it ends; running it in the background
+keeps the session responsive to the operator, to other agents' messages and
+to independent work, at no cost.
+
 ## Tim's shells: fish in his terminal, bash in the Claude prompt and the sandbox
 
 Tim's interactive terminal is **fish**; a command he pastes into the Claude
