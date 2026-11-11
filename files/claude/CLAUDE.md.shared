@@ -482,11 +482,12 @@ fails on private repos while SSH keys keep working — and one uniform
 scheme keeps remote identity checks trivial. This generalises the
 exxo-skills marketplace precedent to all git access.
 
-**Scoped exception: Gaia-created worktrees.** Worktrees made by the Gaia
-broker or orchestrator (member, reviewer, releaser, release mirror and
-host-job worktrees) push over HTTPS as the `gaia-tfo[bot]` GitHub App, with
-short-lived installation tokens from Gaia's credential helper. Don't "fix"
-those remotes to SSH. Every other remote, including the operator's own
-checkouts, stays SSH. An App has no SSH identity, and the helper is always
-configured there, so the unattended-HTTPS failure this rule guards against
-doesn't apply. See Exxo-Labs/gaia `docs/adr/2026-11-11-gaia-github-identity.md`.
+**Scoped exception: Gaia session processes.** A Gaia session pushes over
+HTTPS as the `gaia-tfo[bot]` GitHub App, through env-scoped git config in its
+launch env (a reset credential-helper list, `squad git-credential` as the only
+helper, `pushInsteadOf` rewriting to HTTPS) with short-lived App installation
+tokens from the orchestrator; the orchestrator's own release and mirror pushes
+use the App token too. Don't "fix" those pushes to SSH. Everything else stays
+SSH: fetch inside Gaia sessions and every remote URL (no repo config is
+rewritten, the operator's checkouts included). See Exxo-Labs/gaia
+`docs/adr/2026-11-11-gaia-github-identity.md`.
