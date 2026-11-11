@@ -23,7 +23,8 @@
 #      local-only commits;
 #   4. the branch is merged: after `git fetch origin`, its tip is an ancestor
 #      of origin/<default>, OR (squash merge) a merged GitHub PR for the branch
-#      has a head SHA exactly equal to the local tip;
+#      has a head SHA equal to the local tip or containing it (the tip is an
+#      ancestor of the fetched refs/pull/<n>/head, so nothing is local-only);
 #   5. no claude process has its cwd in the worktree, and the transcript
 #      relocation dry run succeeds (worktree-relocate-transcripts -n).
 # Then: relocate transcripts (refuse if that fails), `wt -C <primary> remove
@@ -142,10 +143,25 @@ else
         jq -r '.[] | "\(.headRefOid) \(.number) \(.url)"')" ||
         refuse "gh pr list -R $gh_repo --head $branch --state merged failed"
     [ -n "$prs" ] || refuse "$branch is not merged: tip $tip is not in origin/$default and $gh_repo has no merged PR for it"
-    match="$(printf '%s\n' "$prs" | awk -v t="$tip" '$1 == t {print "#" $2 " " $3; exit}')"
-    [ -n "$match" ] || refuse "$branch has a merged PR in $gh_repo, but its head is not the local tip $tip (local commits not in the PR?):
+    # Accept a merged PR whose head is the local tip, or contains it: a PR
+    # finished on GitHub (say a "Merge branch 'main' into ..." commit) leaves
+    # the local tip behind its head with nothing local-only. The head is
+    # fetched (FETCH_HEAD only, no local ref) so the ancestry can be checked.
+    while read -r head num purl; do
+        [ -n "$head" ] || continue
+        if [ "$head" = "$tip" ]; then
+            merged_by="squash-merged PR #$num $purl, head == local tip $tip"
+            break
+        fi
+        if git -C "$P" fetch --quiet origin "refs/pull/$num/head" 2>/dev/null &&
+            git -C "$P" cat-file -e "$head^{commit}" 2>/dev/null &&
+            git -C "$P" merge-base --is-ancestor "$tip" "$head"; then
+            merged_by="local tip $tip is an ancestor of merged PR head $head (#$num $purl)"
+            break
+        fi
+    done <<<"$prs"
+    [ -n "$merged_by" ] || refuse "$branch has a merged PR in $gh_repo, but the local tip $tip is neither its head nor an ancestor of it (local commits not in the PR?):
 $prs"
-    merged_by="squash-merged PR $match, head == local tip $tip"
 fi
 say "ok: merged ($merged_by)"
 
