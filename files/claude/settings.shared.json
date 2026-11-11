@@ -487,6 +487,7 @@
       "mcp__squad__heavy_slot",
       "mcp__squad__land",
       "WebSearch",
+      "mcp__plugin_linear_linear__save_comment",
       "mcp__ide__getDiagnostics"
     ],
     "deny": [
