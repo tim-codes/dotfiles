@@ -353,6 +353,8 @@ implementation), `reviewer` (code/spec review, re-review waves),
 the estate's conventions), `git-pr-ops` (branch/worktree surveys, PR
 create/update, merge-state and CI checks, worktree closedown), `investigator` (debugging, CI/build log
 forensics, smoke follow-ups), `sanity-cms` (Sanity schema/content/Studio)
+`design-architect` (codebase-grounded implementation blueprint before a
+multi-lane or non-trivial build; read-only)
 and `notion-ops` (every Notion read or write — no other agent loads Notion
 tools) each carry their own procedure and pinned model. `general-purpose`
 is the fallback for work none of them fits, and its roster line must say
