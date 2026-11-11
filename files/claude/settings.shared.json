@@ -475,6 +475,7 @@
       "Bash(just --list:*)",
       "Bash(squad doctor:*)",
       "Bash(squad debug report:*)",
+      "Bash(worktree-closedown:*)",
       "mcp__squad__register",
       "mcp__squad__set",
       "mcp__squad__ack",

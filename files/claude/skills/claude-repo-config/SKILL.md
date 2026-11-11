@@ -20,7 +20,11 @@ through `claude-sync` (see the `claude-workstation-setup` skill).
 
 **Global read-only allow set.** `git status/diff/log/branch/show/worktree
 list`, `gh pr view/list/checks/diff`, `gh run view/list`, `just --list`,
-`WebSearch` and `mcp__ide__getDiagnostics`. There are no explicit `WebFetch`
+`WebSearch` and `mcp__ide__getDiagnostics`. One mutating command is granted
+because it is safe by construction rather than read-only: `worktree-closedown`
+(dotfiles `scripts/worktree-closedown`), which deletes a worktree and its local
+branch only after proving the tree clean, the branch merged and the transcripts
+relocated, refuses otherwise, and never touches a remote. There are no explicit `WebFetch`
 allows, by policy: auto mode decides. The local `squad` broker CLI (same-uid Unix-socket IPC to the
 broker, no network or credentials) is granted subcommand by subcommand, and only
 read-only ones: `squad doctor` and `squad debug report`. The squad session tools are
