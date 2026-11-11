@@ -48,7 +48,7 @@ check is not `ok`.
    t repos.put '{"repo":"Exxo-Labs/harness-kit","trunkPolicy":"direct","releaseNeedsApproval":false,"releaseKind":"tag","releaseTagPattern":"semver","releaseWorkflow":"publish.yml","ci":"expected","expectedChecks":["ci"]}'
    t repos.put '{"repo":"Exxo-Labs/h2gc-legacy","operatorOnly":true}'
    t repos.put '{"repo":"Exxo-Labs/gaia","ci":"none"}'
-   t repos.put '{"repo":"Exxo-Labs/theparentedit","verifyRecipe":"just watch-rollout $SQUAD_RUN_ID"}'
+   t repos.put '{"repo":"Exxo-Labs/theparentedit","verifyRecipe":"just watch-rollout $GAIA_RUN_ID"}'
    ```
 
    Re-derive `expectedChecks` from a recent PR whenever a workflow changes:

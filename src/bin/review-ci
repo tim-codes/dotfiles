@@ -8,7 +8,7 @@
 # the worktree. Nothing is written outside the scratch dir apart from the package install: no
 # push, no tag, no gh.
 #
-# REVIEW_CI_SCRATCH_DIR must name an existing directory; SQUAD_SCRATCH_DIR is accepted as a
+# REVIEW_CI_SCRATCH_DIR must name an existing directory; GAIA_SCRATCH_DIR is accepted as a
 # fallback (squad reviewer sessions set it). Pair with testlock on a shared machine:
 #   testlock review-ci <checkout> <sha>
 # Tested by tests/review-ci.sh (fakes only).
@@ -20,9 +20,14 @@ if [ $# -ne 2 ]; then
 fi
 checkout=$1
 sha=$2
-scratch=${REVIEW_CI_SCRATCH_DIR:-${SQUAD_SCRATCH_DIR:-}}
+scratch=${REVIEW_CI_SCRATCH_DIR:-${GAIA_SCRATCH_DIR:-}}
 if [ -z "$scratch" ] || [ ! -d "$scratch" ]; then
-  echo "review-ci: REVIEW_CI_SCRATCH_DIR (or SQUAD_SCRATCH_DIR) is not set to a directory; refused" >&2
+  # SQUAD_SCRATCH_DIR was renamed to GAIA_SCRATCH_DIR (clean break): named, never read.
+  note=
+  if [ -z "$scratch" ] && [ -n "${SQUAD_SCRATCH_DIR:-}" ]; then
+    note=" (SQUAD_SCRATCH_DIR is set, but it was renamed to GAIA_SCRATCH_DIR and is no longer read; rename it)"
+  fi
+  echo "review-ci: REVIEW_CI_SCRATCH_DIR (or GAIA_SCRATCH_DIR) is not set to a directory$note; refused" >&2
   exit 64
 fi
 # A full sha only: `git fetch origin <sha>` cannot fetch an abbreviated one.

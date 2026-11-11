@@ -12,7 +12,7 @@ GUARD="$SRC_REPO/scripts/claude-openrouter-guard"
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 export HOME="$T/home" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-export SQUAD_GUARD_LOG="$T/log/guard.jsonl"
+export GAIA_GUARD_LOG="$T/log/guard.jsonl"
 mkdir -p "$HOME"
 
 fail=0
@@ -482,7 +482,7 @@ got="$(run_guard "$T/job-clone" "gh pr merge 1" Write)"
 if [ "$got" = allow ]; then ok "non-Bash tool passes"; else bad "non-Bash tool: got $got"; fi
 
 # --- Log (Plan E O9): guard.jsonl, no command text, blocks + allowed pushes -
-L="$SQUAD_GUARD_LOG"
+L="$GAIA_GUARD_LOG"
 lines() { [ -f "$L" ] && wc -l <"$L" | tr -d ' ' || echo 0; }
 # logcheck <name> <command> <jq predicate on the single new line> [cwd-key]
 logcheck() {
@@ -531,7 +531,7 @@ run_guard "$T/job-clone" "git status" >/dev/null
 if [ "$(lines)" = 0 ]; then ok "non-push allow writes no log line"; else bad "non-push allow wrote a log line"; fi
 
 # Default location and modes: ~/.local/state/claude-openrouter/guard.jsonl, dir 0700, file 0600.
-( unset SQUAD_GUARD_LOG; run_guard "$T/job-clone" "gh pr merge 1" >/dev/null )
+( unset GAIA_GUARD_LOG; run_guard "$T/job-clone" "gh pr merge 1" >/dev/null )
 DL="$HOME/.local/state/claude-openrouter/guard.jsonl"
 if [ -f "$DL" ] && [ "$(stat -f %Lp "$(dirname "$DL")")" = 700 ] && [ "$(stat -f %Lp "$DL")" = 600 ]; then
     ok "default log path with dir 0700 / file 0600"
@@ -541,7 +541,7 @@ fi
 
 # unwritable_log_still_blocks
 mkdir -p "$T/ro"; chmod 500 "$T/ro"
-got="$(SQUAD_GUARD_LOG="$T/ro/sub/guard.jsonl" run_guard "$T/job-clone" "gh pr merge 1")"
+got="$(GAIA_GUARD_LOG="$T/ro/sub/guard.jsonl" run_guard "$T/job-clone" "gh pr merge 1")"
 chmod 700 "$T/ro"
 if [ "$got" = deny ]; then ok "unwritable_log_still_blocks"; else bad "unwritable_log_still_blocks: got $got"; fi
 
