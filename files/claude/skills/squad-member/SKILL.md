@@ -161,7 +161,8 @@ Branches you push for squad-owned verification are named `gaia/task-<id>` (the s
 - Open lane PRs with `mcp__squad__open_pr` (`{repo?, head, base, title, body,
   draft}`, draft by default) against the base the kickoff names (a branch or a
   `trunk/...`); it returns `{number, url}`. Never push to a trunk branch.
-  Edit a PR with `mcp__squad__pr_edit` (`{pr, title?, body?}`, at least one),
+  Edit a PR with `mcp__squad__pr_edit` (`{pr, title?, body?, base?}`, at least
+  one; `base` only to retarget to the base a wrong-base land refusal names),
   comment with `mcp__squad__pr_comment` (`{pr, body}`), where `pr` is the PR
   URL. All four PR tools act only on your own lane branch, in trunk and
   `direct` repos alike. The Gaia App opens and edits PRs: mutating `gh pr`,
