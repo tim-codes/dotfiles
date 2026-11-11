@@ -27,6 +27,9 @@ brewDeps=(
   fd
   fish
   fzf
+  # Homebrew git ahead of Apple's /usr/bin/git on PATH: minimum supported git
+  # is 2.54 (config-based hooks, `hook.<name>.*`); Apple Git lags behind.
+  git
   gh
   glab
   glances
