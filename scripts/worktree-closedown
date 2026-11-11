@@ -1,0 +1,200 @@
+#!/bin/bash
+# Close down a finished git worktree in one command that is safe by
+# construction: every precondition is checked first, the Claude transcripts are
+# relocated, and only then is the worktree removed and its local branch
+# deleted. Pre-approved globally (`Bash(worktree-closedown:*)` in
+# files/claude/settings.shared.json), so agents can finish a merged PR's
+# worktree without a raw `wt remove -D`, which the auto-mode classifier rightly
+# blocks. The scripted form of the worktree-closedown skill.
+#
+#   worktree-closedown [--dry-run] <repo-path> <branch | /abs/worktree-path>
+#     --dry-run  run every check, say what would happen, change nothing
+#
+# <repo-path> is an absolute path inside the repo (primary checkout or any of
+# its worktrees). The second argument is a branch name, or an absolute
+# worktree path (anything starting with /). No ambient cwd is used.
+#
+# Refuses (non-zero exit, nothing deleted) at the first failed precondition:
+#   1. the target resolves to a linked worktree on a branch: not the primary
+#      checkout, not a detached HEAD, not the default branch;
+#   2. origin/HEAD is set (the default branch is never guessed);
+#   3. the worktree is clean (`git status --porcelain` empty; ignored files
+#      are allowed), and so is every submodule: no status output and no
+#      local-only commits;
+#   4. the branch is merged: after `git fetch origin`, its tip is an ancestor
+#      of origin/<default>, OR (squash merge) a merged GitHub PR for the branch
+#      has a head SHA exactly equal to the local tip;
+#   5. no claude process has its cwd in the worktree, and the transcript
+#      relocation dry run succeeds (worktree-relocate-transcripts -n).
+# Then: relocate transcripts (refuse if that fails), `wt -C <primary> remove
+# <branch> -D -y --foreground`, falling back to `rm -rf` + `git worktree
+# prune` + `git branch -D` only when wt refused because of submodules. Remotes
+# are never touched: no push, no remote branch deletion.
+#
+# Exit codes: 0 done (or dry run passed), 1 refused / failed, 2 usage.
+set -euo pipefail
+
+me=worktree-closedown
+usage() { echo "usage: $me [--dry-run] <repo-path> <branch | /abs/worktree-path>" >&2; exit 2; }
+refuse() { echo "$me: REFUSED: $*" >&2; echo "$me: nothing was deleted" >&2; exit 1; }
+say() { echo "$me: $*"; }
+
+dry=0
+args=()
+for a in "$@"; do
+    case "$a" in
+        --dry-run | -n) dry=1 ;;
+        -h | --help) sed -n '2,/^set -euo/p' "$0" | sed -e '$d' -e 's/^# \{0,1\}//'; exit 0 ;;
+        -*) echo "$me: unknown option: $a" >&2; usage ;;
+        *) args+=("$a") ;;
+    esac
+done
+[ "${#args[@]}" -eq 2 ] || usage
+repo_arg="${args[0]}"
+target="${args[1]}"
+case "$repo_arg" in /*) ;; *) echo "$me: <repo-path> must be absolute: $repo_arg" >&2; usage ;; esac
+[ -d "$repo_arg" ] || refuse "no such directory: $repo_arg"
+
+# The sibling relocation script, from this checkout (scripts/ -> src/bin/), so
+# the two always come from the same revision.
+self="$(readlink -f "$0" 2>/dev/null || echo "$0")"
+relocate="$(cd "$(dirname "$self")/.." && pwd)/src/bin/worktree-relocate-transcripts"
+[ -x "$relocate" ] || refuse "cannot find worktree-relocate-transcripts at $relocate"
+
+# --- 1. resolve primary checkout P, worktree W and branch -------------------
+git -C "$repo_arg" rev-parse --git-dir >/dev/null 2>&1 ||
+    refuse "$repo_arg is not inside a git repository"
+P="$(git -C "$repo_arg" worktree list --porcelain | sed -n '1s/^worktree //p')"
+[ -n "$P" ] && [ -d "$P" ] || refuse "cannot resolve the primary checkout of $repo_arg"
+
+W=""
+wt_branch=""
+cur_w=""
+cur_b=""
+flush() {
+    if [ -n "$cur_w" ]; then
+        case "$target" in
+            /*) [ "$cur_w" = "$target_real" ] && { W="$cur_w"; wt_branch="$cur_b"; } ;;
+            *) [ "$cur_b" = "$target" ] && { W="$cur_w"; wt_branch="$cur_b"; } ;;
+        esac
+    fi
+    cur_w=""
+    cur_b=""
+}
+target_real=""
+case "$target" in
+    /*)
+        [ -d "$target" ] || refuse "no such worktree directory: $target"
+        target_real="$(git -C "$target" rev-parse --show-toplevel 2>/dev/null)" ||
+            refuse "$target is not a git worktree"
+        ;;
+esac
+while IFS= read -r line; do
+    case "$line" in
+        "worktree "*) flush; cur_w="${line#worktree }" ;;
+        "branch refs/heads/"*) cur_b="${line#branch refs/heads/}" ;;
+    esac
+done < <(git -C "$P" worktree list --porcelain)
+flush
+
+[ -n "$W" ] || refuse "no worktree of $P matches '$target'"
+[ "$W" != "$P" ] || refuse "$W is the primary checkout; only linked worktrees are closed down"
+[ -n "$wt_branch" ] || refuse "$W has a detached HEAD; no branch to close down"
+case "$W" in / | "$HOME" | "$HOME/") refuse "refusing to treat $W as a worktree" ;; esac
+branch="$wt_branch"
+
+origin_head="$(git -C "$P" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null)" ||
+    refuse "refs/remotes/origin/HEAD is not set, so the default branch is unknown (fix with: git -C $P remote set-head origin --auto)"
+default="${origin_head#refs/remotes/origin/}"
+[ "$branch" != "$default" ] || refuse "$branch is the default branch"
+say "primary checkout: $P"
+say "worktree:         $W"
+say "branch:           $branch (default: $default)"
+
+# --- 2. clean worktree and submodules ----------------------------------------
+dirty="$(git -C "$W" status --porcelain)" || refuse "git status failed in $W"
+[ -z "$dirty" ] || refuse "$W has uncommitted or untracked changes:
+$dirty"
+if [ -f "$W/.gitmodules" ]; then
+    sub="$(git -C "$W" submodule foreach --recursive --quiet \
+        'git status --porcelain | sed "s|^|$displaypath: |"; git log --oneline HEAD --branches --not --remotes | sed "s|^|$displaypath: local-only commit |"')" ||
+        refuse "submodule check failed in $W"
+    [ -z "$sub" ] || refuse "a submodule in $W holds unsaved work:
+$sub"
+fi
+say "ok: worktree and submodules clean"
+
+# --- 3. branch merged ---------------------------------------------------------
+git -C "$P" fetch --quiet origin || refuse "git fetch origin failed in $P"
+tip="$(git -C "$P" rev-parse --verify --quiet "refs/heads/$branch^{commit}")" ||
+    refuse "local branch $branch not found"
+merged_by=""
+if git -C "$P" merge-base --is-ancestor "$tip" "refs/remotes/origin/$default"; then
+    merged_by="tip $tip is an ancestor of origin/$default"
+else
+    url="$(git -C "$P" config --get remote.origin.url || true)"
+    gh_repo="$(printf '%s\n' "$url" | sed -nE \
+        -e 's#^git@github\.com:([^/]+/[^/]+)$#\1#p' \
+        -e 's#^(ssh|https)://([^@/]+@)?github\.com/([^/]+/[^/]+)$#\3#p' | sed 's/\.git$//')"
+    [ -n "$gh_repo" ] ||
+        refuse "$branch ($tip) is not in origin/$default, and origin ($url) is not GitHub so a squash merge cannot be checked"
+    prs="$(gh pr list -R "$gh_repo" --head "$branch" --state merged --json number,headRefOid,url |
+        jq -r '.[] | "\(.headRefOid) \(.number) \(.url)"')" ||
+        refuse "gh pr list -R $gh_repo --head $branch --state merged failed"
+    [ -n "$prs" ] || refuse "$branch is not merged: tip $tip is not in origin/$default and $gh_repo has no merged PR for it"
+    match="$(printf '%s\n' "$prs" | awk -v t="$tip" '$1 == t {print "#" $2 " " $3; exit}')"
+    [ -n "$match" ] || refuse "$branch has a merged PR in $gh_repo, but its head is not the local tip $tip (local commits not in the PR?):
+$prs"
+    merged_by="squash-merged PR $match, head == local tip $tip"
+fi
+say "ok: merged ($merged_by)"
+
+# --- 4. live sessions + relocation dry run -----------------------------------
+plan="$("$relocate" -n "$W" 2>&1)" || refuse "transcript check failed:
+$plan"
+say "ok: no claude session running in the worktree; transcripts:"
+printf '%s\n' "$plan" | sed 's/^/    /'
+
+if [ "$dry" -eq 1 ]; then
+    say "dry run: would relocate the transcripts above, then run"
+    say "    wt -C $P remove $branch -D -y --foreground"
+    say "    (fallback if wt refuses for submodules: rm -rf $W; git -C $P worktree prune; git -C $P branch -D $branch)"
+    say "dry run: all checks passed, nothing changed"
+    exit 0
+fi
+
+# --- 5. relocate, then remove -------------------------------------------------
+relocated="$("$relocate" "$W" 2>&1)" || refuse "transcript relocation failed:
+$relocated"
+
+removed_by=""
+if out="$(wt -C "$P" remove "$branch" -D -y --foreground 2>&1)"; then
+    removed_by="wt remove"
+else
+    printf '%s\n' "$out" | sed 's/^/    wt: /' >&2
+    if [ -d "$W" ] && [ -f "$W/.gitmodules" ] && printf '%s' "$out" | grep -qi submodule; then
+        # Every precondition above still holds (re-check cleanliness: nothing
+        # may have changed in between); wt/git just cannot remove a worktree
+        # with submodules, so do it the skill's documented way.
+        [ -z "$(git -C "$W" status --porcelain)" ] || refuse "$W became dirty during closedown"
+        rm -rf "${W:?}"
+        git -C "$P" worktree prune
+        git -C "$P" branch -D "$branch" >/dev/null
+        removed_by="rm -rf + git worktree prune (submodule fallback)"
+    else
+        echo "$me: FAILED: wt remove failed (transcripts were already relocated; worktree left in place)" >&2
+        exit 1
+    fi
+fi
+
+[ ! -e "$W" ] || { echo "$me: FAILED: $W still exists after $removed_by" >&2; exit 1; }
+if git -C "$P" rev-parse --verify --quiet "refs/heads/$branch" >/dev/null; then
+    git -C "$P" branch -D "$branch" >/dev/null
+fi
+
+# --- 6. report ----------------------------------------------------------------
+say "transcripts:"
+printf '%s\n' "$relocated" | sed 's/^/    /'
+say "worktree removed: $W ($removed_by)"
+say "branch deleted:   $branch (was $tip; $merged_by)"
+say "remotes untouched"
