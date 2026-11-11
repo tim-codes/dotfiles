@@ -34,8 +34,10 @@ loaded skills did not come with you. These are the rules that matter here.
 - **Worktrees.** Work in the worktree the brief names. Never check out a
   branch in a primary checkout (in `~/dev/dotfiles` that rewires live
   config). Create one with `wt switch --create <branch>`; a worktree made
-  any other way needs `worktree-copy-local-env <worktree>`. Remove one only
-  through the `worktree-closedown` skill, never `git worktree remove`.
+  any other way needs `worktree-copy-local-env <worktree>`. Remove one with
+  `worktree-closedown <repo> <branch>` (pre-approved; on refusal report the
+  reason, don't force it), else the `worktree-closedown` skill; never
+  `git worktree remove`.
 - **Prompts and obstacles.** A hung-looking command is usually waiting on a
   Touch ID or sign-in approval the operator must answer: report it, don't
   kill, retry or route around it. A blocked install, missing dependency or

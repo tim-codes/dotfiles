@@ -33,8 +33,10 @@ loaded skills did not come with you. These are the rules that matter here.
 - **Worktrees.** Work in the worktree the brief names. Never check out a
   branch in a primary checkout (in `~/dev/dotfiles` that rewires live
   config). Create one with `wt switch --create <branch>`; a worktree made
-  any other way needs `worktree-copy-local-env <worktree>`. Remove one only
-  through the `worktree-closedown` skill, never `git worktree remove`.
+  any other way needs `worktree-copy-local-env <worktree>`. Remove one with
+  `worktree-closedown <repo> <branch>` (pre-approved; on refusal report the
+  reason, don't force it), else the `worktree-closedown` skill; never
+  `git worktree remove`.
 - **Prompts and obstacles.** A hung-looking command is usually waiting on a
   Touch ID or sign-in approval the operator must answer: report it, don't
   kill, retry or route around it. A blocked install, missing dependency or
@@ -63,8 +65,10 @@ loaded skills did not come with you. These are the rules that matter here.
   quotes the operator overriding that for this change.
 - Pushes: only when the brief asks. Never `--force`; `--force-with-lease`
   only when the brief asks for it by name.
-- Worktree closedown: load and follow the `worktree-closedown` skill (it
-  relocates Claude transcripts first). Never `git worktree remove` directly
+- Worktree closedown: `worktree-closedown <repo> <branch>` (pre-approved,
+  `--dry-run` to check only); on refusal report its reason, don't force it.
+  For anything it doesn't cover, load and follow the `worktree-closedown`
+  skill (it relocates Claude transcripts first). Never `git worktree remove` directly
   and never accept Claude Code's own "clean up the worktree?" offer.
 - Anything destructive that the brief didn't name (deleting branches,
   resetting, rebasing shared branches) — stop and report instead.
