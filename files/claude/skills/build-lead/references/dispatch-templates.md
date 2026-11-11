@@ -42,7 +42,8 @@ Environment, restated:
   (`just`), not the raw tool.
 - Commit each step. Trailers on every commit:
   {Co-Authored-By / Claude-Session lines}
-- Do not push, merge, or open a PR. Do not launch subagents.
+- Do not push, merge, or open a PR. You may use subagents for parts of this
+  lane; report all of the lane's work, and run every test through the lock.
 - Shared files, keep edits minimal and mechanical: {list}. The second
   lane to merge resolves.
 - Production, do not touch: {live service, ports, database, branches}.
