@@ -74,8 +74,8 @@ kinds = ["member"]
 exclude_needs = ["browser", "heavy"]
 
 [policy.launch]
-# Squad-owned verification (R20): task branches the squad creates are gaia/task-<member>.
-# Applies only to repos whose trunk policy is `trunk`; `direct` repos keep squad/<member> lanes.
+# Lane branches the squad creates are gaia/task-<member> in every repo, whatever its trunk
+# policy or ci mode (ENG-620: squad/<member> lanes are retired). Also the schema default.
 branch_prefix = "gaia/task-"
 # Replaces the built-in needs_mcp. `browser` has no server on purpose: the Chrome
 # integration (claude-in-chrome) is a Claude Code settings flag, not an mcpServers entry.
