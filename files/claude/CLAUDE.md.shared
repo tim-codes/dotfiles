@@ -332,6 +332,17 @@ config is copied in. When the session should move in, use `wt switch --create`
 operator each time is a round-trip for something fully mechanical and safe
 (no overwrite, ignored files only).
 
+## No `git stash` in shared repos
+
+Never use `git stash` in a worktree or a checkout other sessions share: the stash
+list belongs to the repository, not the worktree, so `stash pop` can apply (and
+`stash drop` can lose) another session's or Tim's work in progress. Commit WIP on
+your own branch instead (amend or squash later).
+
+**Why:** 11 Nov 2026, an agent's `stash`/`stash pop` in an exxo-infra worktree
+popped and dropped Tim's April `tim/gateway-vpc` WIP; it was recovered from
+`git fsck` only by luck.
+
 ## Worktree closedown: preserve transcripts first
 
 Never confirm Claude Code's built-in "clean up the worktree?" prompt, and
