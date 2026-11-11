@@ -3,7 +3,8 @@
 Taxonomy from the 2026-10-31 debug review §3 (Exxo-Labs/gaia,
 `docs/superpowers/plans/2026-10-31-squad-v05-debug-review.md`), pinned in
 the orchestrator's `leader.intervention` contract. Log every instance with
-`intervene` (or the file log) using the function id. Counts in brackets are
+`intervene` (or the file log) using the function id, and pass `desk_class`
+(SKILL.md, Interventions) with it. Counts in brackets are
 the 2026-10-31 baseline the next rounds are measured against.
 
 | # | Function | What the leader does by hand today | Retired by | Log as |
