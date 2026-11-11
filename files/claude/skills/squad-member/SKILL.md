@@ -435,6 +435,26 @@ unchanged (`/clear` gives a new id, so a fresh dir). If the variable is
 unset, use that path directly. Use it instead of `/tmp` for notes, logs and
 intermediate files that must survive a resume. Never commit it.
 
+## Subagents
+
+Every subagent you start, at any depth, is traced by the broker (its parent, depth, model, tool calls, tokens and
+cost) and is visible to Tim and the policy layer. This section applies on top of the `fanout` and `cleanup` rows of
+the directive table above.
+
+- Subagents may nest freely. The `subagent_fanout` budget caps live subagents in your whole tree, nested ones
+  included, and the broker enforces it at the tool call: a spawn over it is denied with a `subagent_fanout:` reason.
+  Wait for one to finish or stop a running one with `TaskStop`, then retry. A `fanout` directive is only a notice of
+  your effective cap (`max`, or unlimited) and model ceiling: ack it.
+- A spawn above your model ceiling is denied with a `model_ceiling:` reason: use the ceiling model or below. If the
+  reason says it cannot rank the model, pass an explicit `model` at or below the ceiling.
+- `subagent_fanout: budgets not yet pushed` means the policy layer has not told the broker your cap yet (a reconnect
+  or a launch in progress). Retry after a short wait; do not raise it unless it persists past a few minutes.
+- A `cleanup` directive whose payload lists `subagents`: `TaskStop` each `agent_id` that is yours and still running,
+  then ack with a `note` naming each. Do not stop one that is still doing useful work for a lane you are on; say so in
+  the note instead.
+- A subagent that has made no progress for the supervision threshold is nudged, then named in a `cleanup`, then
+  raised as an item for Tim. Stopping a stuck one yourself earlier avoids all three.
+
 ## Infra helpers
 
 A session of kind `infra` works in an exxo-infra worktree and produces a PR
