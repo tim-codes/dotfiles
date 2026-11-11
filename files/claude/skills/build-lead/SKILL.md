@@ -83,7 +83,9 @@ then restates, because the implementer starts fresh:
 - environment mechanics: the lock wrapper and the exact command to run one
   test file; the database test URL; the trailer lines for commits; the
   runner (`just` recipes, not the raw tool);
-- no push, no merge, no subagents (the lane implements; you merge);
+- no push, no merge (the lane implements; you merge). The lane's implementer
+  may use its own subagents (Claude Code's default nesting); its report still
+  covers all the lane's work, and its test runs still go through the lock;
 - the shared files for this lane, and "keep edits there minimal; the second
   lane to merge resolves";
 - what is production and must not be touched;
