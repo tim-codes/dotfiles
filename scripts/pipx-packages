@@ -21,6 +21,9 @@ pipxPackages=(
   # Python dependency manager. pipx rather than brew so it is not tied to
   # Homebrew's default python (its 3.14 venv dangled when that python went)
   poetry
+  # pytest on PATH for repo test suites (dotfiles' tests/test_*.py, squad
+  # member test commands); Homebrew's python is externally managed (PEP 668)
+  pytest
 )
 
 if ! command -v pipx >/dev/null; then
