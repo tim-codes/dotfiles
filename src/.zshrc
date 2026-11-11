@@ -44,6 +44,9 @@ if [ -d "$HOME/.claude-personal" ]; then
         fi
         local -a cfg=(-u CLAUDE_CONFIG_DIR)
         [ -n "$dir" ] && cfg=(CLAUDE_CONFIG_DIR="$dir")
+        # The retired default ~/.claude has no claude-sync settings.json, so the
+        # task-tool flag (settings.shared.json env elsewhere) is set here.
+        [ -z "$dir" ] && cfg+=(CLAUDE_CODE_ENABLE_TODO_TOOLS=1)
         for d in "${_claude_ctx_dirs[@]}"; do
             if [ "$here" = "$d" ]; then
                 mkdir -p "$HOME/claude"
