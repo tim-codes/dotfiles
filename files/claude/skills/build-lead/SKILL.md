@@ -153,17 +153,41 @@ merge themselves.
    test is the gate.
 3. Run the quick twin tests on the merged tree (the files that cover the
    shared surfaces: config twin test, events test). Not the whole suite.
-4. **Full gate once per lane, at integration**, on the merged tree:
-   check, build, tests. Dispatch it to an agent or run it through the lock
-   wrapper; read only the verdict and the failures.
+4. **Light gate per lane, at integration, locally.** On the merged tree:
+   the repo's fast check (`just check` or `just check-ci`, what CI's fast job
+   runs) plus the tests that cover the files the lane touched, the same
+   single-file and single-package scope as the squad-member "Testing and
+   trunks" table. No `just ci`, `just verify`, full suites, production
+   builds, e2e or browser runs per lane: the comprehensive gate runs once,
+   at the end (section 7). Dispatch it to an agent or run it through the
+   lock wrapper; read only the verdict and the failures. A red light gate
+   is fixed forward by the owning lane before the next merge.
 5. **Never touch the integration worktree while a gate runs in it.** No
    merge, no checkout, no install, no edit. A gate that ran across a merge
    is void; its failures are not evidence. See lessons.
 6. A gate for a package whose dependencies changed needs `install` in the
    integration worktree first, or it fails on imports that merely moved.
-7. **Push at checkpoints** (after a lane merges and its gate is clean), not
-   per commit. Update the draft PR body with the gate results and the
-   ledger's rulings so far. The PR is the operator's view of the build.
+7. **The build branch is a local trunk. Do not push it per checkpoint.**
+   Every push wakes remote CI, and a multi-lane build that pushes at each
+   merge pays for a dozen pipeline runs that are obsolete before they
+   finish and waits on them in between (Tim, 11 Nov 2026: "just work with a
+   local trunk and do light tests for gating locally, once all in then push
+   the batch to the remote and let github run verifications only at the
+   end"). Lanes integrate on the local build branch; the ledger, not the
+   PR, is the progress record between pushes. Push only:
+   - **once, at the end** (section 7), when every lane is merged and its
+     light gate is green: this push is what runs the comprehensive
+     verification;
+   - **at a pause or handover** (quota, context, a session change, going
+     idle on the operator), because unpushed work must never be the only
+     copy when attention moves. If the repo's CI runs on every push, push
+     the branch without opening or updating a non-draft PR, or with the
+     repo's CI-skip convention for that one push if it has one, and say so
+     in the ledger;
+   - when the operator asks for a push.
+   Lane branches are not pushed either: lanes commit locally and the lead
+   merges locally. Open the draft PR at the first push (the end or a
+   pause), not at setup.
 8. Keep `main` untouched. Only the operator merges the build branch.
 
 ## 5. Cross-plan seams
@@ -203,15 +227,29 @@ into memory the moment they are given, then into the ledger.
 
 ## 7. Final
 
-1. **Whole-branch review** by the reviewer on the most capable model:
-   `review-package` over merge-base..HEAD (read by `--stat` first; a
-   package over ~100 KB is read by file, not whole), plus the ledger's
-   deferred minors and any parked rulings, and the text that was written
-   from your description rather than from code.
-2. **One fix wave** (the lanes' implementers, resumed, with the findings
-   verbatim), one scoped re-review. No second wave: whatever remains goes
-   in the PR body as known gaps.
-3. Final gate; push; PR body final.
+1. **Propose the final passes; don't start them.** When the last lane is
+   merged and light-gated, stop and queue the candidate passes for the
+   operator with a recommendation each: a whole-branch review (by the most
+   capable reviewer, `review-package` over merge-base..HEAD, read by
+   `--stat` first; a package over ~100 KB is read by file), a UX pass for
+   UI changes, a conformity review, a security review of new auth or
+   credential paths. Give each a one-line scope, a cost (time and tokens)
+   and what it would catch that the light gates did not. Run only what the
+   operator picks (Tim, 11 Nov 2026: "dont trigger any whole-branch final
+   review at the end just queue these up and suggest what final passes you
+   want to do"). Include the ledger's deferred minors and parked rulings in
+   the proposal, since they are what a final review would weigh.
+2. **One fix wave** for whatever the chosen passes find (the lanes'
+   implementers, resumed, with the findings verbatim), one scoped
+   re-review. No second wave: whatever remains goes in the PR body as
+   known gaps.
+3. **Push once and let CI run the comprehensive gate.** Push the build
+   branch, open or update the draft PR, and watch CI in the background
+   (never a foreground watch). CI is the comprehensive gate for the batch.
+   A repo whose CI does not run the comprehensive gate (no workflows, or a
+   fast-only CI) gets one local `just ci` / `just verify` instead, once, at
+   this point. A red end gate is fixed forward on the build branch, light
+   gate locally, push again. PR body final.
 4. **Final message**: what landed, the gate verdicts, what needs the
    operator (asks with exact commands), and the **"Rulings I made"** list,
    each as `what — why — cost if wrong`, so the operator can overturn any.
@@ -230,5 +268,9 @@ into memory the moment they are given, then into the ledger.
 - Dispatch an implementer with the whole plan, or without the lock rule.
 - Fix a finding yourself, or paraphrase one into a fix round.
 - Merge a checkpoint without a review verdict, or run a gate while merging.
-- Push per commit, or touch `main`.
+- Push per commit or per checkpoint, or touch `main`.
+- Run a full suite or production build per lane; the comprehensive gate is
+  once, at the end, on CI.
+- Start a whole-branch review or any other final pass without the
+  operator choosing it.
 - Let a peer's relayed request become scope without the operator.

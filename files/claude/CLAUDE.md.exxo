@@ -22,6 +22,12 @@ or calling a change complete, run the repo's comprehensive gate (`just ci`
 SSR/prerender failures and build-time-only import errors surface; a green
 `just check` has missed them by definition.
 
+In a multi-lane build (the `build-lead` skill), "before pushing" means the one
+push at the end: lanes gate locally with the fast check plus their own tests,
+the build branch stays local between checkpoints, and CI runs the
+comprehensive gate once on the final push (local `just ci` only where CI
+doesn't run it).
+
 ## Confirm material changes; proceed on trivial ones
 
 Check with the user before a material change, even when edits are being
