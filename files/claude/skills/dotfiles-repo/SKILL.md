@@ -34,6 +34,7 @@ All of these are plain arrays in `zsh` scripts under `~/dev/dotfiles/scripts/`
 | Cargo crate, published | `scripts/cargo-update` | `cargoDeps` |
 | Cargo crate, git-only (unpublished) | `scripts/cargo-update` | `cargoGitDeps` (repo URL) |
 | pnpm global package | `scripts/pnpm-globals` | `packages` |
+| Python CLI tool (pipx, pinned to python@3.12) | `scripts/pipx-packages` | `pipxPackages` |
 
 A one-line comment above the entry explaining *why* it's there (like the
 existing entries do) is the house style — see any current entry in these
@@ -44,8 +45,8 @@ inventing a new ad-hoc script to route around it.
 
 None of these scripts *run* on their own after editing — the entry takes
 effect machine-wide the next time `scripts/brew-update` / `cargo-update` /
-`pnpm-globals` runs (directly, or via `src/bin/deps-up`, which chains all
-three plus nvm/npm). If the dependency is needed *now*, install it directly
+`pnpm-globals` / `pipx-packages` runs (directly, or via `src/bin/deps-up`, which chains
+them plus nvm/npm). If the dependency is needed *now*, install it directly
 first (per the global instruction), then add the manifest entry separately
 so the persisted state matches what's actually on the machine.
 
