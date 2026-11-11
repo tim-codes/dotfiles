@@ -115,8 +115,8 @@ else
     skip "hook handlers equal contracts rule 8: no contracts source readable (set GAIA_CONTRACTS_DIR)"
 fi
 
-check "member deny file is the six merge rules only" \
-    jq -e 'keys == ["permissions"] and (.permissions | keys == ["deny"]) and .permissions.deny == ["Bash(gh pr merge*)","Bash(* gh pr merge*)","Bash(gh * pr merge*)","Bash(* gh * pr merge*)","Bash(gh api *merge*)","Bash(* gh api *merge*)"]' \
+check "member deny file holds the merge rules and the gh write rules (Bash denies only)" \
+    jq -e 'keys == ["permissions"] and (.permissions | keys == ["deny"]) and (.permissions.deny as $d | (["Bash(gh pr merge*)","Bash(* gh pr merge*)","Bash(gh * pr merge*)","Bash(* gh * pr merge*)","Bash(gh api *merge*)","Bash(* gh api *merge*)","Bash(gh pr create*)","Bash(* gh * pr edit*)","Bash(gh * issue close*)","Bash(gh api *--method*)","Bash(* gh * api *-f*)"] | all(. as $r | $d | index($r) != null)) and ($d | all(startswith("Bash(gh ") or startswith("Bash(* gh "))))' \
     "$SRC_REPO/files/claude/settings.member-deny.json"
 for ctx in personal reserve exxo exxo-personal; do
     check "$ctx: member deny is not merged" \
