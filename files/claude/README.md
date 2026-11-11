@@ -171,10 +171,12 @@ procedure, including the environment mechanics a fresh subagent context does
 not inherit). `~/.claude-personal/agents` (and `~/.claude-reserve/agents`) is a
 whole-directory symlink to `files/claude/agents`; the curated contexts get a real `agents/` directory of
 per-file symlinks for the names in `shared_agents()` in `scripts/claude-sync`
-— currently the round-one agents (`implementer`, `reviewer`,
-`git-pr-ops`, `investigator`, `sanity-cms`, `notion-ops`), because 92% of the
-subagent spend they target is in exxo, plus `conformity-reviewer` and `design-architect` (a read-only blueprint agent adapted from the feature-dev plugin's code-architect), plus the experimental `ux-designer`
-(promoted to exxo 2026-11-05 at Tim's request). A real file dropped into a curated
+— currently every dedicated agent: `implementer`, `reviewer`, `git-pr-ops`,
+`investigator`, `sanity-cms`, `notion-ops` (the first wave, shared because 92%
+of the subagent spend they target is in exxo), `conformity-reviewer`,
+`design-architect` (a read-only blueprint agent adapted from the feature-dev
+plugin's code-architect) and the experimental `ux-designer` (promoted to exxo
+2026-11-05 at Tim's request). A real file dropped into a curated
 `agents/` dir is adopted into the repo as personal-only, same as skills.
 Rationale and the measurement baseline:
 `docs/superpowers/specs/2026-10-23-subagent-plugin-hygiene-design.md`;

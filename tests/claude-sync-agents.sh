@@ -15,7 +15,7 @@ cp "$SRC_REPO/scripts/claude-sync" "$REPO/scripts/"
 cp -R "$SRC_REPO/files/claude" "$REPO/files/"
 for c in personal exxo exxo-personal; do mkdir -p "$FAKE/.claude-$c"; done
 AG="$REPO/files/claude/agents"
-SHARED=(implementer reviewer git-pr-ops investigator sanity-cms notion-ops ux-designer design-architect)
+SHARED=(implementer reviewer git-pr-ops investigator sanity-cms notion-ops ux-designer design-architect conformity-reviewer)
 printf -- '---\nname: private-probe\ndescription: x\nmodel: haiku\n---\n' > "$AG/private-probe.md"
 
 fail=0
