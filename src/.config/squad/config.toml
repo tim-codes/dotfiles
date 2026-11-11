@@ -23,14 +23,14 @@ name = "personal"
 # provides: capabilities this pool can satisfy; placement needs provides ⊇ task needs
 #   (empty means the pool can never be placed).
 # placement_rank: lower is preferred (reserve first, then exxo, then personal).
-# reserve_pct: floor kept back for Tim's own use (squad v0.5 P4 decision).
+# The quota reserve (floor kept back for Tim's own use) is a runtime directive from Gaia v0.6.1
+# (quota_reserve @ account:<name>; squad docs/runbooks/budgets.md), not a config key.
 # playwright/browser are capabilities for placement; only playwright has an MCP server the orchestrator passes to member launches that need it ([policy.launch] needs_mcp)
 # 1password: agent/run resolves 1Password references on this host in every context, so every account provides it; vercel: the Vercel MCP server is exxo-only, so only exxo provides it
 # Test round (Tim, 7 Nov 2026, hand-over 7): out of placement, kept defined so it is reversible.
 # Restore: provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"], placement_rank = 30.
 provides = []
 placement_rank = 99
-reserve_pct = 10
 email = "timoconnell1024@gmail.com"
 config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
 
@@ -42,7 +42,6 @@ name = "reserve"
 # Restore: provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"], placement_rank = 10.
 provides = []
 placement_rank = 99
-reserve_pct = 0
 email = "tim.oc@outlook.com"
 config_dirs = ["~/.claude-reserve"]
 
@@ -50,7 +49,6 @@ config_dirs = ["~/.claude-reserve"]
 name = "exxo"
 provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "vercel", "boards"]
 placement_rank = 20
-reserve_pct = 30
 email = "tim@exxo.io"
 config_dirs = ["~/.claude-exxo"]
 
@@ -63,9 +61,7 @@ key_file = "~/keys/openrouter.key"
 # (placement.ts placeMetered). browser, playwright and vercel are left out on purpose: those tasks are excluded by exclude_needs / not placed here.
 config_dirs = ["~/.claude-exxo-openrouter"]
 provides = ["agent-run", "docker", "rust", "shell", "node", "postgres", "1password", "boards"]
-# $75 for the test round, squad-side cap only (no key limit). "month" not "round": a round cap re-arms on every squad.resumed.
-budget_usd = 75
-budget_period = "month"
+# The spend cap is a runtime directive from Gaia v0.6.1 (spend_cap @ account:openrouter: $75/month for the test round).
 
 [quota]
 levels = [50, 75, 85, 90, 95, 100]
@@ -73,9 +69,7 @@ projection_horizon_minutes = 60
 
 [policy.launch.metered_share]
 # Some member launches on the metered OpenRouter account (DeepSeek), to compare outcomes per account.
-# Raise pct towards 50 for a heavier share (hand-over 7).
-account = "openrouter"
-pct = 25
+# The account and share are a runtime directive from Gaia v0.6.1 (metered_share @ squad: openrouter, 25 %).
 kinds = ["member"]
 exclude_needs = ["browser", "heavy"]
 
@@ -220,13 +214,8 @@ recheck_s = 600
 max_nudges = 2
 background_wait_max_s = 3600
 
-# Orchestrator kit calls on Tim's personal API credits, falling back to OpenRouter at prefer_fallback_at_pct of the month's spend.
-[budget]
-# TODO(tim): anthropic_monthly_usd = <the credit you allow>
-prefer_fallback_at_pct = 90
-provider = "anthropic"
-fallback = "openrouter"
-
+# Kit calls go to the providers below in order. Their caps are runtime directives from Gaia v0.6.1
+# (spend_cap @ provider:<name>, kit_token_cap @ kit:<role>), not config keys.
 [kit]
 [[kit.providers]]
 name = "anthropic"
