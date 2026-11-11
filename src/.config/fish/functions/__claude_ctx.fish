@@ -35,7 +35,9 @@ function __claude_ctx --description 'Run claude in a per-account config context'
     if test -n "$dir"
         env $scrub CLAUDE_CONFIG_DIR=$dir claude $argv
     else
-        env $scrub -u CLAUDE_CONFIG_DIR claude $argv
+        # The retired default ~/.claude has no claude-sync settings.json, so the
+        # task-tool flag (settings.shared.json env elsewhere) is set here.
+        env $scrub CLAUDE_CODE_ENABLE_TODO_TOOLS=1 -u CLAUDE_CONFIG_DIR claude $argv
     end
     set -l st $status
     test $jumped -eq 1; and popd

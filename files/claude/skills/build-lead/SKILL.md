@@ -58,9 +58,8 @@ of your own context; take conclusions.
    time, and only while the one-minute load is under N (20 on a laptop
    running a dozen sessions). Restate the rule in every brief. Lanes run
    their own test files only; the gate is yours.
-6. **No todo tool in the harness?** Keep a tracker file in the
-   scratchpad: checklist per lane, per gate, per open ask for the operator.
-   Update it at every merge.
+6. **Tracker file.** Keep one in the scratchpad: checklist per lane, per
+   gate, per open ask for the operator. Update it at every merge.
 7. Name what is production and must not be touched (live services, a
    running round, ports, databases, branches such as `main`). It goes in
    the ledger and into every brief.
