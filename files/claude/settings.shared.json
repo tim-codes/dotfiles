@@ -488,6 +488,11 @@
       "mcp__squad__land",
       "WebSearch",
       "mcp__plugin_linear_linear__save_comment",
+      "mcp__plugin_linear_linear__save_issue",
+      "mcp__plugin_linear_linear__save_issue_label",
+      "mcp__claude_ai_Linear__save_comment",
+      "mcp__claude_ai_Linear__save_issue",
+      "mcp__squad__claim",
       "mcp__ide__getDiagnostics"
     ],
     "deny": [
