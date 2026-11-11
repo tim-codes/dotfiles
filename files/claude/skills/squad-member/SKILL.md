@@ -57,10 +57,10 @@ ack_required: <directive_id>
 
 | Directive kind | Payload keys | What you do |
 |---|---|---|
-| `pause` | `reason`, optional `resets_at` | Finish the tool call in flight; start nothing new. Commit work in progress on the lane branch (`wip: <what is half-done>`), push if the branch already has a PR, `set` `paused` with `detail` saying exactly where you stopped and the next step, ack, end the turn. |
+| `pause` | `reason`, optional `resets_at`, optional `checkpoint` | Finish the tool call in flight; start nothing new. Commit work in progress on the lane branch (`wip: <what is half-done>`), push if the branch already has a PR, `set` `paused` with `detail` saying exactly where you stopped and the next step, ack, end the turn. With `checkpoint: true` (a spend cap, `trigger.kind: spend_cap`) it is a checkpoint pause: see Spend-cap checkpoints. |
 | `resume` | `reason`, optional `from`, `to` (accounts, after a switch) | Read `squad://me` and your last `detail`, `set` `working`, ack, carry on from the next step. |
 | `priority` | `priority` (1 to 5) | Note it and ack. At 4 or 5, defer optional work (polish, extra refactors, nice-to-have tests). |
-| `fanout` | `max_subagents` (0 to 8), optional `model_ceiling` (none means no ceiling) | The payload caps parallel subagents and may cap their model. A lower cap applies at once: start no subagent until you are under it; let running ones finish. Ack. |
+| `fanout` | `max_subagents` (0 to 8, or `null`), `notice: true`, optional `model_ceiling` (none means no ceiling) | A notice of your current subagent cap; it changes nothing by itself. `null` means no cap: start subagents freely, as you normally would. A number is the most live subagents in your whole tree: yours and every subagent they start, nested ones included. Keep within it from now on: start no subagent until the tree is under it, and tell any subagent you start that may start its own how many it may use; let running ones finish. A model ceiling applies to every new subagent in the tree. Once the spawn gate is live, a spawn over the cap or above the ceiling is refused with a `subagent_fanout` reason: that refusal is this cap, not an error. Ack. |
 | `delegate_mode` | `mode` (`local` or `pool`), optional `needs` | `pool`: route new implementer and reviewer work for the listed needs through `mcp__squad__delegate` instead of local subagents; `local`: back to subagents. Work already running stays where it is. Ack. |
 | `heavy_slot` | `decision` (`grant`, `deny`, `revoke`), optional `expires_at`, `est_minutes`, `retry_after_s`, `reason` | A grant, deny or revoke of your heavy slot (see Heavy jobs). On a revoke, interrupt the heavy command, then release. Ack. |
 | `scope_change` | `task_id`, `content_sha256`, `quote` (Tim's words) | Tim changed the task. His quoted words supersede the kickoff where they conflict; re-plan the remaining work around them, `set` a `detail` naming the change, ack. |
@@ -79,6 +79,12 @@ the contract (`contracts/mcp-tools.md`, "Directive payloads" in the squad repo).
   `done`) and a one-line `detail` at start, at each milestone (a deliverable
   done, a PR opened, tests green), when blocked and when done. The `detail` is
   what the orchestrator and a resumed you read, so name the next step.
+- With each status change, also send `eta_minutes`: your honest estimate of
+  the minutes this task has left (0 to 1440), e.g. `set {status: "working",
+  detail: "...", eta_minutes: 25}`. At a spend cap it decides whether you are
+  let finish or checkpointed: an estimate (less the time since you gave it,
+  within 30 minutes) inside the cap's `finish_within_min` finishes; anything
+  else, or no estimate, is checkpointed at once.
 - A headless member does not end a turn on a "next step" it has not started.
   Either do the step, or end the turn only while waiting on a
   `mcp__squad__watch` or a job, and say what it waits on with `mcp__squad__set`
@@ -107,6 +113,34 @@ the contract (`contracts/mcp-tools.md`, "Directive payloads" in the squad repo).
 - A denied tool call is not retried in another form (a different command, a
   wrapper, another tool reaching the same effect). If the work needs it,
   raise it with the exact command and why.
+
+## Spend-cap checkpoints
+
+When an account's spend cap is reached, nothing new starts on it and each
+member on it is either let finish or checkpointed.
+
+- **Let finish.** An inbox message says "Spend cap reached on `<account>`:
+  finish this task; no new work will start here." Finish and land as usual.
+  If you are still running `finish_within_min` after the cap, you are
+  checkpointed anyway.
+- **Checkpointed.** A `pause` with `checkpoint: true`. Finish the tool call in
+  flight, start nothing new, then:
+  1. commit your work in progress and push it to your lane branch (no PR
+     needed);
+  2. call `mcp__squad__handoff` with `summary` (what is done and where you
+     stopped, up to 4000 characters), `next_steps` (1 to 20 concrete steps),
+     `branch` (your lane branch) and `head_sha` (the commit you pushed);
+  3. ack the pause and end the turn.
+  The orchestrator closes your session after the ack and the task shows as
+  `parked`. Without a `handoff` the checkpoint is `missed`: your last `set`
+  `detail` stands in for the summary, so keep it current.
+- **Resumed.** When the cap clears your own session is resumed with a
+  `resume` directive ("the spend cap on `<account>` has cleared; read your
+  handoff and carry on"): read your last `detail` and the handoff, `set`
+  `working`, ack, carry on. If the task is relaunched on another account
+  instead, the new session's kickoff carries the handoff under "Resumed from a
+  checkpoint": fetch the lane branch at that head and continue from the next
+  steps; do not start again.
 
 ## Testing and trunks
 
