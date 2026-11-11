@@ -61,6 +61,8 @@ new_repo() {
 merge_ff() { git -C "$P" push -q origin "$B:main"; }               # ancestor merge
 merge_squash() { git -C "$P" push -q origin "$(git -C "$P" commit-tree -p main -m squash "$B^{tree}"):refs/heads/main"; }
 tip() { git -C "$P" rev-parse "$B"; }
+# pull_ref <sha>: publish <sha> as origin's refs/pull/7/head, as GitHub does.
+pull_ref() { git -C "$P" push -q origin "$1:refs/pull/7/head"; }
 pr_json() { printf '[{"number":7,"headRefOid":"%s","url":"https://github.com/tim/fake/pull/7"}]' "$1"; }
 has_branch() { git -C "$P" rev-parse --verify --quiet "refs/heads/$B" >/dev/null; }
 intact() { [ -d "$W" ] && has_branch; }
@@ -80,13 +82,25 @@ check "unmerged branch refused" test "$rc" = 1
 check "unmerged: reason given" says "is not merged"
 check "unmerged: nothing deleted" intact
 
-# 3. squash-merged PR whose head != local tip refused
-new_repo; merge_squash; old="$(tip)"
+# 3. squash-merged PR whose head is BEHIND the local tip refused (tip ahead)
+new_repo; merge_squash; old="$(tip)"; pull_ref "$old"
 echo more >>"$W/file"; git -C "$W" commit -qam more
 GH_JSON="$(pr_json "$old")" run "$P" "$B"; rc=$?
-check "squash PR head != tip refused" test "$rc" = 1
-check "squash mismatch: reason given" says "head is not the local tip"
-check "squash mismatch: nothing deleted" intact
+check "tip ahead of merged PR head refused" test "$rc" = 1
+check "tip ahead: reason given" says "neither its head nor an ancestor"
+check "tip ahead: nothing deleted" intact
+
+# 3b. tip BEHIND the merged PR head (PR finished on GitHub with a merge
+# commit; nothing local-only) is accepted via the fetched pull ref
+new_repo; merge_squash
+head="$(git -C "$P" commit-tree -p "$B" -p main -m "Merge branch 'main' into $B" "$B^{tree}")"
+pull_ref "$head"; git -C "$P" update-ref -d refs/pull/7/head 2>/dev/null
+git -C "$P" reflog expire --expire=now --all; git -C "$P" gc -q --prune=now
+check "PR head commit not local before the run" bash -c '! git -C "$1" cat-file -e "$2^{commit}" 2>/dev/null' _ "$P" "$head"
+GH_JSON="$(pr_json "$head")" run "$P" "$B"; rc=$?
+check "tip behind merged PR head closes down" test "$rc" = 0 || cat "$T/out"
+check "tip behind: says ancestor of merged PR head" says "ancestor of merged PR head"
+check "tip behind: worktree removed and branch deleted" bash -c '[ ! -e "$1" ] && ! git -C "$2" rev-parse --verify --quiet "refs/heads/$3" >/dev/null' _ "$W" "$P" "$B"
 
 # 4. primary checkout and default branch refused
 new_repo; merge_ff
@@ -139,10 +153,11 @@ check "report names the session and removal" bash -c 'grep -q "'"$uuid"'" "$1" &
 check "remote branch list untouched" test "$(git -C "$P" ls-remote --heads origin | wc -l | tr -d ' ')" = 1
 
 # 9. squash-merged with head == tip succeeds, by worktree path
-new_repo; merge_squash
+new_repo; merge_squash; pull_ref "$(tip)"
 GH_JSON="$(pr_json "$(tip)")" run "$P" "$W"; rc=$?
 check "squash-merged (head == tip) closes down" test "$rc" = 0 || cat "$T/out"
 check "squash: worktree removed and branch deleted" bash -c '[ ! -e "$1" ] && ! git -C "$2" rev-parse --verify --quiet "refs/heads/$3" >/dev/null' _ "$W" "$P" "$B"
+check "squash (tip == head): says head == local tip" says "head == local tip"
 check "squash: gh queried with -R owner/repo --head --state merged" grep -q -- "-R tim/fake$n --head $B --state merged" "$T/gh.log"
 
 # 10. submodules: dirty submodule refused; clean one removed via the fallback

@@ -36,7 +36,7 @@ whole skill for a finished branch: it refuses unless the target is a linked
 worktree on a non-default branch, `origin/HEAD` is set, the tree and every
 submodule are clean (no changes, no local-only commits), the branch is merged
 (its tip is in `origin/<default>`, or a merged PR's head SHA equals the local
-tip), and no claude session is running there; then it relocates the
+tip or contains it, so nothing is local-only), and no claude session is running there; then it relocates the
 transcripts across every context, runs `wt remove <branch> -D -y
 --foreground` (or, when wt refuses for submodules, the `rm -rf` + `prune`
 route of step 6), and prints what it moved and deleted. It never touches a
