@@ -152,9 +152,27 @@ Branches you push for squad-owned verification are named `gaia/task-<id>` (the s
 
 ## Landing
 
-- Open lane PRs against the base the kickoff names (a branch or a
-  `trunk/...`) as drafts. Never push to a trunk branch.
-- On either merge path, mark the PR ready (`gh pr ready <n> -R <owner/name>`)
+- Keep the model `Co-Authored-By` trailer in your commits. Do not set
+  `git config user.*`: the session env carries the bot identity. Never create a
+  worktree push config (`config.worktree`, `remote.*.pushurl`) or change a
+  remote URL: pushes go over HTTPS through the session env automatically, and
+  fetch stays SSH. A push that changes `.github/workflows/` is refused by
+  GitHub (the Gaia App's member token has no workflows permission): do not
+  work around it; `raise` an item asking Tim to push the lane branch himself.
+  Never run `gh pr review`, `gh auth token` or other `gh` write commands (the
+  member settings deny them).
+
+- Open lane PRs with `mcp__squad__open_pr` (`{repo?, head, base, title, body,
+  draft}`, draft by default) against the base the kickoff names (a branch or a
+  `trunk/...`); it returns `{number, url}`. Never push to a trunk branch.
+  Edit a PR with `mcp__squad__pr_edit` (`{pr, title?, body?, base?}`, at least
+  one; `base` only to retarget to the base a wrong-base land refusal names),
+  comment with `mcp__squad__pr_comment` (`{pr, body}`), where `pr` is the PR
+  URL. All four PR tools act only on your own lane branch, in trunk and
+  `direct` repos alike. The Gaia App opens and edits PRs: mutating `gh pr`,
+  `gh issue` and `gh api` write commands are denied to members.
+- On either merge path, mark the PR ready (`mcp__squad__pr_ready` with
+  `{pr: "<PR URL>"}`)
   before landing or handing it to Tim and before you watch its checks, and have the branch up to date with
   its base (merge `origin/<base>` in once pushed; see the pushed-branch rule below), with CI green or the failure explained in the PR. The
   trunk service pre-gates only a closed PR and a dirty or behind branch; it
@@ -171,7 +189,7 @@ Branches you push for squad-owned verification are named `gaia/task-<id>` (the s
     (correctness and estate conformity) and squash-merged by it once the
     review, the GitHub checks and the merge state are clean. The reviewer
     reads the head sha's CI result and the evidence you attached to the land;
-    it runs no gate itself, so put the evidence in the land and the PR body.
+    it runs no gate itself, so put the evidence in the land and the PR body (`mcp__squad__pr_edit`).
     The task reaches `done` with no operator item (on repos that release to
     production it stays `landing` until the release is live, and your status
     line shows Releasing/Released).
@@ -230,7 +248,7 @@ Branches you push for squad-owned verification are named `gaia/task-<id>` (the s
   ready, then land them all in one go. Read each repo's
   `squad://context-brief/<owner>%2F<name>` before working in it, and list
   every PR URL in the final `set` `detail`.
-- Never `gh pr merge` (the member settings deny it), never the GitHub UI,
+- Never `gh pr merge` (the member settings deny it, as they do every mutating `gh pr`/`gh issue` command), never the GitHub UI,
   never another merge route.
 - Before calling a PR green, check each expected CI job on the head sha by
   run id: `gh run list -R <owner/name> --commit <sha> --json

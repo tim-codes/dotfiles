@@ -4,7 +4,7 @@
 # carries the squad hook handlers of contracts/README.md rule 8 (byte for byte,
 # so Claude Code runs one when the broker also passes them with --settings),
 # the `squad` stdio MCP server and the v0.5 grants, that the handler commands
-# fail open, and that the member deny overlay stays the six merge rules.
+# fail open, and that the member deny overlay holds the merge rules and the gh write rules.
 # Usage: bash tests/squad-hooks-settings.sh
 #   GAIA_CONTRACTS_DIR   directory holding the squad repo's contracts/README.md
 #                         (else read it from git in $GAIA_REPO at
@@ -115,8 +115,8 @@ else
     skip "hook handlers equal contracts rule 8: no contracts source readable (set GAIA_CONTRACTS_DIR)"
 fi
 
-check "member deny file is the six merge rules only" \
-    jq -e 'keys == ["permissions"] and (.permissions | keys == ["deny"]) and .permissions.deny == ["Bash(gh pr merge*)","Bash(* gh pr merge*)","Bash(gh * pr merge*)","Bash(* gh * pr merge*)","Bash(gh api *merge*)","Bash(* gh api *merge*)"]' \
+check "member deny file holds the merge rules and the gh write rules (Bash denies only)" \
+    jq -e 'keys == ["permissions"] and (.permissions | keys == ["deny"]) and (.permissions.deny as $d | (["Bash(gh pr merge*)","Bash(* gh pr merge*)","Bash(gh * pr merge*)","Bash(* gh * pr merge*)","Bash(gh api *merge*)","Bash(* gh api *merge*)","Bash(gh pr create*)","Bash(* gh * pr edit*)","Bash(gh * issue close*)","Bash(gh api *--method*)","Bash(* gh * api *-f*)","Bash(gh pr review*)","Bash(* gh pr review*)","Bash(gh * pr review*)","Bash(* gh * pr review*)","Bash(gh auth token*)","Bash(* gh auth token*)","Bash(gh * auth token*)","Bash(* gh * auth token*)","Bash(gh release create*)","Bash(gh workflow run*)","Bash(gh run rerun*)","Bash(gh secret set*)","Bash(gh variable set*)","Bash(gh label create*)","Bash(gh repo edit*)","Bash(* gh * repo edit*)"] | all(. as $r | $d | index($r) != null)) and ($d | all(startswith("Bash(gh ") or startswith("Bash(* gh "))))' \
     "$SRC_REPO/files/claude/settings.member-deny.json"
 for ctx in personal reserve exxo exxo-personal; do
     check "$ctx: member deny is not merged" \
