@@ -32,17 +32,20 @@ HOME="$FAKE" "$REPO/scripts/claude-sync" >"$T/sync.log" 2>&1 || { bad "claude-sy
 S() { echo "$FAKE/.claude-$1/settings.json"; }
 J() { echo "$FAKE/.claude-$1/.claude.json"; }
 
-# The handler objects rule 8 pins: <event>|<matcher or empty>|<cli arg>|<timeout>.
+# The handler objects rule 8 pins: <event>@<matcher or empty>@<cli arg>@<timeout>.
 ROWS=(
-    'SessionStart||session-start|10'
-    'Stop||stop|10'
-    'UserPromptSubmit||user-prompt-submit|10'
-    'PreToolUse|Bash|pre-tool-use|10'
-    'PermissionRequest||permission-request|10'
-    'PostToolUse||prompt-cleared|10'
-    'PostToolUseFailure||prompt-cleared|10'
-    'PermissionDenied||prompt-cleared|10'
-    'SessionEnd||session-end|5'
+    'SessionStart@@session-start@10'
+    'Stop@@stop@10'
+    'UserPromptSubmit@@user-prompt-submit@10'
+    'PreToolUse@Bash@pre-tool-use@10'
+    'PreToolUse@Agent|Task@pre-tool-use@10'
+    'PermissionRequest@@permission-request@10'
+    'PostToolUse@@prompt-cleared@10'
+    'PostToolUseFailure@@prompt-cleared@10'
+    'PermissionDenied@@prompt-cleared@10'
+    'SessionEnd@@session-end@5'
+    'SubagentStart@@subagent-start@10'
+    'SubagentStop@@subagent-stop@10'
 )
 # Command string, built from the pieces so it is written once here: the guard
 # and stdout capture are what keep a v0.4 `squad` (exit 2 on `hook`) or a missing
@@ -55,7 +58,7 @@ entry_for() { # <matcher> <arg> <timeout>
 
 for ctx in "${CTXS[@]}"; do
     for row in "${ROWS[@]}"; do
-        IFS='|' read -r ev matcher arg to <<<"$row"
+        IFS='@' read -r ev matcher arg to <<<"$row"
         want="$(entry_for "$matcher" "$arg" "$to")"
         n="$(jq --argjson w "$want" --arg e "$ev" '[.hooks[$e][]? | select(. == $w)] | length' "$(S "$ctx")")"
         check "$ctx: $ev carries the squad handler once" test "$n" = 1
@@ -100,11 +103,10 @@ fi
 if [ -r "$README" ]; then
     awk '/^## 8\. /{f=1;next} /^## 9\. /{f=0} f&&/^```json/{j=1;next} f&&j&&/^```/{exit} f&&j' "$README" >"$T/rule8.json"
     if jq -e '.hooks | length >= 9' "$T/rule8.json" >/dev/null 2>&1; then
-        for row in "${ROWS[@]}"; do
-            IFS='|' read -r ev _ _ _ <<<"$row"
-            check "hook handler equals contracts rule 8 byte for byte: $ev" \
+        for ev in $(for row in "${ROWS[@]}"; do IFS='@' read -r e _ _ _ <<<"$row"; echo "$e"; done | sort -u); do
+            check "hook handlers equal contracts rule 8 byte for byte: $ev" \
                 jq -e --slurpfile r "$T/rule8.json" --arg e "$ev" \
-                '$r[0].hooks[$e] as $w | ($w | length) == 1 and ([.hooks[$e][] | select(. == $w[0])] | length) == 1' "$(S exxo)"
+                '. as $m | $r[0].hooks[$e] as $w | ($w | length) >= 1 and ([$w[] | . as $x | select([$m.hooks[$e][] | select(. == $x)] | length == 1)] | length) == ($w | length)' "$(S exxo)"
         done
     else
         bad "hook handlers equal contracts rule 8: README rule 8 carries no pinned handler JSON (pre-amendment contracts?)"
@@ -125,7 +127,7 @@ done
 
 # The handler commands themselves, run as Claude Code runs them.
 mapfile -t CMDS < <(jq -r '[.hooks[][]?.hooks[]?.command | select(contains("squad hook"))] | unique[]' "$(S exxo)")
-check "seven distinct squad hook commands in the merged exxo settings" test "${#CMDS[@]}" -eq 7
+check "nine distinct squad hook commands in the merged exxo settings" test "${#CMDS[@]}" -eq 9
 INPUT='{"session_id":"00000000-0000-4000-8000-000000000000","hook_event_name":"X"}'
 cat >"$BIN/squad" <<STUB
 #!/bin/bash

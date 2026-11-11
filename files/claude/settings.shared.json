@@ -150,6 +150,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook pre-tool-use) && printf '%s\\n' \"$o\"; exit 0",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -387,6 +397,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook subagent-start) && printf '%s\\n' \"$o\"; exit 0",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "SubagentStop": [
@@ -396,6 +415,15 @@
             "type": "command",
             "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SubagentStop >/dev/null 2>&1 || true # tmux-home",
             "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook subagent-stop) && printf '%s\\n' \"$o\"; exit 0",
+            "timeout": 10
           }
         ]
       }
