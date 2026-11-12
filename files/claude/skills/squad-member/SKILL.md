@@ -113,6 +113,17 @@ the contract (`contracts/mcp-tools.md`, "Directive payloads" in the squad repo).
 - A denied tool call is not retried in another form (a different command, a
   wrapper, another tool reaching the same effect). If the work needs it,
   raise it with the exact command and why.
+- Write commands to pass the permission classifier first time, so none is
+  denied and none needs retrying in another form: a commit message goes in a
+  file, `git commit -F <file>` (never `-F -` with a heredoc); read GitHub
+  with `gh ... --json <fields> --jq '<expr>'` (never a pipe into
+  `python3 -c` or a `--template`); keep one command per call, with no
+  interpreter on the end of a pipe.
+- A land blocked by gaia-guard or a missing trunk is raised to Tim as "needs a
+  trunk / landing route" (blocking `now`, recommending that option). Never
+  recommend, offer as the recommended option, or run a hand-merge of a
+  `gaia/*` head into `main` (or `master`); `raise` refuses such a
+  recommendation.
 
 ## Spend-cap checkpoints
 
