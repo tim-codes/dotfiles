@@ -181,7 +181,11 @@ Never build, borrow or symlink a dependency tree (`node_modules`) into the
 worktree: in a `ci: squad` repo push and call `run_tests`; elsewhere run only
 checks that need no dependencies. The broker denies the symlink step. A
 `squad: the host's local test slots are full` denial means wait (do other
-work) and retry; never wrap or rename the command to dodge it.
+work) and retry; never wrap or rename the command to dodge it. To remove a
+stray `node_modules` symlink, run `rm` with its literal absolute path, for
+example `rm /Users/.../<worktree>/node_modules`: no variable (not
+`$GAIA_WORKTREE`), no quotes, no relative path and no `.` segment, because the
+broker allows only that form without asking the operator.
 
 The full gate is not a pre-land step. CI runs it on the head sha, and the land
 reviewer reads that result; do not run it yourself before landing, and do not
