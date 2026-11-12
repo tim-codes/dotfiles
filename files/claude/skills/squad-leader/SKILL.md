@@ -132,7 +132,7 @@ After **each** hand-done action, in the same turn:
 ```
 mcp__squad__intervene({ function: "L5", action: "told t3 the pnpm alias fix is live (inbox note)",
                         reason: "no confirmation note when an item's fix lands (ENG-476)",
-                        outcome: "done", desk_class: "question", member: "t3",
+                        outcome: "done", arbiter_class: "question", member: "t3",
                         item_id: "r-20261031053635-1a2b3c" })
 ```
 
@@ -141,7 +141,7 @@ mcp__squad__intervene({ function: "L5", action: "told t3 the pnpm alias fix is l
 approve the tool once, which is expected). Fields: `function` L1–L13,
 `action` (one imperative line), `reason` (why the squad could not; a
 ruling id or `managed_repos` row when authority is the point), `outcome`
-(`done` | `parked` | `handed_to_tim`), `desk_class` (below; pass it on
+(`done` | `parked` | `handed_to_tim`), `arbiter_class` (below; pass it on
 every call), and whichever of `item_id`, `task_id`, `member`, `pr`,
 `command`, `ruling` apply. The same call from a
 script is tRPC `operator.intervene` (procedures.md). On an orchestrator
@@ -149,7 +149,7 @@ older than v0.5.10, append one JSON line of the same fields to
 `~/.local/state/squad/debug/<run>/interventions.jsonl` (shape in
 procedures.md); the bundle merges it into `interventions.csv`.
 
-**`desk_class` (orchestrator v0.6.1 and later).** On every `intervene`, say
+**`arbiter_class` (orchestrator v0.6.1 and later; renamed from `desk_class` in v0.7.0).** On every `intervene`, say
 which class of exception the desk would have handled the act as, so the eval
 scorecard can show how much of the leader's work the desk would absorb. One
 of `deliverables_audit`, `human_steps`, `triage`, `relaunch_or_abandon`,
@@ -159,7 +159,8 @@ nearest class, not the function: an item decided by ruling is usually
 `triage`, a brief to a member that answers its question is `question`, a
 kickoff you wrote by hand is `kickoff_authoring`. Omitting it records the
 act as `untagged`, which the scorecard counts but cannot attribute. An
-orchestrator older than v0.6.1 refuses the field: leave it out there.
+orchestrator older than v0.6.1 refuses the field: leave it out there; one
+before v0.7.0 knows it as `desk_class`.
 
 The scorecard's interventions-per-land figure counts only these explicit
 `intervene` rows (L1–L13) over lands that reached `landed` or `released`;

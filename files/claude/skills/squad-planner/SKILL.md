@@ -316,7 +316,10 @@ omitted, never `null`.
   `done`. Check the context brief's `release_kind`, `release_tag_pattern` and
   `verify_recipe`, and name post-deploy acceptance checks (e.g. "deploy log
   shows Sync topics succeeding") as `production` deliverables, since they are
-  only observable after the release.
+  only observable after the release. A deliverable may also carry
+  `release: patch | minor | major`: set it on the deliverable that changes a
+  tag-released package's public surface, and always when the brief names a
+  target version; the trunk service's version check reads it.
 - `depends_on` (optional): up to 50 task ids, only ids present in the
   brief's `tasks`, never the task's own id. This is how cross-task order is
   expressed, and the round stays at depth two or less (see "The shape of a
@@ -407,8 +410,8 @@ omitted, never `null`.
   OpenSpec change exists (an interactive plan always has the PR; a headless
   one only if the task file names it), `## Notes` names the plan PR URL and
   the OpenSpec change id and says to run the staleness pass first, bringing
-  the lane onto the kickoff's base (main or the active trunk) (rebase before
-  the first push only; after pushing, merge the base in), so the member cannot
+  the lane onto the kickoff's base (main or the active trunk) (rebase onto
+  it; after pushing, `--force-with-lease`), so the member cannot
   miss it.
 - `merge_authority`: `trunk_service`, unless Tim says he merges this one
   himself, then `operator`.
@@ -484,7 +487,10 @@ approves the revision with the reasons as its ruling; `deviates` (a new repo,
 new operator steps or heavy jobs, scope or title drift, dropped intake
 `resources`) and `refuse` leave it pending and raise an approval item for Tim.
 Justify any departure from the intake in the plan's notes so the reviewer, and
-Tim, can see why.
+Tim, can see why. A deliverable that shows a person or identity (a name,
+email, avatar, owner, author) must say how the identity resolves (source,
+lookup, caching) and who may see it; the plan reviewer answers `deviates` if
+either is missing.
 
 **Interactive: the acceptance gate.** Until Tim says in his own words that the
 plan is accepted or finalised, the planner does not call `submit_task`.
