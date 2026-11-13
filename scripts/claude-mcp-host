@@ -1,0 +1,82 @@
+#!/bin/bash
+# Apply host-scoped MCP servers: files/claude/mcp.host.<hostname>.json, for
+# servers that only make sense on one machine (a local daemon on that box,
+# e.g. the NVIDIA App's MCP endpoint on odin-win11).
+#
+# Why this is not part of claude-sync: claude-sync fans account fragments into
+# the ~/.claude-* contexts and needs jq. The Windows host (Git Bash) has
+# neither — Claude Code there runs on the default ~/.claude.json and there is
+# no jq — so this script goes through the `claude` CLI itself
+# (`claude mcp add-json -s user`), which also means it never rewrites
+# .claude.json under a live session. Python (present on every platform here)
+# only reads the live file to skip servers that are already current.
+#
+# Target: ${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json, i.e. whatever context the
+# `claude` CLI would use from this environment.
+#
+# Same rules as the account fragments: no credentials in a fragment, names
+# only are printed, and removal is not managed — dropping a server from the
+# fragment stops managing it; retire it with `claude mcp remove -s user <name>`.
+#
+# No fragment for this host → silent no-op, so init can call it everywhere.
+# CLAUDE_MCP_HOST overrides the detected hostname (tests).
+#
+# Usage: claude-mcp-host [--diff]
+set -euo pipefail
+
+diff_only=0
+case "$#:${1:-}" in
+    0:) ;;
+    1:--diff) diff_only=1 ;;
+    *) echo "usage: claude-mcp-host [--diff]" >&2; exit 2 ;;
+esac
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+host="${CLAUDE_MCP_HOST:-$(hostname)}"
+host="${host%%.*}"
+fragment="$REPO_DIR/files/claude/mcp.host.$host.json"
+[ -f "$fragment" ] || exit 0
+
+live="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
+
+# Windows python cannot open MSYS paths.
+winpath() { if command -v cygpath >/dev/null; then cygpath -m "$1"; else printf '%s\n' "$1"; fi; }
+
+py=""
+for c in python3 python; do
+    if command -v "$c" >/dev/null && "$c" -c '' 2>/dev/null; then py="$c"; break; fi
+done
+[ -n "$py" ] || { echo "claude-mcp-host: no python - skipped $host MCP servers" >&2; exit 0; }
+command -v claude >/dev/null || { echo "claude-mcp-host: no claude CLI - skipped $host MCP servers" >&2; exit 0; }
+
+# One line per managed server: <status>\t<name>\t<compact json>
+# status: current | missing | differs
+plan="$("$py" - "$(winpath "$fragment")" "$(winpath "$live")" <<'PY'
+import json, os, sys
+frag = json.load(open(sys.argv[1], encoding="utf-8")).get("mcpServers", {})
+live = {}
+if os.path.exists(sys.argv[2]):
+    try:
+        live = json.load(open(sys.argv[2], encoding="utf-8")).get("mcpServers", {}) or {}
+    except ValueError:
+        live = {}
+for name, cfg in frag.items():
+    status = "current" if live.get(name) == cfg else ("differs" if name in live else "missing")
+    print(f"{status}\t{name}\t{json.dumps(cfg, separators=(',', ':'))}")
+PY
+)"
+
+echo "claude-mcp-host: $host -> ${live/#"$HOME"/'~'}"
+while IFS=$'\t' read -r status name cfg; do
+    [ -n "$name" ] || continue
+    if [ "$status" = current ] ; then echo "  $name: current"; continue; fi
+    if [ "$diff_only" = 1 ]; then echo "  $name: $status"; continue; fi
+    if [ "$status" = differs ]; then
+        claude mcp remove -s user "$name" >/dev/null
+        claude mcp add-json -s user "$name" "$cfg" >/dev/null
+        echo "  $name: replaced"
+    else
+        claude mcp add-json -s user "$name" "$cfg" >/dev/null
+        echo "  $name: added"
+    fi
+done <<<"$plan"

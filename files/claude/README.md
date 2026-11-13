@@ -118,6 +118,15 @@ Four properties of the merge, all deliberate:
   managing it; it does not delete it from a context. Retire one with
   `claude mcp remove -s user <name>` under that `CLAUDE_CONFIG_DIR`.
 
+Host-only servers — a daemon that exists on one machine, like the NVIDIA App's
+`nvidia-app` endpoint on odin-win11 — live in `mcp.host.<hostname>.json` and are
+applied by `scripts/claude-mcp-host` (called from `init`, safe to re-run,
+`--diff` to preview), not by `claude-sync`. That host is the Windows side, which
+has no `~/.claude-*` contexts and no jq, so the script goes through
+`claude mcp add-json -s user` against whatever context the `claude` CLI would
+use, skipping servers already current. Same rules: no credentials, names only,
+removal by hand. `tests/claude-mcp-host.sh` covers it.
+
 Managed preferences are the same merge applied to top-level `.claude.json`
 keys. An optional `files/claude/prefs.shared.json` plus
 `files/claude/prefs.<account>.json` (account wins per key, as for MCP) are
