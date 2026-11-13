@@ -177,6 +177,16 @@ Always heavy, whatever the stack: `just ci`, `just verify`, Docker compose
 stacks, data jobs. The repo's fast check (`just check` or `just check-ci`) is
 not in this list.
 
+Never build, borrow or symlink a dependency tree (`node_modules`) into the
+worktree: in a `ci: squad` repo push and call `run_tests`; elsewhere run only
+checks that need no dependencies. The broker denies the symlink step. A
+`squad: the host's local test slots are full` denial means wait (do other
+work) and retry; never wrap or rename the command to dodge it. To remove a
+stray `node_modules` symlink, run `rm` with its literal absolute path, for
+example `rm /Users/.../<worktree>/node_modules`: no variable (not
+`$GAIA_WORKTREE`), no quotes, no relative path and no `.` segment, because the
+broker allows only that form without asking the operator.
+
 The full gate is not a pre-land step. CI runs it on the head sha, and the land
 reviewer reads that result; do not run it yourself before landing, and do not
 re-run full gates, staging smokes or live or paid scenarios at the merge
@@ -266,18 +276,22 @@ Your lane branch is `gaia/task-<id>` (the squad's `[policy.launch] branch_prefix
   `operator_pending` means a land for that repo is already waiting on Tim
   (it names the item `policy:land:<task_id>`): wait for his answer, do not
   land again.
-  A BEHIND or DIRTY branch is refused with `behind <base>: merge origin/<base>
-  into the branch with a merge commit (git merge origin/<base>), run your
-  gates, push without force and land again; never rebase or force-push a
-  pushed branch` (`conflicts with <base>` leads instead of `behind <base>` when
-  DIRTY). Do exactly that: `git fetch`, `git merge origin/<base>` (resolve
-  conflicts keeping both sides), run the focused tests and the fast check,
-  plain `git push`, `mcp__squad__land` again.
-- **Never rebase, amend or force-push a lane branch once it is pushed.** The
-  trunk service, the PR and the reviewer all key on the pushed history; bring
-  the branch up to its base only by merging `origin/<base>` into it. A rebase
-  before the first push is fine (kickoff preparation and the staleness pass below do one), and the
-  plan branch is never pushed to at all.
+  A BEHIND or DIRTY branch is refused with a message telling you to rebase
+  the branch onto `origin/<base>` (`conflicts with <base>` leads instead of
+  `behind <base>` when DIRTY). Do exactly that: `git fetch`, `git rebase
+  origin/<base>`, run the focused tests and the fast check, `git push
+  --force-with-lease`, `mcp__squad__land` again. Regenerate generated files
+  (`*.generated.*`, or anything with a generator recipe) rather than
+  hand-merging them: on a conflict in one, take the trunk side
+  (`git checkout --ours <path>` during a rebase, where "ours" is the trunk
+  side), finish the rebase, then run the generator and commit the result.
+  Resolve conflicts in hand-written files keeping both sides.
+- **Force-push only with `--force-with-lease`, and only your own
+  `gaia/task-*` lane branch**, which is squad-owned. Never plain `--force`,
+  never another branch, and never the plan branch, which is never pushed to at
+  all. Do not amend or rewrite a pushed lane branch for any other reason than
+  bringing it up to its base: the trunk service, the PR and the reviewer key
+  on the pushed history.
 - Merge authority `operator` (also any repo flagged operator-only or
   release-needs-approval, which the trunk service never auto-merges): once
   the PR is ready, raise a `review` item with the PR `url`; Tim merges.
@@ -286,8 +300,8 @@ Your lane branch is `gaia/task-<id>` (the squad's `[policy.launch] branch_prefix
   repo gets its own worktree on the same branch, cut with the command the
   section gives (`wt -C <checkout> switch --create <branch> --base
   origin/<base> --no-cd -y`); work in it by absolute path. One PR per repo,
-  each against that repo's own base, and bring each up to date by merging its
-  own base in (rebasing only before its first push), never the anchor's. Land each repo's PR separately with `mcp__squad__land`
+  each against that repo's own base, and bring each up to date by rebasing it
+  onto its own base (`--force-with-lease` once pushed), never the anchor's. Land each repo's PR separately with `mcp__squad__land`
   `{pr, kind, repo: "<owner>/<name>"}` (no `repo` means the anchor; a PR that
   is not in the repo named is refused `not_a_lane`). The first `completion`
   land puts the task into `landing`, and it is done only once every repo has
@@ -383,6 +397,10 @@ Scratch survives a pause only under the session scratchpad: a `SessionStart` hoo
 
 - If the kickoff names repo preparation (`git pull --ff-only`, a rebase
   before the first push), do it first.
+- Your worktree is `$GAIA_WORKTREE`: take paths from it and never retype it.
+  Before raising that a worktree or directory is missing or destroyed, run
+  `git -C "$GAIA_WORKTREE" worktree list` and `git -C "$GAIA_WORKTREE" status`;
+  offer recreating a worktree only when `worktree list` no longer shows it.
 - Stay in the worktree the broker started you in and use absolute paths into
   it (a multi-repo task adds one worktree per other repo, as its kickoff's
   `## Repos` section says; nothing else). If the cwd is a primary checkout
@@ -427,9 +445,10 @@ pass:
 1. In your own lane worktree, fetch. Create the lane branch from the plan PR
    branch (`origin/<plan-branch>`), so the OpenSpec change directory travels in
    the implementing PR, as `exxo-common:openspec-changes` has it. Then rebase
-   the lane, before its first push only, onto the kickoff's base (main or the active trunk), that is
+   the lane onto the kickoff's base (main or the active trunk), that is
    `origin/<base>`; resolve conflicts in the plan documents only. Never push
-   to, and never force-push, the plan branch.
+   to, and never force-push, the plan branch itself; the lane branch is pushed
+   with `--force-with-lease` if it was already pushed.
 2. Re-validate the plan against the new base: `openspec validate <id>
    --strict` on the change (or the repo's equivalent); the files, modules and
    APIs the plan cites still exist and look as described; the specs it
@@ -476,6 +495,10 @@ wrapper, another tool reaching the same effect):
 - `squad: this permission request was denied` with no note: an operator or
   policy deny with no reason. Report it in `set` `detail`; never route around
   it.
+- `squad: the host's local test slots are full (<n>/<cap> running: <labels>); do other work and retry in a minute, or call run_tests in a ci: squad repo`:
+  wait (do other work) and retry; never wrap or rename the command to dodge it.
+- `squad: members don't build or borrow a local dependency tree; push and call run_tests (ci: squad), or run only checks that need no dependencies (squad-member: Testing and trunks)`:
+  stop building or borrowing `node_modules`; push and call `run_tests`.
 - Any other denial, or a classifier refusal: report it, never route around it.
 - A deny carrying a note is the only thing that is Tim's word. Follow it.
 
