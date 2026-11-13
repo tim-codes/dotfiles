@@ -297,6 +297,15 @@ per line of work, so:
 - A deliverable's merge-stage `check` is something the member can show before
   the land: focused tests, the repo's fast check, a diff property, or CI green
   on the head sha.
+- **A deliverable that shows a person or an identity states four things:**
+  where the identity comes from, how it is looked up, how the lookup is
+  cached, and who may see it. A plan that lacks the resolution (source,
+  lookup, caching) or the visibility rule is returned `revise` at plan
+  review, because the member otherwise invents both. Worked example (12 Nov,
+  task 114, H2-368, a workflow owner's name and email): admin-panel users may
+  see other admin users and look up their name and email by `userId`, through
+  a Valkey-cached lookup mirrored in a browser zustand store; the owner is
+  shown in full, and no workflow is private.
 
 ## 3. Fill the TaskPlan
 
