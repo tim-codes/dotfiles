@@ -97,10 +97,15 @@ holds even so:
   `main` is Tim's. The leader hand-merges nothing; a refused merge goes to
   Tim.
 - **Release scope.** On a `release_kind = tag` repo outside the floor
-  (theparentedit dated tags, harness-kit `semver` from the PR's
-  `release:patch|minor|major` label), the orchestrator tags, deploys and
-  verifies with no human gate; a BREAKING change below `major` holds. The
-  leader never tags by hand.
+  (publication sites theparentedit and therenaway: dated tags
+  `v<date>-<n>`, deployed by `ci.yml`; consumed things harness-kit,
+  agent-tooling and mailkit: `semver` from the PR's
+  `release:patch|minor|major` label, published by `publish.yml`), the
+  orchestrator tags, deploys and verifies with no human gate; a BREAKING
+  change below `major` holds. A release number means something only when a
+  consumer pins to it: sites get dated tags, consumed things get semver
+  (mailkit's API service promote stays a hand-run `workflow_dispatch`, not a
+  squad release). The leader never tags by hand.
 - **Standing rulings** are cited by id (`ruling 29`, `ruling 38`) from the
   rulings memory file for the round, plus the round rulings in
   procedures.md (the Ario v0.4 staging purge); from 0.6.0 also the
