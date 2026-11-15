@@ -8,7 +8,7 @@ Repo: <owner/name>   Base: <base branch or trunk>   Priority (suggested): <1-5>
 <two to five sentences>
 
 ## Deliverables
-<one line per deliverable: name: how "done" is checked>
+<one line per deliverable: name: how "done" is checked; add "release: patch|minor|major" where it changes a tag-released package's public surface; where it shows a person or identity, how the identity resolves (source, lookup, caching) and who may see it>
 
 ## Milestones
 <"none": the work lands once, at the completion land. A milestone only where Tim named one.>
