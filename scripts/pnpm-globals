@@ -1,5 +1,7 @@
 #!/bin/zsh
 
+set -euo pipefail
+
 packages=(
   ts-node@latest
   prettier@latest
@@ -36,4 +38,56 @@ packages=(
   mongosh@latest
 )
 
-pnpm i -g "${packages[@]}"
+# pnpm holds back any release younger than its minimumReleaseAge (supply-chain
+# guard), so `<pkg>@latest` quietly resolves to the newest *mature* version and
+# an installed older one stays put (an explicit `<pkg>@x.y.z` is exempt, which
+# is why pinning by hand "fixed" it). Our own scope is trusted, so exempt it;
+# third-party packages keep the guard and are reported below when held back.
+exempt=(--config.minimumReleaseAgeExclude='@exxo-labs/*')
+
+# name of "name@tag" (the scope's leading @ is not a separator)
+pkgName() { print -r -- "${1%@*}"; }
+
+# "name version" lines for every installed global
+installed() {
+  pnpm ls -g --json | node -e '
+    const l = JSON.parse(require("fs").readFileSync(0, "utf8"));
+    for (const p of l) for (const [n, d] of Object.entries(p.dependencies ?? {})) console.log(n, d.version);'
+}
+
+before=$(installed)
+
+echo "pnpm-globals: installing ${#packages[@]} global packages"
+if ! pnpm i -g "${exempt[@]}" "${packages[@]}"; then
+  echo "pnpm-globals: FAILED: pnpm i -g ${packages[*]}" >&2
+  exit 1
+fi
+
+after=$(installed)
+
+echo "pnpm-globals: changes"
+changed=0
+for pkg in "${packages[@]}"; do
+  name=$(pkgName "$pkg")
+  old=$(print -r -- "$before" | awk -v n="$name" '$1 == n { print $2 }')
+  new=$(print -r -- "$after" | awk -v n="$name" '$1 == n { print $2 }')
+  if [[ "$old" != "$new" ]]; then
+    echo "  $name: ${old:-(new)} -> $new"
+    changed=1
+  fi
+done
+(( changed )) || echo "  none"
+
+# Report (not fail) any @latest entry that is still behind its dist-tag.
+for pkg in "${packages[@]}"; do
+  [[ "$pkg" == *@latest ]] || continue
+  name=$(pkgName "$pkg")
+  have=$(print -r -- "$after" | awk -v n="$name" '$1 == n { print $2 }')
+  latest=$(pnpm view "$name" version) || {
+    echo "pnpm-globals: FAILED: pnpm view $name version" >&2
+    exit 1
+  }
+  if [[ "$have" != "$latest" ]]; then
+    echo "pnpm-globals: WARNING $name is $have but latest is $latest (held back by pnpm minimumReleaseAge; the next run picks it up)" >&2
+  fi
+done
