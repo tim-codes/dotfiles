@@ -408,6 +408,7 @@ Scratch survives a pause only under the session scratchpad: a `SessionStart` hoo
   Before raising that a worktree or directory is missing or destroyed, run
   `git -C "$GAIA_WORKTREE" worktree list` and `git -C "$GAIA_WORKTREE" status`;
   offer recreating a worktree only when `worktree list` no longer shows it.
+  To push or merge, use the literal worktree path in one plain command (`git -C <path> push -u origin HEAD`): no `cd`, `&&`, `$` or backticks; some workers' guards reject those.
 - Stay in the worktree the broker started you in and use absolute paths into
   it (a multi-repo task adds one worktree per other repo, as its kickoff's
   `## Repos` section says; nothing else). If the cwd is a primary checkout
