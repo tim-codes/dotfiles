@@ -418,6 +418,9 @@ Scratch survives a pause only under the session scratchpad: a `SessionStart` hoo
   (`git rev-parse --path-format=absolute --git-common-dir` equals
   `$(git rev-parse --show-toplevel)/.git`), `set` `blocked` and raise; never
   work there.
+- List processes by name only (`pgrep -l <name>`, `ps -Ao pid,comm`), never
+  `ps aux`, `ps -ef` or `pgrep -fl`: shell command lines carry the squad
+  session token.
 - Safe drift is fixed without asking, one log line each: a submodule whose
   checkout differs from its pin and whose own status is clean →
   `git submodule update --init <path>`; untracked `.claude-cache/`,

@@ -26,7 +26,7 @@ name = "personal"
 # The quota reserve (floor kept back for Tim's own use) is a runtime directive from Gaia v0.6.1
 # (quota_reserve @ account:<name>; squad docs/runbooks/budgets.md), not a config key.
 # playwright/browser are capabilities for placement; only playwright has an MCP server the orchestrator passes to member launches that need it ([policy.launch] needs_mcp)
-# 1password: agent/run resolves 1Password references on this host in every context, so every account provides it; vercel: the Vercel MCP server is exxo-only, so only exxo provides it
+# 1password: agent/run resolves 1Password references on this host in every context, so every account except openrouter (agent/run is denied there) provides it; vercel: the Vercel MCP server is exxo-only, so only exxo provides it
 # Tim, 16 Nov 2026: back in placement. Policy: most Gaia work goes to the personal/reserve Ultra plans;
 # exxo is used only where a task needs an org-scope capability (vercel) or the others are full.
 provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"]
