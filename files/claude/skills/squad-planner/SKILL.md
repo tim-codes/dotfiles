@@ -163,6 +163,18 @@ its own check). Skip both skills' "write a doc under docs/ and commit" and
 the artefacts, and `submit_task` is the hand-off. If the argument was a file,
 `Read` it first and plan from it.
 
+**Expected human gates, stated up front** (from batch 15, 16 Nov 2026). Name in
+the plan's Approach any deliverable that will predictably stop for Tim, so the
+stop is planned rather than a surprise:
+- `.github/**` changes in a repo with `risk_review = pulumi` (exxo-infra) always
+  escalate as `policy:risk:<land>`, by design (until ENG-688).
+- Workflow files in Gaia's own repo can't be pushed by members at all (push
+  ruleset). Gaia work isn't a Gaia task anyway.
+- Elsewhere, members can push workflow changes (v0.7.4 push tokens carry
+  `workflows: write`).
+- Members install their own dependencies (squad-member skill). Don't plan
+  around a missing `node_modules`.
+
 From the settled point, the planner keeps the following current. The settled
 point is when the brief is clear enough: the repo, the scope and an outline of
 the deliverables agreed with Tim, after the sibling check. At that point the
