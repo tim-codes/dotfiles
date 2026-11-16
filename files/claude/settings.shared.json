@@ -522,6 +522,7 @@
       "mcp__claude_ai_Linear__save_comment",
       "mcp__claude_ai_Linear__save_issue",
       "mcp__squad__claim",
+      "mcp__squad__intervene",
       "mcp__ide__getDiagnostics"
     ],
     "deny": [
