@@ -177,9 +177,11 @@ Always heavy, whatever the stack: `just ci`, `just verify`, Docker compose
 stacks, data jobs. The repo's fast check (`just check` or `just check-ci`) is
 not in this list.
 
-Install your worktree's own dependencies with the repo's install recipe
-(`just install`, or the repo's documented equivalent) when a check, a
-pre-commit hook or a test needs them: that is expected (Tim, 16 Nov 2026).
+Install your worktree's own dependencies when a check, a pre-commit hook or a
+test needs them: that is expected (Tim, 16 Nov 2026). Adapt to the repo: its
+install recipe if it has one (`just install`), else what its README, CI or
+lockfile implies (`pnpm install --frozen-lockfile`, `uv sync`, and so on).
+Never assume a repo is prepared for you.
 Never **borrow** a dependency tree: no symlinking or copying another checkout's
 `node_modules` in, because the broker denies the symlink step. The install
 recipe is the only way in, and `--no-verify` is never the answer to a hook that
