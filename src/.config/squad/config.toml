@@ -22,15 +22,15 @@ launch_path = ["~/.cargo/bin", "~/.local/bin", "~/Library/pnpm/bin", "~/.local/s
 name = "personal"
 # provides: capabilities this pool can satisfy; placement needs provides ⊇ task needs
 #   (empty means the pool can never be placed).
-# placement_rank: lower is preferred (reserve first, then exxo, then personal).
+# placement_rank: lower is preferred (reserve, then personal, then exxo last; Tim 16 Nov 2026).
 # The quota reserve (floor kept back for Tim's own use) is a runtime directive from Gaia v0.6.1
 # (quota_reserve @ account:<name>; squad docs/runbooks/budgets.md), not a config key.
 # playwright/browser are capabilities for placement; only playwright has an MCP server the orchestrator passes to member launches that need it ([policy.launch] needs_mcp)
 # 1password: agent/run resolves 1Password references on this host in every context, so every account provides it; vercel: the Vercel MCP server is exxo-only, so only exxo provides it
-# Test round (Tim, 7 Nov 2026, hand-over 7): out of placement, kept defined so it is reversible.
-# Restore: provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"], placement_rank = 30.
-provides = []
-placement_rank = 99
+# Tim, 16 Nov 2026: back in placement. Policy: most Gaia work goes to the personal/reserve Ultra plans;
+# exxo is used only where a task needs an org-scope capability (vercel) or the others are full.
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"]
+placement_rank = 20
 email = "timoconnell1024@gmail.com"
 config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
 
@@ -38,17 +38,16 @@ config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
 # so its own account and quota.
 [[accounts]]
 name = "reserve"
-# Test round: out of placement, kept defined so it is reversible.
-# Restore: provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"], placement_rank = 10.
-provides = []
-placement_rank = 99
+# Tim, 16 Nov 2026: back in placement (see personal).
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"]
+placement_rank = 10
 email = "tim.oc@outlook.com"
 config_dirs = ["~/.claude-reserve"]
 
 [[accounts]]
 name = "exxo"
 provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "vercel", "boards"]
-# Last choice while the exxo 7d window is tight (quota_reserve @ account:exxo/7d 45, 16 Nov).
+# Tim, 16 Nov 2026: exxo is last choice by policy (org-scope needs such as vercel, or overflow).
 placement_rank = 90
 email = "tim@exxo.io"
 config_dirs = ["~/.claude-exxo"]
