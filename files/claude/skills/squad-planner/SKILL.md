@@ -424,6 +424,14 @@ omitted, never `null`.
     it from a prerequisite's `step`; an unbound one is refused. For a plan
     approved before v0.5.14 these and the `infra` check give `warnings`, not
     refusals; read the `submit_task` result's `warnings` and act on them.
+  - A step the operator does after a deploy (for example "upload a test image
+    in the staging Studio, check the preview") is a `blocks_step` step bound to
+    the `stage: staging` (or `production`) deliverable it serves, through its
+    own `for` or a prerequisite's `step`. It outlives the task: from Gaia
+    v0.7.7 a bound post-deploy step stays open when the task lands, and in a
+    direct-release repo it is raised to `now`, with a notification, once the
+    land is staging-verified or released. An unbound step is caught only by a
+    narrow text fallback, so always bind it.
 - `kickoff_brief`: 1–50000 characters, `kickoff-template.md` in this
   directory filled in: replace every `<…>`; keep the merge-authority line
   that applies, remove its brackets and delete the other. A new task with no
