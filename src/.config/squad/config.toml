@@ -290,6 +290,13 @@ verdicts = ["merge", "revise", "escalate"]
 enabled = true
 repo = "Exxo-Labs/gaia"
 
+[policy.followup_backlog]
+# v0.7.5 (ENG-691/R1): low other/conformity follow-ups are filed to batched Linear tickets
+# ("Follow-ups: <owner/repo>"), not operator items (Tim, 16 Nov 2026). Key: Linear personal key gaia-tfo,
+# ENG team scope, resolved from the warm secret cache only; expiry is recorded in ESC beside it.
+team = "ENG"
+token_ref = "esc:exxo/gaia/tfo:linear.apiKey"
+
 [policy.grants]
 # Tim, 16 Nov 2026: "turn on all the new grants". The five built grants are on; the rest are not built
 # yet (docs/runbooks/grants.md) and stay false until they are. Each key is its kill switch (hot reload).
@@ -298,3 +305,4 @@ restart_orchestrator_when_idle = true      # G2
 prune_gaia_build_output = true             # G4
 followup_rulings = true                    # G10
 test_db_prune = true                       # G15
+linear_filing = true                       # G11 (v0.7.5): probe passed 16 Nov (team ENG, viewer Tim)
