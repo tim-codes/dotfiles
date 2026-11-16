@@ -177,9 +177,14 @@ Always heavy, whatever the stack: `just ci`, `just verify`, Docker compose
 stacks, data jobs. The repo's fast check (`just check` or `just check-ci`) is
 not in this list.
 
-Never build, borrow or symlink a dependency tree (`node_modules`) into the
-worktree: in a `ci: squad` repo push and call `run_tests`; elsewhere run only
-checks that need no dependencies. The broker denies the symlink step. A
+Install your worktree's own dependencies with the repo's install recipe
+(`just install`, or the repo's documented equivalent) when a check, a
+pre-commit hook or a test needs them: that is expected (Tim, 16 Nov 2026).
+Never **borrow** a dependency tree: no symlinking or copying another checkout's
+`node_modules` in, because the broker denies the symlink step. The install
+recipe is the only way in, and `--no-verify` is never the answer to a hook that
+needs dependencies: install, then commit. In a `ci: squad` repo the heavy
+suites still go through push and `run_tests`. A
 `squad: the host's local test slots are full` denial means wait (do other
 work) and retry; never wrap or rename the command to dodge it. To remove a
 stray `node_modules` symlink, run `rm` with its literal absolute path, for
@@ -498,7 +503,10 @@ wrapper, another tool reaching the same effect):
 - `squad: the host's local test slots are full (<n>/<cap> running: <labels>); do other work and retry in a minute, or call run_tests in a ci: squad repo`:
   wait (do other work) and retry; never wrap or rename the command to dodge it.
 - `squad: members don't build or borrow a local dependency tree; push and call run_tests (ci: squad), or run only checks that need no dependencies (squad-member: Testing and trunks)`:
-  stop building or borrowing `node_modules`; push and call `run_tests`.
+  you tried to borrow another checkout's `node_modules` (a symlink or copy).
+  Remove the link instead, run the repo's install recipe (`just install`) in
+  your own worktree, and carry on. (The reason text predates the 16 Nov ruling
+  that members install their own dependencies.)
 - Any other denial, or a classifier refusal: report it, never route around it.
 - A deny carrying a note is the only thing that is Tim's word. Follow it.
 
