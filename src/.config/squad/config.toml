@@ -125,12 +125,9 @@ max_slots = 6
 offload_to = "buildlab"
 
 [policy.heavy.host_pressure]
-# 15 Nov 2026: swap_used_frac 0.85 → 0.97. macOS keeps swap allocated after the pressure that caused it has passed
-# (6.6 of 7.2 GB used with memory at 62%), so 0.85 latched the host "hot" for good: t129 stayed paused by
-# host_pressure, heavy slots read 0, launches waited. Load and free memory still catch real pressure; 0.97 catches
-# swap actually running out. Other keys are the documented defaults.
+# v0.7.2 (ENG-685): swap_used_frac removed (macOS swap latches, which kept t129 paused on 15 Nov); the hot rule
+# reads the memory-pressure level, mem_pressure_at default "warn". Other keys are the documented defaults.
 load_per_core = 3.0
-swap_used_frac = 0.97
 min_free_mb = 2048
 hot_for_s = 120
 throttle = true
@@ -173,9 +170,10 @@ packages_token_ref = "esc:exxo/gaia/tfo:github.packagesToken"
 # absolute path). Tears down the lane previews the member owns.
 teardown = ["just", "-f", "/Users/tim/dev/squad/deploy/Justfile", "preview-prune", "{member}"]
 
-[exclusions]
-# h2gc production stacks need Tim's approval (2026-11-03); intent only, not yet enforced (ENG-536).
-approval_stack_patterns = ["exxo/h2gc*/*prod*"]
+[policy.risk_review]
+# v0.7.2 (lane K): replaces [exclusions] approval_stack_patterns. Unions with the code floor (the h2gc prod stacks);
+# the glob keeps the 3 Nov intent for any further h2gc prod stack.
+production_stacks = ["exxo/h2gc*/*prod*"]
 
 # Project data access (R18). Tim's baseline: rows for ceiling deliverables.
 [[policy.data_access.rule]]
@@ -280,3 +278,23 @@ verdicts = ["relaunch", "abandon", "escalate"]
 verdicts = ["answered"]
 [policy.arbiter.classes.deliverables_audit]
 verdicts = ["complete", "incomplete", "descope", "amend", "accept_with_followup", "unverifiable"]
+# v0.7.2: stall_review (ENG-686; resume is G12, approved 16 Nov) and infra_risk (lane K, full-auto infra 16 Nov).
+[policy.arbiter.classes.stall_review]
+verdicts = ["resume", "nudge", "relaunch", "rerun_verify", "wait", "escalate"]
+[policy.arbiter.classes.infra_risk]
+verdicts = ["merge", "revise", "escalate"]
+
+[policy.self_release]
+# v0.7.2: needed by G1/G2 (the idle restart goes through dev.tim.squad-release). Gaia never lands on gaia main
+# (Gaia fixes are built by subagents), so only the idle-restart path uses it.
+enabled = true
+repo = "Exxo-Labs/gaia"
+
+[policy.grants]
+# Tim, 16 Nov 2026: "turn on all the new grants". The five built grants are on; the rest are not built
+# yet (docs/runbooks/grants.md) and stay false until they are. Each key is its kill switch (hot reload).
+restart_broker_when_idle = true            # G1
+restart_orchestrator_when_idle = true      # G2
+prune_gaia_build_output = true             # G4
+followup_rulings = true                    # G10
+test_db_prune = true                       # G15
