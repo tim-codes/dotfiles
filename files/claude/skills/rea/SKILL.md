@@ -19,8 +19,7 @@ the native backend decision is open (`HANDOVER.md`).
 - rea covers "what the app runs". It does not replace recording visible
   behaviour, nor checking whether the target publishes an open-source package
   for the feature (that changed the plan on the first web run). For the
-  end-to-end workflow see the `reproduce-web-app` skill (_unverified_: being
-  written separately).
+  end-to-end workflow see the `reproduce-web-app` skill (proven on one target).
 
 ## CLI first, not MCP (current decision)
 
@@ -109,4 +108,4 @@ material): `references/switch-titles.md`. Full Stardew log:
 - Any native backend run; which Astris mod root applies.
 - Web route on more than one target; behaviour when the debugging port is
   already attached by another tool.
-- `reproduce-web-app` skill (not yet written).
+- `reproduce-web-app` skill on more than one target (written from one run).

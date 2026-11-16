@@ -46,7 +46,7 @@ scripts in this skill folder rather than leaving them in scratch.
 5. Web-app test: **done 2026-11-16** against a hosted web editor (signed-in
    session over loopback CDP). Codified in `SKILL.md` and
    `references/web-apps.md`. A sibling `reproduce-web-app` skill for the
-   end-to-end workflow is being written separately.
+   end-to-end workflow is `reproduce-web-app`.
 
 ## Decided
 
