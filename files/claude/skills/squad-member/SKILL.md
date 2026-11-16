@@ -204,7 +204,8 @@ lane's business before the land.
 Skills do not travel into a fresh subagent context, so every brief you write
 for a subagent restates this policy in one line: focused tests only, the
 repo's local fast check before every land, CI runs the comprehensive gate on
-the head sha.
+the head sha, and no heavy command without the member's heavy slot: in a
+squad member the heavy slot is the lock, so do not use `testlock`.
 
 ### Verification on buildlab (repos on `ci: squad`)
 
@@ -220,11 +221,12 @@ Your lane branch is `gaia/task-<id>` (the squad's `[policy.launch] branch_prefix
   `git config user.*`: the session env carries the bot identity. Never create a
   worktree push config (`config.worktree`, `remote.*.pushurl`) or change a
   remote URL: pushes go over HTTPS through the session env automatically, and
-  fetch stays SSH. A push that changes `.github/workflows/` is refused by
-  GitHub (the Gaia App's member token has no workflows permission): do not
-  work around it; `raise` an item asking Tim to push the lane branch himself.
-  Never run `gh pr review`, `gh auth token` or other `gh` write commands (the
-  member settings deny them).
+  fetch stays SSH. Push tokens carry `workflows: write` (v0.7.4), so
+  `.github/workflows/` changes push like any other; only Gaia's own repo
+  refuses them, and Gaia work is never a Gaia task. If a workflow push is
+  refused, `raise` it; do not work around it.
+  Never run `gh pr review`, `gh auth token` or other `gh` write commands: the
+  squad PR tools below do that work.
 
 - Open lane PRs with `mcp__squad__open_pr` (`{repo?, head, base, title, body,
   draft}`, draft by default) against the base the kickoff names (a branch or a
@@ -234,7 +236,7 @@ Your lane branch is `gaia/task-<id>` (the squad's `[policy.launch] branch_prefix
   comment with `mcp__squad__pr_comment` (`{pr, body}`), where `pr` is the PR
   URL. All four PR tools act only on your own lane branch, in trunk and
   `direct` repos alike. The Gaia App opens and edits PRs: mutating `gh pr`,
-  `gh issue` and `gh api` write commands are denied to members.
+  `gh issue` and `gh api` write commands are not for members.
 - On either merge path, mark the PR ready (`mcp__squad__pr_ready` with
   `{pr: "<PR URL>"}`)
   before landing or handing it to Tim and before you watch its checks, and have the branch up to date with
@@ -316,7 +318,7 @@ Your lane branch is `gaia/task-<id>` (the squad's `[policy.launch] branch_prefix
   ready, then land them all in one go. Read each repo's
   `squad://context-brief/<owner>%2F<name>` before working in it, and list
   every PR URL in the final `set` `detail`.
-- Never `gh pr merge` (the member settings deny it, as they do every mutating `gh pr`/`gh issue` command), never the GitHub UI,
+- Never `gh pr merge` (the member settings deny it), never the GitHub UI,
   never another merge route.
 - Before calling a PR green, check each expected CI job on the head sha by
   run id: `gh run list -R <owner/name> --commit <sha> --json
@@ -408,6 +410,7 @@ Scratch survives a pause only under the session scratchpad: a `SessionStart` hoo
   Before raising that a worktree or directory is missing or destroyed, run
   `git -C "$GAIA_WORKTREE" worktree list` and `git -C "$GAIA_WORKTREE" status`;
   offer recreating a worktree only when `worktree list` no longer shows it.
+  To push or merge, use the literal worktree path in one plain command (`git -C <path> push -u origin HEAD`): no `cd`, `&&`, `$` or backticks; some workers' guards reject those.
 - Stay in the worktree the broker started you in and use absolute paths into
   it (a multi-repo task adds one worktree per other repo, as its kickoff's
   `## Repos` section says; nothing else). If the cwd is a primary checkout
@@ -509,6 +512,9 @@ wrapper, another tool reaching the same effect):
   you tried to borrow another checkout's `node_modules` (a symlink or copy).
   Remove the link instead, run the repo's install recipe (`just install`) in
   your own worktree, and carry on.
+- A guard block saying a push or merge "must be fully literal": run the same
+  command once more as one plain literal command (Repo conventions). That
+  follows the guard; it is not routing around it.
 - Any other denial, or a classifier refusal: report it, never route around it.
 - A deny carrying a note is the only thing that is Tim's word. Follow it.
 

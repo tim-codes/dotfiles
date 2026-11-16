@@ -142,7 +142,9 @@ Options:
                   skip the member deny overlay. By default every launch passes
                   `--settings <repo>/files/claude/settings.member-deny.json`, which
                   denies raw `gh pr merge` (and `gh api ... merge`) for the session,
-                  so members land only through mcp__squad__land. Use it for an
+                  so members land only through mcp__squad__land. A planner kickoff
+                  (body starts with /squad-planner) gets the same rules minus
+                  `gh pr create` and `gh pr ready`, as a JSON string. Use it for an
                   attended launch. --dry-run prints `member_deny: <path>` and
                   `member_deny_rules: <rules>`, or `member_deny: off`.
   --check-trust DIR
@@ -524,6 +526,17 @@ if [ "$member_deny" -eq 1 ]; then
     member_deny_rules=$(jq -er '.permissions.deny | if type == "array" and length > 0 and all(type == "string") then join(" ") else error("no deny rules") end' "$member_deny_file" 2>/dev/null) \
         || die 6 "member deny overlay is not valid JSON with a permissions.deny list: $member_deny_file (--no-member-deny skips it)"
     member_deny_args=(--settings "$member_deny_file")
+    # A planner kickoff (body starts with /squad-planner; not a resume, which relaunches a
+    # member) opens and readies its own plan PR: the same overlay minus the `gh pr create`
+    # and `gh pr ready` rules, passed as a JSON string so nothing is written. Members are
+    # unchanged.
+    if [ -z "$resume" ] && [ "$(tail -n +"$((term + 1))" "$prompt" | awk 'NF { print $1; exit }')" = /squad-planner ]; then
+        planner_deny=$(jq -c '.permissions.deny |= map(select(test(" pr (create|ready)\\*\\)$") | not))' "$member_deny_file") \
+            || die 6 "member deny overlay could not be narrowed for a planner: $member_deny_file (--no-member-deny skips it)"
+        member_deny_rules=$(printf '%s' "$planner_deny" | jq -r '.permissions.deny | join(" ")')
+        member_deny_file="$member_deny_file (planner: gh pr create and gh pr ready allowed)"
+        member_deny_args=(--settings "$planner_deny")
+    fi
 fi
 
 # --- body --------------------------------------------------------------------

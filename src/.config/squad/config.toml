@@ -26,7 +26,7 @@ name = "personal"
 # The quota reserve (floor kept back for Tim's own use) is a runtime directive from Gaia v0.6.1
 # (quota_reserve @ account:<name>; squad docs/runbooks/budgets.md), not a config key.
 # playwright/browser are capabilities for placement; only playwright has an MCP server the orchestrator passes to member launches that need it ([policy.launch] needs_mcp)
-# 1password: agent/run resolves 1Password references on this host in every context, so every account provides it; vercel: the Vercel MCP server is exxo-only, so only exxo provides it
+# 1password: agent/run resolves 1Password references on this host in every context, so every account except openrouter (agent/run is denied there) provides it; vercel: the Vercel MCP server is exxo-only, so only exxo provides it
 # Tim, 16 Nov 2026: back in placement. Policy: most Gaia work goes to the personal/reserve Ultra plans;
 # exxo is used only where a task needs an org-scope capability (vercel) or the others are full.
 provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"]
@@ -60,7 +60,7 @@ key_file = "~/keys/openrouter.key"
 # The metered share places a launch here only when the pool has a config dir and provides the task's needs
 # (placement.ts placeMetered). browser, playwright and vercel are left out on purpose: those tasks are excluded by exclude_needs / not placed here.
 config_dirs = ["~/.claude-exxo-openrouter"]
-provides = ["agent-run", "docker", "rust", "shell", "node", "postgres", "1password", "boards"]
+provides = ["docker", "rust", "shell", "node", "postgres", "boards"]
 # v0.7.0 (ENG-663): repricing at the tim-ds preset's first provider (DeepInfra fp8, read 13 Nov 2026; USD per Mtok)
 # and the per-session cost guard (Tim 13 Nov: pause $6, warn item $3).
 pricing = { input = 0.098, output = 0.294, cache_read = 0.0029, cache_write = 0 }
@@ -290,6 +290,13 @@ verdicts = ["merge", "revise", "escalate"]
 enabled = true
 repo = "Exxo-Labs/gaia"
 
+[policy.followup_backlog]
+# v0.7.5 (ENG-691/R1): low other/conformity follow-ups are filed to batched Linear tickets
+# ("Follow-ups: <owner/repo>"), not operator items (Tim, 16 Nov 2026). Key: Linear personal key gaia-tfo,
+# ENG team scope, resolved from the warm secret cache only; expiry is recorded in ESC beside it.
+team = "ENG"
+token_ref = "esc:exxo/gaia/tfo:linear.apiKey"
+
 [policy.grants]
 # Tim, 16 Nov 2026: "turn on all the new grants". The five built grants are on; the rest are not built
 # yet (docs/runbooks/grants.md) and stay false until they are. Each key is its kill switch (hot reload).
@@ -298,3 +305,4 @@ restart_orchestrator_when_idle = true      # G2
 prune_gaia_build_output = true             # G4
 followup_rulings = true                    # G10
 test_db_prune = true                       # G15
+linear_filing = true                       # G11 (v0.7.5): probe passed 16 Nov (team ENG, viewer Tim)

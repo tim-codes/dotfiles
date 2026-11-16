@@ -338,9 +338,13 @@ omitted, never `null`.
   `verify_recipe`, and name post-deploy acceptance checks (e.g. "deploy log
   shows Sync topics succeeding") as `production` deliverables, since they are
   only observable after the release. A deliverable may also carry
-  `release: patch | minor | major`: set it on the deliverable that changes a
-  tag-released package's public surface, and always when the brief names a
-  target version; the trunk service's version check reads it.
+  `release: patch | minor | major | none`: set it on the deliverable that
+  changes a tag-released package's public surface, and always when the brief
+  names a target version; the trunk service's version check reads it.
+  Set `release: none` on the deliverables of a tag-released repo when the change touches no published file: CI, workflows, .nvmrc, docs, tooling.
+  A repo with a `stage: production` deliverable can't mark its deliverables
+  only `none` (unset ones count for nothing): give one a release level, or
+  drop the production stage. `submit_task` refuses it.
 - `depends_on` (optional): up to 50 task ids, only ids present in the
   brief's `tasks`, never the task's own id. This is how cross-task order is
   expressed, and the round stays at depth two or less (see "The shape of a
