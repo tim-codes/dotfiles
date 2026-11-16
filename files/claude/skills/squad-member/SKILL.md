@@ -504,11 +504,11 @@ wrapper, another tool reaching the same effect):
   it.
 - `squad: the host's local test slots are full (<n>/<cap> running: <labels>); do other work and retry in a minute, or call run_tests in a ci: squad repo`:
   wait (do other work) and retry; never wrap or rename the command to dodge it.
-- `squad: members don't build or borrow a local dependency tree; push and call run_tests (ci: squad), or run only checks that need no dependencies (squad-member: Testing and trunks)`:
+- `squad: members don't borrow another checkout's dependency tree (no symlinking or copying its node_modules); install this worktree's own dependencies with the repo's own install recipe (e.g. `just install`, `pnpm install`) and run checks from it (squad-member: Testing and trunks)`
+  (v0.7.4 wording; brokers before v0.7.4 say "don't build or borrow a local dependency tree"):
   you tried to borrow another checkout's `node_modules` (a symlink or copy).
   Remove the link instead, run the repo's install recipe (`just install`) in
-  your own worktree, and carry on. (The reason text predates the 16 Nov ruling
-  that members install their own dependencies.)
+  your own worktree, and carry on.
 - Any other denial, or a classifier refusal: report it, never route around it.
 - A deny carrying a note is the only thing that is Tim's word. Follow it.
 
