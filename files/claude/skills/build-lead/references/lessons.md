@@ -81,3 +81,59 @@ same files.
 Wording the lead wrote into a plan or a skill from memory (item rows,
 hand-back formats) was not checked against code by any lane. List it for the
 final whole-branch review.
+
+# From the Gaia v0.7.5 build, 16 Nov 2026
+
+## A lane that touches a second package needs that package's gate
+
+A lane changed two GUI label maps but could not run the GUI typecheck (no
+`node_modules`), and said so in its report. A third map in `glossary.ts`
+was missed and the PR's CI went red. Rule: when a report says "X not run",
+that is a gate gap. The lead puts X in the light gate: install the package
+and run its check recipe.
+
+## Contract tests belong in the light gate when a lane adds procedures or events
+
+A query procedure passed the lane's own tests but failed a contract test
+elsewhere (`contracts/actionApi.test.ts`) that pins "only X is a query".
+Rule: after a merge that adds tRPC procedures or events, run the contract
+and registry tests, not just the lane's files.
+
+## Tests that start real servers can load the operator's config
+
+Rust tests started private tmux servers that read `~/.tmux.conf` (TPM,
+resurrect). One restored the operator's 197-pane session, load passed 190,
+and resurrect saves piled up. Rule: before running a repo's integration
+tests on the operator's workstation, check that test servers start with no
+user config (`-f /dev/null` for tmux). Until then, run only filtered tests.
+
+## When lanes stall, check the host before the code
+
+`testlock` also waits for the 1-minute load to drop under its ceiling, and
+a repo's heavy-slot gate can be blocked by a stale request whose holder
+died. Rule: when several lanes report "waiting on background work", check
+the load average, the testlock owner file and the heavy queue's head first.
+
+## A gate script passes arguments as arrays
+
+A light-gate script passed `"--lib name"` as one argument, cargo rejected
+it, and the "red" gate was void. Rule: build commands with `"$@"` or
+arrays, and read a red gate's first error before dispatching a fix.
+
+## Check what triggers CI before deciding when to push
+
+In a repo whose CI runs only on PRs, `main` and dispatch, a push of the
+build branch wakes nothing, so checkpoint pushes are free off-machine
+copies. Rule: read the workflow `on:` blocks at setup and record the push
+policy in the ledger.
+
+## The ledger lives in a gitignored worktree directory
+
+SDD's `.superpowers/sdd/` sits in the integration worktree, so closedown
+deletes it. Rule: copy the ledger to durable scratch before closedown.
+
+## A subagent's second hand-back is refused
+
+When an agent reports twice, the second report is dropped ("one report per
+result"). Rule: when the notice says a hand-back was refused, ask the agent
+to resend in a few lines. Don't assume it said nothing.

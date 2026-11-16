@@ -19,6 +19,10 @@ Built by slicing, in this order, into `{scratchpad}/briefs/lane-{X}-{name}.md`:
 sed -n '/^### Task R1:/,/^### Task R2:/p' PLAN | sed '$d'
 ```
 
+Whole brief in one go: `slice-plan.sh PLAN OUT_DIR LANE NAME TASK_ID...`
+(this directory) writes `OUT_DIR/lane-LANE-NAME.md` with the five parts above
+plus `## Plan rulings`, and fails on a missing plan or task heading.
+
 ## Implementer dispatch (the message)
 
 ```
