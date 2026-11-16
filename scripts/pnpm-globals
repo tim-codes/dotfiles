@@ -13,7 +13,10 @@ packages=(
   # else project-level comes from the repo's own deps
   concurrently@latest
   nodemon@latest
-  typescript@latest
+  # pinned to major 6: typescript@latest is now 7.x (the native port), whose
+  # lib/ has no tsserver.js, so it cannot back typescript-language-server;
+  # revisit when tsls supports TS7/tsgo
+  typescript@6
   typescript-language-server@latest
   # language servers for Claude Code code intelligence (LSP plugins declare
   # them; binaries must be on PATH) — pairs with gopls (brew), rust-analyzer
@@ -89,5 +92,40 @@ for pkg in "${packages[@]}"; do
   }
   if [[ "$have" != "$latest" ]]; then
     echo "pnpm-globals: WARNING $name is $have but latest is $latest (held back by pnpm minimumReleaseAge; the next run picks it up)" >&2
+  fi
+done
+
+# pnpm 12 installs each global package into its own isolated group dir, so the
+# global `typescript` above is invisible to typescript-language-server, whose
+# fallback is a plain require.resolve('typescript') from its own location (the
+# plugin runs it outside any TS workspace: "Could not find a valid TypeScript
+# installation"). Give tsls's own group a typescript it can resolve. Pinned to
+# major 6 for the same reason as the entry above (TS7 has no tsserver.js).
+tslsGroups=$(pnpm root -g | node -e '
+  const fs = require("fs"), path = require("path");
+  const root = fs.readFileSync(0, "utf8").trim();
+  const seen = new Set();
+  for (const e of fs.readdirSync(root)) {
+    let dir;
+    try { dir = fs.realpathSync(path.join(root, e)); } catch { continue; }
+    if (seen.has(dir)) continue;
+    seen.add(dir);
+    try {
+      const pj = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
+      if (pj.dependencies && "typescript-language-server" in pj.dependencies) console.log(dir);
+    } catch { /* not a group dir */ }
+  }') || {
+  echo "pnpm-globals: FAILED: locating the typescript-language-server group under \$(pnpm root -g)" >&2
+  exit 1
+}
+if [[ -z "$tslsGroups" ]]; then
+  echo "pnpm-globals: FAILED: no pnpm global group contains typescript-language-server (looked under $(pnpm root -g))" >&2
+  exit 1
+fi
+for group in ${(f)tslsGroups}; do
+  echo "pnpm-globals: adding typescript@6 beside typescript-language-server in $group"
+  if ! pnpm --dir "$group" add typescript@6; then
+    echo "pnpm-globals: FAILED: pnpm --dir $group add typescript@6" >&2
+    exit 1
   fi
 done
