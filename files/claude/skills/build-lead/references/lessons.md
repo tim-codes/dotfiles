@@ -137,3 +137,35 @@ deletes it. Rule: copy the ledger to durable scratch before closedown.
 When an agent reports twice, the second report is dropped ("one report per
 result"). Rule: when the notice says a hand-back was refused, ask the agent
 to resend in a few lines. Don't assume it said nothing.
+
+# From the Gaia v0.7.7 build, 16 Nov 2026
+
+## Some contexts refuse PR and CI commands, so plan the hand-over
+
+In the reserve context the permission system refused `gh pr create` and
+`gh run rerun` (for the gaia PR, a dotfiles PR and a rerun of flaky jobs).
+Rule: expect this at setup. At the end, write the PR body to a file and send
+the operator session the exact command (identical in fish and bash) for Tim to
+run. Do the same for a rerun. Don't retry or work around a refusal.
+
+## The end-of-build PR must be ready, not a draft, for the full gate to run
+
+Gaia's `ci.yml` skips draft PRs (`github.event.pull_request.draft != true` on
+every job), so a draft PR gets no comprehensive gate. Rule: read the
+workflow's draft guard at setup. When the final push exists to run the full
+gate, open the PR as ready, and record that as a ruling in the ledger.
+
+## Gate arguments as arrays, again
+
+A light-gate script stored `just -f <path>` in one variable and passed it to
+`testlock` as a single word. Every test step exited 127 (command not found),
+so the red gate was void. Rule: build commands as arrays
+(`J=(just -f "$PWD/Justfile")`, `testlock "${J[@]}" test-file …`), and check a
+red gate's exit codes before reading it as test failures. See "A gate script
+passes arguments as arrays" above.
+
+## A CI red can be a pre-existing flake
+
+Rule: before fixing forward, check whether the failing test's file is in the
+diff and whether the test has failed on main. If neither, rerun, and file a
+hardening ticket.
