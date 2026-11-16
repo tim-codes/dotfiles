@@ -204,8 +204,8 @@ lane's business before the land.
 Skills do not travel into a fresh subagent context, so every brief you write
 for a subagent restates this policy in one line: focused tests only, the
 repo's local fast check before every land, CI runs the comprehensive gate on
-the head sha, and no heavy command without your heavy slot (here it replaces
-`testlock`).
+the head sha, and no heavy command without the member's heavy slot: in a
+squad member the heavy slot is the lock, so do not use `testlock`.
 
 ### Verification on buildlab (repos on `ci: squad`)
 
