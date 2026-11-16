@@ -29,7 +29,7 @@ name = "personal"
 # 1password: agent/run resolves 1Password references on this host in every context, so every account except openrouter (agent/run is denied there) provides it; vercel: the Vercel MCP server is exxo-only, so only exxo provides it
 # Tim, 16 Nov 2026: back in placement. Policy: most Gaia work goes to the personal/reserve Ultra plans;
 # exxo is used only where a task needs an org-scope capability (vercel) or the others are full.
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"]
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards", "figma"]
 placement_rank = 20
 email = "timoconnell1024@gmail.com"
 config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
@@ -38,8 +38,8 @@ config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
 # so its own account and quota.
 [[accounts]]
 name = "reserve"
-# Tim, 16 Nov 2026: back in placement (see personal).
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"]
+# Tim, 16 Nov 2026: back in placement (see personal). figma added 16 Nov 21:10Z: the claude.ai Figma connector is signed in for this login.
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards", "figma"]
 placement_rank = 10
 email = "tim.oc@outlook.com"
 config_dirs = ["~/.claude-reserve"]
