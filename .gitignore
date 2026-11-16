@@ -39,7 +39,6 @@ src/.config/squad/tunnel.json
 # Tracked files are re-included explicitly; keys live under ~/.local/state/squad/keys.
 src/.config/squad/*.json
 !src/.config/squad/member-settings.json
-!src/.config/squad/tunnel.json
 src/.config/squad/*.key
 src/.config/squad/*.pem
 src/.config/squad/agent.env
