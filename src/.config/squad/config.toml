@@ -61,6 +61,11 @@ key_file = "~/keys/openrouter.key"
 # (placement.ts placeMetered). browser, playwright and vercel are left out on purpose: those tasks are excluded by exclude_needs / not placed here.
 config_dirs = ["~/.claude-exxo-openrouter"]
 provides = ["agent-run", "docker", "rust", "shell", "node", "postgres", "1password", "boards"]
+# v0.7.0 (ENG-663): repricing at the tim-ds preset's first provider (DeepInfra fp8, read 13 Nov 2026; USD per Mtok)
+# and the per-session cost guard (Tim 13 Nov: pause $6, warn item $3).
+pricing = { input = 0.098, output = 0.294, cache_read = 0.0029, cache_write = 0 }
+session_cost_pause_usd = 6
+session_cost_item_usd = 3
 # The spend cap is a runtime directive from Gaia v0.6.1 (spend_cap @ account:openrouter: $75/month for the test round).
 
 [quota]
@@ -119,6 +124,21 @@ max_slots = 6
 # Heavy work naming a verify-manifest suite goes to buildlab (Gaia v0.6.1 rollout C5, 2026-11-11).
 offload_to = "buildlab"
 
+[policy.heavy.host_pressure]
+# 15 Nov 2026: swap_used_frac 0.85 → 0.97. macOS keeps swap allocated after the pressure that caused it has passed
+# (6.6 of 7.2 GB used with memory at 62%), so 0.85 latched the host "hot" for good: t129 stayed paused by
+# host_pressure, heavy slots read 0, launches waited. Load and free memory still catch real pressure; 0.97 catches
+# swap actually running out. Other keys are the documented defaults.
+load_per_core = 3.0
+swap_used_frac = 0.97
+min_free_mb = 2048
+hot_for_s = 120
+throttle = true
+throttle_after_s = 180
+throttle_step_s = 120
+throttle_min_running = 2
+release_after_s = 300
+
 [heavy]
 # heavy_slot_min_calm_s omitted: the built-in 300 s dwell applies (squad #257, v0.5.11).
 
@@ -143,6 +163,10 @@ trailers = ["Co-Authored-By: Claude <noreply@anthropic.com>"]
 app_id = 5704284
 installation_ids = { "Exxo-Labs" = 180689949 }
 key_env = "GAIA_GITHUB_APP_KEY_FILE"
+
+[policy.members]
+# v0.7.0 (ENG-642): the classic read:packages PAT for member pnpm installs, read from the secret cache only.
+packages_token_ref = "esc:exxo/gaia/tfo:github.packagesToken"
 
 [policy.preview]
 # Run once per member when a task is done or its land is finally refused (execFile, no shell, so an
@@ -193,7 +217,8 @@ auth_plugin = "/opt/homebrew/share/google-cloud-sdk/bin/gke-gcloud-auth-plugin"
 image = "europe-west2-docker.pkg.dev/exxo-internal/gaia/gaia-verify@sha256:77dc784e7fa1af85c48c26244cc9f85809ca2bc2317ab32a07864532335e5a3c"  # tag mise-2026.11.1-3712bba; pinned by digest
 machine_cpu = 16
 machine_mem_gi = 64
-max_nodes = 4
+max_nodes = 3                      # Tim 15 Nov: within exxo-internal's CPU quota once exxo-infra#286 (heavy 6→4, small 4→3 nodes) applies: pools at max = 178 of 200 vCPU
+max_cpu_m = 43500  # 3 nodes x ~14.5 cores allocatable (2 nodes admitted 29000); an h2gc-portal verify needs 33000
 min_nodes = 0
 warm_idle_s = 1200
 scale_ahead = true
@@ -222,13 +247,36 @@ background_wait_max_s = 3600
 # Kit calls go to the providers below in order. Their caps are runtime directives from Gaia v0.6.1
 # (spend_cap @ provider:<name>, kit_token_cap @ kit:<role>), not config keys.
 [kit]
+# Anthropic keys (15 Nov 2026): Console service-account keys gaia-tfo-<plan> in workspace gaia-tfo, one org per Ultra plan
+# (its $200/month API credits). Source of truth is ESC exxo/gaia/tfo; refill a file with
+# `just -f deploy/ops.Justfile provider-key-sync esc:exxo/gaia/tfo:anthropic.<plan>.apiKey <key_file>`, then restart.
 [[kit.providers]]
-name = "anthropic"
+name = "anthropic"                 # personal Ultra plan: anthropic.personal.apiKey
 kind = "anthropic"
 key_file = "~/.local/state/squad/keys/anthropic.key"
+
+[[kit.providers]]
+name = "anthropic-reserve"         # reserve Ultra plan: anthropic.reserve.apiKey; used once anthropic fails or is capped
+kind = "anthropic"
+key_file = "~/.local/state/squad/keys/anthropic-reserve.key"
 
 [[kit.providers]]
 name = "openrouter"
 kind = "openrouter"
 key_file = "~/.local/state/squad/keys/openrouter.key"
 model = "deepseek/deepseek-v4.1-flash-1017@preset/tim-ds"
+
+# v0.7.0: the arbiter, on for the next test round (Tim 13 Nov). Cap: kit_token_cap @ kit:arbiter (1.5M tokens/day since 15 Nov, both Ultra plans' API credits;
+# provider spend caps $200/month each). Model and limits are the defaults (sonnet). To switch off: enabled = false, restart.
+[policy.arbiter]
+enabled = true
+[policy.arbiter.classes.triage]
+verdicts = ["retry", "reroute", "escalate", "ignore", "close", "wait"]
+[policy.arbiter.classes.refusal_review]
+verdicts = ["auto_close", "refuse", "escalate"]
+[policy.arbiter.classes.relaunch_or_abandon]
+verdicts = ["relaunch", "abandon", "escalate"]
+[policy.arbiter.classes.question]
+verdicts = ["answered"]
+[policy.arbiter.classes.deliverables_audit]
+verdicts = ["complete", "incomplete", "descope", "amend", "accept_with_followup", "unverifiable"]
