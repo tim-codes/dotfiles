@@ -91,6 +91,24 @@ kick "$T/both.md"
 check "--settings follows --add-dir and precedes --disallowedTools" \
     [ "$(recs)" = "arg<--add-dir> arg<$FAKE/briefs> arg<--settings> arg<$OVERLAY> arg<--disallowedTools> arg<Bash(curl:*)> arg<--model> arg<opus> arg<--effort> arg<high> arg<Do the thing.> " ]
 
+# --- a planner kickoff (body starts with /squad-planner): the overlay minus gh pr create
+# and gh pr ready, as a JSON string; members keep the file
+sed 's|^Do the thing.$|/squad-planner\n\nPlan the thing.|' "$T/member.md" >"$T/planner.md"
+kick "$T/planner.md" --dry-run
+check "planner dry-run exits 0" [ "$rc" -eq 0 ]
+check "planner dry-run says the two commands are allowed" hasx "member_deny: $OVERLAY (planner: gh pr create and gh pr ready allowed)"
+check "planner rules still deny gh pr merge" bash -c 'printf "%s\n" "$1" | grep -F "member_deny_rules: " | grep -qF "Bash(gh pr merge*)"' _ "$out"
+check "planner rules drop gh pr create and gh pr ready" bash -c '! printf "%s\n" "$1" | grep -F "member_deny_rules: " | grep -qE "pr (create|ready)"' _ "$out"
+kick "$T/planner.md"
+check "planner launch exits 0 (stub)" [ "$rc" -eq 0 ]
+planner_json=$(sed -n 2p "$REC" | sed 's/^arg<//; s/>$//')
+check "planner launch passes --settings with a JSON string" [ "$(sed -n 1p "$REC")" = "arg<--settings>" ]
+check "  the JSON keeps every other rule" [ "$(printf '%s' "$planner_json" | jq '.permissions.deny | length')" -eq "$(jq '.permissions.deny | length - 8' "$OVERLAY")" ]
+check "  the JSON allows only create and ready" bash -c 'printf "%s" "$1" | jq -e ".permissions.deny | (index(\"Bash(gh pr create*)\") == null) and (index(\"Bash(gh pr ready*)\") == null) and (index(\"Bash(gh pr edit*)\") != null)" >/dev/null' _ "$planner_json"
+sed 's|^Do the thing.$|Plan with /squad-planner later.|' "$T/member.md" >"$T/notplanner.md"
+kick "$T/notplanner.md" --dry-run
+check "a body that only mentions /squad-planner keeps the full overlay" hasx "member_deny: $OVERLAY"
+
 # --- the symlinked entry point (src/bin/claude-kickoff -> ../../scripts/claude-kickoff)
 SYM="$SRC_REPO/src/bin/claude-kickoff"
 if [ -L "$SYM" ]; then
