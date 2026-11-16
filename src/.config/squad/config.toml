@@ -48,7 +48,8 @@ config_dirs = ["~/.claude-reserve"]
 [[accounts]]
 name = "exxo"
 provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "vercel", "boards"]
-placement_rank = 20
+# Last choice while the exxo 7d window is tight (quota_reserve @ account:exxo/7d 45, 16 Nov).
+placement_rank = 90
 email = "tim@exxo.io"
 config_dirs = ["~/.claude-exxo"]
 
