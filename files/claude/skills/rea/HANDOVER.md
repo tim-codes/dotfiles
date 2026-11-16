@@ -45,8 +45,8 @@ scripts in this skill folder rather than leaving them in scratch.
    `SKILL.md`, remove the _unverified_ markers, and add the helper scripts.
 5. Web-app test: **done 2026-11-16** against a hosted web editor (signed-in
    session over loopback CDP). Codified in `SKILL.md` and
-   `references/web-apps.md`. A sibling `reproduce-web-app` skill for the
-   end-to-end workflow is `reproduce-web-app`.
+   `references/web-apps.md`. The sibling `reproduce-web-app` skill covers the
+   end-to-end workflow.
 
 ## Decided
 
