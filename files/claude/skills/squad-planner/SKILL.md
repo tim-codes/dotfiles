@@ -433,9 +433,7 @@ omitted, never `null`.
   - A step the operator does after a deploy (for example "upload a test image
     in the staging Studio, check the preview") is a `blocks_step` step bound to
     the `stage: staging` (or `production`) deliverable it serves, through its
-    own `for` or a prerequisite's `step`; a post-deploy step is a `blocks_step`
-    step bound (by `for` or a prerequisite `step`) to the `stage: staging` or
-    `production` deliverable it serves. It outlives the task: from Gaia
+    own `for` or a prerequisite's `step`. It outlives the task: from Gaia
     v0.7.7 a bound post-deploy step stays open when the task lands, and in a
     direct-release repo it is raised to `now`, with a notification, once the
     land is staging-verified or released. An unbound step is caught only by a
