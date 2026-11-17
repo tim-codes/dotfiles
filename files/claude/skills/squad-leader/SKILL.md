@@ -194,9 +194,9 @@ instead.
 sign-in, a render) are decided and closed in the same breath:
 `items.decide` on the matching item with the delivered result, and the
 intervention record carries that `item_id`. Skipping this left pf-t16-r1-1
-open after its deck was built (tim-codes/squad#301). An `intervene` with
-`outcome: done` naming the item also closes it; `parked` and
-`handed_to_tim` leave it open. A task's open items close as superseded at
+open after its deck was built (tim-codes/squad#301). `intervene` only
+records the intervention; it never changes the item. Close the item with
+`items.decide` (or `items.patch {status: done}`) as well. A task's open items close as superseded at
 `task.done`, so a step still owed after that (a sign-off, the attended
 rebuild) goes on Tim's list.
 
