@@ -259,7 +259,13 @@ Scratch survives a pause only under the session scratchpad: a `SessionStart` hoo
   pass (`[policy.hygiene]`, ENG-525) retires done members, closes items of
   finished tasks and ends sessions the broker lost; act only on what its
   `policy:hygiene:<run>` item lists as unsure, or on a c5/c12 push.
-- **Round wrap-up**, when a batch completes or Tim asks: produce the bundle
+- **Round wrap-up**, when a batch completes or Tim asks: first stop the
+  failsafe watch yourself (`just -f /Users/tim/dev/squad/deploy/ops.Justfile
+  leader-watch-stop`; confirm `launchctl print
+  gui/$(id -u)/dev.tim.squad-leader-watch` no longer finds it) and say so in
+  the hand-back; parked items live on Tim's list, not in the watch's repeats
+  (Tim, 18 Nov 2026: a watch left running pushed the same parked c11/c12
+  repeats for 13 hours). Then produce the bundle
   (`just -f /Users/tim/dev/squad/orchestrator/Justfile bundle <run>`, or
   `squad debug bundle <run>`), read the morning report (`squad://morning`
   or BFF `reports.morning`), file its "Backlog candidates" in Linear, send
