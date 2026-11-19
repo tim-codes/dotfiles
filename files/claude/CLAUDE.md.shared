@@ -161,23 +161,30 @@ pure latency with nothing to judge until it ends; running it in the background
 keeps the session responsive to the operator, to other agents' messages and
 to independent work, at no cost.
 
-## Tim's shells: fish in his terminal, bash in the Claude prompt and the sandbox
+## Tim's shells: fish in his terminal, zsh at the Claude prompt
 
 Tim's interactive terminal is **fish**; a command he pastes into the Claude
-Code prompt as `! <cmd>` runs in the session's own shell (bash or zsh, the
-sandbox), so that form must be bash. An inline command or short set he is
-asked to run is printed in both forms, fish for his terminal and bash for the
-`!` prompt, unless the text is identical in both shells, in which case it is
-printed once. Fish syntax means `set`, `begin … end | cmd`, `; and` / `; or`,
+Code prompt as `! <cmd>` runs in the session's login shell, which is **zsh** on
+his Macs. Never hand him bash: every command or script meant for him comes in
+two forms, fish for his terminal and zsh for the `!` prompt, and only a text
+that is identical in both shells is printed once. Say which shell each form
+targets. Fish syntax means `set`, `begin … end | cmd`, `; and` / `; or`,
 `(cmd)` substitution and `$argv`, and his wrapper functions (`claude`,
-`claude-reserve`, `claude-exxo`, `restow`) used as they are. Inline goes in a
-fenced block, one command per line when they run in sequence. Anything longer,
-or anything relying on his fish functions, is written to `/tmp/<name>.fish`
-and handed over as `source /tmp/<name>.fish`, not `fish /tmp/<name>.fish`,
-because a non-interactive `bash` or `fish script.fish` does not load those
-functions; add a bash twin (`/tmp/<name>.sh`) when he may run it from the
-prompt. Commands the session runs itself through the Bash tool stay bash.
-Say which shell a snippet targets whenever the two forms differ.
+`claude-reserve`, `claude-exxo`, `restow`) used as they are. Keep the zsh form
+zsh-safe: arrays are 1-based, so never index from 0 (`${arr[1]}` is the first
+element; prefer a `for` loop); an unmatched glob is an error, so use
+`setopt nullglob` or the `(N)` qualifier when a glob may match nothing; a
+variable expansion is not word-split, so use arrays or `${=var}` where
+splitting is meant; quote anything with spaces. Inline goes in a fenced block,
+one command per line when they run in sequence. Anything longer, or anything
+relying on his fish functions, is written to `/tmp/<name>.fish` and handed over
+as `source /tmp/<name>.fish`, not `fish /tmp/<name>.fish`, because a
+non-interactive `fish script.fish` does not load those functions; add a zsh
+twin (`/tmp/<name>.zsh`, run with `source /tmp/<name>.zsh` or
+`zsh /tmp/<name>.zsh`) when he may run it from the prompt.
+
+Commands the session runs itself through the Bash tool run in the session's own
+shell and are a separate matter; this rule is about text handed to Tim.
 
 A script handed to Tim that runs longer than a few seconds prints what it is
 doing as it goes, prints a progress line (an elapsed counter, a step n of m, a
@@ -191,6 +198,10 @@ instead of the personal context his fish `claude` function pins; two runs
 failed before the cause was seen. His interactive shells are always fish
 (`src/.config/fish/`), and the wrapper functions that pin accounts, scrub env
 and jump directories live only there.
+
+**Why (19 Nov 2026):** a bash-indexed array (`${f[0]}`) silently failed at the
+zsh `!` prompt, where arrays are 1-based; Tim directed that bash be discarded
+and fish plus zsh forms always given.
 
 ## Scratch files are persisted, never trusted to /tmp
 
