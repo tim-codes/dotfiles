@@ -300,7 +300,10 @@ per line of work, so:
 - **Size a task to one PR a reviewer can read in about ten minutes.** A
   cutover that deletes thousands of lines, or a task that touches a hundred
   files, is split, not landed whole.
-- **Post-deploy checks are `stage: staging` deliverables**, judged by the
+- **Post-deploy checks are `stage: staging` deliverables**, labelled in the
+  plan "checked after the trunk staging deploy (owed, never pre-land
+  evidence)": the land reviewer never asks for them before the land, and a
+  `stage: production` deliverable is labelled the same way. They are judged by the
   verifier after the one deploy. The full gate, a staging smoke, a live or
   paid scenario, "verified on staging" and screenshots from a deployed
   environment are never merge-stage checks: the merge-stage land reviewer
@@ -330,7 +333,10 @@ omitted, never `null`.
   can run or observe. In a multi-repo plan, give each deliverable its `repo`
   (`owner/name`, the anchor or one of `resources.repos`) so the plan says
   where it lands. A deliverable may carry `stage: merge | staging |
-  production` (absent means checked at the merge). `production` is accepted at
+  production` (absent means checked at the merge). A `stage: staging`
+  deliverable is labelled "checked after the trunk staging deploy (owed,
+  never pre-land evidence)", and a `stage: production` one the same way.
+  `production` is accepted at
   plan approval only for a repo whose `managed_repos.release_kind` is not
   `none`: the orchestrator then takes the land through staging, cuts the
   release by the repo's convention and verifies production before the task is

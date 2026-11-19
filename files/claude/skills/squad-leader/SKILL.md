@@ -194,9 +194,9 @@ instead.
 sign-in, a render) are decided and closed in the same breath:
 `items.decide` on the matching item with the delivered result, and the
 intervention record carries that `item_id`. Skipping this left pf-t16-r1-1
-open after its deck was built (tim-codes/squad#301). An `intervene` with
-`outcome: done` naming the item also closes it; `parked` and
-`handed_to_tim` leave it open. A task's open items close as superseded at
+open after its deck was built (tim-codes/squad#301). `intervene` only
+records the intervention; it never changes the item. Close the item with
+`items.decide` (or `items.patch {status: done}`) as well. A task's open items close as superseded at
 `task.done`, so a step still owed after that (a sign-off, the attended
 rebuild) goes on Tim's list.
 
@@ -259,7 +259,13 @@ Scratch survives a pause only under the session scratchpad: a `SessionStart` hoo
   pass (`[policy.hygiene]`, ENG-525) retires done members, closes items of
   finished tasks and ends sessions the broker lost; act only on what its
   `policy:hygiene:<run>` item lists as unsure, or on a c5/c12 push.
-- **Round wrap-up**, when a batch completes or Tim asks: produce the bundle
+- **Round wrap-up**, when a batch completes or Tim asks: first stop the
+  failsafe watch yourself (`just -f /Users/tim/dev/squad/deploy/ops.Justfile
+  leader-watch-stop`; confirm `launchctl print
+  gui/$(id -u)/dev.tim.squad-leader-watch` no longer finds it) and say so in
+  the hand-back; parked items live on Tim's list, not in the watch's repeats
+  (Tim, 18 Nov 2026: a watch left running pushed the same parked c11/c12
+  repeats for 13 hours). Then produce the bundle
   (`just -f /Users/tim/dev/squad/orchestrator/Justfile bundle <run>`, or
   `squad debug bundle <run>`), read the morning report (`squad://morning`
   or BFF `reports.morning`), file its "Backlog candidates" in Linear, send
