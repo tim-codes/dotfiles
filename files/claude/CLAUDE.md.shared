@@ -172,8 +172,10 @@ targets. Fish syntax means `set`, `begin … end | cmd`, `; and` / `; or`,
 `(cmd)` substitution and `$argv`, and his wrapper functions (`claude`,
 `claude-reserve`, `claude-exxo`, `restow`) used as they are. Keep the zsh form
 zsh-safe: arrays are 1-based, so never index from 0 (`${arr[1]}` is the first
-element; prefer a `for` loop); an unmatched glob is an error, so use
-`setopt nullglob` or the `(N)` qualifier when a glob may match nothing; a
+element; prefer a `for` loop); an unmatched glob is an error, and glob
+qualifiers such as `(N)` are not reliably enabled at the `!` prompt (they
+failed there on 19 Nov), so when a file may not exist, list it with
+`find <dir> -maxdepth 1 -name '<pattern>'` rather than a glob; a
 variable expansion is not word-split, so use arrays or `${=var}` where
 splitting is meant; quote anything with spaces. Inline goes in a fenced block,
 one command per line when they run in sequence. Anything longer, or anything
