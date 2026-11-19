@@ -150,6 +150,11 @@ review_timeout_s = 1800                     # was 900; raised 2026-11-03 (portal
 # Appended to each squash-merge body after the PR body.
 trailers = ["Co-Authored-By: Claude <noreply@anthropic.com>"]
 
+[policy.trunk.ci_dispatch]
+# Tim 17 Nov 00:55Z: off for the rest of the h2 batch night: a periodic_lands bug dispatched a full
+# GitHub CI run on every one-minute sweep (trunk_ci_runs 15-22). Needs an orchestrator restart.
+enabled = false
+
 # The squad-tfo GitHub App (hand-over 3): every GitHub call of the orchestrator runs as it.
 # key_env is the NAME of the variable holding the key file's PATH; it is read from deploy/.env in the squad
 # checkout (exported by the launchd wrapper), never from this repo. The key itself stays in 1Password.
@@ -215,8 +220,8 @@ auth_plugin = "/opt/homebrew/share/google-cloud-sdk/bin/gke-gcloud-auth-plugin"
 image = "europe-west2-docker.pkg.dev/exxo-internal/gaia/gaia-verify@sha256:77dc784e7fa1af85c48c26244cc9f85809ca2bc2317ab32a07864532335e5a3c"  # tag mise-2026.11.1-3712bba; pinned by digest
 machine_cpu = 16
 machine_mem_gi = 64
-max_nodes = 3                      # Tim 15 Nov: within exxo-internal's CPU quota once exxo-infra#286 (heavy 6→4, small 4→3 nodes) applies: pools at max = 178 of 200 vCPU
-max_cpu_m = 43500  # 3 nodes x ~14.5 cores allocatable (2 nodes admitted 29000); an h2gc-portal verify needs 33000
+max_nodes = 3                      # Tim 16 Nov 23:55Z: dynamic, raised from 3 while CI pools idle (leader balances back to 3 when GitHub CI needs the quota). Was: Tim 15 Nov: within exxo-internal's CPU quota once exxo-infra#286 (heavy 6→4, small 4→3 nodes) applies: pools at max = 178 of 200 vCPU
+max_cpu_m = 43500  # 3 nodes: restored 17 Nov 01:29Z after the h2 batch finished (was 145000 at peak) x ~14.5 cores allocatable (2 nodes admitted 29000); an h2gc-portal verify needs 33000
 min_nodes = 0
 warm_idle_s = 1200
 scale_ahead = true
