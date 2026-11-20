@@ -139,10 +139,10 @@ Then build **what shipped since** (when the previous run ran a different
 major version, list only the previous ranked list's status and skip the PR
 sweep):
 
-- The previous ranked list: issues labelled `debug-review:<previous run>`
+- The previous ranked list: Linear tickets labelled `debug-review:<previous run>`
   when that label exists; otherwise `debug/<previous run>/review.md`
   section 11, or the squad issue titled "fixes from the <previous run>
-  debug review". Never read issues created after the window ended: they
+  debug review". Never read tickets created after the window ended: they
   may be this run's conclusions, filed from a hand review.
 - Each change merged since the previous run, in three groups from the PR's
   `mergedAt` (`gh pr list -R <repo> --state merged --search "merged:<prev
@@ -314,8 +314,8 @@ the `review.md` path and the three biggest findings in a line each. Then
 ask with `AskUserQuestion` whether to file the top items (top 3, top 5,
 none; Other for a chosen set). File Gaia follow-ups as Linear tickets (ENG),
 never GitHub issues on Exxo repos. Only on a yes: file each chosen item as a
-Linear ticket (where, cost, benefit, evidence, `review.md` path in the
-body), then list the ticket IDs.
+Linear ticket labelled `debug-review:<run>` (where, cost, benefit, evidence,
+`review.md` path in the body), then list the ticket IDs.
 
 Unattended (nobody to answer, or the brief says so): file nothing, and end
 the report with "issues not filed: unattended; ranked list in review.md".
@@ -339,4 +339,4 @@ the report with "issues not filed: unattended; ranked list in review.md".
   leader's merges, refusals, restarts and releases then all read zero.
 - Reading issues filed after the window ended, or this run's own hand
   review, before writing: they leak the conclusions.
-- Filing issues without the yes, or in an unattended session.
+- Filing tickets without the yes, or in an unattended session.
