@@ -110,15 +110,8 @@ the contract (`contracts/mcp-tools.md`, "Directive payloads" in the squad repo).
   (tim-codes/squad#283). Then
   carry on with everything the raise does not block; set `blocked` only when
   nothing is left. His answer comes back as an `operator_decision`.
-- A denied tool call is not retried in another form (a different command, a
-  wrapper, another tool reaching the same effect). If the work needs it,
-  raise it with the exact command and why.
-- Write commands to pass the permission classifier first time, so none is
-  denied and none needs retrying in another form: a commit message goes in a
-  file, `git commit -F <file>` (never `-F -` with a heredoc); read GitHub
-  with `gh ... --json <fields> --jq '<expr>'` (never a pipe into
-  `python3 -c` or a `--template`); keep one command per call, with no
-  interpreter on the end of a pipe.
+- A denied tool call is not retried in another form (see Denials). If the
+  work needs it, raise it with the exact command and why.
 - A land blocked by gaia-guard or a missing trunk is raised to Tim as "needs a
   trunk / landing route" (blocking `now`, recommending that option). Never
   recommend, offer as the recommended option, or run a hand-merge of a
@@ -225,8 +218,6 @@ Your lane branch is `gaia/task-<id>` (the squad's `[policy.launch] branch_prefix
   `.github/workflows/` changes push like any other; only Gaia's own repo
   refuses them, and Gaia work is never a Gaia task. If a workflow push is
   refused, `raise` it; do not work around it.
-  Never run `gh pr review`, `gh auth token` or other `gh` write commands: the
-  squad PR tools below do that work.
 
 - Open lane PRs with `mcp__squad__open_pr` (`{repo?, head, base, title, body,
   draft}`, draft by default) against the base the kickoff names (a branch or a
@@ -235,8 +226,7 @@ Your lane branch is `gaia/task-<id>` (the squad's `[policy.launch] branch_prefix
   one; `base` only to retarget to the base a wrong-base land refusal names),
   comment with `mcp__squad__pr_comment` (`{pr, body}`), where `pr` is the PR
   URL. All four PR tools act only on your own lane branch, in trunk and
-  `direct` repos alike. The Gaia App opens and edits PRs: mutating `gh pr`,
-  `gh issue` and `gh api` write commands are not for members.
+  `direct` repos alike.
 - On either merge path, mark the PR ready (`mcp__squad__pr_ready` with
   `{pr: "<PR URL>"}`)
   before landing or handing it to Tim and before you watch its checks, and have the branch up to date with
@@ -318,8 +308,6 @@ Your lane branch is `gaia/task-<id>` (the squad's `[policy.launch] branch_prefix
   ready, then land them all in one go. Read each repo's
   `squad://context-brief/<owner>%2F<name>` before working in it, and list
   every PR URL in the final `set` `detail`.
-- Never `gh pr merge` (the member settings deny it), never the GitHub UI,
-  never another merge route.
 - Before calling a PR green, check each expected CI job on the head sha by
   run id: `gh run list -R <owner/name> --commit <sha> --json
   databaseId,name,status,conclusion`, then `gh run view <id> -R <owner/name>
@@ -561,13 +549,9 @@ the directive table above.
 
 ## Infra helpers
 
-A session of kind `infra` works in an exxo-infra worktree and produces a PR
-only. The orchestrator's merge gate merges it and GitHub Actions applies it.
-Never `pulumi up`, never merge, and never `mcp__squad__land`: it is not
-allowed for `infra`, because the PR goes through the orchestrator's merge
-gate instead. exxo-infra's own repo skills govern how the change is written
-and previewed. Everything else in this skill applies, except Finishing's
-landing step.
+A session of kind `infra` works in an exxo-infra worktree; exxo-infra's own
+repo skills govern how the change is written and previewed, and the land gate
+and role file decide what it may do. Everything else in this skill applies.
 
 ## Finishing
 
@@ -577,10 +561,7 @@ raise the review item), stop completed subagents and background shells you
 started, `set` `done` with the PR URL (every PR URL, for a multi-repo task)
 in `detail`, and end the turn. The lane ends there: no watching for the merge,
 no waiting on the release, no follow-up on a review item once the land is in.
-Deploy and staging checks belong to the verifier. A session of kind `infra` never calls
-`mcp__squad__land`: its PR goes through the orchestrator's merge gate, so it
-finishes with `set` `status: "done"` (PR URL in `detail`) only. The policy
-layer winds the session down; do not wait for it.
+Deploy and staging checks belong to the verifier.
 
 Previews: the orchestrator tears down a lane's previews when the task is done or
 its land is finally refused (`[policy.preview] teardown`), so do not leave that to the end. A lane removes
