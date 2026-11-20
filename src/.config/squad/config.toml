@@ -39,7 +39,9 @@ config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
 [[accounts]]
 name = "reserve"
 # Tim, 16 Nov 2026: back in placement (see personal). figma added 16 Nov 21:10Z: the claude.ai Figma connector is signed in for this login.
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards", "figma"]
+# 17 Nov 2026 (v0.7.8 leader): figma REMOVED for tonight's batch: the reserve claude.ai account no longer lists a Figma connector
+# (claude mcp list), so figma tasks would fail here. Restore once Figma is connected at claude.ai for tim.oc@outlook.com.
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"]
 placement_rank = 10
 email = "tim.oc@outlook.com"
 config_dirs = ["~/.claude-reserve"]
@@ -147,6 +149,8 @@ public_url = "https://j9fsc30w-7780.uks1.devtunnels.ms"
 # Squad-owned verification (R20): trunk branches are gaia/trunk-<name>.
 branch_prefix = "gaia/trunk-"
 review_timeout_s = 1800                     # was 900; raised 2026-11-03 (portal land reviews take 10-20 min)
+max_parallel_reviews = 4                    # Tim 17 Nov 00:20Z: default 2; buildlab gaia pool at 10 nodes verifies ~4 h2gc lands at once
+max_parallel_reviews_per_repo = 4           # Tim 17 Nov 00:20Z: default 2 (needs an orchestrator restart; not hot-reloadable)
 # Appended to each squash-merge body after the PR body.
 trailers = ["Co-Authored-By: Claude <noreply@anthropic.com>"]
 
