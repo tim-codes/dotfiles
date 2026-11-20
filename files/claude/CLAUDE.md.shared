@@ -483,6 +483,10 @@ one backend; the overlay settings fragment sets them, never a session.
 The task tools are enabled by `CLAUDE_CODE_ENABLE_TODO_TOOLS` in
 `settings.shared.json` env (via claude-sync).
 
+## Review threads get an outcome before merge
+
+@~/dev/exxo/skills/agent-conventions/review-threads.md
+
 ## Dev stack
 
 "Dev stack", "dev-stack" or "my stack" means the setup repos plus the
