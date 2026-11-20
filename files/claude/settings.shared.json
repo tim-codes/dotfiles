@@ -523,7 +523,14 @@
       "mcp__claude_ai_Linear__save_issue",
       "mcp__squad__claim",
       "mcp__squad__intervene",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr ready:*)",
+      "Bash(gh pr edit:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr comment:*)",
+      "Bash(gh pr update-branch:*)",
+      "mcp__claude_ai_Notion"
     ],
     "deny": [
       "Bash(op read*)",
@@ -538,6 +545,10 @@
       "Bash(* gcloud secrets versions access*)",
       "Read(**/.claude.json)",
       "Read(**/.credentials.json)"
+    ],
+    "ask": [
+      "mcp__claude_ai_Notion__notion-delete-pages",
+      "mcp__claude_ai_Notion__notion-delete-databases"
     ]
   },
   "worktree": {
