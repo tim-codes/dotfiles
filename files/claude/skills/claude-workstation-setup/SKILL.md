@@ -198,7 +198,7 @@ plus `--append-system-prompt-file <roles_dir>/builder-instructions.md` and
 `--permission-mode auto`. A render failure or missing `squad` exits 6. The old
 `settings.member-deny.json` and the broker's `member_settings` overlay are
 retired; `claude-config-audit --roles <dir>` checks the fragments' deny floor
-(`tests/squad-roles-attended-leak.sh`). Design and rationale: the permissions
+(`tests/squad-roles-floor.sh`). Design and rationale: the permissions
 tier split spec in Exxo-Labs/gaia. `tests/claude-kickoff-role.sh` covers it.
 
 ## Repo config: conventions skill, audit script, SessionStart hook

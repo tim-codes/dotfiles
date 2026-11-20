@@ -325,8 +325,7 @@ class CliTests(unittest.TestCase):
 
 
 class RoleFloorTests(unittest.TestCase):
-    """--roles DIR: every kind fragment carries the deny floor, no fragment carries an attended-only rule
-    or a never-grant wildcard."""
+    """--roles DIR: every kind fragment carries the deny floor, no fragment carries a never-grant wildcard."""
     KINDS = ["member", "operator", "planner", "reviewer", "infra", "releaser"]
 
     def setUp(self):
@@ -364,14 +363,6 @@ class RoleFloorTests(unittest.TestCase):
     def test_overlay_needs_no_floor(self):
         code, fs = self.roles()
         self.assertEqual(code, 0)
-
-    def test_attended_rule_in_a_role_is_an_error(self):
-        attended = cca.perms(cca.load_json(os.path.join(cca.FRAGMENTS, "settings.attended.json")), "allow")
-        rule = next(r for r in attended if r.startswith("Bash(gh pr merge"))
-        self.put("infra", {"permissions": {"allow": [rule], "deny": self.floor}})
-        code, fs = self.roles()
-        self.assertEqual(code, 1)
-        self.assertEqual([(c, f) for c, _, f, _ in fs], [("role-attended-leak", "infra.json")])
 
     def test_never_grant_wildcard_is_an_error(self):
         self.put("planner", {"permissions": {"allow": ["Bash(just:*)", "Bash(*)"], "deny": self.floor}})

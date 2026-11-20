@@ -44,7 +44,6 @@ Checks (level, id):
                               (info when 1-3; local ref only, never fetched)
   error role-floor            (--roles) a kind fragment (member, operator, planner, reviewer,
                               infra, releaser) is missing, malformed or lacks a deny-floor rule
-  error role-attended-leak    (--roles) a fragment allows/asks a rule of settings.attended.json
   error role-wildcard         (--roles) a fragment grants an interpreter, curl, just:*, git:*,
                               Bash(*) or another dangerous_reason() rule
 Exit status: 1 if any error-level finding (0 under --hook), else 0.
@@ -647,18 +646,14 @@ ROLE_KINDS = ("member", "operator", "planner", "reviewer", "infra", "releaser")
 
 
 def audit_roles(roles_dir):
-    """Findings for a directory of Gaia role fragments (the floor comes from settings.shared.json,
-    the attended-only rules from settings.attended.json, minus anything the shared base also allows)."""
+    """Findings for a directory of Gaia role fragments (the floor comes from settings.shared.json)."""
     findings = []
 
     def add(level, check, name, msg):
         findings.append({"level": level, "check": check, "file": name, "message": msg})
 
     shared = load_json(os.path.join(FRAGMENTS, "settings.shared.json")) or {}
-    attended = load_json(os.path.join(FRAGMENTS, "settings.attended.json")) or {}
     floor = perms(shared, "deny")
-    shared_allow = set(perms(shared, "allow"))
-    attended_rules = (set(perms(attended, "allow")) | set(perms(attended, "ask"))) - shared_allow
     if not os.path.isdir(roles_dir):
         add("error", "role-floor", ".", f"roles directory not found: {roles_dir}")
         return findings
@@ -676,9 +671,6 @@ def audit_roles(roles_dir):
             if missing:
                 add("error", "role-floor", f"{name}.json",
                     f"lacks {len(missing)} of {len(floor)} deny-floor rules: " + ", ".join(missing))
-        for rule in perms(doc, "allow") + perms(doc, "ask"):
-            if rule in attended_rules:
-                add("error", "role-attended-leak", f"{name}.json", f"carries an attended-fragment rule: {redact(rule, 100)}")
         for rule in perms(doc, "allow"):
             why = dangerous_reason(rule)
             if why:
