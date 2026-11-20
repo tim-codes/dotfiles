@@ -7,7 +7,8 @@
 # Replaces homelab's projects/macos-common/sync-claude-config.sh. Two changes
 # of substance beyond the move:
 #
-# 1. settings.json is built by deep-merging files/claude/settings.shared.json
+# 1. settings.json is built by deep-merging files/claude/settings.shared.json,
+#    files/claude/settings.attended.json (Tim's attended scope)
 #    with a per-account files/claude/settings.<account>.json fragment
 #    (jq, account fragment wins, permission rule arrays concatenated — see
 #    SETTINGS_MERGE) and the result is COPIED
@@ -150,6 +151,7 @@ esac
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_SETTINGS_SHARED="$REPO_DIR/files/claude/settings.shared.json"
+SRC_SETTINGS_ATTENDED="$REPO_DIR/files/claude/settings.attended.json"
 SRC_CLAUDE_MD_SHARED="$REPO_DIR/files/claude/CLAUDE.md.shared"
 SRC_SKILLS="$REPO_DIR/files/claude/skills"
 SRC_MCP_SHARED="$REPO_DIR/files/claude/mcp.shared.json"
@@ -199,21 +201,26 @@ SETTINGS_MERGE='
 '
 
 # Build the merged settings for context <name> (fragment account <account>)
-# into <outfile>: shared + account fragment, then, if
+# into <outfile>: shared -> attended -> account fragment, then, if
 # files/claude/settings.overlay.<name>.json exists, merged again through
-# SETTINGS_MERGE so permission and hook arrays concatenate. Returns 1 if the account
-# fragment is missing.
+# SETTINGS_MERGE so permission and hook arrays concatenate. The attended
+# fragment holds Tim's broad pairing scope (the builder tier never loads user
+# settings, so none of it may sit in shared). Returns 1 if the account
+# fragment or the attended fragment is missing.
 build_settings() {
     local name="$1" account="$2" out="$3"
     local fragment="$REPO_DIR/files/claude/settings.$account.json"
     local overlay="$REPO_DIR/files/claude/settings.overlay.$name.json"
     [ -f "$fragment" ] || return 1
+    [ -f "$SRC_SETTINGS_ATTENDED" ] || return 1
+    jq -s "$SETTINGS_MERGE" "$SRC_SETTINGS_SHARED" "$SRC_SETTINGS_ATTENDED" > "$out.shared"
+    jq -s "$SETTINGS_MERGE" "$out.shared" "$fragment" > "$out.base"
+    rm -f "$out.shared"
     if [ -f "$overlay" ]; then
-        jq -s "$SETTINGS_MERGE" "$SRC_SETTINGS_SHARED" "$fragment" > "$out.base"
         jq -s "$SETTINGS_MERGE" "$out.base" "$overlay" > "$out"
         rm -f "$out.base"
     else
-        jq -s "$SETTINGS_MERGE" "$SRC_SETTINGS_SHARED" "$fragment" > "$out"
+        mv "$out.base" "$out"
     fi
 }
 
@@ -465,7 +472,7 @@ if [ "$diff_only" = 1 ]; then
             warn "settings.$account.json missing — skipping ${ctx/#$HOME/~}"
             continue
         fi
-        info "${ctx/#$HOME/~} vs repo (settings.shared.json + settings.$account.json)"
+        info "${ctx/#$HOME/~} vs repo (settings.shared.json + settings.attended.json + settings.$account.json)"
         build_settings "$name" "$account" "$MERGE_TMP"
         if diff -u "$ctx/settings.json" "$MERGE_TMP" 2>/dev/null; then
             echo "  identical"
@@ -523,7 +530,7 @@ sync_settings() {
         echo "  (promote anything worth keeping into settings.shared.json / settings.$account.json, then re-run)"
     fi
     cp "$MERGE_TMP" "$ctx/settings.json"
-    echo "  settings.json: written from settings.shared.json + settings.$account.json"
+    echo "  settings.json: written from settings.shared.json + settings.attended.json + settings.$account.json"
 }
 
 # ---- settings.local.json: retire it (context-level local settings are drift) ----

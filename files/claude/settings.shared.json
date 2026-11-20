@@ -4,56 +4,7 @@
   },
   "model": "opus",
   "hooks": {
-    "Notification": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Waiting # notchbar-agents-claude-hook"
-          }
-        ]
-      },
-      {
-        "matcher": "permission_prompt",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/bell.sh\" # tmux-claude-hatch"
-          },
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/refresh-cache.sh\" # tmux-claude-hatch"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude Notification >/dev/null 2>&1 || true # tmux-home",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Auto # notchbar-agents-claude-hook"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude PostToolUse >/dev/null 2>&1 || true # tmux-home",
-            "timeout": 5
-          }
-        ]
-      },
       {
         "hooks": [
           {
@@ -69,23 +20,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' ToolFail # notchbar-agents-claude-hook"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude PostToolUseFailure >/dev/null 2>&1 || true # tmux-home",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook prompt-cleared) && printf '%s\\n' \"$o\"; exit 0",
             "timeout": 10
           }
@@ -93,14 +27,6 @@
       }
     ],
     "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Working # notchbar-agents-claude-hook"
-          }
-        ]
-      },
       {
         "matcher": "Write|Edit",
         "hooks": [
@@ -125,19 +51,6 @@
           {
             "type": "command",
             "command": "\"$HOME/dev/dotfiles/scripts/claude-agent-model-guard\" # claude-agent-model-guard"
-          }
-        ]
-      },
-      {
-        "matcher": "AskUserQuestion",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/bell.sh\" # tmux-claude-hatch"
-          },
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/refresh-cache.sh\" # tmux-claude-hatch"
           }
         ]
       },
@@ -167,32 +80,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Ended # notchbar-agents-claude-hook"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "\"$HOME/dev/dotfiles/files/claude/hooks/preserve-worktree-transcripts.sh\" # worktree-transcript-preserve"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/refresh-cache.sh\" 0.3 # tmux-claude-hatch"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SessionEnd >/dev/null 2>&1 || true # tmux-home",
-            "timeout": 5
           }
         ]
       },
@@ -207,41 +95,6 @@
       }
     ],
     "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Idle # notchbar-agents-claude-hook"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/refresh-cache.sh\" # tmux-claude-hatch"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SessionStart >/dev/null 2>&1 || true # tmux-home",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "startup|resume",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/dev/dotfiles/scripts/claude-config-audit\" --repo \"$CLAUDE_PROJECT_DIR\" --quiet --hook # claude-config-audit",
-            "timeout": 5
-          }
-        ]
-      },
       {
         "hooks": [
           {
@@ -267,36 +120,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Idle # notchbar-agents-claude-hook"
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/bell.sh\" # tmux-claude-hatch"
-          },
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/refresh-cache.sh\" # tmux-claude-hatch"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude Stop >/dev/null 2>&1 || true # tmux-home",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook stop) && printf '%s\\n' \"$o\"; exit 0",
             "timeout": 10
           }
@@ -317,31 +140,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Working # notchbar-agents-claude-hook"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/refresh-cache.sh\" # tmux-claude-hatch"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude UserPromptSubmit >/dev/null 2>&1 || true # tmux-home",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook user-prompt-submit) && printf '%s\\n' \"$o\"; exit 0",
             "timeout": 10
           }
@@ -349,15 +147,6 @@
       }
     ],
     "StopFailure": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude StopFailure >/dev/null 2>&1 || true # tmux-home",
-            "timeout": 5
-          }
-        ]
-      },
       {
         "hooks": [
           {
@@ -373,15 +162,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude PermissionDenied >/dev/null 2>&1 || true # tmux-home",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook prompt-cleared) && printf '%s\\n' \"$o\"; exit 0",
             "timeout": 10
           }
@@ -393,15 +173,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SubagentStart >/dev/null 2>&1 || true # tmux-home",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook subagent-start) && printf '%s\\n' \"$o\"; exit 0",
             "timeout": 10
           }
@@ -409,15 +180,6 @@
       }
     ],
     "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SubagentStop >/dev/null 2>&1 || true # tmux-home",
-            "timeout": 5
-          }
-        ]
-      },
       {
         "hooks": [
           {
@@ -523,14 +285,7 @@
       "mcp__claude_ai_Linear__save_issue",
       "mcp__squad__claim",
       "mcp__squad__intervene",
-      "mcp__ide__getDiagnostics",
-      "Bash(gh pr create:*)",
-      "Bash(gh pr ready:*)",
-      "Bash(gh pr edit:*)",
-      "Bash(gh pr merge:*)",
-      "Bash(gh pr comment:*)",
-      "Bash(gh pr update-branch:*)",
-      "mcp__claude_ai_Notion"
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [
       "Bash(op read*)",
@@ -545,10 +300,6 @@
       "Bash(* gcloud secrets versions access*)",
       "Read(**/.claude.json)",
       "Read(**/.credentials.json)"
-    ],
-    "ask": [
-      "mcp__claude_ai_Notion__notion-delete-pages",
-      "mcp__claude_ai_Notion__notion-delete-databases"
     ]
   },
   "worktree": {

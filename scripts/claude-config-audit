@@ -253,8 +253,9 @@ _GLOBAL = {}
 def global_settings(ctx):
     if ctx not in _GLOBAL:
         shared = load_json(os.path.join(FRAGMENTS, "settings.shared.json")) or {}
+        attended = load_json(os.path.join(FRAGMENTS, "settings.attended.json")) or {}
         frag = load_json(os.path.join(FRAGMENTS, f"settings.{ctx}.json")) or {}
-        _GLOBAL[ctx] = {"allow": perms(shared, "allow") + perms(frag, "allow"),
+        _GLOBAL[ctx] = {"allow": perms(shared, "allow") + perms(attended, "allow") + perms(frag, "allow"),
                         "floor": perms(shared, "deny")}
     return _GLOBAL[ctx]
 

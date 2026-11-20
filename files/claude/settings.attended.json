@@ -1,0 +1,361 @@
+{
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Waiting # notchbar-agents-claude-hook"
+          }
+        ]
+      },
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/bell.sh\" # tmux-claude-hatch"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/refresh-cache.sh\" # tmux-claude-hatch"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude Notification >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Auto # notchbar-agents-claude-hook"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude PostToolUse >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' ToolFail # notchbar-agents-claude-hook"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude PostToolUseFailure >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Working # notchbar-agents-claude-hook"
+          }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/bell.sh\" # tmux-claude-hatch"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/refresh-cache.sh\" # tmux-claude-hatch"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Ended # notchbar-agents-claude-hook"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/refresh-cache.sh\" 0.3 # tmux-claude-hatch"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SessionEnd >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Idle # notchbar-agents-claude-hook"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/refresh-cache.sh\" # tmux-claude-hatch"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SessionStart >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/dev/dotfiles/scripts/claude-config-audit\" --repo \"$CLAUDE_PROJECT_DIR\" --quiet --hook # claude-config-audit",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Idle # notchbar-agents-claude-hook"
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/bell.sh\" # tmux-claude-hatch"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/refresh-cache.sh\" # tmux-claude-hatch"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude Stop >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/tim/Library/Application Support/Bartender/NotchBar/AgentStatus/hooks/claude-event-hook.sh' Working # notchbar-agents-claude-hook"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME/.tmux/plugins/tmux-claude-hatch/plugins/tmux-claude-hatch/hooks/refresh-cache.sh\" # tmux-claude-hatch"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude UserPromptSubmit >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude StopFailure >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude PermissionDenied >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SubagentStart >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.tmux/plugins/tmux-home/target/release/tmux-home\" hook claude SubagentStop >/dev/null 2>&1 || true # tmux-home",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(gh pr create:*)",
+      "Bash(gh pr ready:*)",
+      "Bash(gh pr edit:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr comment:*)",
+      "Bash(gh pr update-branch:*)",
+      "mcp__claude_ai_Notion",
+      "mcp__claude_ai_Notion__notion-delete-pages",
+      "Artifact",
+      "ArtifactData",
+      "ArtifactComments",
+      "Bash(gh api:*)",
+      "Bash(git push:*)",
+      "Bash(git tag:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh repo list:*)",
+      "Bash(gh project view:*)",
+      "Bash(gh project item-list:*)",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_network_requests",
+      "Read(//Users/tim/scratch/claude/**)",
+      "Edit(//Users/tim/scratch/claude/**)",
+      "Write(//Users/tim/scratch/claude/**)",
+      "Read(//private/tmp/claude-501/**)",
+      "Read(//Users/tim/claude/artefacts/**)",
+      "Edit(//Users/tim/claude/artefacts/**)",
+      "Write(//Users/tim/claude/artefacts/**)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(npm view:*)",
+      "mcp__notion__API-get-block-children",
+      "mcp__notion__API-post-search",
+      "mcp__claude_ai_Linear__get_issue",
+      "mcp__plugin_linear_linear__list_teams",
+      "mcp__plugin_linear_linear__list_projects",
+      "mcp__plugin_linear_linear__list_issues",
+      "mcp__plugin_linear_linear__list_issue_labels",
+      "mcp__plugin_linear_linear__list_issue_statuses",
+      "mcp__plugin_linear_linear__get_issue",
+      "mcp__plugin_linear_linear__list_documents",
+      "mcp__Sanity__query_documents",
+      "mcp__Sanity__search_docs",
+      "mcp__Sanity__read_docs",
+      "mcp__Sanity__list_datasets",
+      "mcp__Sanity__get_schema",
+      "mcp__Sanity__get_document",
+      "mcp__Sanity__list_projects",
+      "mcp__Sanity__list_workspace_schemas",
+      "mcp__Sanity__list_sanity_rules",
+      "mcp__Sanity__get_sanity_rules"
+    ],
+    "ask": [
+      "mcp__claude_ai_Notion__notion-delete-databases",
+      "Bash(git push* main)",
+      "Bash(git push* master)",
+      "Bash(git push*:main)",
+      "Bash(git push*:master)",
+      "Bash(pulumi up*)",
+      "Bash(* pulumi up*)",
+      "Bash(gh secret set*)",
+      "Bash(gh variable set*)",
+      "Bash(gh api *-X*)",
+      "Bash(gh api *--method*)",
+      "Bash(gh api *-f *)",
+      "Bash(gh api *-F *)",
+      "Bash(gh api *--field*)",
+      "Bash(gh api *--raw-field*)",
+      "Bash(gh api *--input*)",
+      "Bash(gh api graphql*mutation*)",
+      "mcp__claude_ai_Slack__slack_send_message",
+      "mcp__claude_ai_Slack__slack_send_message_draft",
+      "mcp__claude_ai_Slack__slack_schedule_message",
+      "mcp__claude_ai_Microsoft_365__outlook_send_mail",
+      "mcp__claude_ai_Microsoft_365__outlook_send_draft",
+      "mcp__claude_ai_Microsoft_365__outlook_forward_mail",
+      "mcp__claude_ai_Microsoft_365__teams_send_chat_message",
+      "mcp__claude_ai_Microsoft_365__teams_send_channel_message",
+      "mcp__claude_ai_Microsoft_365__teams_reply_channel_message",
+      "Bash(ps:*)",
+      "Bash(pgrep:*)",
+      "Bash(gcloud config set*)",
+      "Bash(kubectl config use-context*)",
+      "Bash(aws-use*)",
+      "Bash(pulumi stack select*)",
+      "Bash(gh auth switch*)"
+    ]
+  }
+}
