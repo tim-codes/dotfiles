@@ -51,6 +51,9 @@ cat >"$BIN/claude" <<'EOF'
 } >"$REC"
 EOF
 chmod +x "$BIN/claude"
+# Builder lanes (a `role` key) render their settings through squad; stub it.
+printf '#!/bin/bash\necho "{}"\n' >"$BIN/squad"
+chmod +x "$BIN/squad"
 
 fail=0
 ok()  { printf 'ok:   %s\n' "$*"; }
@@ -117,7 +120,7 @@ kick "$T/fixture.md" --resume abc --account exxo-personal --cwd "$W" --dry-run
 check "--resume with --account targets that dir" has "config_dir: $FAKE/.claude-exxo-personal"
 
 # --- real exec of the stub ---
-kick "$T/fixture.md" --no-member-deny
+kick "$T/fixture.md"
 check "new launch exits 0 (stub)" [ "$rc" -eq 0 ]
 rec=$(cat "$REC" 2>/dev/null)
 check "new launch argv is --model M --effort E <body> in that order" \
@@ -131,7 +134,7 @@ check "claude started in the prompt cwd" bash -c 'printf "%s\n" "$1" | grep -qx 
 out=$(HOME="$FAKE" PATH="$BIN:/usr/bin:/bin" REC="$REC" EXXO_SECRET_CACHE_TTL_SECONDS=60 "$KICK" "$T/fixture.md" 2>&1)
 check "a caller-set TTL is respected" bash -c 'grep -qx "TTL=60" "$1"' _ "$REC"
 
-kick "$T/fixture.md" --resume sess-1 --account exxo-personal --cwd "$W" --no-member-deny
+kick "$T/fixture.md" --resume sess-1 --account exxo-personal --cwd "$W"
 check "resume launch exits 0 (stub)" [ "$rc" -eq 0 ]
 rec=$(cat "$REC")
 check "resume argv is --resume ID --model M --effort E, then the relaunch note" \
@@ -312,7 +315,7 @@ cat >"$BIN/claude" <<'EOF'
 #!/bin/bash
 for a in "$@"; do printf 'arg<%s>\n' "$a"; done >"$REC"
 EOF
-kick "$T/adddirs.md" --no-member-deny
+kick "$T/adddirs.md"
 check "add_dirs become --add-dir flags, in order, before --model" bash -c '[ "$(sed -n 1,6p "$1" | tr "\n" " ")" = "arg<--add-dir> arg<$2/briefs> arg<--add-dir> arg<$2/reports> arg<--model> arg<opus> " ]' _ "$REC" "$FAKE"
 kick "$T/adddirs.md" --resume s1 --account exxo --cwd "$W"
 check "add_dirs also apply on resume" bash -c 'grep -qx "arg<--add-dir>" "$1" && grep -qx "arg<--resume>" "$1"' _ "$REC"
@@ -323,7 +326,7 @@ has "nowhere" && ok "  message names the path" || bad "  message: $out"
 sed 's|^model: .*|&\ndeny: Bash(curl:*), WebFetch(domain:localhost)|' "$T/fixture.md" >"$T/deny.md"
 kick "$T/deny.md" --dry-run
 check "deny is echoed" has "deny: Bash(curl:*), WebFetch(domain:localhost)"
-kick "$T/deny.md" --no-member-deny
+kick "$T/deny.md"
 check "deny rules become --disallowedTools flags, before --model" bash -c '[ "$(sed -n 1,5p "$1" | tr "\n" " ")" = "arg<--disallowedTools> arg<Bash(curl:*)> arg<--disallowedTools> arg<WebFetch(domain:localhost)> arg<--model> " ]' _ "$REC"
 kick "$T/nokeys.md" --dry-run
 check "deny defaults to none" has "deny: none"
@@ -334,21 +337,21 @@ check "agent_and_name_echoed" bash -c 'printf "%s\n" "$1" | grep -qx "agent: ux-
 check "agent_name_lines_follow_deny" bash -c 'printf "%s\n" "$1" | grep -oE "^(deny|agent|name):" | tr "\n" " " | grep -qx "deny: agent: name: "' _ "$out"
 kick "$T/fixture.md" --dry-run
 check "agent_name_default_none" bash -c 'printf "%s\n" "$1" | grep -qx "agent: none" && printf "%s\n" "$1" | grep -qx "name: none"' _ "$out"
-kick "$T/agent.md" --no-member-deny
+kick "$T/agent.md"
 check "agent_name_argv_before_model" bash -c '[ "$(sed -n 1,8p "$1" | tr "\n" " ")" = "arg<--agent> arg<ux-designer> arg<--name> arg<ux-designer-nav> arg<--model> arg<opus> arg<--effort> arg<high> " ]' _ "$REC"
 grep -v '^model:' "$T/agent.md" >"$T/agent-nomodel.md"
 kick "$T/agent-nomodel.md" --dry-run
 check "agent_without_model_dry_run" bash -c '[ "$2" -eq 0 ] && printf "%s\n" "$1" | grep -qx "model: none (agent default)"' _ "$out" "$rc"
-kick "$T/agent-nomodel.md" --no-member-deny
+kick "$T/agent-nomodel.md"
 check "agent_without_model_omits_model_flag" bash -c '! grep -qx "arg<--model>" "$1" && grep -qx "arg<--agent>" "$1" && grep -qx "arg<--effort>" "$1"' _ "$REC"
 grep -v '^effort:' "$T/agent-nomodel.md" >"$T/agent-noeffort.md"
 expect_rc "agent_without_effort_exits_4" 4 "$T/agent-noeffort.md" --dry-run
 sed 's|^agent: .*|agent: ux;designer|' "$T/agent.md" >"$T/badagent.md"
 expect_rc "bad_agent_value_exits_5" 5 "$T/badagent.md" --dry-run
 sed 's|^name: .*|name: ux designer nav|' "$T/agent.md" >"$T/spacename.md"
-kick "$T/spacename.md" --no-member-deny
+kick "$T/spacename.md"
 check "name_with_spaces_is_one_arg" grep -qx "arg<ux designer nav>" "$REC"
-kick "$T/agent-nomodel.md" --resume sess-a --account exxo --cwd "$W" --no-member-deny
+kick "$T/agent-nomodel.md" --resume sess-a --account exxo --cwd "$W"
 check "resume_with_agent_passes_no_agent_name_or_model" bash -c '! grep -qxE "arg<--(agent|name|model)>" "$1" && grep -qx "arg<--resume>" "$1"' _ "$REC"
 expect_rc "missing_model_without_agent_still_exits_4" 4 "$T/no-model.md" --dry-run
 # context env: applied unless the caller set it
@@ -425,7 +428,7 @@ cat >"$BIN/claude" <<'EOF'
   echo "PWD=$(pwd -P)"
 } >"$REC"
 EOF
-kick "$T/rcwd.md" --resume sess-9 --cwd "$FAKE/work/other" --account exxo --no-member-deny
+kick "$T/rcwd.md" --resume sess-9 --cwd "$FAKE/work/other" --account exxo
 check "resume launch exits 0 with explicit cwd (stub)" [ "$rc" -eq 0 ]
 rec=$(cat "$REC")
 check "resume argv is --resume ID --model M --effort E <note>" bash -c '

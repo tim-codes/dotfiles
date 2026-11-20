@@ -9,7 +9,6 @@
 #   claude-kickoff <prompt.md> [--account CONTEXT]
 #                              [--resume <session_id> --cwd <dir>] [--dry-run]
 #                              [--trust | --no-trust] [--no-trust-check]
-#                              [--no-member-deny]
 #   claude-kickoff --check-trust <cwd> --account CONTEXT
 #
 # The context wrappers (claude-personal, claude-reserve, claude-exxo,
@@ -69,7 +68,6 @@ usage() {
 Usage: claude-kickoff <prompt.md> [--account CONTEXT]
                                   [--resume <session_id> --cwd <dir>] [--dry-run]
                                   [--trust | --no-trust] [--no-trust-check]
-                                  [--no-member-deny]
        claude-kickoff --check-trust <cwd> --account CONTEXT
 
 Reads the frontmatter of <prompt.md>, changes to its cwd and execs claude in the
@@ -96,6 +94,17 @@ effort is used):
   name     the whole value passed as --name (display name); new launches only
   harness  must equal the context's harness (default claude-code; else exit 5)
   role     client (default) | orchestrator | infra
+  tier     builder | attended. Default builder when `role` is set or the body starts
+           with /squad-planner, else attended (anything else: exit 5). A builder
+           lane renders its settings with `squad roles render --kind K
+           [--overlay openrouter] --interactive` (K: client=member,
+           orchestrator=operator, infra=infra, a /squad-planner body=planner) and
+           passes `--setting-sources project --settings <that JSON>
+           --append-system-prompt-file <roles_dir>/builder-instructions.md
+           --permission-mode auto`, plus `--plugin-dir <roles_dir>/plugin` when that
+           directory exists. roles_dir: $SQUAD_ROLES_DIR, else `roles_dir` in
+           ~/.config/squad/config.toml, else ~/.config/squad/roles. An attended
+           lane gets none of this and keeps the account's own settings.
   lifetime run | task; the default is task for a client, else run
   needs    comma or space separated; each one the file lists in `account_bound` must
            be in the context's `provides` (exit 9); other words are ignored with a
@@ -138,15 +147,6 @@ Options:
                   skip the folder-trust step altogether, check and record (attended
                   launch, where the human can answer the dialog); beats --trust and
                   --no-trust. Also honoured as CLAUDE_KICKOFF_NO_TRUST_CHECK=1.
-  --no-member-deny
-                  skip the member deny overlay. By default every launch passes
-                  `--settings <repo>/files/claude/settings.member-deny.json`, which
-                  denies raw `gh pr merge` (and `gh api ... merge`) for the session,
-                  so members land only through mcp__squad__land. A planner kickoff
-                  (body starts with /squad-planner) gets the same rules minus
-                  `gh pr create` and `gh pr ready`, as a JSON string. Use it for an
-                  attended launch. --dry-run prints `member_deny: <path>` and
-                  `member_deny_rules: <rules>`, or `member_deny: off`.
   --check-trust DIR
                   only check whether DIR is trusted in the --account context; no
                   prompt file. Prints `trust: ok <path> in <context>` and exits 0, or
@@ -177,8 +177,8 @@ Exit codes (stable):
   5   invalid value: unknown context, a harness other than the context's, an unknown
       role or lifetime, or cwd that does not resolve to one directory
   6   the context's config dir (run scripts/claude-contexts) or the contexts file
-      does not exist; or the member deny overlay is missing or not valid JSON
-      (pass --no-member-deny to launch without it)
+      does not exist; or a builder lane's `squad roles render` fails or `squad` is
+      not on PATH (the role fragment fails closed)
   7   the claude binary, or yq, is not on PATH
   8   a context precondition failed (the message names the command, never its output)
   9   an `account_bound` need is not provided by the context
@@ -198,7 +198,7 @@ die() { # die <code> <message...>
     exit "$code"
 }
 
-prompt="" account="" resume="" resume_cwd="" dry=0 check_trust="" trust_check=1 trust_mode=record member_deny=1
+prompt="" account="" resume="" resume_cwd="" dry=0 check_trust="" trust_check=1 trust_mode=record
 [ "${CLAUDE_KICKOFF_NO_TRUST_CHECK:-}" = 1 ] && trust_check=0
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -219,7 +219,6 @@ while [ $# -gt 0 ]; do
         --no-trust-check) trust_check=0; shift ;;
         --trust) trust_mode=record; shift ;;
         --no-trust) trust_mode=refuse; shift ;;
-        --no-member-deny) member_deny=0; shift ;;
         --check-trust)
             [ $# -ge 2 ] || die 2 "--check-trust needs a directory"
             check_trust="$2"; shift 2 ;;
@@ -370,6 +369,7 @@ effort=$(fm_get effort | first_word)
 needs_raw=$(fm_get needs)
 harness_raw=$(fm_get harness | first_word)
 role=$(fm_get role | first_word)
+tier_raw=$(fm_get tier | first_word)
 lifetime=$(fm_get lifetime | first_word)
 capabilities_raw=$(fm_get capabilities)
 env_pass_raw=$(fm_get env-pass)
@@ -513,30 +513,40 @@ claude_bin=$(command -v claude 2>/dev/null || true)
 if [ -z "$claude_bin" ] && [ -x "$HOME/.local/bin/claude" ]; then claude_bin="$HOME/.local/bin/claude"; fi
 [ -n "$claude_bin" ] || die 7 "claude is not on PATH (nor in ~/.local/bin)"
 
-# --- member deny overlay: committed in this repo, found through the real script path
-member_deny_file="" member_deny_rules="" member_deny_args=()
-if [ "$member_deny" -eq 1 ]; then
-    self="${BASH_SOURCE[0]}"
-    while [ -L "$self" ]; do # src/bin/claude-kickoff is a symlink: follow it to scripts/
-        link=$(readlink "$self")
-        case "$link" in /*) self="$link" ;; *) self="$(dirname "$self")/$link" ;; esac
-    done
-    member_deny_file="$(cd "$(dirname "$self")/.." && pwd -P)/files/claude/settings.member-deny.json"
-    [ -r "$member_deny_file" ] || die 6 "member deny overlay not found or unreadable: $member_deny_file (--no-member-deny skips it)"
-    member_deny_rules=$(jq -er '.permissions.deny | if type == "array" and length > 0 and all(type == "string") then join(" ") else error("no deny rules") end' "$member_deny_file" 2>/dev/null) \
-        || die 6 "member deny overlay is not valid JSON with a permissions.deny list: $member_deny_file (--no-member-deny skips it)"
-    member_deny_args=(--settings "$member_deny_file")
-    # A planner kickoff (body starts with /squad-planner; not a resume, which relaunches a
-    # member) opens and readies its own plan PR: the same overlay minus the `gh pr create`
-    # and `gh pr ready` rules, passed as a JSON string so nothing is written. Members are
-    # unchanged.
-    if [ -z "$resume" ] && [ "$(tail -n +"$((term + 1))" "$prompt" | awk 'NF { print $1; exit }')" = /squad-planner ]; then
-        planner_deny=$(jq -c '.permissions.deny |= map(select(test(" pr (create|ready)\\*\\)$") | not))' "$member_deny_file") \
-            || die 6 "member deny overlay could not be narrowed for a planner: $member_deny_file (--no-member-deny skips it)"
-        member_deny_rules=$(printf '%s' "$planner_deny" | jq -r '.permissions.deny | join(" ")')
-        member_deny_file="$member_deny_file (planner: gh pr create and gh pr ready allowed)"
-        member_deny_args=(--settings "$planner_deny")
+# --- lane tier: builder lanes get a Gaia role fragment, attended lanes do not ----
+# A builder is a lane with a `role` key or a /squad-planner body (a resume relaunches a
+# member, so its body does not count); `tier:` overrides either way. The fragment is
+# rendered by squad (never read from this repo) and fails closed: no squad or a failed
+# render exits 6.
+planner_body=0
+if [ -z "$resume" ] && [ "$(tail -n +"$((term + 1))" "$prompt" | awk 'NF { print $1; exit }')" = /squad-planner ]; then planner_body=1; fi
+lane_tier="$tier_raw"
+if [ -z "$lane_tier" ]; then
+    if [ -n "$(fm_get role)" ] || [ "$planner_body" -eq 1 ]; then lane_tier=builder; else lane_tier=attended; fi
+fi
+case "$lane_tier" in builder|attended) ;; *) die 5 "unknown tier '$lane_tier' (expected builder or attended)" ;; esac
+role_fragment=none role_args=() roles_dir=""
+if [ "$lane_tier" = builder ]; then
+    if [ "$planner_body" -eq 1 ]; then kind=planner
+    else
+        case "$role" in client) kind=member ;; orchestrator) kind=operator ;; infra) kind=infra ;; esac
     fi
+    roles_dir="${SQUAD_ROLES_DIR:-}"
+    if [ -z "$roles_dir" ] && [ -r "$HOME/.config/squad/config.toml" ]; then
+        roles_dir=$(yq -p toml -oy '.roles_dir // ""' "$HOME/.config/squad/config.toml" 2>/dev/null)
+    fi
+    [ -n "$roles_dir" ] || roles_dir="$HOME/.config/squad/roles"
+    roles_dir=$(expand_home "$roles_dir")
+    command -v squad >/dev/null 2>&1 || die 6 "squad is not on PATH: a builder lane needs 'squad roles render' (the role fragment fails closed)"
+    render_args=(roles render --kind "$kind")
+    overlay=""
+    if [ "$(ctx_get "$ctx" '.openrouter // false')" = true ]; then overlay=openrouter; render_args+=(--overlay openrouter); fi
+    render_args+=(--interactive)
+    role_json=$(squad "${render_args[@]}") || die 6 "squad roles render failed for kind $kind (the role fragment fails closed)"
+    printf '%s' "$role_json" | jq -e 'type == "object"' >/dev/null 2>&1 || die 6 "squad roles render printed no JSON object for kind $kind"
+    role_fragment="$kind${overlay:+ + overlay $overlay}"
+    [ ! -d "$roles_dir/plugin" ] || role_args+=(--plugin-dir "$roles_dir/plugin")
+    role_args+=(--setting-sources project --settings "$role_json" --append-system-prompt-file "$roles_dir/builder-instructions.md" --permission-mode auto)
 fi
 
 # --- body --------------------------------------------------------------------
@@ -644,12 +654,8 @@ if [ "$dry" -eq 1 ]; then
     printf 'agent: %s\n'         "${session_agent:-none}"
     printf 'name: %s\n'          "${session_name:-none}"
     printf 'trust: %s\n'         "$trust_line"
-    if [ "$member_deny" -eq 1 ]; then
-        printf 'member_deny: %s\n'       "$member_deny_file"
-        printf 'member_deny_rules: %s\n' "$member_deny_rules"
-    else
-        printf 'member_deny: off\n'
-    fi
+    printf 'tier: %s\n'          "$lane_tier"
+    printf 'role_fragment: %s\n' "$role_fragment"
     mark_pane --dry-run
     exit 0
 fi
@@ -667,8 +673,8 @@ if [ "$(ctx_get "$ctx" '.openrouter // false')" != true ]; then
 fi
 mark_pane
 if [ "$mode" = resume ]; then
-    exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" "${member_deny_args[@]+"${member_deny_args[@]}"}" "${deny_args[@]+"${deny_args[@]}"}" --resume "$resume" "${model_args[@]+"${model_args[@]}"}" --effort "$effort" "$body"
+    exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" "${role_args[@]+"${role_args[@]}"}" "${deny_args[@]+"${deny_args[@]}"}" --resume "$resume" "${model_args[@]+"${model_args[@]}"}" --effort "$effort" "$body"
 fi
 # --add-dir is variadic in claude, so its flags go first: the next option ends the
 # list and the body stays a lone positional.
-exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" "${member_deny_args[@]+"${member_deny_args[@]}"}" "${deny_args[@]+"${deny_args[@]}"}" "${agent_args[@]+"${agent_args[@]}"}" "${model_args[@]+"${model_args[@]}"}" --effort "$effort" "$body"
+exec "$claude_bin" "${add_dir_args[@]+"${add_dir_args[@]}"}" "${role_args[@]+"${role_args[@]}"}" "${deny_args[@]+"${deny_args[@]}"}" "${agent_args[@]+"${agent_args[@]}"}" "${model_args[@]+"${model_args[@]}"}" --effort "$effort" "$body"
