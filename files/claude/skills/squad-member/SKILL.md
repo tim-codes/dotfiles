@@ -559,6 +559,27 @@ the directive table above.
 - A subagent that has made no progress for the supervision threshold is nudged, then named in a `cleanup`, then
   raised as an item for Tim. Stopping a stuck one yourself earlier avoids all three.
 
+## Datadog
+
+Members, `infra` sessions and the leader use the repo-managed `datadog` MCP
+server (`mcp__datadog__*`). Reads are free. Writes are limited to notebooks,
+cases and incidents; Claude permission rules enforce that, so a refusal is not
+yours to work around. The user-facing rules live in the exxo-common
+`datadog` skill; this section is only when Gaia writes.
+
+- A triage worth keeping: record it in a notebook.
+- Something needing follow-up: open or update a case.
+- A real incident, once incident management is on: open or update an incident
+  using the incident types and severities configured in Pulumi; never invent
+  new ones.
+- Keep tenant scoping (teams, tags) on everything you write, and link the
+  Linear ticket or PR in it.
+- Anything touching Gaia's protected-production list: `mcp__squad__raise` to
+  Tim first; do not write.
+- A change to monitors, dashboards, SLOs, log pipelines or indexes, roles,
+  restriction policies or integrations is an exxo-infra task, not the MCP
+  server: file or take that task and let the infra flow apply it.
+
 ## Infra helpers
 
 A session of kind `infra` works in an exxo-infra worktree and produces a PR
