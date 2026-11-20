@@ -564,8 +564,8 @@ the directive table above.
 Members, `infra` sessions and the leader use the repo-managed `datadog` MCP
 server (`mcp__datadog__*`). Reads are free. Writes are limited to notebooks,
 cases and incidents; Claude permission rules enforce that, so a refusal is not
-yours to work around. The user-facing rules live in the exxo-common
-`datadog` skill; this section is only when Gaia writes.
+yours to work around. The user-facing rules live in the observability
+plugin's `datadog` skill; this section is only when Gaia writes.
 
 - A triage worth keeping: record it in a notebook.
 - Something needing follow-up: open or update a case.
