@@ -39,6 +39,14 @@ Use `git -C <dir>` and absolute paths.
    wait. Follow the `reauth` skill for the details: rows needing a terminal (`gh auth login`,
    `pulumi login`, ...) go to Tim as exact commands, and MCP steps are per-context `/mcp`.
 
+## b2. Read-only GCP access (Exxo context)
+
+`agent-tooling gcp-ro -- gcloud projects list --format='value(projectId)' --limit=1`
+succeeds: ready. If it fails because `~/.config/exxo/claude-sa.env` is missing, report
+**needs claude-sa.env (see EXX-279 for rollout)**; do not create it. Read-only GCP commands
+run through `agent-tooling gcp-ro -- <gcloud|bq ...>` as the developer's service account;
+writes stay on the human login (plain `gcloud`, which prompts).
+
 ## c. Optional quick check (report only)
 
 - Stale worktrees: count from `git -C <dir> worktree list` per dev-stack repo (merged or

@@ -51,7 +51,9 @@ for ctx in exxo exxo-personal; do
         test "$(jq '[.permissions.allow[] | select(. == "WebSearch")] | length' "$FAKE/.claude-$ctx/settings.json")" -eq 1
 done
 for ctx in exxo exxo-personal; do
-    check "$ctx: gcloud grants are enumerated read-only commands" has "$ctx" allow 'Bash(gcloud compute instances list:*)'
+    check "$ctx: GCP reads go through gcp-ro" has "$ctx" allow 'Bash(agent-tooling gcp-ro:*)'
+    check "$ctx: no bare gcloud allows" \
+        test "$(jq '[.permissions.allow[] | select(test("^Bash\\(gcloud "))] | length' "$FAKE/.claude-$ctx/settings.json")" -eq 0
     check "$ctx: no middle-wildcard gcloud grants" \
         test "$(jq '[.permissions.allow[] | select(test("^Bash\\(gcloud \\*"))] | length' "$FAKE/.claude-$ctx/settings.json")" -eq 0
     check "$ctx: agent-tooling mail send asks" has "$ctx" ask 'Bash(agent-tooling mail send*)'
