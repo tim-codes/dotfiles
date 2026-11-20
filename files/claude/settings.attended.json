@@ -324,18 +324,12 @@
     ],
     "ask": [
       "mcp__claude_ai_Notion__notion-delete-databases",
-      "Bash(git push* main)",
-      "Bash(git push* master)",
-      "Bash(git push*:main)",
-      "Bash(git push*:master)",
       "Bash(pulumi up*)",
       "Bash(* pulumi up*)",
       "Bash(gh secret set*)",
       "Bash(gh variable set*)",
       "Bash(gh api *-X*)",
       "Bash(gh api *--method*)",
-      "Bash(gh api *-f *)",
-      "Bash(gh api *-F *)",
       "Bash(gh api *--field*)",
       "Bash(gh api *--raw-field*)",
       "Bash(gh api *--input*)",
@@ -355,7 +349,16 @@
       "Bash(kubectl config use-context*)",
       "Bash(aws-use*)",
       "Bash(pulumi stack select*)",
-      "Bash(gh auth switch*)"
+      "Bash(gh auth switch*)",
+      "Bash(git push*main*)",
+      "Bash(git push*master*)",
+      "Bash(gh api *-f*)",
+      "Bash(gh api *-F*)",
+      "Bash(find *-delete*)",
+      "Bash(find *-exec*)",
+      "Bash(find *-execdir*)",
+      "Bash(find *-ok*)",
+      "Bash(find *-fprint*)"
     ]
   }
 }

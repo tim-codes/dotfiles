@@ -114,10 +114,11 @@ ATT_GRANTS=(
 )
 ATT_ASKS=(
     'mcp__claude_ai_Notion__notion-delete-databases'
-    'Bash(git push* main)' 'Bash(git push* master)' 'Bash(git push*:main)' 'Bash(git push*:master)'
+    'Bash(git push*main*)' 'Bash(git push*master*)'
+    'Bash(find *-delete*)' 'Bash(find *-exec*)' 'Bash(find *-execdir*)' 'Bash(find *-ok*)' 'Bash(find *-fprint*)'
     'Bash(pulumi up*)' 'Bash(* pulumi up*)'
     'Bash(gh secret set*)' 'Bash(gh variable set*)'
-    'Bash(gh api *-X*)' 'Bash(gh api *--method*)' 'Bash(gh api *-f *)' 'Bash(gh api *-F *)'
+    'Bash(gh api *-X*)' 'Bash(gh api *--method*)' 'Bash(gh api *-f*)' 'Bash(gh api *-F*)'
     'Bash(gh api *--field*)' 'Bash(gh api *--raw-field*)' 'Bash(gh api *--input*)'
     'mcp__claude_ai_Slack__slack_send_message' 'mcp__claude_ai_Microsoft_365__outlook_send_mail'
     'mcp__claude_ai_Microsoft_365__teams_send_chat_message'
