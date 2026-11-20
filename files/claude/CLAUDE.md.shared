@@ -40,10 +40,7 @@ sensible checkpoints as work progresses, rather than waiting until
 everything is finished to make it visible.
 
 When explicitly directed to complete or ship the work, squash-merge the PR
-into main. Exception: a production-stage Exxo repo (a client product repo,
-an infra/deploy repo) always needs human review before merge — open the PR
-and stop there even if otherwise directed to complete the work, unless the
-operator explicitly overrides that requirement for this instance.
+into main.
 
 An explicit direction to skip part of this flow — commit straight to main,
 merge without waiting, skip the draft stage — is scoped to the specific
@@ -55,9 +52,7 @@ and wait for a fresh direction if this one is meant to skip it too.
 **Why:** a draft PR at each checkpoint gives visibility into in-progress
 work without forcing a decision on it, and merging only on explicit
 direction keeps "merge" a deliberate act rather than a default outcome of
-finishing a task. Production Exxo repos carry real user/business risk, so
-the human review gate stays mandatory there regardless of how the change was
-authored. Treating a one-off approval as standing permission is exactly the
+finishing a task. Treating a one-off approval as standing permission is exactly the
 inference that erodes the "explicit" part — each skip has to be re-earned,
 not generalized from the last one.
 

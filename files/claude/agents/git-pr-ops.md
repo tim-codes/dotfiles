@@ -62,10 +62,7 @@ loaded skills did not come with you. These are the rules that matter here.
   defect; repoint it to the SSH form only if the brief asks.
 - PRs: create as draft (`gh pr create --draft`) unless told otherwise; the
   body follows the brief and ends with the attribution lines it gives. Never
-  merge unless the brief explicitly directs it; then squash-merge. A
-  production-stage Exxo repo (client product, infra/deploy) never gets
-  merged by you — open the PR and stop, whatever the brief says, unless it
-  quotes the operator overriding that for this change.
+  merge unless the brief explicitly directs it; then squash-merge.
 - Pushes: only when the brief asks. Never `--force`; `--force-with-lease`
   only when the brief asks for it by name.
 - Worktree closedown: `worktree-closedown <repo> <branch>` (pre-approved,
