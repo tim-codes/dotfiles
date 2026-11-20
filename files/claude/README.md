@@ -357,6 +357,24 @@ stubs.
   `HOMELAB_1P_CACHE_TTL_SECONDS` the run should start with (`--ttl-hours`,
   default 12).
 
+## Read-only GCP access: `agent-tooling gcp-ro`
+
+In the exxo context, Claude reads GCP through `agent-tooling gcp-ro -- <gcloud|bq ...>`
+(agent-tooling 0.8.0+), which runs as the developer's per-person service account with a
+private empty `CLOUDSDK_CONFIG`. Bare `gcloud` read verbs are no longer pre-approved, and
+writes stay on the human's own login (plain `gcloud`, which prompts). The deny rules for
+`gcloud secrets versions access` and `gcloud compute ssh` remain.
+
+Each developer creates `~/.config/exxo/claude-sa.env` by hand (mode 0600) with one line,
+substituting their own initials for `<ini>`:
+
+    CLAUDE_GCP_SA_KEY=esc:exxo/exxo-root/dev-<ini>:claude.gcpSaKey
+
+There is deliberately no default or placeholder file: with it missing, `gcp-ro` fails
+loudly. Readiness check (also in the `workstation-setup` skill):
+`agent-tooling gcp-ro -- gcloud projects list --format='value(projectId)' --limit=1`.
+Rollout: EXX-279.
+
 ## What is NOT in this file
 
 Permission approvals ("yes, don't ask again") are **per repository**, not
