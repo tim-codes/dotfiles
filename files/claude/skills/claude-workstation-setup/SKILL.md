@@ -102,8 +102,7 @@ cannot answer (2026-10-30).
 `settings.shared.json` also allows `gh pr create`, `ready`, `edit`, `merge`, `comment` and
 `update-branch`, and the whole claude.ai Notion connector (`mcp__claude_ai_Notion`), in every
 context. Notion's `notion-delete-pages` and `notion-delete-databases` are in `ask`. The
-deny overlays still win: the OpenRouter worker cannot `gh pr merge`, and `claude-kickoff`
-members cannot use the raw `gh pr` write commands. This departs from "the shared allow set is
+deny overlays still win: the OpenRouter worker cannot `gh pr merge`. This departs from "the shared allow set is
 read-only" on purpose; do not treat it as the settled design.
 
 One exception to "account fragment wins": the permission rule arrays

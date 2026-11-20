@@ -99,6 +99,4 @@ procedure is the same in every repo.
 
 Standard shared git-workflow instruction applies as-is: branch (in a
 worktree, per above), logical commits, push with a draft PR at a sensible
-checkpoint, squash-merge only when explicitly directed. Dotfiles is a
-personal repo, not a production-stage Exxo one, so the mandatory-human-review
-exception doesn't apply here — the default flow is the whole story.
+checkpoint, squash-merge only when explicitly directed.

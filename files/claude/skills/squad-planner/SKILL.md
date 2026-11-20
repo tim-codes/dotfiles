@@ -11,6 +11,10 @@ file; Tim runs it in his own session. Either way the result is the same task
 markdown and the same `TaskPlan`, passed to `mcp__squad__submit_task`, so the
 orchestrator never needs to know which way a plan was made.
 
+The interactive form runs attended (Tim's own permissions: PR and ticket
+writes as he allows them); the headless form runs as a builder and uses the
+tools its role file grants.
+
 ## Invocation
 
 | Form | Session | Arguments |
@@ -543,7 +547,7 @@ accepts, in this order:
    resubmit; if the squad turns out to be unreachable, go to "Squad
    unreachable" below. Nothing after this step happens until a submission has
    succeeded.
-2. Mark the plan PR ready with `gh pr ready <n> -R <owner/name>`. Never
+2. Mark the plan PR ready (`gh pr ready <n> -R <owner/name>` attended). Never
    merge it.
 3. Move the parent ticket to the team's ready or todo state and replace
    `squad:planning` with `squad:planned` on the parent and every sub-issue.
