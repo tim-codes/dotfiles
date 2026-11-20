@@ -53,7 +53,11 @@ ROWS=(
 # Command string, built from the pieces so it is written once here: the guard
 # and stdout capture are what keep a v0.4 `squad` (exit 2 on `hook`) or a missing
 # binary from blocking anything.
-cmd_for() { printf 'command -v squad >/dev/null 2>&1 && o=$(squad hook %s) && printf '"'"'%%s\\n'"'"' "$o"; exit 0' "$1"; }
+cmd_for() {
+    local guard=''
+    [ "$1" = permission ] && guard='[ -n "$o" ] && '
+    printf 'command -v squad >/dev/null 2>&1 && o=$(squad hook %s) && %sprintf '"'"'%%s\\n'"'"' "$o"; exit 0' "$1" "$guard"
+}
 entry_for() { # <matcher> <arg> <timeout>
     jq -cn --arg m "$1" --arg c "$(cmd_for "$2")" --argjson t "$3" \
         '(if $m == "" then {} else {matcher: $m} end) + {hooks: [{type: "command", command: $c, timeout: $t}]}'

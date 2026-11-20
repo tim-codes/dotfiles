@@ -79,7 +79,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook permission) && printf '%s\\n' \"$o\"; exit 0",
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook permission) && [ -n \"$o\" ] && printf '%s\\n' \"$o\"; exit 0",
             "timeout": 10
           }
         ]
@@ -89,7 +89,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook permission) && printf '%s\\n' \"$o\"; exit 0",
+            "command": "command -v squad >/dev/null 2>&1 && o=$(squad hook permission) && [ -n \"$o\" ] && printf '%s\\n' \"$o\"; exit 0",
             "timeout": 10
           }
         ]
