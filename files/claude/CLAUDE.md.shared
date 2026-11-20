@@ -109,7 +109,7 @@ If a task hits an environment or tooling setup issue — a package-manager
 restriction (e.g. PEP 668's "externally managed environment" blocking
 `pip install`), a missing dependency, a blocked install, a permissions or
 config gap — don't route around it unprompted. Surface it and let it be
-resolved first (an unattended session raises it instead). Even when a
+resolved first. Even when a
 different path makes the fix unnecessary, still surface it rather than
 silently absorbing it.
 
@@ -129,7 +129,7 @@ person answering it.
 Before triggering a prompt the operator must answer (a GUI dialog, Touch ID,
 a device-code sign-in), tell them what will appear and what to click, then
 wait at least 10 minutes and never auto-cancel it. Probes that might raise
-one count too. Attended sessions only; an unattended session raises instead.
+one count too.
 
 **Why:** the operator asked for this on 12 Oct 2026 after several dialogs were
 raised without warning and cancelled within seconds.
@@ -222,9 +222,6 @@ schedules it and the OS never does.
 persist, with collection on our own mechanisms at our own pace.
 
 ## Installing a missing dependency on the workstation: fine ad hoc, persist the rest
-
-Attended sessions only; an unattended session raises a missing dependency
-instead.
 
 A small, low-risk dependency missing on the local workstation (e.g. `brew
 install libreoffice` to check a document) can be installed ad hoc without
@@ -349,8 +346,7 @@ picker and the periodic transcript cleanup then deletes them for good.
 
 ## Log accidental out-of-scope file reads
 
-Attended sessions only (unattended sessions cannot write outside the working
-tree). When a session or its subagent reads, prints or lists a file or
+When a session or its subagent reads, prints or lists a file or
 directory it had no reason to touch (a failed `cd`, a broad glob, a path
 mix-up), append one line to `~/claude/fs-breach-log.md` straight away,
 sensitive-looking or not, and tell Tim if anything secret was exposed.

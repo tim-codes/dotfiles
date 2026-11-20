@@ -2,10 +2,9 @@
 
 ## Exxo credentials go through `agent/run`
 
-Attended: a command needing Exxo platform credentials (`gcloud`, `pulumi`,
+A command needing Exxo platform credentials (`gcloud`, `pulumi`,
 `esc`, provider APIs) runs as `agent/run -- <command>`, never bare; see the
-`run-with-secrets` skill. Unattended sessions use `agent/Justfile` recipes,
-never raw `agent/run`.
+`run-with-secrets` skill.
 
 `agent.env` + `agent/run` resolve from the operator's personal 1Password
 account and are for attended local work only: never wire them into anything
