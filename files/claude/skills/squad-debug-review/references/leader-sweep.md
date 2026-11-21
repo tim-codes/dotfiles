@@ -56,7 +56,7 @@ One `grep -c` per pattern per transcript, then read only the hits (the
 |---|---|
 | `claude -p`, `merge-runner`, `--allowedTools` | L2 (a nested session re-running a refused merge; always an incident) |
 | `gh pr merge` | L2 |
-| `gh issue close`, `gh issue create` | L9 |
+| Linear `save_issue` (create or close a ticket) | L9 |
 | `denied`, `classifier`, `Permission`, `refused` (in tool results) | L1 (the refusal; attribute the row to the blocked function) |
 | `launchctl bootout`, `launchctl kickstart`, `bootstrap` | L7 |
 | `build-0`, `pnpm install`, `just .*build`, `recipe failed`, `Rollup` | L7 (restart on a failed build when a failure line precedes the bootout) |
