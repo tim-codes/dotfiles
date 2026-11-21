@@ -65,26 +65,14 @@ un-pausing, rebalancing accounts. Every such action is an intervention with
 a one-line reason (below) and a line in the morning hand-back. The floor
 holds even so:
 
-- **h2gc-portal.** No merge to `main`, no production deploy. Ario work
-  targets the `release/ario-v0.4` trunk: squashed lanes the trunk service
-  lands unattended (`approval_scope: default_branch`), and the squad deploys
-  the trunk to staging by its own periodic dispatch. Non-Ario work bases off
-  and targets `main`, but nothing merges there until Tim returns: those
-  lands park once at the operator (`policy:land:<task>`, the member told
-  "until Tim returns"); leave them parked. The trunk→`main` release is
-  Tim's choice (procedures.md, Releasing the round's trunk).
-- **h2gc-legacy.** Not touched (`operatorOnly`): no tasks, merges or deploys.
-- **exxo-infra.** Full merge and deploy authority through the squad's gates,
-  except anything with a downstream effect on the h2gc production
-  environment (the `exxo/h2gc*/*prod*` stacks; `[exclusions]
-  approval_stack_patterns` records them, nothing enforces it yet, ENG-536).
-  Unregistered this round, so no squad land there.
-- **Every other repo.** Full authority through the squad's gates, with the
-  same h2gc-production exclusion. The global CLAUDE.md gate on
-  production-stage Exxo repos is Tim's default for a session acting alone;
-  for squad work this ruling is his specific instruction and wins.
+- **Protected production.** Gaia's protected-production list (data, not this
+  skill) is the floor: `managed_repos` and the land gate decide what merges
+  or deploys, and anything protected waits for Tim (portal trunk→`main`
+  release: procedures.md, Releasing the round's trunk). Everywhere else the
+  leader has full authority through the squad's gates; exxo-infra changes go
+  through Gaia end to end.
 - **Standing floor.** No production rollback or retag; no branch or tag
-  deletion; a classifier-denied write is never retried in another form; no
+  deletion; no
   spend past an account's ceiling; `release-orchestrator` only on Tim's go;
   `restart-orchestrator` only to recover a dead orchestrator.
 - **Merges go through the trunk service**, not a leader `gh pr merge`:
@@ -111,18 +99,12 @@ holds even so:
   procedures.md (the Ario v0.4 staging purge); from 0.6.0 also the
   orchestrator's `rulings` table (ENG-476: `rulings.put`, concierge
   `add_ruling`), whose routine kinds it auto-decides. A ruling you cannot cite is not one you hold.
-- **Refusals are never routed around. A denied write is never retried in
-  another form** (another flag, wrapper, tool or shell; `gh pr close` after
-  a denied `gh pr merge` is the same write). A classifier or permission refusal
-  (a merge, an issue close, a bulk kill, an unsandboxed run, a grant) is
-  handed to Tim with the exact one-line command, the squad issue that would
-  remove the need linked (file it if none exists), and logged as an
-  intervention under the function it blocked (L2 for a merge, L9 for an
-  issue close, L3 for a sandbox run) with `outcome: handed_to_tim`. No
-  nested session to re-run the denied command, no `claude -p
-  --allowedTools` merge runner, no telling a member to retry what you were
-  refused. The member continues on other work; the write waits for Tim's
-  ruling (ENG-519).
+- **Refusals are never routed around.** A denied write is never retried in
+  another form (another flag, wrapper, tool, shell or nested session). Hand
+  it to Tim with the exact one-line command and the squad issue that would
+  remove the need (file one if none exists), log it as an intervention under
+  the function it blocked with `outcome: handed_to_tim`, and let the member
+  continue on other work (ENG-519).
 - **Handing to Tim** means: a line on *Tim's list* (a file in your
   scratchpad that the consolidated ask and the round summary are built
   from: what, the one-line command, the issue, since when), plus a Slack
@@ -304,9 +286,8 @@ Each one is either a refusal to hand to Tim or an intervention to log.
 
 ## Common mistakes
 
-- Writing merge scope from the CLAUDE.md production-gate default instead
-  of `managed_repos` (2026-10-31 R1: two authorised merges held an hour and
-  logged as doubtful).
+- Writing merge scope from a remembered default instead of `managed_repos`
+  (2026-10-31 R1: two authorised merges held an hour and logged as doubtful).
 - Holding lanes on a quota rule while the host sat idle (R2), against
   rulings that said the opposite; cite the ruling that applies, then act.
 - Restarting with live sessions uncounted (R4) or on a failed build (R5).

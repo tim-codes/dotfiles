@@ -324,5 +324,63 @@ class CliTests(unittest.TestCase):
         self.assertEqual(names, ["active", "nested", "old"])
 
 
+class RoleFloorTests(unittest.TestCase):
+    """--roles DIR: every kind fragment carries the deny floor, no fragment carries a never-grant wildcard."""
+    KINDS = ["member", "operator", "planner", "reviewer", "infra", "releaser"]
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.fx = Fixture(self.tmp.name)
+        self.dir = os.path.join(self.tmp.name, "roles")
+        os.makedirs(self.dir)
+        self.floor = cca.perms(cca.load_json(os.path.join(cca.FRAGMENTS, "settings.shared.json")), "deny")
+        for k in self.KINDS:
+            self.put(k, {"permissions": {"allow": ["Bash(git status:*)"], "deny": list(self.floor)}})
+        self.put("overlay-openrouter", {"permissions": {"deny": ["Bash(curl:*)"]}})
+        self.put("manifest", {"files": {}})
+
+    def put(self, name, doc):
+        with open(os.path.join(self.dir, name + ".json"), "w") as f:
+            json.dump(doc, f)
+
+    def roles(self):
+        code, out, _ = self.fx.run("--roles", self.dir, "--json")
+        doc = json.loads(out)
+        return code, [(f["check"], f["level"], f["file"], f["message"]) for r in doc["repos"] for f in r["findings"]]
+
+    def test_clean_set_passes(self):
+        code, fs = self.roles()
+        self.assertEqual((code, fs), (0, []))
+
+    def test_missing_floor_rule_is_an_error(self):
+        self.put("member", {"permissions": {"deny": self.floor[1:]}})
+        code, fs = self.roles()
+        self.assertEqual(code, 1)
+        self.assertEqual([(c, l, f) for c, l, f, _ in fs], [("role-floor", "error", "member.json")])
+        self.assertIn(self.floor[0], fs[0][3])
+
+    def test_overlay_needs_no_floor(self):
+        code, fs = self.roles()
+        self.assertEqual(code, 0)
+
+    def test_never_grant_wildcard_is_an_error(self):
+        self.put("planner", {"permissions": {"allow": ["Bash(just:*)", "Bash(*)"], "deny": self.floor}})
+        code, fs = self.roles()
+        self.assertEqual(code, 1)
+        self.assertEqual({c for c, _, f, _ in fs}, {"role-wildcard"})
+
+    def test_malformed_fragment_is_an_error(self):
+        with open(os.path.join(self.dir, "reviewer.json"), "w") as f:
+            f.write("{ nope")
+        code, fs = self.roles()
+        self.assertEqual(code, 1)
+        self.assertEqual([c for c, _, f, _ in fs], ["role-floor"])
+
+    def test_missing_dir_is_an_error(self):
+        code, out, _ = self.fx.run("--roles", os.path.join(self.tmp.name, "nope"), "--json")
+        self.assertEqual(code, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

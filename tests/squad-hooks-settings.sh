@@ -4,7 +4,8 @@
 # carries the squad hook handlers of contracts/README.md rule 8 (byte for byte,
 # so Claude Code runs one when the broker also passes them with --settings),
 # the `squad` stdio MCP server and the v0.5 grants, that the handler commands
-# fail open, and that the member deny overlay holds the merge rules and the gh write rules.
+# fail open (the permission hook, `squad hook permission`, on Bash and Write|Edit|NotebookEdit included),
+# and that the retired member deny overlay is gone.
 # Usage: bash tests/squad-hooks-settings.sh
 #   GAIA_CONTRACTS_DIR   directory holding the squad repo's contracts/README.md
 #                         (else read it from git in $GAIA_REPO at
@@ -39,6 +40,8 @@ ROWS=(
     'UserPromptSubmit@@user-prompt-submit@10'
     'PreToolUse@Bash@pre-tool-use@10'
     'PreToolUse@Agent|Task@pre-tool-use@10'
+    'PreToolUse@Bash@permission@10'
+    'PreToolUse@Write|Edit|NotebookEdit@permission@10'
     'PermissionRequest@@permission-request@10'
     'PostToolUse@@prompt-cleared@10'
     'PostToolUseFailure@@prompt-cleared@10'
@@ -50,7 +53,11 @@ ROWS=(
 # Command string, built from the pieces so it is written once here: the guard
 # and stdout capture are what keep a v0.4 `squad` (exit 2 on `hook`) or a missing
 # binary from blocking anything.
-cmd_for() { printf 'command -v squad >/dev/null 2>&1 && o=$(squad hook %s) && printf '"'"'%%s\\n'"'"' "$o"; exit 0' "$1"; }
+cmd_for() {
+    local guard=''
+    [ "$1" = permission ] && guard='[ -n "$o" ] && '
+    printf 'command -v squad >/dev/null 2>&1 && o=$(squad hook %s) && %sprintf '"'"'%%s\\n'"'"' "$o"; exit 0' "$1" "$guard"
+}
 entry_for() { # <matcher> <arg> <timeout>
     jq -cn --arg m "$1" --arg c "$(cmd_for "$2")" --argjson t "$3" \
         '(if $m == "" then {} else {matcher: $m} end) + {hooks: [{type: "command", command: $c, timeout: $t}]}'
@@ -117,9 +124,8 @@ else
     skip "hook handlers equal contracts rule 8: no contracts source readable (set GAIA_CONTRACTS_DIR)"
 fi
 
-check "member deny file holds the merge rules and the gh write rules (Bash denies only)" \
-    jq -e 'keys == ["permissions"] and (.permissions | keys == ["deny"]) and (.permissions.deny as $d | (["Bash(gh pr merge*)","Bash(* gh pr merge*)","Bash(gh * pr merge*)","Bash(* gh * pr merge*)","Bash(gh api *merge*)","Bash(* gh api *merge*)","Bash(gh pr create*)","Bash(* gh * pr edit*)","Bash(gh * issue close*)","Bash(gh api *--method*)","Bash(* gh * api *-f*)","Bash(gh pr review*)","Bash(* gh pr review*)","Bash(gh * pr review*)","Bash(* gh * pr review*)","Bash(gh auth token*)","Bash(* gh auth token*)","Bash(gh * auth token*)","Bash(* gh * auth token*)","Bash(gh release create*)","Bash(gh workflow run*)","Bash(gh run rerun*)","Bash(gh secret set*)","Bash(gh variable set*)","Bash(gh label create*)","Bash(gh repo edit*)","Bash(* gh * repo edit*)"] | all(. as $r | $d | index($r) != null)) and ($d | all(startswith("Bash(gh ") or startswith("Bash(* gh "))))' \
-    "$SRC_REPO/files/claude/settings.member-deny.json"
+# The member deny overlay is retired: builders get the Gaia role fragments (squad roles render).
+check "member deny file is gone" test ! -e "$SRC_REPO/files/claude/settings.member-deny.json"
 for ctx in personal reserve exxo exxo-personal; do
     check "$ctx: member deny is not merged" \
         jq -e '[.permissions.deny[] | select(. == "Bash(gh * pr merge*)")] | length == 0' "$(S "$ctx")"
@@ -127,7 +133,7 @@ done
 
 # The handler commands themselves, run as Claude Code runs them.
 mapfile -t CMDS < <(jq -r '[.hooks[][]?.hooks[]?.command | select(contains("squad hook"))] | unique[]' "$(S exxo)")
-check "nine distinct squad hook commands in the merged exxo settings" test "${#CMDS[@]}" -eq 9
+check "ten distinct squad hook commands in the merged exxo settings" test "${#CMDS[@]}" -eq 10
 INPUT='{"session_id":"00000000-0000-4000-8000-000000000000","hook_event_name":"X"}'
 cat >"$BIN/squad" <<STUB
 #!/bin/bash

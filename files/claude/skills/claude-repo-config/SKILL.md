@@ -15,8 +15,8 @@ through `claude-sync` (see the `claude-workstation-setup` skill).
 | Layer | File | Holds |
 |---|---|---|
 | Global | dotfiles `settings.shared.json` (every context), `settings.exxo.json` (Exxo only) | the read-only allow set, the deny floor, hooks, plugins |
-| Repo, committed | `<repo>/.claude/settings.json` | only what is specific to this repo (see below) |
-| Repo, local | `<repo>/.claude/settings.local.json` (gitignored) | almost nothing |
+| Repo, committed | `<repo>/.claude/settings.json` | hooks only; no permission rules |
+| Repo, local | `<repo>/.claude/settings.local.json` (gitignored) | nothing load-bearing |
 
 **Global read-only allow set.** `git status/diff/log/branch/show/worktree
 list`, `gh pr view/list/checks/diff`, `gh run view/list`, `just --list`,
@@ -52,23 +52,13 @@ start, so `pulumi preview:*` matches `pulumi preview -s dev` but not `pulumi
 pulumi (and gcloud) commands subcommand-first, with the target flags after:
 `pulumi preview -C <dir> -s <stack>`.
 
-**Committed `.claude/settings.json`** holds only these:
-1. Named recipe grants, one per recipe: `Bash(just check:*)`,
-   `Bash(just test-web:*)`. Never `Bash(just:*)`, which approves every recipe,
-   deploys and restores included.
-2. The `agent/Justfile` blanket (`Bash(just --justfile=agent/Justfile:*)`),
-   and only while every recipe in that file is read-only (below).
-3. Hooks, such as the Exxo `just skills-check` SessionStart hook.
-4. Denies specific to this repo, beyond the floor.
-5. Tool grants specific to this repo that have no global equivalent, such as
-   `Bash(pnpm test:*)`. Use one spelling per intent, in the `Bash(cmd sub:*)`
-   form.
+**Committed `.claude/settings.json`** holds hooks only, such as the Exxo
+`just skills-check` SessionStart hook. No permission rules: the floor and the
+single `agent/Justfile` grant (with its origin check) are global.
 
-**`settings.local.json`** is per machine and never reaches a worktree.
-`worktree-copy-local-env` doesn't copy `.claude/`, so nothing load-bearing can
-live there. Benign repo-local items are fine: `additionalDirectories`, a few
-docs domains, a named recipe you are still trialling. Claude Code writes your
-"don't ask again" answers here, and that is how drift accumulates.
+**`settings.local.json`** is per machine and never reaches a worktree, so
+nothing load-bearing can live there. Claude Code writes "don't ask again"
+answers here, and that is how drift accumulates.
 
 **Never grant**, in either repo file:
 - `just:*` or `git:*`
@@ -112,7 +102,7 @@ pipeline and prints nothing.
 
 ## agent/Justfile is read-only by construction; mutations go in ops.Justfile
 
-The blanket grant trusts the file, not today's entries, so every future recipe
+The global grant trusts the file, not today's entries, so every future recipe
 inherits it. Recipes in `agent/Justfile` must be read-only lookups and
 secret-piping reads. Anything that deploys, revokes, destroys, resets,
 restores, writes `.env`, or touches prod state goes in `agent/ops.Justfile`,
