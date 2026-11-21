@@ -451,9 +451,7 @@ pass:
    --strict` on the change (or the repo's equivalent); the files, modules and
    APIs the plan cites still exist and look as described; the specs it
    amends have not moved.
-3. Check that the Linear tickets it references are still open and unchanged
-   in scope.
-4. Record the drift in one `mcp__squad__set` `detail` line. If the drift
+3. Record the drift in one `mcp__squad__set` `detail` line. If the drift
    changes the approach, `mcp__squad__raise` a `review` before building;
    never re-plan silently.
 
