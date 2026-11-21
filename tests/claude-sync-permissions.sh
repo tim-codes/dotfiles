@@ -14,7 +14,7 @@ REPO="$T/repo"; FAKE="$T/home"
 mkdir -p "$REPO/scripts" "$REPO/files" "$FAKE"
 cp "$SRC_REPO/scripts/claude-sync" "$REPO/scripts/"
 cp -R "$SRC_REPO/files/claude" "$REPO/files/"
-for c in personal exxo exxo-personal exxo-openrouter; do mkdir -p "$FAKE/.claude-$c"; done
+for c in personal reserve exxo exxo-personal exxo-openrouter; do mkdir -p "$FAKE/.claude-$c"; done
 C="$REPO/files/claude"
 
 fail=0
@@ -35,9 +35,8 @@ check "isolated: repo copy and fake HOME live under the temp dir" \
 
 shared_allow="$(jq '.permissions.allow | length' "$C/settings.shared.json")"
 shared_deny="$(jq '.permissions.deny | length' "$C/settings.shared.json")"
-exxo_deny="$(jq '(.permissions.deny // []) | length' "$C/settings.exxo.json")"
-for ctx in personal exxo exxo-personal; do
-    want_deny="$shared_deny"; [ "$ctx" = personal ] || want_deny=$((shared_deny + exxo_deny))
+for ctx in personal reserve exxo exxo-personal; do
+    want_deny="$shared_deny"
     check "$ctx keeps the whole shared allow set" \
         test "$(jq '[.permissions.allow[]] | length' "$FAKE/.claude-$ctx/settings.json")" -ge "$shared_allow"
     check "$ctx keeps the whole deny floor" \
@@ -49,12 +48,12 @@ for ctx in personal exxo exxo-personal; do
         check "$ctx has $r grant" has "$ctx" allow "$r"
     done
 done
-for ctx in exxo exxo-personal; do
+for ctx in personal reserve exxo exxo-personal; do
     check "$ctx gets the Exxo cloud grants" has "$ctx" allow 'Bash(agent-tooling:*)'
     check "$ctx: duplicate rule appears once" \
         test "$(jq '[.permissions.allow[] | select(. == "WebSearch")] | length' "$FAKE/.claude-$ctx/settings.json")" -eq 1
 done
-for ctx in exxo exxo-personal; do
+for ctx in personal reserve exxo exxo-personal; do
     check "$ctx: GCP reads go through gcp-ro" has "$ctx" allow 'Bash(agent-tooling gcp-ro:*)'
     check "$ctx: no bare gcloud allows" \
         test "$(jq '[.permissions.allow[] | select(test("^Bash\\(gcloud "))] | length' "$FAKE/.claude-$ctx/settings.json")" -eq 0
@@ -70,21 +69,20 @@ done
 # must carry the whole array into every context (it silences the unauthenticated
 # claude.ai-synced plugin servers).
 shared_denied="$(jq '.deniedMcpServers | length' "$C/settings.shared.json")"
-for ctx in personal exxo exxo-personal; do
+for ctx in personal reserve exxo exxo-personal; do
     check "$ctx keeps all $shared_denied deniedMcpServers entries" \
         test "$(jq '.deniedMcpServers | length' "$FAKE/.claude-$ctx/settings.json")" -eq "$shared_denied"
 done
 check "deniedMcpServers is non-empty" test "$shared_denied" -gt 0
-check "personal never gets the Exxo cloud grants" \
-    test "$(jq '[.permissions.allow[] | select(test("agent-tooling|gcloud|pulumi"))] | length' "$FAKE/.claude-personal/settings.json")" -eq 0
-check "personal never gets the Exxo gcloud ssh deny" \
-    test "$(jq '[.permissions.deny[] | select(test("gcloud compute ssh"))] | length' "$FAKE/.claude-personal/settings.json")" -eq 0
+check "personal and reserve settings are identical" cmp -s "$FAKE/.claude-personal/settings.json" "$FAKE/.claude-reserve/settings.json"
 check "personal gets the exxo-skills marketplace" \
     jq -e '.extraKnownMarketplaces["exxo-skills"].source.url == "git@github.com:Exxo-Labs/skills.git"' "$FAKE/.claude-personal/settings.json"
 check "personal enables exxo-common" jq -e '.enabledPlugins["exxo-common@exxo-skills"] == true' "$FAKE/.claude-personal/settings.json"
 check "personal enables gaia and exxo-ops from the attended fragment" \
     jq -e '.enabledPlugins["gaia@gaia"] == true and .enabledPlugins["exxo-ops@exxo-skills"] == true and .extraKnownMarketplaces.gaia.source.url == "git@github.com:Exxo-Labs/gaia.git"' "$FAKE/.claude-personal/settings.json"
-check "personal never gets exxo-mantine" jq -e '.enabledPlugins | has("exxo-mantine@exxo-skills") | not' "$FAKE/.claude-personal/settings.json"
+for ctx in personal reserve exxo exxo-personal; do
+    check "$ctx enables exxo-mantine (context parity)" jq -e '.enabledPlugins["exxo-mantine@exxo-skills"] == true' "$FAKE/.claude-$ctx/settings.json"
+done
 for ctx in exxo exxo-personal; do
     check "$ctx enables gaia and exxo-ops" \
         jq -e '.enabledPlugins["gaia@gaia"] and .enabledPlugins["exxo-ops@exxo-skills"] and (.extraKnownMarketplaces | has("gaia"))' "$FAKE/.claude-$ctx/settings.json"

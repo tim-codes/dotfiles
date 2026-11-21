@@ -47,7 +47,7 @@ Gather sources, read-only:
   cannot reach.
 - **Repo:** read the UI code and config for the component library, theme,
   tokens and conventions, so directions are buildable in that stack. Load a
-  matching stack skill (for example `mantine-docs`).
+  matching stack skill (for example the `exxo-mantine` plugin skills).
 - **SharePoint:** search and read through the Microsoft 365 connector,
   read-only; never upload, move, rename or edit.
 - **Reference boards and links:** read what Tim points at.

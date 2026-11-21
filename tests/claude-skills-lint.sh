@@ -1,13 +1,9 @@
 #!/bin/bash
-# Lint files/claude/skills/*: SKILL.md frontmatter, no retired squad v0.4
-# command or skill name in the squad v0.5 skills, and the content those skills
-# must carry.
+# Lint files/claude/skills/*: SKILL.md frontmatter and the content the
+# remaining skills must carry.
 # Usage: bash tests/claude-skills-lint.sh
-#
 # Scope: every directory under files/claude/skills/ except synced/ (claude.ai
-# account cache) and the vendored skills named in files/claude/vendor/*.lock.json.
-# The retired-name patterns apply to every files/claude/skills/squad-*/ skill
-# (squad v0.5.10 widened them from squad-member and squad-planner).
+# account cache).
 set -uo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -56,37 +52,16 @@ has_headings() {
     return "$rc"
 }
 
-RETIRED_PATTERNS=(
-    '(^|`)[[:space:]]*squad (status|send|ack|set|subscribe|unsubscribe|publish|register|deregister|roster|get|history|operator|herd|heavy|job|jobs|mail|trunk|prompt|watch)\b'
-    # `squad debug on|off|status|dir|list|report` still exist in the v0.5 binary; these never did.
-    '(^|`)[[:space:]]*squad debug (openrouter|capture)\b'
-    '/?squad-(orchestrator|herder|concierge|liaison|infra|join)\b'
-    '\bsquad-pr-merge\b'
-    '\bsquad-prompt-hook\b'
-    'claude-kickoff [^`]*--resume'
-)
-RETIRED_SCOPE=()
-for d in "$SKILLS"/squad-*/; do RETIRED_SCOPE+=("$(basename "$d")"); done
-
-no_retired_names() {
-    local dir=$1 p rc=0
-    for p in "${RETIRED_PATTERNS[@]}"; do
-        if grep -nE -- "$p" "$dir"/*.md; then rc=1; fi
-    done
-    return "$rc"
-}
 # Skill prose never enumerates accounts or context dirs (they come from the
 # squad config's accounts[]).
 no_context_dirs() { ! grep -nE -- '\.claude-(personal|exxo|reserve|default)\b' "$1"/*.md; }
 
-vendored="$(jq -r '.skills[]' "$REPO_DIR"/files/claude/vendor/*.lock.json 2>/dev/null)"
 
 # --- Every in-scope skill: frontmatter ---------------------------------------
 for dir in "$SKILLS"/*/; do
     dir="${dir%/}"
     s="$(basename "$dir")"
     [ "$s" = synced ] && continue
-    printf '%s\n' "$vendored" | grep -qx "$s" && continue
     f="$dir/SKILL.md"
     check "$s: SKILL.md exists" test -f "$f"
     [ -f "$f" ] || continue
@@ -101,26 +76,11 @@ for dir in "$SKILLS"/*/; do
         sh -c '[ -n "$1" ] && case "$1" in ">"*|"|"*) exit 1;; esac && [ "$(printf "%s" "$1" | wc -m)" -le 1024 ]' _ "$desc"
 done
 
-for s in "${RETIRED_SCOPE[@]}"; do
-    [ -d "$SKILLS/$s" ] || continue
-    check "$s: no retired command or skill name" no_retired_names "$SKILLS/$s"
-    check "$s: names no context directory" no_context_dirs "$SKILLS/$s"
+# --- retired: the squad skills (gaia plugin) and mantine-* skills (exxo-mantine plugin)
+for s_ in squad-member squad-planner squad-leader squad-debug-review mantine-docs mantine-form mantine-combobox mantine-custom-components; do
+    check "$s_: retired, not in the repo" test ! -e "$SKILLS/$s_"
+    check "$s_: not shared" not_shared "$s_"
 done
-
-# --- squad-member (P7 Task 2) ------------------------------------------------
-M="$SKILLS/squad-member/SKILL.md"
-check "squad-member is no longer shared (gaia plugin owns it)" not_shared squad-member
-check "squad-member names every member tool" contains "$M" \
-    mcp__squad__set mcp__squad__ack mcp__squad__raise mcp__squad__land mcp__squad__heavy_slot \
-    mcp__squad__delegate mcp__squad__delegate_result mcp__squad__job_review mcp__squad__watch mcp__squad__unwatch
-check "squad-member teaches the turn format" contains "$M" '<squad-message' 'ack_required:' 'priority="now"'
-check "squad-member never registers" sh -c '! grep -n "call[^.]*mcp__squad__register" "$1" | grep -iv never' _ "$M"
-check "squad-member carries the section headings" has_headings "$M" \
-    '## Turns' '## Status and questions' '## Testing and trunks' '## Landing' '## Heavy jobs' \
-    '## Delegating and serving jobs' '## Watches' '## Repo conventions' '## Starting from a plan PR' \
-    '## Infra helpers' '## Finishing'
-check "squad-member teaches the plan PR staleness pass" contains "$M" rebase stale 'openspec validate' \
-    "onto the kickoff's base (main or the active trunk"
 
 # --- build-lead (multi-lane build procedure) --------------------------------
 B="$SKILLS/build-lead/SKILL.md"
@@ -132,50 +92,6 @@ check "build-lead has its sections and references" has_headings "$B" \
 check "build-lead carries its key rules" contains "$B" subagent-driven-development testlock \
     'Ruling:' 'cost if wrong' '--no-ff' 'Never touch the integration worktree' worktree-closedown
 check "build-lead references exist" test -f "$SKILLS/build-lead/references/dispatch-templates.md" -a -f "$SKILLS/build-lead/references/lessons.md"
-
-# --- squad-planner and the kickoff template (P7 Task 3) ----------------------
-P="$SKILLS/squad-planner/SKILL.md"
-K="$SKILLS/squad-planner/kickoff-template.md"
-check "squad-planner is no longer shared (gaia plugin owns it)" not_shared squad-planner
-check "squad-planner names every TaskPlan field" contains "$P" \
-    '`title`' '`deliverables`' '`depends_on`' '`resources`' '`operator_steps`' '`infra`' '`kickoff_brief`' \
-    '`merge_authority`' '`test_policy`' '`priority_suggestion`' '`blocks_launch`' '`blocks_step`' '`trunk_service`'
-check "squad-planner carries the submit contract" contains "$P" \
-    mcp__squad__submit_task squad://context-brief/ '--headless --task-id' \
-    '"squad_planner":"submitted"' '"squad_planner":"failed"' 'last non-empty line' 'code fence' ExitPlanMode
-check "squad-planner sends no content hash" sh -c '! grep -nE "sha256|shasum" "$1"' _ "$P"
-check "squad-planner composes and never saves headless" contains "$P" 'compose, do not save' 'existing readable file'
-# Local drafts (2026-10-31): the interactive planner keeps the task markdown in a
-# personal draft file outside the repo, submits the file's content, finishes into
-# it when the squad is unreachable, and resumes from it.
-check "squad-planner keeps an interactive local draft" has_headings "$P" '## Drafts'
-check "squad-planner names the draft location, resume and later submission" contains "$P" \
-    '~/.local/state/squad/plans/' '/squad-planner <draft path>' 'New batch' "draft file's content"
-# Lane rulings (2026-10-30): planner guidance as content headings, not TaskPlan
-# fields; the contract's frontmatter_mismatch refusal.
-check "squad-planner carries the lane rulings" contains "$P" \
-    '## Tickets' '## Decisions' '## Docs amendments' '## Recommended model and effort' \
-    notion-ops exxo-common:openspec-changes frontmatter_mismatch
-# Interactive posture (2026-10-30): drafting by default, so the retired --draft
-# flag is gone; the plan lives in a draft PR and Linear tickets mirror it; sibling
-# planners coordinate through the orchestrator's planning claims, with Linear
-# labels as the human-visible mirror, and no file-system claims directory.
-check "squad-planner makes the member run the staleness pass" contains "$P" staleness \
-    "onto the kickoff's base (main or the active trunk)"
-check "kickoff template tells the member to run the staleness pass" contains "$K" staleness
-check "squad-planner has no --draft flag" sh -c '! grep -nF -e "--draft" "$1"' _ "$P"
-check "squad-planner carries the drafting posture" contains "$P" \
-    'draft PR' 'gh pr ready' 'sub-issues' 'mirror' '## Approval'
-check "squad-planner carries the sibling-planner rules" has_headings "$P" '## Sibling planners'
-check "squad-planner names the claim labels and the orchestrator's claims" contains "$P" \
-    'squad:planning' 'squad:planned' planning_claims mcp__squad__claim
-check "squad-planner writes no task files (no kickoff-dir drop)" sh -c \
-    '! grep -nE "kickoff_dir|kickoff dir|kickoff directory|file drop|interim" "$1"' _ "$P"
-check "squad-planner has no claims directory or claim file" sh -c \
-    '! grep -nE "claims directory|claim file|squad/planning|planning/" "$1"' _ "$P"
-check "kickoff template opens with the squad-member invocation and states merge authority and test policy" \
-    sh -c '[ "$(sed -n 1p "$1")" = "/squad-member" ] && [ "$(sed -n 2p "$1")" = "Invoke the squad-member skill first." ] &&
-        grep -qxF "## Merge authority" "$1" && grep -qxF "## Test policy" "$1"' _ "$K"
 
 # --- ux-designer (experimental, shared to exxo contexts) -------------------------------
 U="$SKILLS/ux-designer/SKILL.md"

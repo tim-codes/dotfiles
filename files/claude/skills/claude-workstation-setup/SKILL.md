@@ -85,8 +85,10 @@ and a symlink kept the repo dirty. Drift is backed up to
 
 Consequence: never hand-edit `~/.claude-*/settings.json` for anything meant
 to last — it reverts on the next sync. Put it in the right fragment instead.
-Account-specific keys (`exxo-mantine`, the Exxo cloud grants) live only in
-`settings.exxo.json`; `~/.claude-personal` must never receive them. The
+Contexts are at parity (Tim, 2026-11-21): `exxo-mantine`, the Exxo cloud grants,
+CLAUDE.md, MCP and skills are the same in personal, reserve, exxo and
+exxo-personal; only account-bound things (logins, claude.ai connectors, the
+exxo-openrouter overlay) differ. The
 exxo-skills marketplace and `exxo-common` are in `settings.shared.json`, so
 every context has them (Tim's decision, 2026-11-03, superseding ENG-20).
 The one carve-out is OAuth-only MCP servers (`datadog`, `boards`, `workos`, `vercel`):
@@ -117,8 +119,8 @@ decides, and `claude-config-audit` flags any that reappear in a repo's
 `settings.local.json`) and the **deny floor** (`op read`, `--reveal`,
 `--show-secrets`, `pulumi`/`esc env open`, `gcloud secrets versions access`,
 each also as `* <cmd>` so a later segment matches; `Read` of `.claude.json`
-and `.credentials.json`); `settings.exxo.json` adds the Exxo read-only cloud
-grants (`gcloud * list/describe`, `pulumi preview/whoami/stack ls/stack
+and `.credentials.json`); the same fragment holds the Exxo read-only cloud
+grants (in every context) (`gcloud * list/describe`, `pulumi preview/whoami/stack ls/stack
 output`, `agent-tooling:*`). Deny is evaluated before allow across every
 scope, so no repo file can loosen the floor. Repos keep only repo-specific
 grants — the conventions are the `claude-repo-config` skill.
@@ -257,9 +259,9 @@ and copies the result to `<context>/CLAUDE.md`, copied not symlinked, same
 reasoning as settings.json (the file gets hand-edited in place sometimes,
 and a symlink would let that land in the repo silently instead of showing up
 as drift). Unlike settings, the account fragment is optional: most global
-instructions are expected to stay shared, so `CLAUDE.md.personal` /
-`CLAUDE.md.exxo` don't need to exist until one account actually needs
-something the other shouldn't get.
+instructions are expected to stay shared, so `CLAUDE.md.shared` carries it all
+(the old per-account fragments were folded in on 2026-11-21); a fragment
+returns only if a genuinely account-bound instruction appears.
 
 **Procedure for adding or updating a global instruction:** never write
 directly to `~/.claude-personal/CLAUDE.md` or `~/.claude-exxo/CLAUDE.md` —
@@ -267,8 +269,8 @@ that's exactly the hand-duplication that created the gap this section fixes
 (found 2026-08-18: both contexts had independently hand-copied CLAUDE.md
 content with no sync mechanism between them at all). Instead:
 1. Decide scope — applies to both accounts (the common case) → edit
-   `files/claude/CLAUDE.md.shared`; personal-only or exxo-only → edit (or
-   create) `files/claude/CLAUDE.md.personal` / `CLAUDE.md.exxo`.
+   `files/claude/CLAUDE.md.shared`; everything goes there, scoped by heading (an account-bound one → a new
+   `CLAUDE.md.<account>`).
 2. Run `scripts/claude-sync` (or `--diff` first to preview).
 3. If a context's `CLAUDE.md` had unmanaged edits, they're backed up to
    `CLAUDE.md.bak-<ts>` before being overwritten — check that backup for
@@ -325,18 +327,18 @@ carried no MCP servers at all while `~/.claude-exxo` had four.
    `scripts/claude-sync` get linked in (currently `claude-workstation-setup`,
    `worktree-closedown`, `dotfiles-repo`, `claude-repo-config`, `reauth`, `workstation-sync`,
    `workstation-setup`, `dev-disk-doctor`, `ux-designer`). Every other repo skill is
-   personal-only by default and must be explicitly promoted — add its name to
-   `shared_skills()` to make it cross-account.
+   left out only for a name collision (today `run-with-secrets`); new skills
+   are added to `shared_skills()` (parity).
    Authoring asymmetry (verified against claude-sync): author new skills in
    the personal context or the repo directly. A real directory created under
    `~/.claude-exxo/skills/` works for sessions only until the next
    claude-sync, which ADOPTS it into `files/claude/skills/` — safely in git,
-   but personal-only, so it vanishes from the exxo context until promoted
+   but not in `shared_skills()`, so it vanishes from the exxo context until promoted
    via `shared_skills()`. (A name the repo already has is warned about and
    left in place.) Org content belongs in the Exxo-Labs/skills repo instead.
 2. **Plugins** via marketplaces declared in the settings fragments: every
    context enables `exxo-common@exxo-skills` (org skills: secret handling, CI
-   runner targeting, design workflow); exxo also enables `exxo-mantine`. The marketplace source is the SSH remote
+   runner targeting, design workflow); every context also enables `exxo-mantine`. The marketplace source is the SSH remote
    `git@github.com:Exxo-Labs/skills.git` — SSH, not HTTPS, because the
    background plugin refresh disables git credential helpers and HTTPS fails
    on private repos. Plugin installs are SNAPSHOTS pinned to a commit SHA,
@@ -365,26 +367,12 @@ Environment block names the right one per context.
 When promoting a skill to cross-account, check the plugin side for a name
 collision first.
 
-A repo skill on path 1 can itself be a byte-for-byte VENDORED copy of a public
-upstream. `files/claude/skills/mantine-{form,combobox,custom-components}` are
-`mantinedev/skills`, refreshed by `scripts/vendor-mantine` and pinned by commit
-in `files/claude/vendor/mantine.lock.json` (`--check` reports whether the pin is
-behind). Byte-identical is the point — no local edits, no spliced-in provenance
-headers — so `git diff` after a refresh shows what Mantine changed and nothing
-else; provenance lives in the lockfile and our own framing in the hand-written
-`mantine-docs` skill beside them, which also routes between the three Mantine
-lookup paths (MCP server, these skills, the `llms.txt` index). Never edit a
-vendored directory: the next refresh destroys the edit and hides upstream's.
-
-This adds no third delivery path, but it does mean one upstream can reach the
-two contexts by DIFFERENT paths. The `mantine-*` skills are absent from
-`shared_skills()`, so exxo receives the same content on path 2 instead, as the
-`exxo-mantine@exxo-skills` plugin. That is the `run-with-secrets` rule
-generalised — one capability, one delivery path per context, never two at once
-— with a second reason on top: the personal context must never depend on a
-private Exxo repo for the mantine skills, so it vendors from upstream directly. Both repos pull from
-`mantinedev/skills` and never from each other, so the copies cannot
-chain-drift.
+Moved-out skills: the four `squad-*` skills are the `gaia` plugin's
+(`/gaia:member`, `/gaia:planner`, `/gaia:leader`, `/gaia:debug-review`) and the
+Mantine skills are the `exxo-mantine` plugin's; the dotfiles copies, the six
+moved agents and `scripts/vendor-mantine` were deleted (skills plan T9) and
+`claude-sync` prunes the dangling links it made in each curated context. The
+Mantine MCP server still reaches every context through `mcp.shared.json`.
 
 Not a delivery path you manage: Claude Code itself caches the claude.ai
 ACCOUNT skills (`anthropic-skills:*` — docx, pdf, skill-creator, …) under

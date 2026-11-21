@@ -6,16 +6,18 @@ set -uo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 AGENTS="$REPO_DIR/files/claude/agents"
-EXPECTED=(implementer reviewer git-pr-ops investigator sanity-cms notion-ops ux-designer design-architect conformity-reviewer)
-# These six moved to the exxo-common plugin (invoked namespaced, Ground rules
-# stub instead of an Environment block); their source files here await T9
-# retirement and are no longer held to the Environment/mechanics checks.
+EXPECTED=(git-pr-ops sanity-cms ux-designer)
+# The six agents that moved to the exxo-common plugin are retired here.
 MOVED=(implementer reviewer investigator design-architect conformity-reviewer notion-ops)
 fail=0
 err() { printf 'FAIL: %s\n' "$*"; fail=1; }
 
 for n in "${EXPECTED[@]}"; do
     [ -f "$AGENTS/$n.md" ] || err "missing agent $n.md"
+done
+
+for n in "${MOVED[@]}"; do
+    [ -e "$AGENTS/$n.md" ] && err "retired agent $n.md still present (exxo-common plugin owns it)"
 done
 
 for f in "$AGENTS"/*.md; do
@@ -33,7 +35,6 @@ for f in "$AGENTS"/*.md; do
     case "$model" in sonnet|opus|haiku|inherit) ;; *) err "$base: model '$model' not sonnet|opus|haiku|inherit";; esac
     # ux-designer runs as a main session (claude --agent), which gets CLAUDE.md; it has its own check below.
     [ "$base" = ux-designer ] && continue
-    case " ${MOVED[*]} " in *" $base "*) continue;; esac
     printf '%s\n' "$body" | grep -q '^## Environment' || err "$base: no '## Environment' section"
     for s in run-with-secrets SSH worktree; do
         printf '%s\n' "$body" | grep -q "$s" || err "$base: body does not mention $s"

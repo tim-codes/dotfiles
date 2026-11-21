@@ -35,10 +35,10 @@ sync >"$T/apply.log" 2>&1 || { bad "apply exited non-zero"; cat "$T/apply.log"; 
 R="$FAKE/.claude-reserve"; P="$FAKE/.claude-personal"
 
 check "reserve settings.json equals personal's" cmp -s "$R/settings.json" "$P/settings.json"
-check "reserve settings carry the exxo marketplace and exxo-common, not exxo-mantine" \
-    jq -e '(.extraKnownMarketplaces | has("exxo-skills")) and .enabledPlugins["exxo-common@exxo-skills"] and (.enabledPlugins | has("exxo-mantine@exxo-skills") | not)' "$R/settings.json"
+check "reserve settings carry the exxo marketplace, exxo-common and exxo-mantine" \
+    jq -e '(.extraKnownMarketplaces | has("exxo-skills")) and .enabledPlugins["exxo-common@exxo-skills"] and .enabledPlugins["exxo-mantine@exxo-skills"]' "$R/settings.json"
 check "reserve CLAUDE.md equals personal's" cmp -s "$R/CLAUDE.md" "$P/CLAUDE.md"
-check "reserve CLAUDE.md differs from exxo's" bash -c '! cmp -s "$1" "$2"' _ "$R/CLAUDE.md" "$FAKE/.claude-exxo/CLAUDE.md"
+check "reserve CLAUDE.md equals exxo's (context parity)" cmp -s "$R/CLAUDE.md" "$FAKE/.claude-exxo/CLAUDE.md"
 
 check "reserve skills is a whole-dir symlink to the repo" test "$(readlink "$R/skills")" = "$F/skills"
 check "reserve agents is a whole-dir symlink to the repo" test "$(readlink "$R/agents")" = "$F/agents"

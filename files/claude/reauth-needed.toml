@@ -13,17 +13,20 @@
 # Kept to the subset the parser in claude-reauth reads: [table] headers,
 # `servers`/`optional` string arrays (single- or multi-line), # comments.
 
+# Parity (2026-11-21): the user-scope servers from mcp.shared.json are the same
+# in every context, so they are required everywhere. Only the claude.ai
+# connectors below are account-bound (they follow the logged-in ACCOUNT).
 [all]
-servers = ["playwright"]
+servers = ["playwright", "mantine", "Sanity", "datadog", "workos"]
 
 [personal]
-servers = ["Sanity", "mantine", "workos", "claude.ai Notion", "claude.ai Slack", "claude.ai Figma"]
+servers = ["claude.ai Notion", "claude.ai Slack", "claude.ai Figma"]
 optional = ["claude.ai Datadog", "claude.ai Linear", "claude.ai Gmail", "claude.ai Google Calendar", "claude.ai Google Drive"]
 
 # Second personal subscription, built from the personal fragments. Its claude.ai
 # connectors mirror personal's (set up 2026-10-30), minus the Google ones.
 [reserve]
-servers = ["Sanity", "mantine", "workos", "claude.ai Notion", "claude.ai Slack", "claude.ai Figma"]
+servers = ["claude.ai Notion", "claude.ai Slack", "claude.ai Figma"]
 optional = ["claude.ai Datadog", "claude.ai Linear"]
 
 # Datadog is the user-scope `datadog` server from mcp.shared.json (EU site,
@@ -33,8 +36,6 @@ optional = ["claude.ai Datadog", "claude.ai Linear"]
 # account has it enabled.
 [exxo]
 servers = [
-  "datadog",
-  "workos",
   "claude.ai Microsoft 365",
   "claude.ai Notion",
   "claude.ai Slack",
@@ -45,5 +46,5 @@ optional = ["claude.ai Datadog"]
 # Same exxo fragments, personal subscription: the claude.ai connectors follow
 # the logged-in ACCOUNT, so the Exxo-org ones are not reachable here.
 [exxo-personal]
-servers = ["datadog", "workos"]
+servers = []
 optional = ["claude.ai Datadog"]

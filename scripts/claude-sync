@@ -19,12 +19,12 @@
 #    one-way baseline, and drift is promoted deliberately (see `diff` below)
 #    instead of landing in git by accident. The fragments exist because some
 #    settings — enabledPlugins, extraKnownMarketplaces — must differ per
-#    account (exxo-mantine and the Exxo cloud grants belong only in the exxo
-#    context; exxo-common and the exxo-skills marketplace were widened to
-#    every context by Tim on 2026-11-03, superseding homelab #76 / Linear
-#    ENG-20). The merge is what lets
-#    those account-specific keys layer on top of one shared baseline instead
-#    of forking the whole file.
+#    account. Since 2026-11-21 the contexts are at parity (Tim: "for the sake of
+#    context quota interoperability"): exxo-mantine, exxo-common, the
+#    exxo-skills marketplace and the Exxo cloud grants are in the shared
+#    baseline, and settings.personal.json / settings.exxo.json are empty
+#    seams for a genuinely account-bound key. The merge is what lets such a
+#    key layer on top of one shared baseline instead of forking the file.
 # 2. It targets the real contexts, never ~/.claude. The default context is
 #    retired; recreating it is how it would come back from the dead.
 #
@@ -73,8 +73,9 @@
 # state, and personal has no reason to see anything less than the whole set.
 #
 # Every other context gets a real skills directory curated with per-skill
-# symlinks, and links ONLY the skills named in shared_skills() below — repo
-# skills are personal-only unless explicitly promoted to cross-account.
+# symlinks, and links ONLY the skills named in shared_skills() below. Parity
+# (2026-11-21) means every repo skill is listed there except those that
+# collide by name with a plugin skill (today: run-with-secrets).
 # Allow-list, not deny-list, deliberately: a deny-list fails open, making
 # every new personal skill remember to opt out of the work context. That is
 # exactly how the run-with-secrets collision happened (verified 2026-08-18:
@@ -243,10 +244,10 @@ trap 'rm -f "$MERGE_TMP" "$MCP_TMP" "$MCP_OUT" "$PREFS_TMP" "$PREFS_OUT"' EXIT
 # to cross-account by adding its name here — and check the plugin path for
 # a name collision first (the repo's run-with-secrets is the homelab copy;
 # the Exxo one reaches exxo as exxo-ops:run-with-secrets via the plugin,
-# which is why it must never be in this list). The four squad-* skills live
-# in the gaia plugin now and the vendored mantine-* skills in exxo-mantine;
-# their source files remain until T9 but are not linked into any curated
-# context.
+# which is why it must never be in this list). The squad-* skills live in the
+# gaia plugin and the mantine-* skills in exxo-mantine; their sources were
+# deleted (T9) and the curated-context prune removes the links claude-sync
+# made earlier.
 shared_skills() {
     cat <<'LIST'
 claude-workstation-setup
@@ -259,6 +260,8 @@ workstation-sync
 workstation-setup
 dev-disk-doctor
 ux-designer
+odin-power-check
+satisfactory-mod-compat
 LIST
 }
 
@@ -283,10 +286,8 @@ is_cc_managed() {
 # stays personal-only until promoted here. Names, not filenames (no .md).
 # Check the plugin path for a name collision before promoting one.
 # The six moved agents (implementer, reviewer, investigator, design-architect,
-# conformity-reviewer, notion-ops) are exxo-common plugin agents now, invoked
-# namespaced; their source files stay in files/claude/agents until the T9
-# retirement, but are no longer linked into curated contexts (personal's
-# whole-directory link still exposes them until then).
+# conformity-reviewer, notion-ops) are exxo-common plugin agents, invoked
+# namespaced; their sources were deleted (T9) and the prune drops the old links.
 shared_agents() {
     cat <<'LIST'
 git-pr-ops

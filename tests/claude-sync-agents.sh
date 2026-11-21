@@ -16,7 +16,8 @@ cp -R "$SRC_REPO/files/claude" "$REPO/files/"
 for c in personal exxo exxo-personal; do mkdir -p "$FAKE/.claude-$c"; done
 AG="$REPO/files/claude/agents"
 SHARED=(git-pr-ops sanity-cms ux-designer)
-MOVED=(implementer reviewer investigator design-architect conformity-reviewer notion-ops)  # exxo-common plugin agents now
+MOVED=(implementer reviewer investigator design-architect conformity-reviewer notion-ops)  # exxo-common plugin agents now; sources retired (T9)
+MOVED_SKILLS=(squad-member squad-planner squad-leader squad-debug-review mantine-docs mantine-form mantine-combobox mantine-custom-components)  # gaia / exxo-mantine plugins now
 printf -- '---\nname: private-probe\ndescription: x\nmodel: haiku\n---\n' > "$AG/private-probe.md"
 
 fail=0
@@ -38,6 +39,10 @@ mkdir -p "$FAKE/.claude-exxo/agents"
 ln -s "$AG/private-probe.md" "$FAKE/.claude-exxo/agents/private-probe.md"
 ln -s "$T/nowhere.md" "$FAKE/.claude-exxo/agents/gone.md"
 ln -s "$T/elsewhere.md" "$FAKE/.claude-exxo/agents/git-pr-ops.md"
+# links claude-sync made before the retirement: they dangle now, the sources are gone
+for n in "${MOVED[@]}"; do ln -s "$AG/$n.md" "$FAKE/.claude-exxo/agents/$n.md"; done
+mkdir -p "$FAKE/.claude-exxo/skills"
+for n in "${MOVED_SKILLS[@]}"; do ln -s "$REPO/files/claude/skills/$n" "$FAKE/.claude-exxo/skills/$n"; done
 printf -- '---\nname: handmade\ndescription: x\nmodel: haiku\n---\n' > "$FAKE/.claude-exxo/agents/handmade.md"
 
 out="$(sync --diff 2>&1)"
@@ -60,6 +65,14 @@ for ctx in exxo exxo-personal; do
         check "$ctx: moved agent $n not linked" test ! -e "$d/$n.md" -a ! -L "$d/$n.md"
     done
     check "$ctx: private-probe not linked" test ! -e "$d/private-probe.md" -a ! -L "$d/private-probe.md"
+done
+for n in "${MOVED[@]}"; do check "retired agent $n source is gone" test ! -e "$AG/$n.md"; done
+for ctx in exxo; do
+    for n in "${MOVED[@]}"; do check "$ctx: dangling $n.md link pruned" test ! -L "$FAKE/.claude-$ctx/agents/$n.md"; done
+    for n in "${MOVED_SKILLS[@]}"; do
+        check "retired skill $n source is gone" test ! -e "$REPO/files/claude/skills/$n"
+        check "$ctx: dangling skill link $n pruned" test ! -L "$FAKE/.claude-$ctx/skills/$n"
+    done
 done
 check "prunes stale and broken links" test ! -L "$FAKE/.claude-exxo/agents/gone.md"
 check "adopts unmanaged real agent file (moved into repo)" test -f "$AG/handmade.md"

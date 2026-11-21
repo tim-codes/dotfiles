@@ -174,7 +174,7 @@ layout, commands and recipes, repo-specific rules.
   an existing skill, and leave a pointer behind. Cut and relocate the text;
   don't rewrite its voice.
 - **Repo agents**: phrase a directive as "project agent `ui` takes precedence
-  over the global `implementer` for UI work". Project agents in
+  over the global `exxo-common:implementer` for UI work". Project agents in
   `.claude/agents/` win over the global ones for the work they name.
 
 ## The audit
