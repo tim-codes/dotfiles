@@ -276,6 +276,8 @@
   },
   "permissions": {
     "allow": [
+      "Bash(just --justfile=agent/Justfile:*)",
+      "Bash(just --justfile agent/Justfile:*)",
       "Bash(gh pr create:*)",
       "Bash(gh pr ready:*)",
       "Bash(gh pr edit:*)",

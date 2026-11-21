@@ -54,7 +54,8 @@ pulumi (and gcloud) commands subcommand-first, with the target flags after:
 
 **Committed `.claude/settings.json`** holds hooks only, such as the Exxo
 `just skills-check` SessionStart hook. No permission rules: the floor and the
-single `agent/Justfile` grant (with its origin check) are global.
+single `agent/Justfile` grant (attended fragment; origin check in the shared
+`squad hook permission` PreToolUse hook) are global.
 
 **`settings.local.json`** is per machine and never reaches a worktree, so
 nothing load-bearing can live there. Claude Code writes "don't ask again"

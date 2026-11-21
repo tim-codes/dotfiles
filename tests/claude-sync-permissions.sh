@@ -98,6 +98,7 @@ SHARED="$C/settings.shared.json"
 check "attended fragment exists and is valid JSON" jq -e . "$ATT"
 # every rule the attended fragment owns, per list
 ATT_GRANTS=(
+    'Bash(just --justfile=agent/Justfile:*)' 'Bash(just --justfile agent/Justfile:*)'
     'Bash(gh pr create:*)' 'Bash(gh pr ready:*)' 'Bash(gh pr edit:*)' 'Bash(gh pr merge:*)'
     'Bash(gh pr comment:*)' 'Bash(gh pr update-branch:*)'
     'mcp__claude_ai_Notion' 'mcp__claude_ai_Notion__notion-delete-pages'
