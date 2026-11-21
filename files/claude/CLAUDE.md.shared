@@ -108,20 +108,13 @@ commit.
 If a task hits an environment or tooling setup issue — a package-manager
 restriction (e.g. PEP 668's "externally managed environment" blocking
 `pip install`), a missing dependency, a blocked install, a permissions or
-config gap — don't route around it unprompted. Surface it to the user and
-let them resolve it first.
+config gap — don't route around it unprompted. Surface it and let it be
+resolved first. Even when a
+different path makes the fix unnecessary, still surface it rather than
+silently absorbing it.
 
-Skip prompting only when resolving it is genuinely unnecessary for the task
-at hand (a different path already covers the need, so fixing the blocked one
-buys nothing) — but even then, still surface the issue for awareness rather
-than silently absorbing it.
-
-**Why:** a fixable local-environment quirk is not architectural evidence. Left
-unexamined, it can quietly bias a technical decision — e.g. ruling out an
-otherwise-reasonable approach because its dependency happened to be blocked
-by a solvable config issue, rather than because the approach itself was
-wrong. Surfacing it first keeps that reasoning honest, and gives the user the
-chance to fix the environment rather than have a decision made around it.
+**Why:** a fixable local quirk is not architectural evidence; routing around
+it unexamined can bias a technical decision.
 
 ## A hung-looking command is often waiting on a human approval
 
@@ -133,13 +126,10 @@ command that needs privilege escalation or interactive confirmation on its
 own, not buried in a compound command — the prompt has to be legible to the
 person answering it.
 
-When you are about to trigger something the operator must answer — a GUI
-permission dialog (e.g. Excel's Grant File Access), Touch ID, a device-code
-sign-in — tell them first: what will appear, what to click, and that you are
-waiting. Then wait generously (at least 10 minutes) rather than polling for a
-few seconds, and never auto-cancel a prompt meant for them. Probes that might
-raise a prompt as a side effect count too: warn before running them, or don't
-run them.
+Before triggering a prompt the operator must answer (a GUI dialog, Touch ID,
+a device-code sign-in), tell them what will appear and what to click, then
+wait at least 10 minutes and never auto-cancel it. Probes that might raise
+one count too.
 
 **Why:** the operator asked for this on 12 Oct 2026 after several dialogs were
 raised without warning and cancelled within seconds.
@@ -233,26 +223,15 @@ persist, with collection on our own mechanisms at our own pace.
 
 ## Installing a missing dependency on the workstation: fine ad hoc, persist the rest
 
-If a task needs a dependency that isn't installed on the local workstation
-yet — e.g. `brew install libreoffice` to check a document's formatting — go
-ahead and install it in the current session without stopping to ask, as long
-as it's small, low-risk, and doesn't conflict with what's already installed.
+A small, low-risk dependency missing on the local workstation (e.g. `brew
+install libreoffice` to check a document) can be installed ad hoc without
+asking. A large, invasive or incongruous one, if the task needs it, must also
+be persisted as idempotent config in the repo that governs that machine
+class (dotfiles, or homelab for servers) with a PR; the `dotfiles-repo`
+skill says where.
 
-If instead the dependency is particularly large, invasive, or sits
-incongruously next to existing installables, still install it if the task
-genuinely needs it — but don't leave it as undocumented host state. Persist
-the install into the dotfiles repo (or whichever repo governs that class of
-machine config, e.g. homelab for server-side installs) as idempotent config,
-and open a PR for it. See the `dotfiles-repo` skill for exactly where a
-given install gets persisted.
-
-**Why:** most one-off dependencies are cheap, reversible, and not worth a
-round-trip to ask about — this doesn't conflict with the "surface, don't
-silently work around" rule above, since nothing here is actually blocked.
-But an install big or unusual enough to change the workstation's shape (not
-just add a small tool to it) needs to survive a reinstall or a new machine —
-otherwise the workstation's real state silently diverges from what the repo
-says it is, and the next reproduction from source control is wrong.
+**Why:** otherwise the workstation silently diverges from what the repo says
+it is.
 
 ## Docker not running: start OrbStack, don't ask
 
@@ -281,33 +260,26 @@ expose something real? If yes, it must be a reference.
 
 ## Blanket-trusted files: the trust is in the file, not the entry
 
-Where one permission grant covers a whole file (e.g.
-`Bash(just --justfile=agent/Justfile:*)`), every entry in it runs without
-approval — including entries added after the grant. So anything added to
-such a file must be genuinely reusable, and read-only and
-non-secret-revealing **by construction** (no `--reveal`/`--show-secrets`,
-nothing that mutates resources). If unsure whether an entry is safe enough
-for blanket trust, don't add it — and never add one to dodge a permission
-prompt.
+A grant that covers a whole file (the global `agent/Justfile` grant) runs
+every entry in it, including later additions. Anything added must be
+reusable and read-only and non-secret-revealing **by construction**; if
+unsure, don't add it, and never add one to dodge a prompt. Mutating recipes
+go in `ops.Justfile`. The `claude-repo-config` skill has the detail.
 
 When a recurring task needs a capability the deny rules block, don't ask
-for the deny to be lifted — add a narrowly-scoped recipe that fetches and
-consumes the secret in a single in-recipe pipeline (fixed secret, fixed
-consumer, nothing printed), so the session invokes it without ever seeing
-the value.
+for the deny to be lifted: add a narrow recipe that fetches and consumes the
+secret in one pipeline (fixed secret, fixed consumer, nothing printed).
 
 ## Repo-level Claude config follows the estate conventions
 
-A repo's `.claude/settings.json`, `settings.local.json`, `agent/Justfile`
-and CLAUDE.md follow the `claude-repo-config` skill — read it before
-changing any of them, or when the SessionStart "Claude config drift"
-warning fires. Three hard rules:
+A repo's `.claude/settings.json`, `agent/Justfile` and CLAUDE.md follow the
+`claude-repo-config` skill — read it before changing any of them, or when the
+SessionStart "Claude config drift" warning fires. Hard rules:
 
-- No `just:*`, `git:*` or interpreter grants (`node`, `python`, `npx`,
-  `pnpm`, `bash`, `curl`, `gh` …) in any repo settings file; grant named
-  recipes instead. Read-only basics and the deny floor are global.
-- Blanket-trusted files are read-only by construction; mutating recipes
-  live in a separate, untrusted `ops.Justfile`.
+- Repo settings carry hooks only, no permission rules; the deny floor and
+  grants are global.
+- `agent/Justfile` is read-only by construction; mutating recipes live in
+  `ops.Justfile`.
 - A repo CLAUDE.md restates nothing global — one pointer line at most.
 
 ## Don't code fast-moving tooling from memory
@@ -374,13 +346,10 @@ picker and the periodic transcript cleanup then deletes them for good.
 
 ## Log accidental out-of-scope file reads
 
-When a session (or a subagent it launched) reads, prints or lists a file or
-directory it had no reason to touch, append one line to the global log
-`~/claude/fs-breach-log.md`. The usual causes are a `cd` that failed so a
-command ran in the wrong directory, a glob that matched too much, or a path
-mix-up. This applies whether or not the content looked sensitive. Write the
-line straight away, then tell Tim in the reply if anything secret-looking
-was exposed (a credential, a token, personal data).
+When a session or its subagent reads, prints or lists a file or
+directory it had no reason to touch (a failed `cd`, a broad glob, a path
+mix-up), append one line to `~/claude/fs-breach-log.md` straight away,
+sensitive-looking or not, and tell Tim if anything secret was exposed.
 
 Format: one Markdown table row, never the content itself:
 
@@ -417,13 +386,12 @@ subagents in one message, not sequentially.
 Route to a dedicated agent first. `implementer` (plan-lane and ad-hoc
 implementation), `reviewer` (code/spec review, re-review waves),
 `conformity-reviewer` (stack/pattern conformity of a design or PR against
-the estate's conventions), `git-pr-ops` (branch/worktree surveys, PR
-create/update, merge-state and CI checks, worktree closedown), `investigator` (debugging, CI/build log
+the estate's conventions), `git-pr-ops` (branch/worktree surveys,
+merge-state and CI checks, worktree closedown), `investigator` (debugging, CI/build log
 forensics, smoke follow-ups), `sanity-cms` (Sanity schema/content/Studio)
 `design-architect` (codebase-grounded implementation blueprint before a
 multi-lane or non-trivial build; read-only)
-and `notion-ops` (every Notion read or write — no other agent loads Notion
-tools) each carry their own procedure and pinned model. `general-purpose`
+and `notion-ops` (Notion reads and writes) each carry their own procedure and pinned model. `general-purpose`
 is the fallback for work none of them fits, and its roster line must say
 why none did. A project-defined agent in the repo's `.claude/agents/` takes
 precedence over these for the work it names (e.g. parentedit's `ui` over

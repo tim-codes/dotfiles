@@ -139,13 +139,13 @@ echo '{"session_id":"s","cwd":"/tmp","hook_event_name":"PreToolUse","tool_name":
 check "guard hook, python3 present: merge still denied" grep -q '"deny"' "$T/deny.out"
 check "exxo-openrouter PreToolUse = shared PreToolUse + guard" \
     test "$(jq -c '.hooks.PreToolUse' "$(S exxo-openrouter)")" = \
-         "$(jq -c --arg c "$GUARD_CMD" '(.[0].hooks.PreToolUse + (.[1].hooks.PreToolUse // [])) + [{matcher:"Bash", hooks:[{type:"command", command:$c}]}]' -s "$C/settings.shared.json" "$C/settings.exxo.json")"
+         "$(jq -c --arg c "$GUARD_CMD" '(.[0].hooks.PreToolUse + (.[1].hooks.PreToolUse // []) + (.[2].hooks.PreToolUse // [])) + [{matcher:"Bash", hooks:[{type:"command", command:$c}]}]' -s "$C/settings.shared.json" "$C/settings.attended.json" "$C/settings.exxo.json")"
 check "exxo-openrouter other hook events = exxo's" \
     test "$(jq -c '.hooks | del(.PreToolUse)' "$(S exxo-openrouter)")" = "$(jq -c '.hooks | del(.PreToolUse)' "$(S exxo)")"
 for pair in personal:personal exxo:exxo exxo-personal:exxo; do
     ctx="${pair%%:*}"; acct="${pair##*:}"
-    check "$ctx: hooks unchanged (shared * account)" \
-        test "$(jq -c '.hooks' "$(S "$ctx")")" = "$(jq -cs '. as $f | ($f[0] * $f[1]) | .hooks.PreToolUse = (($f[0].hooks.PreToolUse // []) + ($f[1].hooks.PreToolUse // [])) | .hooks' "$C/settings.shared.json" "$C/settings.$acct.json")"
+    check "$ctx: hooks unchanged (per-event counts of shared + attended + account)" \
+        test "$(jq -cS '.hooks | map_values(length)' "$(S "$ctx")")" = "$(jq -cSs '. as $f | [$f[].hooks // {} | to_entries[]] | group_by(.key) | map({key: .[0].key, value: (map(.value | length) | add)}) | from_entries' "$C/settings.shared.json" "$C/settings.attended.json" "$C/settings.$acct.json")"
     check "$ctx: no guard hook" bash -c "! grep -q claude-openrouter-guard '$(S "$ctx")'"
 done
 

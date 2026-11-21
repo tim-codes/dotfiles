@@ -38,8 +38,9 @@ src/.config/squad/tunnel.json
 # squad: key-like material must never be committed from the stowed config dir (the repo is public).
 # Tracked files are re-included explicitly; keys live under ~/.local/state/squad/keys.
 src/.config/squad/*.json
-!src/.config/squad/member-settings.json
 src/.config/squad/*.key
 src/.config/squad/*.pem
 src/.config/squad/agent.env
 src/.config/squad/*.bak*
+# Gaia install-roles writes role fragments, builder-instructions.md and plugin/ here (via the stow symlink).
+src/.config/squad/roles/

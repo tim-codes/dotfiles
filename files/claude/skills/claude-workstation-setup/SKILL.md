@@ -102,8 +102,7 @@ cannot answer (2026-10-30).
 `settings.shared.json` also allows `gh pr create`, `ready`, `edit`, `merge`, `comment` and
 `update-branch`, and the whole claude.ai Notion connector (`mcp__claude_ai_Notion`), in every
 context. Notion's `notion-delete-pages` and `notion-delete-databases` are in `ask`. The
-deny overlays still win: the OpenRouter worker cannot `gh pr merge`, and `claude-kickoff`
-members cannot use the raw `gh pr` write commands. This departs from "the shared allow set is
+deny overlays still win: the OpenRouter worker cannot `gh pr merge`. This departs from "the shared allow set is
 read-only" on purpose; do not treat it as the settled design.
 
 One exception to "account fragment wins": the permission rule arrays
@@ -189,22 +188,17 @@ squad (account, share, budget, key file) is Exxo-Labs/gaia
 `docs/metered-accounts.md`; the routing rationale and measurements are its
 ADR `docs/adr/2026-11-10-metered-deepseek-routing.md`.
 
-### The member deny overlay (`claude-kickoff`)
+### Builder lane permissions (`claude-kickoff`)
 
-Sessions launched by `scripts/claude-kickoff` (the attended launcher; broker-launched
-members get the broker's own `[broker] member_settings` overlay instead)
-get `--settings files/claude/settings.member-deny.json` on every launch, new or
-`--resume`, any role: a deny-only file (`permissions.deny`) that adds raw
-`gh pr merge` and `gh api ... merge` rules (`Bash(gh pr merge*)`, `Bash(* gh pr
-merge*)`, `Bash(gh * pr merge*)`, `Bash(* gh * pr merge*)`, `Bash(gh api
-*merge*)`, `Bash(* gh api *merge*)`) to the context's merged deny set, so members
-land only through `mcp__squad__land` and the trunk service (tim-codes/squad#102, fix 8b). It is not a
-context overlay: claude-sync never merges it, it is read from the repo at launch
-(the path is resolved through the `src/bin` symlink), and Tim's own sessions
-through the fish wrappers never get it. `claude-kickoff --no-member-deny` skips
-it for an attended launch; a missing or invalid file refuses the launch (exit
-6). `tests/claude-kickoff-member-deny.sh` covers it. The overlay workers keep their
-own rule and guard above.
+`scripts/claude-kickoff` launches a builder lane (frontmatter `role` set, or a
+`/squad-planner` body; `tier: attended` opts out) with the Gaia role fragment:
+`--setting-sources project --settings "$(squad roles render --kind K ...)"`
+plus `--append-system-prompt-file <roles_dir>/builder-instructions.md` and
+`--permission-mode auto`. A render failure or missing `squad` exits 6. The old
+`settings.member-deny.json` and the broker's `member_settings` overlay are
+retired; `claude-config-audit --roles <dir>` checks the fragments' deny floor
+(`tests/squad-roles-floor.sh`). Design and rationale: the permissions
+tier split spec in Exxo-Labs/gaia. `tests/claude-kickoff-role.sh` covers it.
 
 ## Repo config: conventions skill, audit script, SessionStart hook
 

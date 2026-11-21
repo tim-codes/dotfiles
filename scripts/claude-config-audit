@@ -10,6 +10,8 @@ Usage:
   claude-config-audit [--repo PATH]            audit one repo (default: cwd)
   claude-config-audit --estate [--root DIR ...] [--all]
                                                audit every primary checkout under the roots
+  claude-config-audit --roles DIR              audit Gaia role fragments (contracts/roles or the
+                                               installed roles_dir): see role-floor below
   options: --json   machine-readable output
            --quiet  print only warn/error findings, nothing at all when clean
            --hook   SessionStart-hook output (JSON systemMessage + additionalContext,
@@ -40,6 +42,10 @@ Checks (level, id):
                               ({{ param }}) into its shell body (reports file:recipe)
   warn  skills-submodule      shared-skills submodule pin >3 commits behind origin/main
                               (info when 1-3; local ref only, never fetched)
+  error role-floor            (--roles) a kind fragment (member, operator, planner, reviewer,
+                              infra, releaser) is missing, malformed or lacks a deny-floor rule
+  error role-wildcard         (--roles) a fragment grants an interpreter, curl, just:*, git:*,
+                              Bash(*) or another dangerous_reason() rule
 Exit status: 1 if any error-level finding (0 under --hook), else 0.
 """
 import argparse, datetime as dt, json, os, re, subprocess, sys, time
@@ -253,8 +259,9 @@ _GLOBAL = {}
 def global_settings(ctx):
     if ctx not in _GLOBAL:
         shared = load_json(os.path.join(FRAGMENTS, "settings.shared.json")) or {}
+        attended = load_json(os.path.join(FRAGMENTS, "settings.attended.json")) or {}
         frag = load_json(os.path.join(FRAGMENTS, f"settings.{ctx}.json")) or {}
-        _GLOBAL[ctx] = {"allow": perms(shared, "allow") + perms(frag, "allow"),
+        _GLOBAL[ctx] = {"allow": perms(shared, "allow") + perms(attended, "allow") + perms(frag, "allow"),
                         "floor": perms(shared, "deny")}
     return _GLOBAL[ctx]
 
@@ -635,6 +642,42 @@ def splicing_recipes(path):
 
 # --- fix-local ----------------------------------------------------------------
 
+ROLE_KINDS = ("member", "operator", "planner", "reviewer", "infra", "releaser")
+
+
+def audit_roles(roles_dir):
+    """Findings for a directory of Gaia role fragments (the floor comes from settings.shared.json)."""
+    findings = []
+
+    def add(level, check, name, msg):
+        findings.append({"level": level, "check": check, "file": name, "message": msg})
+
+    shared = load_json(os.path.join(FRAGMENTS, "settings.shared.json")) or {}
+    floor = perms(shared, "deny")
+    if not os.path.isdir(roles_dir):
+        add("error", "role-floor", ".", f"roles directory not found: {roles_dir}")
+        return findings
+    names = {n[:-5] for n in os.listdir(roles_dir) if n.endswith(".json")} - {"manifest", "protected-repos"}
+    for kind in ROLE_KINDS:
+        if kind not in names:
+            add("error", "role-floor", f"{kind}.json", "role fragment is missing")
+    for name in sorted(names):
+        doc = load_json(os.path.join(roles_dir, name + ".json"))
+        if not isinstance(doc, dict):
+            add("error", "role-floor", f"{name}.json", "fragment is unreadable or not a JSON object")
+            continue
+        if name in ROLE_KINDS:
+            missing = [f for f in floor if f not in perms(doc, "deny")]
+            if missing:
+                add("error", "role-floor", f"{name}.json",
+                    f"lacks {len(missing)} of {len(floor)} deny-floor rules: " + ", ".join(missing))
+        for rule in perms(doc, "allow"):
+            why = dangerous_reason(rule)
+            if why:
+                add("error", "role-wildcard", f"{name}.json", f"grants {redact(rule, 100)} ({why})")
+    return findings
+
+
 def fix_local(audit):
     reports = []
     for path in audit.local_files:
@@ -765,6 +808,7 @@ def main(argv=None):
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--repo", help="repo to audit (default: cwd)")
     g.add_argument("--estate", action="store_true", help="audit every primary checkout under the roots")
+    g.add_argument("--roles", metavar="DIR", help="audit Gaia role fragments in DIR (role-floor checks)")
     ap.add_argument("--root", action="append", help="estate root (repeatable; replaces the default ~/dev)")
     ap.add_argument("--all", action="store_true", help="estate: include repos idle > 30 days")
     ap.add_argument("--json", action="store_true")
@@ -774,6 +818,19 @@ def main(argv=None):
     ap.add_argument("--explain", action="store_true",
                     help="list each local entry --fix-local would remove, and why (a dry run)")
     a = ap.parse_args(argv)
+
+    if a.roles:
+        fs = audit_roles(os.path.expanduser(a.roles))
+        errors = sum(f["level"] == "error" for f in fs)
+        results = [{"repo": os.path.abspath(os.path.expanduser(a.roles)), "context": "roles", "findings": fs, "fixed": []}]
+        if a.json:
+            print(json.dumps({"repos": results, "skipped": [], "summary": {"repos": 1, "errors": errors, "warnings": 0}}, indent=1))
+        else:
+            for line in render_text(results, a.quiet, False):
+                print(line)
+            if not a.quiet:
+                print(f"roles: {errors} error(s)")
+        return 1 if errors else 0
 
     skipped = []
     if a.estate:

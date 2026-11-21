@@ -4,11 +4,6 @@
 # docs/runbooks/deployment-profile.md (dated decisions live there).
 
 [broker]
-# Deny overlay merged into every member launch's --settings (permissions.deny: the
-# gh pr merge block and the secret-read floor). Members run in auto permission mode;
-# deny rules are checked before the mode, so these always hold.
-member_settings = "~/.config/squad/member-settings.json"
-
 # PATH the broker launches members with (replaces the built-in default). The default
 # list plus the pnpm global bin dir, where the playwright-mcp shim lives. Applies at
 # the next broker restart. The node entry is the mise Node 24 major symlink, stable across
@@ -26,10 +21,11 @@ name = "personal"
 # The quota reserve (floor kept back for Tim's own use) is a runtime directive from Gaia v0.6.1
 # (quota_reserve @ account:<name>; squad docs/runbooks/budgets.md), not a config key.
 # playwright/browser are capabilities for placement; only playwright has an MCP server the orchestrator passes to member launches that need it ([policy.launch] needs_mcp)
+# datadog: the Datadog MCP server (needs_mcp below) is signed in on the personal, reserve and exxo logins, not on openrouter (Tim, 20 Nov 2026: Datadog is a key Gaia tool)
 # 1password: agent/run resolves 1Password references on this host in every context, so every account except openrouter (agent/run is denied there) provides it; vercel: the Vercel MCP server is exxo-only, so only exxo provides it
 # Tim, 16 Nov 2026: back in placement. Policy: most Gaia work goes to the personal/reserve Ultra plans;
 # exxo is used only where a task needs an org-scope capability (vercel) or the others are full.
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards", "figma"]
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards", "datadog", "figma"]
 placement_rank = 20
 email = "timoconnell1024@gmail.com"
 config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
@@ -41,14 +37,14 @@ name = "reserve"
 # Tim, 16 Nov 2026: back in placement (see personal). figma added 16 Nov 21:10Z: the claude.ai Figma connector is signed in for this login.
 # 17 Nov 2026 (v0.7.8 leader): figma REMOVED for tonight's batch: the reserve claude.ai account no longer lists a Figma connector
 # (claude mcp list), so figma tasks would fail here. Restore once Figma is connected at claude.ai for tim.oc@outlook.com.
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards"]
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards", "datadog"]
 placement_rank = 10
 email = "tim.oc@outlook.com"
 config_dirs = ["~/.claude-reserve"]
 
 [[accounts]]
 name = "exxo"
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "vercel", "boards"]
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "vercel", "boards", "datadog"]
 # Tim, 16 Nov 2026: exxo is last choice by policy (org-scope needs such as vercel, or overflow).
 placement_rank = 90
 email = "tim@exxo.io"
@@ -87,7 +83,7 @@ branch_prefix = "gaia/task-"
 # Replaces the built-in needs_mcp. `browser` has no server on purpose: the Chrome
 # integration (claude-in-chrome) is a Claude Code settings flag, not an mcpServers entry.
 # `browser` still gates placement through `provides`.
-needs_mcp = { playwright = "playwright", boards = "boards" }
+needs_mcp = { playwright = "playwright", boards = "boards", datadog = "datadog" }
 # Ten live members while unattended (Tim, 2026-10-31).
 max_live_members = 10
 
