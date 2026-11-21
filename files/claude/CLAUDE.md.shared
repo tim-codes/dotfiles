@@ -378,19 +378,23 @@ conflict resolution where each step depends on judging the previous one,
 and final synthesis. Independent delegable units launch as parallel
 subagents in one message, not sequentially.
 
-Route to a dedicated agent first. `implementer` (plan-lane and ad-hoc
-implementation), `reviewer` (code/spec review, re-review waves),
-`conformity-reviewer` (stack/pattern conformity of a design or PR against
-the estate's conventions), `git-pr-ops` (branch/worktree surveys,
-merge-state and CI checks, worktree closedown), `investigator` (debugging, CI/build log
-forensics, smoke follow-ups), `sanity-cms` (Sanity schema/content/Studio)
-`design-architect` (codebase-grounded implementation blueprint before a
-multi-lane or non-trivial build; read-only)
-and `notion-ops` (Notion reads and writes) each carry their own procedure and pinned model. `general-purpose`
+Route to a dedicated agent first. The first six are `exxo-common` plugin
+agents and are invoked namespaced: `exxo-common:implementer` (plan-lane and
+ad-hoc implementation), `exxo-common:reviewer` (code/spec review, re-review
+waves), `exxo-common:conformity-reviewer` (stack/pattern conformity of a
+design or PR against the estate's conventions), `exxo-common:investigator`
+(debugging, CI/build log forensics, smoke follow-ups),
+`exxo-common:design-architect` (codebase-grounded implementation blueprint
+before a multi-lane or non-trivial build; read-only) and
+`exxo-common:notion-ops` (Notion reads and writes). Two stay bare:
+`git-pr-ops` (branch/worktree surveys, merge-state and CI checks, worktree
+closedown) and `sanity-cms` (Sanity schema/content/Studio). Each carries its
+own procedure and pinned model. `general-purpose`
 is the fallback for work none of them fits, and its roster line must say
 why none did. A project-defined agent in the repo's `.claude/agents/` takes
 precedence over these for the work it names (e.g. parentedit's `ui` over
-`implementer` for UI work), matching Claude Code's own subagent precedence.
+`exxo-common:implementer` for UI work), matching Claude Code's own subagent
+precedence.
 
 Model choice:
 

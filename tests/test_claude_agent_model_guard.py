@@ -52,6 +52,12 @@ class AgentModelGuard(unittest.TestCase):
     def test_allows_dedicated_agent_without_model(self):
         self.assertAllowed(payload(subagent_type="implementer"))
 
+    def test_allows_namespaced_plugin_agents_without_model(self):
+        for name in ("exxo-common:implementer", "exxo-common:reviewer",
+                     "exxo-common:investigator", "exxo-common:design-architect",
+                     "exxo-common:conformity-reviewer", "exxo-common:notion-ops"):
+            self.assertAllowed(payload(subagent_type=name))
+
     def test_allows_when_subagent_model_env_set(self):
         self.assertAllowed(payload(subagent_type="general-purpose"), subagent_model="moonshotai/kimi-k3")
 

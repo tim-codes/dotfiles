@@ -435,7 +435,7 @@ check "resume argv is --resume ID --model M --effort E <note>" bash -c '
     printf "%s\n" "$1" | grep -qx "argc=7" &&
     printf "%s\n" "$1" | sed -n "2,7p" | tr "\n" " " | grep -qx "arg<--resume> arg<sess-9> arg<--model> arg<opus> arg<--effort> arg<high> "' _ "$rec"
 check "the relaunch note is the final positional arg" bash -c '
-    printf "%s\n" "$1" | sed -n "8p" | grep -qx "arg<squad relaunch: you are now on context exxo\. The SessionStart hook rebinds this session; do not call mcp__squad__register\. Follow /squad-member\.>"' _ "$rec"
+    printf "%s\n" "$1" | sed -n "8p" | grep -qx "arg<squad relaunch: you are now on context exxo\. The SessionStart hook rebinds this session; do not call mcp__squad__register\. Follow /gaia:member\.>"' _ "$rec"
 check "resume ran from the explicit cwd, not the frontmatter one" bash -c '
     printf "%s\n" "$1" | grep -qx "PWD=$2" &&
     printf "%s\n" "$1" | grep -qx "CFG=$3"' _ "$rec" "$(cd "$FAKE/work/other" && pwd -P)" "$FAKE/.claude-exxo"

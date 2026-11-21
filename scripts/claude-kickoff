@@ -95,10 +95,10 @@ effort is used):
   harness  must equal the context's harness (default claude-code; else exit 5)
   role     client (default) | orchestrator | infra
   tier     builder | attended. Default builder when `role` is set or the body starts
-           with /squad-planner, else attended (anything else: exit 5). A builder
+           with /gaia:planner (or the legacy /squad-planner), else attended (anything else: exit 5). A builder
            lane renders its settings with `squad roles render --kind K
            [--overlay openrouter] --interactive` (K: client=member,
-           orchestrator=operator, infra=infra, a /squad-planner body=planner) and
+           orchestrator=operator, infra=infra, a /gaia:planner or /squad-planner body=planner) and
            passes `--setting-sources project --settings <that JSON>
            --append-system-prompt-file <roles_dir>/builder-instructions.md
            --permission-mode auto`, plus `--plugin-dir <roles_dir>/plugin` when that
@@ -515,12 +515,13 @@ if [ -z "$claude_bin" ] && [ -x "$HOME/.local/bin/claude" ]; then claude_bin="$H
 [ -n "$claude_bin" ] || die 7 "claude is not on PATH (nor in ~/.local/bin)"
 
 # --- lane tier: builder lanes get a Gaia role fragment, attended lanes do not ----
-# A builder is a lane with a `role` key or a /squad-planner body (a resume relaunches a
+# A builder is a lane with a `role` key or a /gaia:planner (legacy /squad-planner) body (a resume relaunches a
 # member, so its body does not count); `tier:` overrides either way. The fragment is
 # rendered by squad (never read from this repo) and fails closed: no squad or a failed
 # render exits 6.
 planner_body=0
-if [ -z "$resume" ] && [ "$(tail -n +"$((term + 1))" "$prompt" | awk 'NF { print $1; exit }')" = /squad-planner ]; then planner_body=1; fi
+body_cmd="$(tail -n +"$((term + 1))" "$prompt" | awk 'NF { print $1; exit }')"
+if [ -z "$resume" ] && { [ "$body_cmd" = /gaia:planner ] || [ "$body_cmd" = /squad-planner ]; }; then planner_body=1; fi
 lane_tier="$tier_raw"
 if [ -z "$lane_tier" ]; then
     if [ -n "$(fm_get role)" ] || [ "$planner_body" -eq 1 ]; then lane_tier=builder; else lane_tier=attended; fi
@@ -557,7 +558,7 @@ if [ -n "$resume" ]; then
     # `claude --resume <id> <prompt>` takes a positional prompt in interactive mode
     # (claude --help: "Usage: claude [options] [command] [prompt]"), so the relaunch
     # note travels with the resume and the member sees it as its first message.
-    body="squad relaunch: you are now on context $ctx. The SessionStart hook rebinds this session; do not call mcp__squad__register. Follow /squad-member."
+    body="squad relaunch: you are now on context $ctx. The SessionStart hook rebinds this session; do not call mcp__squad__register. Follow /gaia:member."
 else
     # Same as `$(sed '1,/^---$/d' file)`: everything after the terminator, trailing
     # newlines trimmed by the command substitution.

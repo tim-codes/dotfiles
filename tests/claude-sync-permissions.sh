@@ -82,8 +82,12 @@ check "personal never gets the Exxo gcloud ssh deny" \
 check "personal gets the exxo-skills marketplace" \
     jq -e '.extraKnownMarketplaces["exxo-skills"].source.url == "git@github.com:Exxo-Labs/skills.git"' "$FAKE/.claude-personal/settings.json"
 check "personal enables exxo-common" jq -e '.enabledPlugins["exxo-common@exxo-skills"] == true' "$FAKE/.claude-personal/settings.json"
+check "personal enables gaia and exxo-ops from the attended fragment" \
+    jq -e '.enabledPlugins["gaia@gaia"] == true and .enabledPlugins["exxo-ops@exxo-skills"] == true and .extraKnownMarketplaces.gaia.source.url == "git@github.com:Exxo-Labs/gaia.git"' "$FAKE/.claude-personal/settings.json"
 check "personal never gets exxo-mantine" jq -e '.enabledPlugins | has("exxo-mantine@exxo-skills") | not' "$FAKE/.claude-personal/settings.json"
 for ctx in exxo exxo-personal; do
+    check "$ctx enables gaia and exxo-ops" \
+        jq -e '.enabledPlugins["gaia@gaia"] and .enabledPlugins["exxo-ops@exxo-skills"] and (.extraKnownMarketplaces | has("gaia"))' "$FAKE/.claude-$ctx/settings.json"
     check "$ctx still enables exxo-common and exxo-mantine" \
         jq -e '.enabledPlugins["exxo-common@exxo-skills"] and .enabledPlugins["exxo-mantine@exxo-skills"]' "$FAKE/.claude-$ctx/settings.json"
 done

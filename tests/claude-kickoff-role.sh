@@ -1,6 +1,6 @@
 #!/bin/bash
 # Tests for the role-fragment launch of scripts/claude-kickoff. A builder lane
-# (frontmatter `role` set, or a body starting with /squad-planner; `tier: builder`
+# (frontmatter `role` set, or a body starting with /gaia:planner (legacy /squad-planner); `tier: builder`
 # forces it, `tier: attended` opts out) renders its settings with
 # `squad roles render --kind K [--overlay openrouter] --interactive` and passes
 # `--setting-sources project --settings <json> --append-system-prompt-file
@@ -46,7 +46,8 @@ mkfile() { # mkfile <name> <extra frontmatter lines> <body>
 mkfile client 'role: client' 'Do the thing.'
 mkfile orch 'role: orchestrator' 'Do the thing.'
 mkfile infra 'role: infra' 'Do the thing.'
-mkfile planner '' $'/squad-planner\n\nPlan the thing.'
+mkfile planner '' $'/gaia:planner\n\nPlan the thing.'
+mkfile planner_legacy '' $'/squad-planner\n\nPlan the thing.'
 mkfile attended '' 'Do the thing.'
 mkfile attended-forced $'role: client\ntier: attended' 'Do the thing.'
 mkfile builder-forced 'tier: builder' 'Do the thing.'
@@ -76,7 +77,9 @@ check "orchestrator renders kind operator" [ "$(squadargs)" = "roles render --ki
 kick "$T/infra.md"
 check "infra renders kind infra" [ "$(squadargs)" = "roles render --kind infra --roles-dir $ROLES_DIR --interactive" ]
 kick "$T/planner.md"
-check "a /squad-planner body renders kind planner" [ "$(squadargs)" = "roles render --kind planner --roles-dir $ROLES_DIR --interactive" ]
+check "a /gaia:planner body renders kind planner" [ "$(squadargs)" = "roles render --kind planner --roles-dir $ROLES_DIR --interactive" ]
+kick "$T/planner_legacy.md"
+check "a legacy /squad-planner body still renders kind planner" [ "$(squadargs)" = "roles render --kind planner --roles-dir $ROLES_DIR --interactive" ]
 kick "$T/builder-forced.md"
 check "tier: builder without a role defaults to kind member" [ "$(squadargs)" = "roles render --kind member --roles-dir $ROLES_DIR --interactive" ]
 mkdir -p "$ROLES_DIR/plugin"

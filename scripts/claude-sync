@@ -243,17 +243,16 @@ trap 'rm -f "$MERGE_TMP" "$MCP_TMP" "$MCP_OUT" "$PREFS_TMP" "$PREFS_OUT"' EXIT
 # to cross-account by adding its name here — and check the plugin path for
 # a name collision first (the repo's run-with-secrets is the homelab copy;
 # the Exxo one reaches exxo as exxo-common:run-with-secrets via the plugin,
-# which is why it must never be in this list).
+# which is why it must never be in this list). The four squad-* skills live
+# in the gaia plugin now and the vendored mantine-* skills in exxo-mantine;
+# their source files remain until T9 but are not linked into any curated
+# context.
 shared_skills() {
     cat <<'LIST'
 claude-workstation-setup
 worktree-closedown
 dotfiles-repo
 claude-repo-config
-squad-debug-review
-squad-leader
-squad-member
-squad-planner
 build-lead
 reauth
 workstation-sync
@@ -283,16 +282,15 @@ is_cc_managed() {
 # from this allow list. Same allow-list-not-deny-list reasoning: a new agent
 # stays personal-only until promoted here. Names, not filenames (no .md).
 # Check the plugin path for a name collision before promoting one.
+# The six moved agents (implementer, reviewer, investigator, design-architect,
+# conformity-reviewer, notion-ops) are exxo-common plugin agents now, invoked
+# namespaced; their source files stay in files/claude/agents until the T9
+# retirement, but are no longer linked into curated contexts (personal's
+# whole-directory link still exposes them until then).
 shared_agents() {
     cat <<'LIST'
-implementer
-reviewer
-conformity-reviewer
-design-architect
 git-pr-ops
-investigator
 sanity-cms
-notion-ops
 ux-designer
 LIST
 }

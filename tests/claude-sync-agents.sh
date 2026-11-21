@@ -15,7 +15,8 @@ cp "$SRC_REPO/scripts/claude-sync" "$REPO/scripts/"
 cp -R "$SRC_REPO/files/claude" "$REPO/files/"
 for c in personal exxo exxo-personal; do mkdir -p "$FAKE/.claude-$c"; done
 AG="$REPO/files/claude/agents"
-SHARED=(implementer reviewer git-pr-ops investigator sanity-cms notion-ops ux-designer design-architect conformity-reviewer)
+SHARED=(git-pr-ops sanity-cms ux-designer)
+MOVED=(implementer reviewer investigator design-architect conformity-reviewer notion-ops)  # exxo-common plugin agents now
 printf -- '---\nname: private-probe\ndescription: x\nmodel: haiku\n---\n' > "$AG/private-probe.md"
 
 fail=0
@@ -26,9 +27,9 @@ sync() { HOME="$FAKE" "$REPO/scripts/claude-sync" "$@"; }
 
 # --- diff is read-only ---
 out="$(sync --diff 2>&1)"
-check "diff: exxo reports implementer missing" grep -q 'implementer.md: missing (would be linked)' <<<"$out"
+check "diff: exxo reports git-pr-ops missing" grep -q 'git-pr-ops.md: missing (would be linked)' <<<"$out"
 check "diff: personal reports would link" grep -q 'agents: would link' <<<"$out"
-check "diff: private-probe reported personal-only" grep -q 'personal-only, not linked: private-probe' <<<"$out"
+check "diff: private-probe reported personal-only" grep -q 'personal-only, not linked:.*private-probe' <<<"$out"
 check "diff is read-only (no agents dir created)" \
     test ! -e "$FAKE/.claude-personal/agents" -a ! -e "$FAKE/.claude-exxo/agents"
 
@@ -36,12 +37,12 @@ check "diff is read-only (no agents dir created)" \
 mkdir -p "$FAKE/.claude-exxo/agents"
 ln -s "$AG/private-probe.md" "$FAKE/.claude-exxo/agents/private-probe.md"
 ln -s "$T/nowhere.md" "$FAKE/.claude-exxo/agents/gone.md"
-ln -s "$T/elsewhere.md" "$FAKE/.claude-exxo/agents/reviewer.md"
+ln -s "$T/elsewhere.md" "$FAKE/.claude-exxo/agents/git-pr-ops.md"
 printf -- '---\nname: handmade\ndescription: x\nmodel: haiku\n---\n' > "$FAKE/.claude-exxo/agents/handmade.md"
 
 out="$(sync --diff 2>&1)"
-check "diff: wrong-target link reported" grep -q 'reviewer.md: wrong target (would be relinked)' <<<"$out"
-check "diff: stale links reported for pruning" grep -q 'would prune: gone.md, private-probe.md' <<<"$out"
+check "diff: wrong-target link reported" grep -q 'git-pr-ops.md: wrong target (would be relinked)' <<<"$out"
+check "diff: stale links reported for pruning" grep -q 'would prune: .*gone.md.*private-probe.md' <<<"$out"
 check "diff: unmanaged file reported for adoption" grep -q 'unmanaged, would adopt: handmade.md' <<<"$out"
 
 # --- apply ---
@@ -54,6 +55,9 @@ for ctx in exxo exxo-personal; do
     check "$ctx agents is a real dir" test -d "$d" -a ! -L "$d"
     for n in "${SHARED[@]}"; do
         check "$ctx/$n.md links to repo" test "$(readlink "$d/$n.md")" = "$AG/$n.md"
+    done
+    for n in "${MOVED[@]}"; do
+        check "$ctx: moved agent $n not linked" test ! -e "$d/$n.md" -a ! -L "$d/$n.md"
     done
     check "$ctx: private-probe not linked" test ! -e "$d/private-probe.md" -a ! -L "$d/private-probe.md"
 done
@@ -68,7 +72,7 @@ after="$(ls -l "$FAKE/.claude-exxo/agents" | awk '{print $9,$10,$11}')"
 check "second run is idempotent (personal)" grep -q 'agents: already linked' "$T/apply2.log"
 check "second run is idempotent (exxo listing unchanged)" test "$before" = "$after"
 out="$(sync --diff 2>&1)"
-check "diff after apply: implementer current" grep -q 'implementer.md: current' <<<"$out"
+check "diff after apply: git-pr-ops current" grep -q 'git-pr-ops.md: current' <<<"$out"
 
 [ "$fail" = 0 ] && echo "all claude-sync agents tests passed"
 exit "$fail"
