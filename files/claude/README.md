@@ -12,8 +12,15 @@ to that file, so the repo was perpetually dirty.
 - `settings.shared.json` also enables `exxo-common@exxo-skills` and registers
   the `exxo-skills` marketplace in every context (Tim, 2026-11-03, so
   `claude-design-workflow` / `working-with-figma` reach personal).
-- `settings.exxo.json` — Exxo-only: enables `exxo-mantine@exxo-skills` and adds
-  the Exxo read-only cloud grants.
+- `settings.exxo.json` — the exxo-context fragment, currently `{}`.
+- **Context parity (Tim, 2026-11-21, for quota interoperability):** personal,
+  reserve, exxo and exxo-personal get the same plugins (`exxo-mantine`
+  included), Exxo cloud grants, CLAUDE.md, MCP servers and skills, all from
+  `settings.shared.json` / `CLAUDE.md.shared` / `mcp.shared.json`. What stays
+  per context is account-bound: logins and the claude.ai connectors
+  (`reauth-needed.toml`), the `exxo-openrouter` overlay (backend, denies,
+  disabled servers), and the homelab `run-with-secrets` skill, kept out of
+  the curated contexts because it collides with `exxo-common`'s.
 
 Permissions are the one place the merge is not "account wins": `allow`,
 `deny` and `ask` are concatenated across the fragments (`SETTINGS_MERGE` in
@@ -23,10 +30,9 @@ deny floor; repos carry only repo-specific grants (the `claude-repo-config`
 skill, checked by `scripts/claude-config-audit`, which also runs as a
 SessionStart hook in every session).
 
-The split now holds only for `exxo-mantine` and the Exxo cloud grants, which
-`~/.claude-personal` must never get. The earlier rule that personal must never
-get the exxo marketplace/plugin (homelab #76, Linear ENG-20) was widened by Tim
-on 2026-11-03: `exxo-common` is enabled in every context. Personal and reserve
+The earlier rule that personal must never get the exxo marketplace/plugin
+(homelab #76, Linear ENG-20) was widened by Tim on 2026-11-03 and fully
+retired on 2026-11-21: every plugin and grant above is in every context. Personal and reserve
 still need `claude plugin install exxo-common@exxo-skills` once under each
 `CLAUDE_CONFIG_DIR` (plugin installs are snapshots).
 
@@ -63,10 +69,9 @@ context's `CLAUDE.md` — copied, not symlinked, for the same reason as
 settings.json: the file can be hand-edited in a context (or edited by a
 Claude session), and a symlink would let that edit land in the repo silently
 instead of surfacing as drift to promote deliberately. Unlike the settings
-fragments, the account fragment is optional — `CLAUDE.md.personal` and
-`CLAUDE.md.exxo` don't need to exist until an account actually needs
-instructions the other shouldn't get; `CLAUDE.md.shared` alone is a valid
-baseline. This closes a gap where both contexts had independently
+fragments, the account fragment is optional — `CLAUDE.md.shared` alone is the
+baseline (the former `CLAUDE.md.personal` / `.exxo` text was folded into it
+under scoped headings on 2026-11-21). This closes a gap where both contexts had independently
 hand-duplicated copies of the same global instructions with no sync
 mechanism at all (found and fixed 2026-08-18).
 
@@ -155,8 +160,8 @@ context name) stays a whole-directory symlink to `files/claude/skills`. `~/.clau
 a real directory of per-skill symlinks maintained by `claude-sync`, built
 from an allow list: a `shared_skills()` list in `scripts/claude-sync` names
 the repo skills that are cross-account — currently `claude-workstation-setup`,
-`worktree-closedown`, `dotfiles-repo`, `claude-repo-config`, `reauth`, `workstation-sync`, `workstation-setup`, `dev-disk-doctor` and `ux-designer` — and only those are linked into exxo;
-every other repo skill is personal-only by default. The allow-list replaced an
+`worktree-closedown`, `dotfiles-repo`, `claude-repo-config`, `reauth`, `workstation-sync`, `workstation-setup`, `dev-disk-doctor`, `ux-designer`, `odin-power-check` and `satisfactory-mod-compat` — and only those are linked into exxo;
+the only repo skill left out is `run-with-secrets` (name collision). The allow-list replaced an
 earlier exclusion list after `run-with-secrets` — homelab guidance (op-shim,
 Ansible, zima/ragnar) — turned up alongside the `exxo-common` plugin's own
 `run-with-secrets` (`agent/run` + `agent.env`) in the exxo context; both were
@@ -226,7 +231,7 @@ that answering from memory is wrong. The Mantine MCP server is registered for
 every context through `mcp.shared.json` above. The upstream skills
 (`mantine-form`, `mantine-combobox`, `mantine-custom-components`) and the
 `mantine-docs` routing skill are no longer vendored here: the `exxo-mantine`
-plugin (`exxo-mantine@exxo-skills`, enabled by `settings.exxo.json`) is the one
+plugin (`exxo-mantine@exxo-skills`, enabled by `settings.shared.json`) is the one
 copy, and `scripts/vendor-mantine` and `vendor/mantine.lock.json` are gone. The
 personal context therefore has the MCP server but not the skills; enabling the
 plugin there is a separate decision for Tim (not made here).

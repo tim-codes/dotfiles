@@ -19,12 +19,12 @@
 #    one-way baseline, and drift is promoted deliberately (see `diff` below)
 #    instead of landing in git by accident. The fragments exist because some
 #    settings — enabledPlugins, extraKnownMarketplaces — must differ per
-#    account (exxo-mantine and the Exxo cloud grants belong only in the exxo
-#    context; exxo-common and the exxo-skills marketplace were widened to
-#    every context by Tim on 2026-11-03, superseding homelab #76 / Linear
-#    ENG-20). The merge is what lets
-#    those account-specific keys layer on top of one shared baseline instead
-#    of forking the whole file.
+#    account. Since 2026-11-21 the contexts are at parity (Tim: "for the sake of
+#    context quota interoperability"): exxo-mantine, exxo-common, the
+#    exxo-skills marketplace and the Exxo cloud grants are in the shared
+#    baseline, and settings.personal.json / settings.exxo.json are empty
+#    seams for a genuinely account-bound key. The merge is what lets such a
+#    key layer on top of one shared baseline instead of forking the file.
 # 2. It targets the real contexts, never ~/.claude. The default context is
 #    retired; recreating it is how it would come back from the dead.
 #
@@ -73,8 +73,9 @@
 # state, and personal has no reason to see anything less than the whole set.
 #
 # Every other context gets a real skills directory curated with per-skill
-# symlinks, and links ONLY the skills named in shared_skills() below — repo
-# skills are personal-only unless explicitly promoted to cross-account.
+# symlinks, and links ONLY the skills named in shared_skills() below. Parity
+# (2026-11-21) means every repo skill is listed there except those that
+# collide by name with a plugin skill (today: run-with-secrets).
 # Allow-list, not deny-list, deliberately: a deny-list fails open, making
 # every new personal skill remember to opt out of the work context. That is
 # exactly how the run-with-secrets collision happened (verified 2026-08-18:
@@ -259,6 +260,8 @@ workstation-sync
 workstation-setup
 dev-disk-doctor
 ux-designer
+odin-power-check
+satisfactory-mod-compat
 LIST
 }
 

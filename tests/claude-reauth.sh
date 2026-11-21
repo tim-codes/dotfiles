@@ -93,16 +93,15 @@ case "$1 $2" in
   "mcp list")
     echo "Checking MCP server health…"; echo
     case "$ctx" in
-      personal|reserve) echo "Sanity: https://mcp.sanity.io?k=SECRETLEAK (HTTP) - $(st Sanity)"
-                echo "mantine: npx -y @mantine/mcp-server SECRETLEAK - ✔ Connected"
-                echo "workos: https://mcp.workos.com/SECRETLEAK (HTTP) - ✔ Connected"
-                for s in Notion Slack Figma; do echo "claude.ai $s: https://x/SECRETLEAK - ✔ Connected"; done ;;
-      exxo)     echo "datadog: https://mcp.datadoghq.eu/v1/mcp?SECRETLEAK (HTTP) - $(st datadog)"
-                echo "workos: https://mcp.workos.com/SECRETLEAK (HTTP) - ✔ Connected"
-                for s in "Microsoft 365" Notion Slack Figma; do echo "claude.ai $s: https://x/SECRETLEAK - ✔ Connected"; done
+      *) echo "Sanity: https://mcp.sanity.io?k=SECRETLEAK (HTTP) - ✔ Connected"
+         echo "mantine: npx -y @mantine/mcp-server SECRETLEAK - ✔ Connected"
+         echo "datadog: https://mcp.datadoghq.eu/v1/mcp?SECRETLEAK (HTTP) - $(st datadog)"
+         echo "workos: https://mcp.workos.com/SECRETLEAK (HTTP) - ✔ Connected" ;;
+    esac
+    case "$ctx" in
+      personal|reserve) for s in Notion Slack Figma; do echo "claude.ai $s: https://x/SECRETLEAK - ✔ Connected"; done ;;
+      exxo)     for s in "Microsoft 365" Notion Slack Figma; do echo "claude.ai $s: https://x/SECRETLEAK - ✔ Connected"; done
                 [ "${!v:-ok}" = ok ] && echo "claude.ai Datadog: https://x/SECRETLEAK - ✔ Connected" ;;
-      exxo-personal) echo "datadog: https://mcp.datadoghq.eu/v1/mcp (HTTP) - $(st datadog)"
-                echo "workos: https://mcp.workos.com/SECRETLEAK (HTTP) - ✔ Connected" ;;
     esac
     echo "playwright: npx @playwright/mcp@latest SECRETLEAK - ✔ Connected"
     echo "plugin:x:broken: https://x/SECRETLEAK (HTTP) - ✘ Failed to connect — SECRETLEAK" ;;
@@ -135,8 +134,9 @@ check "--help exits 0" test "$rc" -eq 0
 reset; go --check
 check "all ok: exit 0" test "$rc" -eq 0
 for r in docker exxo-secret-cache homelab-secret-cache 1password gh glab gcloud gcloud-adc pulumi az \
-         'mcp:personal:Sanity' 'mcp:personal:mantine' 'mcp:personal:playwright' \
-         'mcp:reserve:Sanity' 'mcp:reserve:mantine' 'mcp:reserve:playwright' \
+         'mcp:personal:Sanity' 'mcp:personal:mantine' 'mcp:personal:playwright' 'mcp:personal:datadog' \
+         'mcp:reserve:Sanity' 'mcp:reserve:mantine' 'mcp:reserve:playwright' 'mcp:reserve:datadog' \
+         'mcp:exxo-personal:Sanity' 'mcp:exxo-personal:mantine' \
          'mcp:exxo:datadog' 'mcp:exxo:workos' 'mcp:exxo:claude.ai Microsoft 365' \
          'mcp:exxo:claude.ai Datadog' 'mcp:exxo-personal:datadog'; do
     check "all ok: $r ok" row "$r" ok
@@ -206,7 +206,7 @@ check "--context reserve: homelab cache row, like personal" row homelab-secret-c
 check "--context reserve: only that context's MCP" bash -c '! grep -qE "^  mcp:(personal|exxo|exxo-personal):" <<<"$1"' _ "$summary"
 check "--context reserve: Sanity row" row 'mcp:reserve:Sanity' ok
 reset; STUBENV=(STUB_mcp_reserve=missing); go --check --context reserve
-check "reserve mcp missing: Sanity needs-auth" row 'mcp:reserve:Sanity' needs-auth
+check "reserve mcp missing: datadog needs-auth" row 'mcp:reserve:datadog' needs-auth
 check "reserve mcp missing: step names claude-reserve" grep -q 'claude-reserve' <<<"$out"
 reset; go --check --context exxo-personal
 check "--context exxo-personal: only that context's MCP" bash -c '! grep -qE "^  mcp:(personal|reserve|exxo):" <<<"$1"' _ "$summary"

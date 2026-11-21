@@ -512,3 +512,146 @@ use the App token too. Don't "fix" those pushes to SSH. Everything else stays
 SSH: fetch inside Gaia sessions and every remote URL (no repo config is
 rewritten, the operator's checkouts included). See Exxo-Labs/gaia
 `docs/adr/2026-11-11-gaia-github-identity.md`.
+
+# Homelab and personal machines
+
+Applies wherever Tim's own machines or the homelab repo are in play.
+
+## Edit the source, not the deployed file
+
+Many live files on these machines are not their own source of truth:
+Stow symlinks into `~/dev/dotfiles/src`, the per-account
+`~/.claude-*/CLAUDE.md` and `settings.json` assembled by `claude-sync`,
+files rendered by a playbook. Edit the owning repo and re-run the mechanism
+(`restow`, `claude-sync`, the playbook) — never write to the deployed path:
+that edit is either silently overwritten on the next sync or diverges from
+the repo until a rebuild loses it.
+
+When dotfiles and homelab both configure the same machine, never write into
+the other repo's tree. The deciding question for anything new: would this
+belong on a work laptop that never joins the lab? Yes → dotfiles
+(user-level install and config). No → homelab (setup, integration,
+network).
+
+## Lab machines: codify state changes; probe read-only ad hoc
+
+On a machine whose configuration a repo owns (the homelab boxes), never
+change state with an ad-hoc command — put the change in that machine's
+project (a playbook, recipe, or committed script) and run it from there,
+writing the playbook first if none covers it. "I'll just `apt install` it
+this once" is exactly the drift the next rebuild silently loses. (Ad-hoc
+installs on the local workstation are the one carve-out — see the shared
+dependency rule above.)
+
+Reading needs no ceremony: ssh in and look around, check what's installed,
+`docker ps`, read logs. Only state changes must be codified.
+
+## Preserve a recovery path
+
+Before a change that could sever the access it's made over — network, SSH,
+firewall, auth, the shell config the session runs in — confirm an untouched
+second path exists, sequence the change so it's recoverable, and never
+"improve" the recovery path in the same pass. Say which path is the
+fallback before starting.
+
+# Exxo repos
+
+Applies when working in an Exxo repo (any context; the contexts are at parity).
+
+## Exxo credentials go through `agent/run`
+
+A command needing Exxo platform credentials (`gcloud`, `pulumi`,
+`esc`, provider APIs) runs as `agent/run -- <command>`, never bare; see the
+`run-with-secrets` skill.
+
+`agent.env` + `agent/run` resolve from the operator's personal 1Password
+account and are for attended local work only: never wire them into anything
+unattended or deployed, and never treat them as a substitute for an app's
+own `.env` or service accounts — production credentials belong in the real
+secrets path (Secret Manager, Workload Identity Federation, Pulumi ESC).
+
+## The fast check is necessary, not sufficient
+
+`just check` (format + lint + typecheck) is the inner loop. Before pushing
+or calling a change complete, run the repo's comprehensive gate (`just ci`
+/ `just verify`) — it includes the production build, which is where
+SSR/prerender failures and build-time-only import errors surface; a green
+`just check` has missed them by definition.
+
+In a multi-lane build (the `build-lead` skill), "before pushing" means the one
+push at the end: lanes gate locally with the fast check plus their own tests,
+the build branch stays local between checkpoints, and CI runs the
+comprehensive gate once on the final push (local `just ci` only where CI
+doesn't run it).
+
+## Confirm material changes; proceed on trivial ones
+
+Check with the user before a material change, even when edits are being
+auto-accepted: a new pattern or architectural approach, work spanning
+multiple files or systems, a non-trivial refactor, or a solution that
+required researching documentation (say what you relied on). Proceed
+without asking for trivial fixes (lint, imports, typos), changes the user
+described explicitly, and work following a pattern already established in
+the repo.
+
+## British English
+
+Use British spellings in prose, identifiers and documentation — initialise,
+colour, optimise, organisation. Exception: match a third-party API's US
+spelling where a name must line up with an external signature (`color`
+props, upstream field names).
+
+## Query the live source, don't copy it in
+
+A fact with a live source is looked up on demand, not cached into a repo:
+another repo's stack outputs, project ids, resource names, environment
+values. Overviews and summaries are derived by scanning the underlying
+records, never hand-maintained beside them. Only a value with no live
+source at all (a billing account id, a checkout path) gets written down,
+and that is configuration, not a fact about infrastructure. A copied
+identifier is right on the day it's pasted and silently wrong afterwards.
+
+## Earn the abstraction
+
+Add a recipe, package, or directory level when the need has actually
+repeated, not in anticipation — a one-off command doesn't need a recipe,
+and files stay flat inside a package until growth genuinely justifies
+subdirectories.
+
+## Logging
+
+- Never leave a catch block empty; log at the level the consequence
+  warrants — `error` for lost data or broken functionality, `warn` for
+  degraded-but-working (fallback taken, audit write failed), `info` for
+  operational counts and progress.
+- Log unexpected failures only — not expected outcomes like bad credentials
+  or expired sessions. Noisy logs actively reduce signal.
+- Attach the exception and its context as structured fields, never
+  interpolated into the message string.
+- No bare `print`/`echo`/`dd()`/`console.*` as production logging — go
+  through the project's logger.
+
+## Configuration: fail loudly, no fallbacks
+
+Required configuration has no default and no fallback: config keys, env vars
+and CLI flags that drive core behaviour, or that the invoker or deployment is
+expected to supply (especially at deploy time). That includes no legacy-name
+aliases and no "best guess" values. Validate at start-up, or as early as
+possible, and exit non-zero with a message that names the missing key. If a
+legacy name is present, say it was renamed and to what, but don't use it.
+Renames are clean breaks: readers and writers change together in one change,
+with no dual-read transition period. Genuinely optional tuning knobs (widths,
+intervals, timeouts with a sensible value) may keep defaults, and are
+documented as optional. This sits beside "Logging": unexpected failures are
+never silent.
+
+**Why:** Tim, 10 Nov 2026 — a silent fallback turns a missing deploy-time
+value into wrong behaviour that surfaces later and elsewhere, while a loud
+start-up failure names the gap at the moment and place it can be fixed.
+
+## Prefer the platform's native mechanism for UI behaviour
+
+Reach for the CSS/HTML capability before writing JavaScript to reproduce
+it — `scroll-snap-type`, `position: sticky`, `overflow-anchor` rather than
+scroll handlers and offset maths. Use JS only where the native mechanism
+genuinely cannot express the behaviour.
