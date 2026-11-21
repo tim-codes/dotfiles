@@ -22,6 +22,7 @@ ok()  { printf 'ok:   %s\n' "$*"; }
 bad() { printf 'FAIL: %s\n' "$*"; fail=1; }
 check() { local d="$1"; shift; if "$@"; then ok "$d"; else bad "$d"; fi; }
 sync() { HOME="$FAKE" "$REPO/scripts/claude-sync" "$@"; }
+lacks() { ! has "$@"; }
 has() { jq -e --arg r "$3" ".permissions.$2 | index([\$r]) != null" "$FAKE/.claude-$1/settings.json" >/dev/null; }
 
 # A shared rule duplicated in the account fragment must appear once.
@@ -143,6 +144,19 @@ check "notion-delete-pages is not asked anywhere (soft delete, allow)" \
     bash -c '! jq -e "(.permissions.ask // []) | index(\"mcp__claude_ai_Notion__notion-delete-pages\")" "$1" >/dev/null' _ "$ATT"
 check "attended fragment has no deny floor of its own" \
     jq -e '(.permissions.deny // []) | length == 0' "$ATT"
+# agent/Justfile is trusted by the permission hook's origin check ONLY: a static
+# allow rule would also match foreign-origin repos (the hook has no opinion there).
+for r in 'Bash(just --justfile=agent/Justfile:*)' 'Bash(just --justfile agent/Justfile:*)'; do
+    check "attended fragment has no static agent/Justfile grant: $r" \
+        jq -e --arg r "$r" '(.permissions.allow // []) | index($r) == null' "$ATT"
+    for ctx in $ctxs; do
+        check "$ctx has no static agent/Justfile grant: $r" lacks "$ctx" allow "$r"
+    done
+done
+for ctx in $ctxs; do
+    check "$ctx wires the squad permission hook on Bash (origin check)" \
+        jq -e '[.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[].command | select(test("squad hook permission"))] | length > 0' "$FAKE/.claude-$ctx/settings.json"
+done
 # never-grant list, in every fragment
 for f in "$SHARED" "$ATT" "$C/settings.exxo.json" "$C/settings.personal.json"; do
     check "$(basename "$f"): no never-grant wildcard" \
