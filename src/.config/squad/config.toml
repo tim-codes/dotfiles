@@ -311,3 +311,8 @@ prune_gaia_build_output = true             # G4
 followup_rulings = true                    # G10
 test_db_prune = true                       # G15
 linear_filing = true                       # G11 (v0.7.5): probe passed 16 Nov (team ENG, viewer Tim)
+notion_docs = true                         # Plan C (C3, v0.7.11): Tim, 21 Nov 2026: integration gaia-tfo-docs; writes only under [policy.docs] allowed_roots
+
+[policy.docs]                              # Plan C (C3, v0.7.11): the Notion docs kit behind docs_update
+token_ref = "esc:exxo/gaia/tfo:notion.docsToken"  # internal integration gaia-tfo-docs (Tim, 21 Nov 2026); warm cache only
+allowed_roots = ["2df68f9d46d8807db9d3cda6e64cf14d"]  # Exxo Engineering page (Infrastructure, Onboarding, Incidents, Admin Journal under it)
