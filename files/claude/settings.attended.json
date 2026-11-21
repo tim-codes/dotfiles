@@ -261,6 +261,18 @@
       }
     ]
   },
+  "enabledPlugins": {
+    "gaia@gaia": true,
+    "exxo-ops@exxo-skills": true
+  },
+  "extraKnownMarketplaces": {
+    "gaia": {
+      "source": {
+        "source": "git",
+        "url": "git@github.com:Exxo-Labs/gaia.git"
+      }
+    }
+  },
   "permissions": {
     "allow": [
       "Bash(gh pr create:*)",

@@ -40,6 +40,7 @@ shared_skills_list() {
 }
 is_shared() { shared_skills_list | grep -qx "$1"; }
 exists_and_shared() { [ -f "$SKILLS/$1/SKILL.md" ] || { echo "no $1/SKILL.md"; return 1; }; is_shared "$1" || { echo "$1 not in shared_skills()"; return 1; }; }
+not_shared() { is_shared "$1" && { echo "$1 still in shared_skills()"; return 1; }; return 0; }
 # contains <file> <fixed string>...: every string occurs in the file.
 contains() {
     local f=$1 s rc=0
@@ -108,7 +109,7 @@ done
 
 # --- squad-member (P7 Task 2) ------------------------------------------------
 M="$SKILLS/squad-member/SKILL.md"
-check "squad-member exists and is shared" exists_and_shared squad-member
+check "squad-member is no longer shared (gaia plugin owns it)" not_shared squad-member
 check "squad-member names every member tool" contains "$M" \
     mcp__squad__set mcp__squad__ack mcp__squad__raise mcp__squad__land mcp__squad__heavy_slot \
     mcp__squad__delegate mcp__squad__delegate_result mcp__squad__job_review mcp__squad__watch mcp__squad__unwatch
@@ -135,7 +136,7 @@ check "build-lead references exist" test -f "$SKILLS/build-lead/references/dispa
 # --- squad-planner and the kickoff template (P7 Task 3) ----------------------
 P="$SKILLS/squad-planner/SKILL.md"
 K="$SKILLS/squad-planner/kickoff-template.md"
-check "squad-planner exists and is shared" exists_and_shared squad-planner
+check "squad-planner is no longer shared (gaia plugin owns it)" not_shared squad-planner
 check "squad-planner names every TaskPlan field" contains "$P" \
     '`title`' '`deliverables`' '`depends_on`' '`resources`' '`operator_steps`' '`infra`' '`kickoff_brief`' \
     '`merge_authority`' '`test_policy`' '`priority_suggestion`' '`blocks_launch`' '`blocks_step`' '`trunk_service`'
