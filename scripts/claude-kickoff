@@ -102,8 +102,9 @@ effort is used):
            passes `--setting-sources project --settings <that JSON>
            --append-system-prompt-file <roles_dir>/builder-instructions.md
            --permission-mode auto`, plus `--plugin-dir <roles_dir>/plugin` when that
-           directory exists. roles_dir: $SQUAD_ROLES_DIR, else `roles_dir` in
-           ~/.config/squad/config.toml, else ~/.config/squad/roles. An attended
+           directory exists. roles_dir: `[broker] roles_dir` in
+           $GAIA_CONFIG (default ~/.config/squad/config.toml), else
+           ~/.config/squad/roles; passed to `squad roles render --roles-dir`. An attended
            lane gets none of this and keeps the account's own settings.
   lifetime run | task; the default is task for a client, else run
   needs    comma or space separated; each one the file lists in `account_bound` must
@@ -531,14 +532,14 @@ if [ "$lane_tier" = builder ]; then
     else
         case "$role" in client) kind=member ;; orchestrator) kind=operator ;; infra) kind=infra ;; esac
     fi
-    roles_dir="${SQUAD_ROLES_DIR:-}"
-    if [ -z "$roles_dir" ] && [ -r "$HOME/.config/squad/config.toml" ]; then
-        roles_dir=$(yq -p toml -oy '.roles_dir // ""' "$HOME/.config/squad/config.toml" 2>/dev/null)
+    roles_dir="" gaia_cfg="${GAIA_CONFIG:-$HOME/.config/squad/config.toml}"
+    if [ -r "$gaia_cfg" ]; then
+        roles_dir=$(yq -p toml -oy '.broker.roles_dir // ""' "$gaia_cfg" 2>/dev/null)
     fi
     [ -n "$roles_dir" ] || roles_dir="$HOME/.config/squad/roles"
     roles_dir=$(expand_home "$roles_dir")
     command -v squad >/dev/null 2>&1 || die 6 "squad is not on PATH: a builder lane needs 'squad roles render' (the role fragment fails closed)"
-    render_args=(roles render --kind "$kind")
+    render_args=(roles render --kind "$kind" --roles-dir "$roles_dir")
     overlay=""
     if [ "$(ctx_get "$ctx" '.openrouter // false')" = true ]; then overlay=openrouter; render_args+=(--overlay openrouter); fi
     render_args+=(--interactive)

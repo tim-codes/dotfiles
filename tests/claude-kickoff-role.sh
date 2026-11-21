@@ -36,7 +36,7 @@ echo '{"permissions":{"deny":["Bash(op read*)"]},"env":{"GAIA_TIER":"builder"}}'
 EOF2
 chmod +x "$BIN/claude" "$BIN/squad"
 export CLAUDE_KICKOFF_CONTEXTS="$SRC_REPO/src/.config/claude-kickoff/contexts.toml"
-unset CLAUDE_KICKOFF_NO_TRUST_CHECK SQUAD_ROLES_DIR
+unset CLAUDE_KICKOFF_NO_TRUST_CHECK GAIA_CONFIG
 jq -n --arg w "$W" '{projects: {($w): {hasTrustDialogAccepted: true}}}' >"$CFG/.claude.json"
 mkdir -p "$FAKE/.claude-exxo-openrouter"
 cp "$CFG/.claude.json" "$FAKE/.claude-exxo-openrouter/.claude.json"
@@ -70,27 +70,42 @@ TAIL="arg<--model> arg<opus> arg<--effort> arg<high> arg<Do the thing.> "
 kick "$T/client.md"
 check "client launch exits 0" [ "$rc" -eq 0 ]
 check "client argv carries the role flags" [ "$(recs)" = "${BASE}${TAIL}" ]
-check "client renders kind member, interactive" [ "$(squadargs)" = "roles render --kind member --interactive" ]
+check "client renders kind member, interactive" [ "$(squadargs)" = "roles render --kind member --roles-dir $ROLES_DIR --interactive" ]
 kick "$T/orch.md"
-check "orchestrator renders kind operator" [ "$(squadargs)" = "roles render --kind operator --interactive" ]
+check "orchestrator renders kind operator" [ "$(squadargs)" = "roles render --kind operator --roles-dir $ROLES_DIR --interactive" ]
 kick "$T/infra.md"
-check "infra renders kind infra" [ "$(squadargs)" = "roles render --kind infra --interactive" ]
+check "infra renders kind infra" [ "$(squadargs)" = "roles render --kind infra --roles-dir $ROLES_DIR --interactive" ]
 kick "$T/planner.md"
-check "a /squad-planner body renders kind planner" [ "$(squadargs)" = "roles render --kind planner --interactive" ]
+check "a /squad-planner body renders kind planner" [ "$(squadargs)" = "roles render --kind planner --roles-dir $ROLES_DIR --interactive" ]
 kick "$T/builder-forced.md"
-check "tier: builder without a role defaults to kind member" [ "$(squadargs)" = "roles render --kind member --interactive" ]
+check "tier: builder without a role defaults to kind member" [ "$(squadargs)" = "roles render --kind member --roles-dir $ROLES_DIR --interactive" ]
 mkdir -p "$ROLES_DIR/plugin"
 kick "$T/client.md"
 check "--plugin-dir is added when <roles_dir>/plugin exists" [ "$(recs)" = "arg<--plugin-dir> arg<$ROLES_DIR/plugin> ${BASE}${TAIL}" ]
 rmdir "$ROLES_DIR/plugin"
 kick "$T/client.md" --account exxo-openrouter
-check "openrouter context adds --overlay openrouter" [ "$(squadargs)" = "roles render --kind member --overlay openrouter --interactive" ]
-SQUAD_ROLES_DIR="$T/alt-roles" kick "$T/client.md"
-check "SQUAD_ROLES_DIR overrides the roles dir" bash -c 'grep -qx "arg<--append-system-prompt-file>" "$1" && grep -qx "arg<$2/builder-instructions.md>" "$1"' _ "$REC" "$T/alt-roles"
-printf 'roles_dir = "~/custom-roles"\n' >"$FAKE/.config/squad/config.toml"
+check "openrouter context adds --overlay openrouter" [ "$(squadargs)" = "roles render --kind member --roles-dir $ROLES_DIR --overlay openrouter --interactive" ]
+printf '[broker]\nroles_dir = "/tmp/x"\n' >"$FAKE/.config/squad/config.toml"
 kick "$T/client.md"
-check "roles_dir in ~/.config/squad/config.toml is honoured" bash -c 'grep -qx "arg<$2/custom-roles/builder-instructions.md>" "$1"' _ "$REC" "$FAKE"
+check "[broker] roles_dir is passed to render as --roles-dir" [ "$(squadargs)" = "roles render --kind member --roles-dir /tmp/x --interactive" ]
+check "  builder-instructions path is under it" grep -qx "arg<--append-system-prompt-file>" "$REC"
+check "  and names /tmp/x/builder-instructions.md" grep -qx "arg</tmp/x/builder-instructions.md>" "$REC"
+mkdir -p /tmp/x/plugin
+kick "$T/client.md"
+check "  plugin dir is taken from it" grep -qx "arg</tmp/x/plugin>" "$REC"
+rmdir /tmp/x/plugin 2>/dev/null; rmdir /tmp/x 2>/dev/null
+printf '[broker]\nroles_dir = "~/custom-roles"\n' >"$FAKE/.config/squad/config.toml"
+kick "$T/client.md"
+check "~ in [broker] roles_dir is expanded" bash -c 'grep -qx "arg<$2/custom-roles/builder-instructions.md>" "$1"' _ "$REC" "$FAKE"
+printf 'roles_dir = "/tmp/top"\n' >"$FAKE/.config/squad/config.toml"
+kick "$T/client.md"
+check "top-level roles_dir is ignored (default used)" [ "$(squadargs)" = "roles render --kind member --roles-dir $ROLES_DIR --interactive" ]
 rm "$FAKE/.config/squad/config.toml"
+printf '[broker]\nroles_dir = "/tmp/viagaia"\n' >"$T/gaia.toml"
+GAIA_CONFIG="$T/gaia.toml" kick "$T/client.md"
+check "GAIA_CONFIG is honoured" [ "$(squadargs)" = "roles render --kind member --roles-dir /tmp/viagaia --interactive" ]
+kick "$T/client.md"
+check "default roles dir when no config" [ "$(squadargs)" = "roles render --kind member --roles-dir $ROLES_DIR --interactive" ]
 kick "$T/client.md" --resume sess-1 --account exxo-personal --cwd "$W"
 check "resume of a builder lane passes the role flags before --resume" bash -c '[ "$(sed -n 1,2p "$1" | tr "\n" " ")" = "arg<--setting-sources> arg<project> " ] && grep -qx "arg<--resume>" "$1"' _ "$REC"
 
