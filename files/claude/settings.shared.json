@@ -262,7 +262,8 @@
       "source": {
         "source": "git",
         "url": "git@github.com:Exxo-Labs/skills.git"
-      }
+      },
+      "autoUpdate": true
     }
   },
   "crossSessionInbound": "accept",

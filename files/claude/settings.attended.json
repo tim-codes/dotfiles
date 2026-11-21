@@ -270,7 +270,8 @@
       "source": {
         "source": "git",
         "url": "git@github.com:Exxo-Labs/gaia.git"
-      }
+      },
+      "autoUpdate": true
     }
   },
   "permissions": {
