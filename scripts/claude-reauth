@@ -151,7 +151,7 @@ fix_docker() {
     return 1
 }
 
-# --- secret caches (see the exxo-common run-with-secrets skill and homelab's
+# --- secret caches (see the exxo-ops run-with-secrets skill and homelab's
 # run-with-secrets skill; never stopped here — only started) ----------------------
 container_running() { [ -n "$(docker ps -q -f "name=^$1$" 2>/dev/null)" ]; }
 check_exxo_cache() {

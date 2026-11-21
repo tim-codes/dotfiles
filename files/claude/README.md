@@ -167,7 +167,7 @@ Ansible, zima/ragnar) — turned up alongside the `exxo-common` plugin's own
 `run-with-secrets` (`agent/run` + `agent.env`) in the exxo context; both were
 visible at once (verified 2026-08-18), which risked an Exxo session following
 homelab credential guidance. In the Exxo context, the plugin's
-`exxo-common:run-with-secrets` is the only one. To make a repo skill
+`exxo-ops:run-with-secrets` is the only one. To make a repo skill
 cross-account, add its name to `shared_skills()`.
 
 Claude Code also writes into each context's skills dir itself: `synced/` is its

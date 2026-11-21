@@ -168,7 +168,7 @@ layout, commands and recipes, repo-specific rules.
   secrets referenced not written, blanket-trusted files, British English,
   commit/push cadence, branch and worktree rules, and the subagent policy.
   Where a reminder helps, use one pointer line: `Credentials: global rules +
-  the exxo-common run-with-secrets skill apply.`
+  the exxo-ops run-with-secrets skill apply.`
 - **Over 300 lines** (counting `@imports`): move changelogs, design notes and
   reference material into `docs/`, as dated files plus a short index, or into
   an existing skill, and leave a pointer behind. Cut and relocate the text;
