@@ -78,7 +78,7 @@
 # Allow-list, not deny-list, deliberately: a deny-list fails open, making
 # every new personal skill remember to opt out of the work context. That is
 # exactly how the run-with-secrets collision happened (verified 2026-08-18:
-# the repo's homelab run-with-secrets and the exxo-common plugin's Exxo
+# the repo's homelab run-with-secrets and the exxo-ops plugin's Exxo
 # run-with-secrets BOTH loaded at once in the exxo context, so an Exxo
 # session could pick up homelab credential guidance). With the allow-list,
 # a new skill defaults to staying out of exxo.
@@ -242,7 +242,7 @@ trap 'rm -f "$MERGE_TMP" "$MCP_TMP" "$MCP_OUT" "$PREFS_TMP" "$PREFS_OUT"' EXIT
 # directory anyway) and left out of every curated context. Promote a skill
 # to cross-account by adding its name here — and check the plugin path for
 # a name collision first (the repo's run-with-secrets is the homelab copy;
-# the Exxo one reaches exxo as exxo-common:run-with-secrets via the plugin,
+# the Exxo one reaches exxo as exxo-ops:run-with-secrets via the plugin,
 # which is why it must never be in this list). The four squad-* skills live
 # in the gaia plugin now and the vendored mantine-* skills in exxo-mantine;
 # their source files remain until T9 but are not linked into any curated

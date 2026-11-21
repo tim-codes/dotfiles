@@ -7,7 +7,7 @@
 #   squad-tunnel ensure   create/reconcile the tunnel and cache its URL
 #   squad-tunnel url      print the cached URL
 #
-# Conventions copied from the exxo-common dev-tunnels skill: id
+# Conventions copied from the exxo-ops dev-tunnels skill: id
 # exxo-<account>-<repo>, --expiration 30d, one labelled tunnel, http port with
 # per-port `tenant` access (signed-in Exxo Entra users; never anonymous).
 # Port URLs only exist while hosted, so the URL is cached under
