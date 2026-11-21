@@ -29,9 +29,10 @@ brief skeleton, review dispatch, fix-round message, roster line) and
 [references/lessons.md](references/lessons.md) (what went wrong, and the
 rule each cost us).
 
-**Dispatch agents.** Implementation goes to `implementer`, review to
-`reviewer`, branch and PR bookkeeping to `git-pr-ops`, "why did the gate
-fail" to `investigator` (the dotfiles agents). Keep gate logs and diffs out
+**Dispatch agents.** Implementation goes to `exxo-common:implementer`, review to
+`exxo-common:reviewer`, branch and PR bookkeeping to `git-pr-ops`, "why did
+the gate fail" to `exxo-common:investigator` (plugin agents are invoked
+namespaced). Keep gate logs and diffs out
 of your own context; take conclusions.
 
 ## 1. Setup
@@ -114,7 +115,7 @@ When a lane reports DONE or DONE_WITH_CONCERNS at a checkpoint:
 
 1. From the lane worktree: `bash <sdd skill>/scripts/review-package PLAN_FILE BASE HEAD`.
    It prints the file it wrote. `BASE` is the recorded commit, never `HEAD~1`.
-2. Dispatch the `reviewer` with: the lane brief, the implementer's report,
+2. Dispatch the `exxo-common:reviewer` with: the lane brief, the implementer's report,
    the package path, and the binding constraints **verbatim** (Global
    Constraints, Review Focus, any ruling that bears on these tasks). Two
    verdicts come back: spec compliance, and code quality (approved or not).
@@ -156,7 +157,7 @@ merge themselves.
 4. **Light gate per lane, at integration, locally.** On the merged tree:
    the repo's fast check (`just check` or `just check-ci`, what CI's fast job
    runs) plus the tests that cover the files the lane touched, the same
-   single-file and single-package scope as the squad-member "Testing and
+   single-file and single-package scope as the `gaia:member` "Testing and
    trunks" table. No `just ci`, `just verify`, full suites, production
    builds, e2e or browser runs per lane: the comprehensive gate runs once,
    at the end (section 7). Dispatch it to an agent or run it through the

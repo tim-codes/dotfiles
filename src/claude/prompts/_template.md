@@ -3,7 +3,7 @@ context: exxo
 model: opus
 effort: high
 needs: none
-join: /squad-member
+join: /gaia:member
 launch: claude-kickoff ~/claude/prompts/<date>/<NN>-<member>.md
 base: main
 depends: none
@@ -11,7 +11,7 @@ tickets: <KEY-1>, <KEY-2>
 before-launch: none
 ---
 
-/squad-member
+/gaia:member
 
 <!--
 Kickoff prompt template. Copy to ~/claude/prompts/<yymmdd>/<NN>-<member>.md,
@@ -20,7 +20,7 @@ fill it in and delete every comment. Launch with
 `--dry-run` to see what it would do first), never a hand-built `claude` line.
 This is the attended launcher (the leader starts client lanes in tmux with it);
 the squad broker launches its own members from the plan's `kickoff_brief`
-(squad-planner/kickoff-template.md) and does not read this file.
+(gaia plugin planner/kickoff-template.md) and does not read this file.
 
 FRONTMATTER (key: value lines, ended by the first line that is exactly `---`;
 the body is everything after it). claude-kickoff reads the first four keys and the optional
@@ -48,7 +48,7 @@ Values may run long. A comment after `context` is fine: only its first word coun
   add_dirs      optional comma or space separated paths (~ expanded), each passed as
                 `--add-dir`, so the member can read and write brief and report files outside
                 its cwd without prompts; each must exist (else exit 3)
-  join          the /squad-member line the member runs first (repeat it as the first
+  join          the /gaia:member line the member runs first (repeat it as the first
                 line of the body so the member sees it)
   launch        informational: how it is started; claude-kickoff is the launcher
   base          base branch the work starts from (and PRs target), if not main

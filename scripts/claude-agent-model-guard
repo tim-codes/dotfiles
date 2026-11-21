@@ -30,6 +30,8 @@ def should_deny(payload):
     if os.environ.get("CLAUDE_CODE_SUBAGENT_MODEL"):
         return False
     subagent_type = tool_input.get("subagent_type")
+    # Any named type other than general-purpose is dedicated, including
+    # plugin-namespaced ones (exxo-common:implementer): the definition pins the model.
     if subagent_type and subagent_type != "general-purpose":
         return False
     return not tool_input.get("model")
