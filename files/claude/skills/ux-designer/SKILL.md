@@ -43,7 +43,7 @@ Gather sources, read-only:
   open menus, switch tabs; never submit a form or take any create, edit,
   delete, send or settings action; if a click could change data, describe
   the state instead). It may be Tim's live instance. Use
-  `exxo-common:agent-chrome-screenshots` only for a signed-in page Playwright
+  `exxo-ops:agent-chrome-screenshots` only for a signed-in page Playwright
   cannot reach.
 - **Repo:** read the UI code and config for the component library, theme,
   tokens and conventions, so directions are buildable in that stack. Load a

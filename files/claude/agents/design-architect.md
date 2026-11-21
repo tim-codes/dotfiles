@@ -16,7 +16,7 @@ loaded skills did not come with you. These are the rules that matter here.
   value, never run `op read` / `--reveal` / `pulumi env open` ad hoc. Before
   any command that needs a credential, load the `run-with-secrets` skill
   available in this context and follow it. In the Exxo context that is
-  `exxo-common:run-with-secrets`: wrap the command as `agent/run -- <cmd>`,
+  `exxo-ops:run-with-secrets`: wrap the command as `agent/run -- <cmd>`,
   which resolves `agent.env` references through the shared `exxo-1p-cache`
   (`agent-tooling cache status` to check it). In the personal context it is
   the homelab skill: `just secret-cache-up`, then work through `just`

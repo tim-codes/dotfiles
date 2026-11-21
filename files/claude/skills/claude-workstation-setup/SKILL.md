@@ -358,8 +358,8 @@ without an exclusion, BOTH loaded at once in the exxo context, which risked
 an Exxo session following homelab credential guidance. Under the allow-list,
 `run-with-secrets` is simply absent from `shared_skills()`, so exxo's
 curated dir never contains the repo copy — leaving only
-`exxo-common:run-with-secrets` there, while personal keeps the homelab one.
-Since 2026-11-03 personal and reserve also load `exxo-common:run-with-secrets`
+`exxo-ops:run-with-secrets` there, while personal keeps the homelab one.
+Since 2026-11-03 personal and reserve also load `exxo-ops:run-with-secrets`
 beside the homelab copy; the descriptions are disjoint and the agents'
 Environment block names the right one per context.
 When promoting a skill to cross-account, check the plugin side for a name
