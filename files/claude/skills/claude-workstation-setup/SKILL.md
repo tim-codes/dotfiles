@@ -191,7 +191,7 @@ ADR `docs/adr/2026-11-10-metered-deepseek-routing.md`.
 ### Builder lane permissions (`claude-kickoff`)
 
 `scripts/claude-kickoff` launches a builder lane (frontmatter `role` set, or a
-`/squad-planner` body; `tier: attended` opts out) with the Gaia role fragment:
+`/gaia:planner` body; `tier: attended` opts out) with the Gaia role fragment:
 `--setting-sources project --settings "$(squad roles render --kind K ...)"`
 plus `--append-system-prompt-file <roles_dir>/builder-instructions.md` and
 `--permission-mode auto`. A render failure or missing `squad` exits 6. The old
@@ -323,8 +323,7 @@ carried no MCP servers at all while `~/.claude-exxo` had four.
    REAL directory of per-skill symlinks curated by claude-sync against an
    allow list: only repo skills named in `shared_skills()` in
    `scripts/claude-sync` get linked in (currently `claude-workstation-setup`,
-   `worktree-closedown`, `dotfiles-repo`, `claude-repo-config`, `squad-member`,
-   `squad-planner`, `squad-debug-review`, `reauth`, `workstation-sync`,
+   `worktree-closedown`, `dotfiles-repo`, `claude-repo-config`, `reauth`, `workstation-sync`,
    `workstation-setup`, `dev-disk-doctor`, `ux-designer`). Every other repo skill is
    personal-only by default and must be explicitly promoted — add its name to
    `shared_skills()` to make it cross-account.
@@ -403,9 +402,10 @@ Dedicated subagents live in `files/claude/agents/<name>.md` (frontmatter
 environment mechanics a subagent doesn't inherit). The personal-account contexts (personal, reserve) get
 `agents` as a whole-directory symlink to that dir; exxo and
 exxo-personal get a real `agents/` directory of per-file symlinks for the
-names in `shared_agents()` in `scripts/claude-sync` (currently `implementer`,
-`reviewer`, `conformity-reviewer`, `design-architect`, `git-pr-ops`, `investigator`, `sanity-cms`, `notion-ops`, `ux-designer` — all
-of them). Same allow-list and adoption rules as skills: a new agent is
+names in `shared_agents()` in `scripts/claude-sync` (currently `git-pr-ops`,
+`sanity-cms`, `ux-designer`). The moved agents are `exxo-common:implementer`, `exxo-common:reviewer`,
+`exxo-common:investigator`, `exxo-common:design-architect`, `exxo-common:conformity-reviewer` and
+`exxo-common:notion-ops`, invoked namespaced from the plugin, not linked. Same allow-list and adoption rules as skills: a new agent is
 personal-only until named there, and a real file created in a curated
 `agents/` dir is adopted into the repo on the next sync. Verified 2026-10-23
 that Claude Code follows both a symlinked `agents/` dir and symlinked agent
