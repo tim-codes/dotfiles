@@ -243,10 +243,10 @@ trap 'rm -f "$MERGE_TMP" "$MCP_TMP" "$MCP_OUT" "$PREFS_TMP" "$PREFS_OUT"' EXIT
 # to cross-account by adding its name here — and check the plugin path for
 # a name collision first (the repo's run-with-secrets is the homelab copy;
 # the Exxo one reaches exxo as exxo-common:run-with-secrets via the plugin,
-# which is why it must never be in this list). The four squad-* skills live
-# in the gaia plugin now and the vendored mantine-* skills in exxo-mantine;
-# their source files remain until T9 but are not linked into any curated
-# context.
+# which is why it must never be in this list). The squad-* skills live in the
+# gaia plugin and the mantine-* skills in exxo-mantine; their sources were
+# deleted (T9) and the curated-context prune removes the links claude-sync
+# made earlier.
 shared_skills() {
     cat <<'LIST'
 claude-workstation-setup
@@ -283,10 +283,8 @@ is_cc_managed() {
 # stays personal-only until promoted here. Names, not filenames (no .md).
 # Check the plugin path for a name collision before promoting one.
 # The six moved agents (implementer, reviewer, investigator, design-architect,
-# conformity-reviewer, notion-ops) are exxo-common plugin agents now, invoked
-# namespaced; their source files stay in files/claude/agents until the T9
-# retirement, but are no longer linked into curated contexts (personal's
-# whole-directory link still exposes them until then).
+# conformity-reviewer, notion-ops) are exxo-common plugin agents, invoked
+# namespaced; their sources were deleted (T9) and the prune drops the old links.
 shared_agents() {
     cat <<'LIST'
 git-pr-ops

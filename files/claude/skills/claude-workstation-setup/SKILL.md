@@ -365,26 +365,12 @@ Environment block names the right one per context.
 When promoting a skill to cross-account, check the plugin side for a name
 collision first.
 
-A repo skill on path 1 can itself be a byte-for-byte VENDORED copy of a public
-upstream. `files/claude/skills/mantine-{form,combobox,custom-components}` are
-`mantinedev/skills`, refreshed by `scripts/vendor-mantine` and pinned by commit
-in `files/claude/vendor/mantine.lock.json` (`--check` reports whether the pin is
-behind). Byte-identical is the point — no local edits, no spliced-in provenance
-headers — so `git diff` after a refresh shows what Mantine changed and nothing
-else; provenance lives in the lockfile and our own framing in the hand-written
-`mantine-docs` skill beside them, which also routes between the three Mantine
-lookup paths (MCP server, these skills, the `llms.txt` index). Never edit a
-vendored directory: the next refresh destroys the edit and hides upstream's.
-
-This adds no third delivery path, but it does mean one upstream can reach the
-two contexts by DIFFERENT paths. The `mantine-*` skills are absent from
-`shared_skills()`, so exxo receives the same content on path 2 instead, as the
-`exxo-mantine@exxo-skills` plugin. That is the `run-with-secrets` rule
-generalised — one capability, one delivery path per context, never two at once
-— with a second reason on top: the personal context must never depend on a
-private Exxo repo for the mantine skills, so it vendors from upstream directly. Both repos pull from
-`mantinedev/skills` and never from each other, so the copies cannot
-chain-drift.
+Moved-out skills: the four `squad-*` skills are the `gaia` plugin's
+(`/gaia:member`, `/gaia:planner`, `/gaia:leader`, `/gaia:debug-review`) and the
+Mantine skills are the `exxo-mantine` plugin's; the dotfiles copies, the six
+moved agents and `scripts/vendor-mantine` were deleted (skills plan T9) and
+`claude-sync` prunes the dangling links it made in each curated context. The
+Mantine MCP server still reaches every context through `mcp.shared.json`.
 
 Not a delivery path you manage: Claude Code itself caches the claude.ai
 ACCOUNT skills (`anthropic-skills:*` — docx, pdf, skill-creator, …) under

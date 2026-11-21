@@ -182,8 +182,10 @@ per-file symlinks for the names in `shared_agents()` in `scripts/claude-sync`
 — currently `git-pr-ops`, `sanity-cms` and the experimental `ux-designer`
 (promoted to exxo 2026-11-05 at Tim's request). The six moved agents
 (`implementer`, `reviewer`, `investigator`, `design-architect`,
-`conformity-reviewer`, `notion-ops`) are now `exxo-common:` plugin agents and
-are no longer linked into curated contexts. A real file dropped into a curated
+`conformity-reviewer`, `notion-ops`) are `exxo-common:` plugin agents; their files were removed from this repo
+(skills plan T9) and `claude-sync` prunes the links it made earlier. The four
+`squad-*` skills are the `gaia` plugin's (`/gaia:member`, `/gaia:planner`,
+`/gaia:leader`, `/gaia:debug-review`) and were removed the same way. A real file dropped into a curated
 `agents/` dir is adopted into the repo as personal-only, same as skills.
 Rationale and the measurement baseline:
 `docs/superpowers/specs/2026-10-23-subagent-plugin-hygiene-design.md`;
@@ -204,7 +206,7 @@ Plugins that are off by default: `notion@claude-plugins-official` and
 absent key leaves an installed marketplace plugin at its default, on). To use
 one for a session, enable it with `/plugin`; the next `claude-sync` turns it
 back off. That is the lazy-load pattern. Notion work in exxo goes through the
-`claude_ai_Notion` account connector (and the `notion-ops` agent); the legacy
+`claude_ai_Notion` account connector (and the `exxo-common:notion-ops` agent); the legacy
 hand-added `notion` server is retired per context with `claude mcp remove -s
 user notion`. `linear@claude-plugins-official` stays on: the parentedit
 repo's `linear-tpe` skill calls the plugin's `mcp__plugin_linear_linear__*`
@@ -217,39 +219,17 @@ Contexts are created by `scripts/claude-contexts`; the `claude`,
 select them via `CLAUDE_CONFIG_DIR` (see `src/.config/fish/common.fish`,
 `src/.zshrc`).
 
-## Vendored upstream skills: Mantine
+## Mantine
 
-Mantine is the standard UI framework for Exxo frontends and for personal
-projects, and it moves fast enough that answering from memory is simply wrong.
-Upstream publishes three agent-facing things
-([mantine.dev/guides/llms](https://mantine.dev/guides/llms/)): an MCP server, a
-skills repo, and `llms.txt`/`llms-full.txt`. The server is registered for every
-context through `mcp.shared.json` above. `scripts/vendor-mantine` handles the
-other two — it vendors `mantinedev/skills` (public, pinned by commit in
-`vendor/mantine.lock.json`) into
-`skills/mantine-{form,combobox,custom-components}`, and fetches the compact
-`llms.txt` index into `skills/mantine-docs/references/`. `--check` reports
-whether the pin is behind upstream and lists what has landed since.
-`llms-full.txt` (~1.8MB, rewritten every release) is deliberately not vendored:
-it would put a megabyte of churn in git to duplicate what the MCP server
-already answers on demand.
-
-The vendored directories are kept **byte-identical** to upstream — no local
-edits, no provenance headers spliced in. That is the whole point: `git diff`
-after a refresh shows exactly what Mantine changed and nothing else. Provenance
-lives beside them in the lockfile, and our own framing lives in
-`skills/mantine-docs/SKILL.md`, which is ours and not vendored — it routes
-between the three lookup paths and says which to reach for first.
-
-The `mantine-*` skills are deliberately **not** in `shared_skills()`, so they
-stay personal-only. The exxo context receives the same upstream by the plugin
-path instead, as `exxo-mantine@exxo-skills` from `Exxo-Labs/skills`. That is
-the `run-with-secrets` rule again — one capability, one delivery path per
-context, never two at once — but the stronger reason here is that the personal
-context must never depend on a private Exxo repo, so it vendors from
-`mantinedev/skills` directly. Both repos pull from upstream and never from each
-other, so the two copies cannot chain-drift: they are either at the same
-upstream commit or visibly not.
+Mantine is the standard UI framework for Exxo frontends and moves fast enough
+that answering from memory is wrong. The Mantine MCP server is registered for
+every context through `mcp.shared.json` above. The upstream skills
+(`mantine-form`, `mantine-combobox`, `mantine-custom-components`) and the
+`mantine-docs` routing skill are no longer vendored here: the `exxo-mantine`
+plugin (`exxo-mantine@exxo-skills`, enabled by `settings.exxo.json`) is the one
+copy, and `scripts/vendor-mantine` and `vendor/mantine.lock.json` are gone. The
+personal context therefore has the MCP server but not the skills; enabling the
+plugin there is a separate decision for Tim (not made here).
 
 ## The exxo-personal overlay context
 
