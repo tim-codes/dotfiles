@@ -491,6 +491,22 @@ exception: in the `exxo-openrouter` context only, `CLAUDE_CODE_SUBAGENT_MODEL`
 and every tier variable point at `deepseek/deepseek-v4.1-flash-1017@preset/tim-ds`, because one session has
 one backend; the overlay settings fragment sets them, never a session.
 
+## Talking to other Claude sessions in tmux
+
+Prefer SendMessage. When typing into a pane is the only route, send the text
+literally (`tmux send-keys -t <pane> -l "<text>"`), send Enter as a separate
+call, then `tmux capture-pane` to confirm the prompt is empty and the message
+is in the transcript; until that check passes, the message is not sent.
+
+A session spawned into a tmux window (`claude-kickoff`) reports its results to
+the session that spawned it unless Tim says he will work with it directly. The
+launch brief names the spawner; where the two run in different account
+contexts (they cannot see each other), it gives a report file path and the
+spawner sets a background watch on it at launch.
+
+**Why:** Tim, 22 Nov 2026 — a correction typed with one send-keys call sat
+unsent for 50 minutes, and a builder's final report stayed in its own pane.
+
 ## Always set up the task tracker
 
 @~/dev/exxo/skills/agent-conventions/task-tracking.md
