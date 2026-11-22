@@ -15,6 +15,20 @@ mkdir -p "$REPO/scripts" "$REPO/files/claude" "$FAKE/dev/homelab" "$BIN" "$STATE
 cp "$SRC_REPO/scripts/claude-reauth" "$REPO/scripts/"
 cp "$SRC_REPO/files/claude/reauth-needed.toml" "$REPO/files/claude/"
 touch "$FAKE/dev/homelab/justfile"
+# A fake Gaia config: references only (never values), as in the real one. Two keys are generic
+# (token_ref) so the row names must be disambiguated by their section.
+mkdir -p "$FAKE/.config/squad"
+cat >"$FAKE/.config/squad/config.toml" <<'CFG'
+[policy.members]
+# packages_token_ref = "esc:fake/commented:out"
+packages_token_ref = "esc:fake/env:github.packagesToken"
+[policy.docs]
+token_ref = "esc:fake/env:notion.docsToken"  # trailing comment
+[policy.datadog]
+api_key_ref = "esc:fake/dd:datadog.apiKey"
+[policy.other]
+not_a_secret = "1p:abcdefghijklmnop"
+CFG
 for c in personal reserve exxo exxo-personal; do mkdir -p "$FAKE/.claude-$c"; done
 ln -s "$(command -v jq)" "$BIN/jq"
 
@@ -37,7 +51,23 @@ case "$1" in
   ps)   up docker && up cache && echo "0123abcd"; exit 0 ;;
   start) echo "Error: No such container: $2" >&2; exit 1 ;;  # no stopped container to restart: fall through to run
   run)  touch "$STATE/cache"; echo "SECRETLEAK-container-id"; exit 0 ;;
+  # redis-cli TTL inside the exxo cache: STUB_ttl=ok (12h left) | absent (-2) | noexp (-1) | short (30m);
+  # absent flips to 72h once the agent-run stub has warmed it. Any GET would leak.
+  exec) case "$*" in
+          *"redis-cli TTL esc:v1:"*)
+            if [ -e "$STATE/warm" ]; then echo 259200; exit 0; fi
+            case "${STUB_ttl:-ok}" in ok) echo 43200 ;; absent) echo -2 ;; noexp) echo -1 ;; short) echo 1800 ;; esac; exit 0 ;;
+          *) echo "SECRETLEAK unexpected docker exec: $*"; exit 1 ;;
+        esac ;;
 esac'
+# squad is only probed for presence; agent-run records the manifest it was handed (refs only) and
+# the TTL env, then "resolves" it, printing a value the script must not relay.
+stub squad 'echo "SECRETLEAK squad should not be run"'
+stub agent-run '
+{ echo "AGENT_ENV_FILE set: ${AGENT_ENV_FILE:+yes}"; echo "TTL=$EXXO_SECRET_CACHE_TTL_SECONDS"; } >>"$STATE/agent-run.env"
+cp "$AGENT_ENV_FILE" "$STATE/manifest.copy"; ls -l "$AGENT_ENV_FILE" | cut -c1-10 >"$STATE/manifest.mode"
+echo "$AGENT_ENV_FILE" >"$STATE/manifest.path"
+touch "$STATE/warm"; echo "ghp_SECRETLEAK"'
 stub orb 'touch "$STATE/docker"; echo "SECRETLEAK"'
 stub agent-tooling 'echo "secret cache at redis://127.0.0.1:6380: reachable"; echo "  SECRETLEAK 3"'
 stub just 'touch "$STATE/cache"; echo "homelab-1p-cache up SECRETLEAK"'
@@ -250,6 +280,93 @@ check "run: op ok afterwards" row 1password ok
 reset; rm -f "$BIN/glab"; go --check
 check "glab absent: row skipped" row glab skipped
 check "glab absent: exit 0" test "$rc" -eq 0
+
+# --- Gaia cache items --------------------------------------------------------------
+GROWS='gaia-members-packages-token gaia-docs-token gaia-datadog-api-key'
+reset; go --check
+for r in $GROWS; do check "gaia ok: $r ok with remaining TTL" row "$r" ok; done
+check "gaia ok: remaining TTL shown" grep -q 'expires in 12h00m' <<<"$summary"
+check "gaia ok: commented-out ref not a row" bash -c '! grep -q commented <<<"$1"' _ "$out"
+check "gaia ok: 1p ref in config not a row" bash -c '! grep -q not-a-secret <<<"$1"' _ "$out"
+check "gaia ok: TTL read with redis-cli TTL" grep -q 'exec exxo-1p-cache redis-cli TTL esc:v1:fake/env:github.packagesToken' "$STATE/calls.log"
+check "gaia ok: never GETs a value" bash -c '! grep -qiE "redis-cli (GET|MGET)" "$1"' _ "$STATE/calls.log"
+check "gaia ok: squad itself is not run" bash -c '! grep -q "^squad" "$1"' _ "$STATE/calls.log"
+check "gaia ok: no secret-like output" noleak
+check "gaia ok: --check does not warm" bash -c '! test -e "$1/agent-run.env"' _ "$STATE"
+
+reset; STUBENV=(STUB_ttl=noexp); go --check
+check "gaia no expiry: ok" row gaia-members-packages-token ok
+reset; STUBENV=(STUB_ttl=short); go --check --ttl-hours 72
+check "gaia short TTL: still ok" row gaia-members-packages-token ok
+check "gaia short TTL: hint says shorter than the run" grep -q 'shorter than the 72h, from --ttl-hours run' <<<"$summary"
+
+reset; STUBENV=(STUB_ttl=absent); go --check
+for r in $GROWS; do check "gaia absent: $r needs-auth" row "$r" needs-auth; done
+check "gaia absent: exit 1" test "$rc" -eq 1
+check "gaia absent: hint names agent-run, the manifest and the effective TTL" \
+    grep -q 'AGENT_ENV_FILE=<refs-only manifest> EXXO_SECRET_CACHE_TTL_SECONDS=43200 agent-run -- true' <<<"$summary"
+check "gaia absent: --check does not warm" bash -c '! test -e "$1/agent-run.env"' _ "$STATE"
+check "gaia absent: no secret-like output" noleak
+
+# Run mode warms every absent ref in ONE agent-run with a refs-only manifest and the effective TTL.
+reset; STUBENV=(STUB_ttl=absent); go --ttl-hours 6
+check "gaia run: agent-run invoked once" test "$(grep -c '^TTL=' "$STATE/agent-run.env")" -eq 1
+check "gaia run: effective TTL passed (6h)" grep -q '^TTL=21600$' "$STATE/agent-run.env"
+check "gaia run: manifest handed over via AGENT_ENV_FILE" grep -q 'AGENT_ENV_FILE set: yes' "$STATE/agent-run.env"
+check "gaia run: manifest is exactly the three refs" test "$(cat "$STATE/manifest.copy")" = "ESC_REF_1=esc:fake/env:github.packagesToken
+ESC_REF_2=esc:fake/env:notion.docsToken
+ESC_REF_3=esc:fake/dd:datadog.apiKey"
+check "gaia run: manifest holds references only (no value, no 1p ref)" bash -c '! grep -qE "SECRETLEAK|ghp_|1p:" "$1"' _ "$STATE/manifest.copy"
+check "gaia run: manifest not world-readable" grep -q '^-rw-------' "$STATE/manifest.mode"
+check "gaia run: manifest removed afterwards" bash -c '! test -e "$(cat "$1")"' _ "$STATE/manifest.path"
+check "gaia run: rows ok afterwards" row gaia-members-packages-token ok
+check "gaia run: exit 0" test "$rc" -eq 0
+check "gaia run: agent-run output not relayed" noleak
+
+# Skipped: squad absent, config absent, no refs in the config (last in this block: removes the stub).
+mv "$FAKE/.config/squad/config.toml" "$T/config.toml.keep"
+reset; go --check
+check "gaia config absent: row skipped" row gaia-cache skipped
+check "gaia config absent: exit 0" test "$rc" -eq 0
+printf '[policy.members]\nx = 1\n' >"$FAKE/.config/squad/config.toml"
+reset; go --check
+check "gaia config without refs: row skipped" row gaia-cache skipped
+mv "$T/config.toml.keep" "$FAKE/.config/squad/config.toml"
+mv "$BIN/squad" "$T/squad.keep"
+reset; go --check
+check "squad absent: row skipped" row gaia-cache skipped
+check "squad absent: exit 0" test "$rc" -eq 0
+mv "$T/squad.keep" "$BIN/squad"
+reset; STUBENV=(STUB_docker=missing); go --check
+check "docker down: gaia rows skipped" row gaia-members-packages-token skipped
+reset; STUBENV=(STUB_cache=missing); go --check
+check "cache down: gaia rows skipped" row gaia-members-packages-token skipped
+
+# --- TTL: --ttl-hours > local config > built-in 12, and where it came from ---------
+reset; go --check
+check "ttl default: 12h built-in label" grep -q 'Unattended run: .*12h, built-in default' <<<"$out"
+check "ttl default: cache hint labels it" grep -q 'EXXO_SECRET_CACHE_TTL_SECONDS=43200 (12h, built-in default)' <<<"$summary"
+printf 'export CLAUDE_REAUTH_TTL_HOURS=72   # this machine\n' >"$FAKE/.config/local.sh"
+reset; go --check
+check "ttl local.sh: 72h → seconds" grep -q 'EXXO_SECRET_CACHE_TTL_SECONDS=259200' <<<"$out"
+check "ttl local.sh: homelab line too" grep -q 'HOMELAB_1P_CACHE_TTL_SECONDS=259200' <<<"$out"
+check "ttl local.sh: labelled local" grep -q 'Unattended run: .*72h, from local config' <<<"$out"
+check "ttl local.sh: cache row labelled local" grep -q '(72h, from local config CLAUDE_REAUTH_TTL_HOURS)' <<<"$summary"
+reset; go --check --ttl-hours 5
+check "ttl flag beats local.sh: 5h" grep -q 'EXXO_SECRET_CACHE_TTL_SECONDS=18000' <<<"$out"
+check "ttl flag beats local.sh: labelled flag" grep -q 'Unattended run: .*5h, from --ttl-hours' <<<"$out"
+reset; STUBENV=(CLAUDE_REAUTH_TTL_HOURS=48); go --check
+check "ttl env: 48h" grep -q 'EXXO_SECRET_CACHE_TTL_SECONDS=172800' <<<"$out"
+reset; STUBENV=(CLAUDE_REAUTH_TTL_HOURS=48); go --check --ttl-hours 3
+check "ttl flag beats env: 3h" grep -q 'EXXO_SECRET_CACHE_TTL_SECONDS=10800' <<<"$out"
+printf 'export CLAUDE_REAUTH_TTL_HOURS=soon\n' >"$FAKE/.config/local.sh"
+reset; go --check
+check "ttl bad local value: exit 2 naming the source" bash -c 'test "$1" -eq 2 && grep -q "CLAUDE_REAUTH_TTL_HOURS in ~/.config/local.sh" <<<"$2"' _ "$rc" "$out"
+reset; go --check --ttl-hours 2
+check "ttl bad local value is not consulted when the flag is given" test "$rc" -eq 0
+rm -f "$FAKE/.config/local.sh"
+reset; go --help
+check "--help documents the local override" grep -q 'CLAUDE_REAUTH_TTL_HOURS' <<<"$out"
 
 [ "$fail" = 0 ] && echo "all claude-reauth tests passed"
 exit "$fail"
