@@ -39,8 +39,11 @@ than one commit for everything, and push the branch with a draft PR at
 sensible checkpoints as work progresses, rather than waiting until
 everything is finished to make it visible.
 
-When explicitly directed to complete or ship the work, squash-merge the PR
-into main.
+Drafts are for checkpoints only. To hand a PR to the operator for review,
+bring the branch up to date with its base, mark it ready (`gh pr ready`), wait
+for CI in the background until it is green, then hand over with the check
+result. When explicitly directed to complete or ship the work, squash-merge
+the PR into main.
 
 An explicit direction to skip part of this flow — commit straight to main,
 merge without waiting, skip the draft stage — is scoped to the specific
@@ -54,7 +57,9 @@ work without forcing a decision on it, and merging only on explicit
 direction keeps "merge" a deliberate act rather than a default outcome of
 finishing a task. Treating a one-off approval as standing permission is exactly the
 inference that erodes the "explicit" part — each skip has to be re-earned,
-not generalized from the last one.
+not generalized from the last one. Tim, 22 Nov 2026: sessions pushed draft PRs
+and stopped, and in Exxo repos a draft skips or fails `ci-ok` by design, so he
+arrived at PRs with no CI verdict.
 
 ## Commit often, push in batches
 
