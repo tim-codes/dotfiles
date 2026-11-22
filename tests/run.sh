@@ -22,6 +22,7 @@ needs() {
   case "$1" in
     claude-kickoff*.sh|claude-sync-*.sh|squad-hooks-settings.sh|claude-config*) echo "jq" ;;
     claude-openrouter-wrapper.sh) echo "fish zsh" ;;
+    squad-config-parity.sh) echo "yq" ;;
   esac
 }
 

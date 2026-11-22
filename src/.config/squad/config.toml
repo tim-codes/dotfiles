@@ -22,10 +22,17 @@ name = "personal"
 # (quota_reserve @ account:<name>; squad docs/runbooks/budgets.md), not a config key.
 # playwright/browser are capabilities for placement; only playwright has an MCP server the orchestrator passes to member launches that need it ([policy.launch] needs_mcp)
 # datadog: the Datadog MCP server (needs_mcp below) is signed in on the personal, reserve and exxo logins, not on openrouter (Tim, 20 Nov 2026: Datadog is a key Gaia tool)
-# 1password: agent/run resolves 1Password references on this host in every context, so every account except openrouter (agent/run is denied there) provides it; vercel: the Vercel MCP server is exxo-only, so only exxo provides it
+# 1password: agent/run resolves 1Password references on this host in every context, so every account except openrouter (agent/run is denied there) provides it
+# MCP parity (Tim, 22 Nov 2026: the contexts are to be "fully interchangeable to balance quota availability"):
+# personal, reserve and exxo provide the SAME list. figma and vercel are the repo-managed `figma` and `vercel`
+# servers (dotfiles files/claude/mcp.shared.json), present in every attended context, not claude.ai connectors;
+# a Vercel login must still be authorised for the Exxo Labs team in each context (claude-reauth's vercel row).
+# These are placement capabilities only: a member's launch carries --strict-mcp-config and just the needs_mcp
+# servers below, so listing a capability here gives no builder a tool. No notion/slack capability on purpose:
+# builders do not use Notion or Slack (Tim, 22 Nov 2026).
 # Tim, 16 Nov 2026: back in placement. Policy: most Gaia work goes to the personal/reserve Ultra plans;
-# exxo is used only where a task needs an org-scope capability (vercel) or the others are full.
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards", "datadog", "figma"]
+# exxo is the overflow (placement_rank 90).
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "vercel", "boards", "datadog", "figma"]
 placement_rank = 20
 email = "timoconnell1024@gmail.com"
 config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
@@ -34,18 +41,17 @@ config_dirs = ["~/.claude-personal", "~/.claude-exxo-personal"]
 # so its own account and quota.
 [[accounts]]
 name = "reserve"
-# Tim, 16 Nov 2026: back in placement (see personal). figma added 16 Nov 21:10Z: the claude.ai Figma connector is signed in for this login.
-# 17 Nov 2026 (v0.7.8 leader): figma REMOVED for tonight's batch: the reserve claude.ai account no longer lists a Figma connector
-# (claude mcp list), so figma tasks would fail here. Restore once Figma is connected at claude.ai for tim.oc@outlook.com.
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "boards", "datadog"]
+# Tim, 16 Nov 2026: back in placement (see personal). Same provides as personal and exxo (MCP parity, 22 Nov 2026):
+# figma restored, now the repo-managed `figma` server rather than the claude.ai connector removed on 17 Nov.
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "vercel", "boards", "datadog", "figma"]
 placement_rank = 10
 email = "tim.oc@outlook.com"
 config_dirs = ["~/.claude-reserve"]
 
 [[accounts]]
 name = "exxo"
-provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "vercel", "boards", "datadog"]
-# Tim, 16 Nov 2026: exxo is last choice by policy (org-scope needs such as vercel, or overflow).
+provides = ["docker", "rust", "shell", "node", "postgres", "playwright", "browser", "1password", "vercel", "boards", "datadog", "figma"]
+# Tim, 16 Nov 2026: exxo is last choice by policy (overflow; since MCP parity it has no capability the others lack).
 placement_rank = 90
 email = "tim@exxo.io"
 config_dirs = ["~/.claude-exxo"]
@@ -57,8 +63,9 @@ provider = "openrouter"
 key_file = "~/keys/openrouter.key"
 # The metered share places a launch here only when the pool has a config dir and provides the task's needs
 # (placement.ts placeMetered). browser, playwright and vercel are left out on purpose: those tasks are excluded by exclude_needs / not placed here.
+# boards removed 22 Nov 2026: the exxo-openrouter context denies the boards server (settings.overlay.exxo-openrouter.json).
 config_dirs = ["~/.claude-exxo-openrouter"]
-provides = ["docker", "rust", "shell", "node", "postgres", "boards"]
+provides = ["docker", "rust", "shell", "node", "postgres"]
 # v0.7.0 (ENG-663): repricing at the tim-ds preset's first provider (DeepInfra fp8, read 13 Nov 2026; USD per Mtok)
 # and the per-session cost guard (Tim 13 Nov: pause $6, warn item $3).
 pricing = { input = 0.098, output = 0.294, cache_read = 0.0029, cache_write = 0 }
