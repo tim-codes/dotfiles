@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install tools the tests use
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends jq fish zsh tmux
+      - name: Test suite
+        run: bash tests/run.sh
+
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: All jobs succeeded
+        run: |
+          result='${{ needs.test.result }}'
+          echo "test: $result"
+          [ "$result" = success ]
