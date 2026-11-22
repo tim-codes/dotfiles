@@ -1,9 +1,11 @@
 name: ci
 
+# Pull requests only: there is no automated deployment from main, so checks are
+# needed before merge, and a commit that passed on its PR is not re-run after the
+# squash merge. workflow_dispatch lets a run on main be started by hand.
 on:
   pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -26,13 +28,6 @@ jobs:
         # bash 5: several tests use mapfile and `source <(...)`, which /bin/bash 3.2 lacks.
         run: brew install bash jq yq fish
       - name: Test suite
-        # Pre-existing failures on main (also fail on a clean local checkout), tracked for the owner:
-        #   claude-skills-lint: build-lead SKILL.md is 277 lines, the lint allows 250
-        #   claude-openrouter-wrapper: the fish wrappers' `env` invocation fails under the test's stubbed PATH
-        #   claude-reauth: the "exxo cache started after Docker came up" case fails
-        # Reported as KNOWN-FAIL by tests/run.sh, never hidden; remove a name here once it is fixed.
-        env:
-          TESTS_KNOWN_FAILING: claude-skills-lint.sh claude-openrouter-wrapper.sh claude-reauth.sh
         run: bash tests/run.sh
 
   ci-ok:

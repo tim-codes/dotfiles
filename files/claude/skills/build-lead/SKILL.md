@@ -168,45 +168,24 @@ merge themselves.
    is void; its failures are not evidence. See lessons.
 6. A gate for a package whose dependencies changed needs `install` in the
    integration worktree first, or it fails on imports that merely moved.
-7. **The build branch is a local trunk. Do not push it per checkpoint.**
-   Every push wakes remote CI, and a multi-lane build that pushes at each
-   merge pays for a dozen pipeline runs that are obsolete before they
-   finish and waits on them in between (Tim, 11 Nov 2026: "just work with a
-   local trunk and do light tests for gating locally, once all in then push
-   the batch to the remote and let github run verifications only at the
-   end"). Lanes integrate on the local build branch; the ledger, not the
-   PR, is the progress record between pushes. Push only:
-   - **once, at the end** (section 7), when every lane is merged and its
-     light gate is green: this push is what runs the comprehensive
-     verification;
-   - **at a pause or handover** (quota, context, a session change, going
-     idle on the operator), because unpushed work must never be the only
-     copy when attention moves. If the repo's CI runs on every push, push
-     the branch without opening or updating a non-draft PR, or with the
-     repo's CI-skip convention for that one push if it has one, and say so
-     in the ledger;
-   - when the operator asks for a push.
-   Lane branches are not pushed either: lanes commit locally and the lead
-   merges locally. Open the draft PR at the first push (the end or a
-   pause), not at setup.
+7. **The build branch is a local trunk. Do not push it per checkpoint**:
+   every push wakes remote CI, and the ledger, not the PR, is the progress
+   record between pushes. Lanes commit and merge locally and are never
+   pushed. Push only once at the end (section 7, which runs the
+   comprehensive verification), at a pause or handover, or when the
+   operator asks; open the draft PR at the first push. The full rule,
+   the Tim quote and the pause-push variants are in
+   [references/push-policy.md](references/push-policy.md).
 8. Keep `main` untouched. Only the operator merges the build branch.
 
 ## 5. Cross-plan seams
 
-- **Contract first.** When two plans build on the same new contract (a
-  protocol type, a tool definition, a table), one task lands it first on
-  the build branch as a seam: the stub, the types, the parity tests. The
-  dependent branch then rebases onto the build branch before its first
-  task. Order it in the preflight table.
-- **One commit across languages.** A change that must move together (a
-  config key with its TypeScript twins and the Rust struct that reads it;
-  a schema with its generated client) is one commit by one lane, even when
-  it belongs to another plan. The parity tests refuse a half-done change,
-  so splitting it makes both lanes red. Rule it in the preflight table:
-  which lane does it, which branch rebases after, cost if wrong.
-- **Whichever lands second wires both.** Rewrite that sentence into a
-  ruling: name the lane that creates the shared file and the lane that must
-  not.
+Land a contract two plans share first, as a seam on the build branch; move
+a change that must span languages in one commit by one lane; and turn
+"whichever lands second wires both" into a ruling naming who creates the
+shared file. Order each in the preflight table. The three rules, with
+their reasons, are in
+[references/cross-plan-seams.md](references/cross-plan-seams.md).
 
 ## 6. Scope changes mid-build
 
@@ -229,17 +208,12 @@ into memory the moment they are given, then into the ledger.
 ## 7. Final
 
 1. **Propose the final passes; don't start them.** When the last lane is
-   merged and light-gated, stop and queue the candidate passes for the
-   operator with a recommendation each: a whole-branch review (by the most
-   capable reviewer, `review-package` over merge-base..HEAD, read by
-   `--stat` first; a package over ~100 KB is read by file), a UX pass for
-   UI changes, a conformity review, a security review of new auth or
-   credential paths. Give each a one-line scope, a cost (time and tokens)
-   and what it would catch that the light gates did not. Run only what the
-   operator picks (Tim, 11 Nov 2026: "dont trigger any whole-branch final
-   review at the end just queue these up and suggest what final passes you
-   want to do"). Include the ledger's deferred minors and parked rulings in
-   the proposal, since they are what a final review would weigh.
+   merged and light-gated, stop and queue the candidate passes
+   (whole-branch review, UX pass, conformity review, security review) for
+   the operator with a recommendation each, plus the ledger's deferred
+   minors and parked rulings. Run only what the operator picks. Scope,
+   cost and the quote are in
+   [references/final-passes.md](references/final-passes.md).
 2. **One fix wave** for whatever the chosen passes find (the lanes'
    implementers, resumed, with the findings verbatim), one scoped
    re-review. No second wave: whatever remains goes in the PR body as
@@ -258,11 +232,9 @@ into memory the moment they are given, then into the ledger.
    the operator says the build is accepted. Never a bare `git worktree
    remove`.
 6. **Fold back** what was generic: wrappers, scripts and procedures go to
-   the libraries (dotfiles `src/bin`, skills repos, the harness kit) as
-   draft PRs, one per library. Procedure text goes to a skill; data goes
-   to a reference; code that only suited this repo stays there. Note
-   candidates in the ledger as they arise so the pass at the end is a
-   read, not a memory.
+   the libraries as draft PRs, one per library; note candidates in the
+   ledger as they arise. Detail in
+   [references/final-passes.md](references/final-passes.md).
 
 ## Do not
 

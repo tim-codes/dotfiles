@@ -35,6 +35,7 @@ case "$1" in
   info) up docker && { echo "Server: SECRETLEAK"; exit 0; }
         echo "Cannot connect to the Docker daemon at unix:///x/docker.sock. Is the docker daemon running?" >&2; exit 1 ;;
   ps)   up docker && up cache && echo "0123abcd"; exit 0 ;;
+  start) echo "Error: No such container: $2" >&2; exit 1 ;;  # no stopped container to restart: fall through to run
   run)  touch "$STATE/cache"; echo "SECRETLEAK-container-id"; exit 0 ;;
 esac'
 stub orb 'touch "$STATE/docker"; echo "SECRETLEAK"'
@@ -221,7 +222,7 @@ reset; STUBENV=(STUB_gcloud=missing STUB_adc=missing STUB_docker=missing STUB_ca
 check "run: gcloud login ran" grep -q '^gcloud auth login' "$STATE/calls.log"
 check "run: ADC login ran" grep -q '^gcloud auth application-default login' "$STATE/calls.log"
 check "run: OrbStack started" grep -q '^orb start' "$STATE/calls.log"
-check "run: exxo cache started after Docker came up" grep -q '^docker run -d --rm --name exxo-1p-cache' "$STATE/calls.log"
+check "run: exxo cache started after Docker came up" grep -q '^docker run -d --restart unless-stopped --name exxo-1p-cache' "$STATE/calls.log"
 check "run: az login ran" grep -q '^az login' "$STATE/calls.log"
 check "run: mcp login ran for the exxo server" grep -q '^claude mcp login datadog' "$STATE/calls.log"
 check "run: everything ok afterwards → exit 0" test "$rc" -eq 0
