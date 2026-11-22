@@ -293,7 +293,7 @@ check_gaia_ref() {  # ctx(unused) ref
     esac
     S=ok; N="$ref cached, expires in $(human_secs "$ttl")"
     if [ "$ttl" -lt "$TTL_SECONDS" ]; then
-        N="$N (shorter than the $TTL_DESC run; a cache hit keeps its TTL: to renew, DEL it from the cache, then re-run)"
+        N="$N (shorter than the ${TTL_HOURS}h unattended run; a cache hit keeps its TTL: to renew, DEL it from the cache, then re-run)"
     fi
 }
 fix_gaia_ref() {  # warm every Gaia ref that is absent, in one agent-run, refs-only manifest

@@ -298,7 +298,7 @@ reset; STUBENV=(STUB_ttl=noexp); go --check
 check "gaia no expiry: ok" row gaia-members-packages-token ok
 reset; STUBENV=(STUB_ttl=short); go --check --ttl-hours 72
 check "gaia short TTL: still ok" row gaia-members-packages-token ok
-check "gaia short TTL: hint says shorter than the run" grep -q 'shorter than the 72h, from --ttl-hours run' <<<"$summary"
+check "gaia short TTL: hint says shorter than the run" grep -q 'shorter than the 72h unattended run' <<<"$summary"
 
 reset; STUBENV=(STUB_ttl=absent); go --check
 for r in $GROWS; do check "gaia absent: $r needs-auth" row "$r" needs-auth; done
