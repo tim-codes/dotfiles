@@ -7,44 +7,45 @@
 # `claude mcp get` / `claude mcp login`.
 #
 #   servers  — required: absent or not connected counts against the exit code
+#              (a required claude.ai connector that is absent → needs-auth,
+#              "attach <Name> at claude.ai for <account>")
 #   optional — checked only if the context lists it; absent → skipped
 #
 # [all] applies to every context. Tables are personal, reserve, exxo, exxo-personal.
 # Kept to the subset the parser in claude-reauth reads: [table] headers,
 # `servers`/`optional` string arrays (single- or multi-line), # comments.
 
-# Parity (2026-11-21): the user-scope servers from mcp.shared.json are the same
-# in every context, so they are required everywhere. Only the claude.ai
-# connectors below are account-bound (they follow the logged-in ACCOUNT).
+# MCP parity (Tim, 22 Nov 2026): every repo-managed server in mcp.shared.json is
+# required in every attended context, so any of them can take any work.
+# claude-sync resets a per-project "Disabled for this project" flag on these.
 [all]
-servers = ["playwright", "mantine", "Sanity", "datadog", "workos"]
+servers = ["mantine", "Sanity", "datadog", "boards", "workos", "playwright", "vercel", "squad", "figma"]
 
+# Connectors: the repo-managed server or plugin is preferred wherever both exist,
+# so claude.ai Figma (→ the `figma` server, Figma's own endpoint), claude.ai
+# Datadog (→ `datadog`, EU site) and claude.ai Linear (→ plugin:linear:linear)
+# are never required. Notion and Slack have no repo-managed server and stay
+# claude.ai connectors (they follow the logged-in ACCOUNT, attached at
+# claude.ai/customize/connectors). The Google connectors are personal-only and
+# outside parity.
 [personal]
-servers = ["claude.ai Notion", "claude.ai Slack", "claude.ai Figma"]
-optional = ["claude.ai Datadog", "claude.ai Linear", "claude.ai Gmail", "claude.ai Google Calendar", "claude.ai Google Drive"]
+servers = ["claude.ai Notion", "claude.ai Slack"]
+optional = ["claude.ai Gmail", "claude.ai Google Calendar", "claude.ai Google Drive"]
 
-# Second personal subscription, built from the personal fragments. Its claude.ai
-# connectors mirror personal's (set up 2026-10-30), minus the Google ones.
+# Second personal subscription, built from the personal fragments.
 [reserve]
-servers = ["claude.ai Notion", "claude.ai Slack", "claude.ai Figma"]
-optional = ["claude.ai Datadog", "claude.ai Linear"]
+servers = ["claude.ai Notion", "claude.ai Slack"]
 
-# Datadog is the user-scope `datadog` server from mcp.shared.json (EU site,
-# mcp.datadoghq.eu/v1/mcp), not the engineering plugin's US-site
-# `plugin:engineering:datadog`, whose OAuth starts on the wrong site.
-# `claude.ai Datadog` is the account connector — present only where the
-# account has it enabled.
+# Microsoft 365 is tied to the Exxo tenant: exxo only.
 [exxo]
 servers = [
   "claude.ai Microsoft 365",
   "claude.ai Notion",
   "claude.ai Slack",
-  "claude.ai Figma",
 ]
-optional = ["claude.ai Datadog"]
 
 # Same exxo fragments, personal subscription: the claude.ai connectors follow
-# the logged-in ACCOUNT, so the Exxo-org ones are not reachable here.
+# the logged-in ACCOUNT, so none is required here; the managed servers in [all]
+# are what make it interchangeable.
 [exxo-personal]
 servers = []
-optional = ["claude.ai Datadog"]

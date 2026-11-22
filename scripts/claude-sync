@@ -119,10 +119,30 @@
 # Skills/agents are keyed on the fragment ACCOUNT, not the context name, which
 # is what makes it "personal" for delivery purposes.
 #
+# MCP parity (Tim, 22 Nov 2026: "config parity between personal/exxo/reserve
+# contexts ... so that we can use them fully interchangeably to balance quota
+# availability"). The attended contexts — personal, reserve, exxo and
+# exxo-personal — must expose the same repo-managed servers. A server switched
+# off with the /mcp toggle is recorded per project in that context's
+# .claude.json (projects.<path>.disabledMcpServers), which silently breaks
+# parity for that project in that context only. So a plain run also removes the
+# MANAGED server names (the keys of the merged MCP fragment) from every
+# project's disabledMcpServers list in those four contexts. Every other entry —
+# hand-added servers, plugin servers, claude.ai connectors such as
+# `claude.ai Slack` — is left exactly as it is. exxo-openrouter is out of scope:
+# it denies most managed servers on purpose (settings overlay) and is never
+# touched by the reset or reported by --check. A deliberate per-project
+# switch-off of a managed server is therefore undone by the next sync; to keep
+# a managed server off, deny it in a settings fragment (deniedMcpServers)
+# instead of the /mcp toggle.
+#
 # Usage:
 #   claude-sync            apply settings + CLAUDE.md + MCP servers + skills + agents
 #                          to every context
 #   claude-sync --diff     show what has drifted, change nothing
+#   claude-sync --check    MCP parity only: report managed servers that differ and
+#                          managed names in per-project disabled lists (names and
+#                          counts only); exit 1 on drift, 0 when at parity
 #   claude-sync -h|--help  print this usage and exit 0
 #
 # Any other argument prints the usage to stderr and exits 2 without syncing.
@@ -132,20 +152,24 @@ set -euo pipefail
 
 usage() {
     cat <<'USAGE'
-Usage: claude-sync [--diff | -h | --help]
+Usage: claude-sync [--diff | --check | -h | --help]
   (no argument)  apply settings + CLAUDE.md + MCP servers + skills + agents
-                 to every context
+                 to every context, and reset per-project disabled flags for
+                 the managed MCP servers in personal, reserve, exxo and
+                 exxo-personal
   --diff         show what has drifted, change nothing
+  --check        MCP parity check, read-only: exit 1 on drift, 0 at parity
   -h, --help     print this usage and exit
 USAGE
 }
 
 # Parse before anything else runs: an unrecognised argument must never fall
 # through to a real sync.
-diff_only=0
+diff_only=0; check_only=0
 case "$#:${1:-}" in
     0:)         ;;
     1:--diff)   diff_only=1 ;;
+    1:--check)  check_only=1 ;;
     1:-h|1:--help) usage; exit 0 ;;
     *)          echo "claude-sync: unknown argument: $*" >&2; usage >&2; exit 2 ;;
 esac
@@ -162,6 +186,14 @@ SRC_AGENTS="$REPO_DIR/files/claude/agents"
 # settings.<account>.json / CLAUDE.md.<account> the context is built from —
 # exxo-personal deliberately reuses the exxo fragments (see header).
 CONTEXTS=("personal:personal" "reserve:personal" "exxo:exxo" "exxo-personal:exxo" "exxo-openrouter:exxo")
+
+# The attended contexts held at MCP parity (see the header). exxo-openrouter is
+# deliberately absent: its overlay denies most managed servers.
+PARITY_CONTEXTS=(personal reserve exxo exxo-personal)
+in_parity() {
+    case " ${PARITY_CONTEXTS[*]} " in *" $1 "*) return 0 ;; esac
+    return 1
+}
 
 # The durable state exxo-personal shares back into ~/.claude-exxo. Runtime
 # state (daemon, caches, session-env, shell-snapshots, sessions) and auth
@@ -460,6 +492,102 @@ prefs_status_lines() {
     ' 2>/dev/null || echo "  (unreadable .claude.json — skipped)"
 }
 
+# The per-project disabled-flag reset, as a jq program over .claude.json with
+# $m the built MCP fragment. Defensive by construction: it acts only where
+# .projects is an object, a project entry is an object and its
+# disabledMcpServers is an array; inside such a list it drops only the managed
+# names. Every other key and every other list entry (hand-added, plugin and
+# claude.ai connector names) is kept as it is.
+DISABLED_RESET='
+  (($m[0].mcpServers // {}) | keys) as $names
+  | if (.projects | type) == "object" then
+      .projects |= with_entries(
+        if (.value | type) == "object" and ((.value.disabledMcpServers | type) == "array")
+        then .value.disabledMcpServers |= map(select(. as $x | any($names[]; . == $x) | not))
+        else . end)
+    else . end
+'
+
+# "<projects>\t<names>" for the managed names that some project's
+# disabledMcpServers list holds in the given .claude.json: the number of
+# projects affected and the distinct managed names, comma-separated (empty when
+# none). Names only: project paths and every other value stay out of the
+# output. Fails (nonzero) on unreadable JSON.
+disabled_managed() {
+    local live="$1"
+    jq -r --slurpfile m "$MCP_TMP" '
+        (($m[0].mcpServers // {}) | keys) as $names
+        | [ (if (.projects | type) == "object" then .projects[] else empty end)
+            | select(type == "object" and ((.disabledMcpServers | type) == "array"))
+            | [ .disabledMcpServers[] | select(. as $x | any($names[]; . == $x)) ]
+            | select(length > 0) ] as $hits
+        | "\($hits | length)\t\($hits | add // [] | unique | join(", "))"
+    ' "$live" 2>/dev/null
+}
+
+# Managed server names whose live .mcpServers entry is missing or differs from
+# the fragment, comma-separated (empty at parity). Names only, never values.
+mcp_drift_names() {
+    local live="$1"
+    jq -r --slurpfile m "$MCP_TMP" '
+        (.mcpServers // {}) as $live
+        | [ ($m[0].mcpServers // {}) | to_entries[]
+            | select(($live[.key] // null) != .value)
+            | .key + (if ($live[.key] // null) == null then " (missing)" else " (differs)" end) ]
+        | join(", ")
+    ' "$live" 2>/dev/null
+}
+
+if [ "$check_only" = 1 ]; then
+    drift=0
+    for mapping in "${CONTEXTS[@]}"; do
+        name="${mapping%%:*}"
+        account="${mapping#*:}"
+        in_parity "$name" || continue
+        ctx="$HOME/.claude-$name"
+        if [ ! -d "$ctx" ]; then
+            info "${ctx/#$HOME/~}: does not exist — skipped (run scripts/claude-contexts)"
+            continue
+        fi
+        info "${ctx/#$HOME/~} MCP parity"
+        if [ ! -f "$SRC_MCP_SHARED" ]; then
+            warn "mcp.shared.json missing — nothing to check against"
+            drift=1
+            continue
+        fi
+        build_mcp "$account" "$MCP_TMP"
+        live="$ctx/.claude.json"
+        if [ ! -f "$live" ]; then
+            echo "  .claude.json: absent (never launched) — every managed server missing"
+            drift=1
+            continue
+        fi
+        if ! names="$(mcp_drift_names "$live")" || ! hits="$(disabled_managed "$live")"; then
+            echo "  .claude.json: not readable as JSON"
+            drift=1
+            continue
+        fi
+        if [ -n "$names" ]; then
+            echo "  mcpServers: drift: $names"
+            drift=1
+        else
+            echo "  mcpServers: current ($(jq -r '.mcpServers | length' "$MCP_TMP") managed)"
+        fi
+        if [ "${hits%%$'\t'*}" != 0 ]; then
+            echo "  disabled per project: ${hits#*$'\t'} (in ${hits%%$'\t'*} project(s))"
+            drift=1
+        else
+            echo "  disabled per project: none of the managed servers"
+        fi
+    done
+    if [ "$drift" = 1 ]; then
+        warn "MCP parity drift — run claude-sync"
+        exit 1
+    fi
+    info "MCP parity: all attended contexts current"
+    exit 0
+fi
+
 if [ "$diff_only" = 1 ]; then
     for mapping in "${CONTEXTS[@]}"; do
         name="${mapping%%:*}"
@@ -630,6 +758,49 @@ sync_mcp_servers() {
     cat "$MCP_OUT" > "$swap"
     mv "$swap" "$live"
     echo "  .claude.json: mcpServers merged from mcp.shared.json + mcp.$account.json (if present)"
+}
+
+# ---- MCP parity: reset per-project disabled flags for the managed servers ----
+# Parity contexts only (see the header). Same discipline as sync_mcp_servers:
+# checksum before the read and again before the swap, skip a no-op, swap
+# atomically in-directory preserving the mode; plus a mode-preserving backup of
+# the file before the one write that changes it. Prints one line: how many
+# projects had flags reset and for which managed names (never a path or value).
+sync_disabled_flags() {
+    local account="$1" ctx="$2"
+    local live="$ctx/.claude.json"
+
+    [ -f "$SRC_MCP_SHARED" ] || return 0
+    [ -f "$live" ] || return 0
+    build_mcp "$account" "$MCP_TMP"
+
+    local sum_before hits
+    sum_before="$(cksum < "$live")"
+    if ! hits="$(disabled_managed "$live")"; then
+        warn "  .claude.json is not readable as JSON — per-project MCP flags left alone"
+        return
+    fi
+    if [ "${hits%%$'\t'*}" = 0 ]; then
+        echo "  .claude.json: no project disables a managed MCP server"
+        return
+    fi
+    if ! jq --slurpfile m "$MCP_TMP" "$DISABLED_RESET" "$live" > "$MCP_OUT" 2>/dev/null; then
+        warn "  .claude.json is not readable as JSON — per-project MCP flags left alone"
+        return
+    fi
+    if [ "$(cksum < "$live")" != "$sum_before" ]; then
+        warn "  .claude.json changed while syncing (a Claude session is likely running)"
+        warn "  — per-project MCP flags not reset, nothing lost; re-run claude-sync"
+        return
+    fi
+
+    local backup="$live.bak-$(date +%Y%m%d-%H%M%S)"
+    cp -p "$live" "$backup"
+    local swap="$ctx/.claude.json.claude-sync-$$"
+    cp -p "$live" "$swap"
+    cat "$MCP_OUT" > "$swap"
+    mv "$swap" "$live"
+    echo "  .claude.json: reset per-project disabled flags in ${hits%%$'\t'*} project(s) for: ${hits#*$'\t'} (backup ${backup/#$HOME/~})"
 }
 
 # ---- preferences: merge the managed top-level keys into <context>/.claude.json ----
@@ -938,6 +1109,9 @@ for mapping in "${CONTEXTS[@]}"; do
     sync_local_settings "$account" "$ctx"
     sync_claude_md "$account" "$ctx"
     sync_mcp_servers "$account" "$ctx"
+    if in_parity "$name"; then
+        sync_disabled_flags "$account" "$ctx"
+    fi
     sync_prefs "$account" "$ctx"
     sync_skills "$name" "$account" "$ctx"
     sync_agents "$name" "$account" "$ctx"

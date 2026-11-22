@@ -192,11 +192,26 @@ for n in datadog boards; do
     for c in exxo exxo-personal personal reserve; do expect_rc "needs $n is met in $c" 0 "$T/needs.md" --account "$c" --dry-run; done
     expect_rc "needs $n is unmet in exxo-openrouter" 9 "$T/needs.md" --account exxo-openrouter --dry-run
 done
-for n in m365 figma notion; do
-    withneeds "$n"
-    expect_rc "needs $n is met in exxo" 0 "$T/needs.md" --account exxo --dry-run
-    for c in exxo-personal personal reserve exxo-openrouter; do expect_rc "needs $n is unmet in $c" 9 "$T/needs.md" --account "$c" --dry-run; done
-done
+# MCP parity (22 Nov 2026): m365 stays exxo-only (Exxo tenant); figma is the
+# repo-managed server in every attended context; notion wherever its connector
+# is required (exxo, personal, reserve).
+withneeds m365
+expect_rc "needs m365 is met in exxo" 0 "$T/needs.md" --account exxo --dry-run
+for c in exxo-personal personal reserve exxo-openrouter; do expect_rc "needs m365 is unmet in $c" 9 "$T/needs.md" --account "$c" --dry-run; done
+withneeds figma
+for c in exxo exxo-personal personal reserve; do expect_rc "needs figma is met in $c" 0 "$T/needs.md" --account "$c" --dry-run; done
+expect_rc "needs figma is unmet in exxo-openrouter" 9 "$T/needs.md" --account exxo-openrouter --dry-run
+withneeds notion
+for c in exxo personal reserve; do expect_rc "needs notion is met in $c" 0 "$T/needs.md" --account "$c" --dry-run; done
+for c in exxo-personal exxo-openrouter; do expect_rc "needs notion is unmet in $c" 9 "$T/needs.md" --account "$c" --dry-run; done
+# The Anthropic accounts' contexts provide identical sets apart from the
+# documented exxo-only m365 (and exxo-personal, a personal login with no
+# connector required, lacking notion).
+CTXF="$SRC_REPO/src/.config/claude-kickoff/contexts.toml"
+prov() { "$YQ_REAL" -p toml -oy ".context[] | select(.name == \"$1\") | .provides${2:-} | sort | join(\" \")" "$CTXF"; }
+check "parity: personal and reserve provide the same" test "$(prov personal)" = "$(prov reserve)"
+check "parity: exxo = personal + m365" test "$(prov exxo)" = "$(prov personal ' + ["m365"]')"
+check "parity: exxo-personal = personal - notion" test "$(prov exxo-personal)" = "$(prov personal ' - ["notion"]')"
 withneeds "agent-run"
 for c in exxo exxo-personal personal reserve; do expect_rc "needs agent-run is met in $c" 0 "$T/needs.md" --account "$c" --dry-run; done
 expect_rc "needs agent-run is unmet in exxo-openrouter" 9 "$T/needs.md" --account exxo-openrouter --dry-run

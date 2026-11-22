@@ -56,7 +56,8 @@ case "$1" in
   exec) case "$*" in
           *"redis-cli TTL esc:v1:"*)
             if [ -e "$STATE/warm" ]; then echo 259200; exit 0; fi
-            case "${STUB_ttl:-ok}" in ok) echo 43200 ;; absent) echo -2 ;; noexp) echo -1 ;; short) echo 1800 ;; esac; exit 0 ;;
+            case "${STUB_ttl:-ok}" in ok) echo 43200 ;; absent) echo -2 ;; noexp) echo -1 ;; short) echo 1800 ;;
+              justwarm) echo 43080 ;; tenh) echo 36000 ;; esac; exit 0 ;;
           *) echo "SECRETLEAK unexpected docker exec: $*"; exit 1 ;;
         esac ;;
 esac'
@@ -115,25 +116,33 @@ case "$1" in
 esac'
 stub az "$AZ_STUB"
 # claude mcp list/get/login. Every needed server is connected unless
-# STUB_mcp_<ctx>=missing, which flips that context's first needed server to
-# "Needs authentication" and drops its optional servers.
+# STUB_mcp_<ctx>=missing, which flips that context's datadog to "Needs
+# authentication" and drops its optional servers, or STUB_mcp_<ctx>=disabled,
+# which shows mantine as disabled for the project. STUB_conn_<ctx>=missing drops
+# that context's claude.ai Notion connector. The claude.ai Figma, Datadog and
+# Linear connectors always need auth: they must never become rows.
 stub claude '
-ctx="$(basename "$CLAUDE_CONFIG_DIR")"; ctx="${ctx#.claude-}"; v="STUB_mcp_${ctx//-/_}"
-st() { if [ "${!v:-ok}" = ok ] || [ -e "$STATE/mcp-$ctx-$1" ]; then echo "✔ Connected"; else echo "! Needs authentication"; fi; }
+ctx="$(basename "$CLAUDE_CONFIG_DIR")"; ctx="${ctx#.claude-}"; v="STUB_mcp_${ctx//-/_}"; cv="STUB_conn_${ctx//-/_}"
+st() { if [ "${!v:-ok}" != missing ] || [ -e "$STATE/mcp-$ctx-$1" ]; then echo "✔ Connected"; else echo "! Needs authentication"; fi; }
+conn() { for s in "$@"; do [ "$s" = Notion ] && [ "${!cv:-ok}" = missing ] && continue; echo "claude.ai $s: https://x/SECRETLEAK - ✔ Connected"; done; }
 case "$1 $2" in
   "mcp list")
     echo "Checking MCP server health…"; echo
+    echo "Sanity: https://mcp.sanity.io?k=SECRETLEAK (HTTP) - ✔ Connected"
+    if [ "${!v:-ok}" = disabled ]; then echo "mantine: npx -y @mantine/mcp-server SECRETLEAK - ⊘ Disabled for this project (re-enable via /mcp)"
+    else echo "mantine: npx -y @mantine/mcp-server SECRETLEAK - ✔ Connected"; fi
+    echo "datadog: https://mcp.datadoghq.eu/v1/mcp?SECRETLEAK (HTTP) - $(st datadog)"
+    echo "workos: https://mcp.workos.com/SECRETLEAK (HTTP) - ✔ Connected"
+    echo "boards: https://boards.example/SECRETLEAK (HTTP) - ✔ Connected"
+    echo "vercel: https://mcp.vercel.com/SECRETLEAK (HTTP) - ✔ Connected"
+    echo "squad: squad mcp SECRETLEAK - ✔ Connected"
+    echo "figma: https://mcp.figma.com/mcp?SECRETLEAK (HTTP) - ✔ Connected"
     case "$ctx" in
-      *) echo "Sanity: https://mcp.sanity.io?k=SECRETLEAK (HTTP) - ✔ Connected"
-         echo "mantine: npx -y @mantine/mcp-server SECRETLEAK - ✔ Connected"
-         echo "datadog: https://mcp.datadoghq.eu/v1/mcp?SECRETLEAK (HTTP) - $(st datadog)"
-         echo "workos: https://mcp.workos.com/SECRETLEAK (HTTP) - ✔ Connected" ;;
+      personal) conn Notion Slack; [ "${!v:-ok}" = ok ] && conn Gmail ;;
+      reserve)  conn Notion Slack ;;
+      exxo)     conn "Microsoft 365" Notion Slack ;;
     esac
-    case "$ctx" in
-      personal|reserve) for s in Notion Slack Figma; do echo "claude.ai $s: https://x/SECRETLEAK - ✔ Connected"; done ;;
-      exxo)     for s in "Microsoft 365" Notion Slack Figma; do echo "claude.ai $s: https://x/SECRETLEAK - ✔ Connected"; done
-                [ "${!v:-ok}" = ok ] && echo "claude.ai Datadog: https://x/SECRETLEAK - ✔ Connected" ;;
-    esac
+    for s in Figma Datadog Linear; do echo "claude.ai $s: https://x/SECRETLEAK - ! Needs authentication"; done
     echo "playwright: npx @playwright/mcp@latest SECRETLEAK - ✔ Connected"
     echo "plugin:x:broken: https://x/SECRETLEAK (HTTP) - ✘ Failed to connect — SECRETLEAK" ;;
   "mcp get")   printf "%s:\n  Status: %s\n  URL: https://x/SECRETLEAK\n" "$3" "$(st "$3")" ;;
@@ -169,9 +178,23 @@ for r in docker exxo-secret-cache homelab-secret-cache 1password gh glab gcloud 
          'mcp:reserve:Sanity' 'mcp:reserve:mantine' 'mcp:reserve:playwright' 'mcp:reserve:datadog' \
          'mcp:exxo-personal:Sanity' 'mcp:exxo-personal:mantine' \
          'mcp:exxo:datadog' 'mcp:exxo:workos' 'mcp:exxo:claude.ai Microsoft 365' \
-         'mcp:exxo:claude.ai Datadog' 'mcp:exxo-personal:datadog'; do
+         'mcp:exxo-personal:datadog' 'mcp:personal:claude.ai Gmail'; do
     check "all ok: $r ok" row "$r" ok
 done
+# Parity: all nine managed servers are required in every context.
+for c in personal reserve exxo exxo-personal; do
+    for s in mantine Sanity datadog boards workos playwright vercel squad figma; do
+        check "parity: $c requires $s" row "mcp:$c:$s" ok
+    done
+done
+for c in personal reserve exxo; do
+    for s in Notion Slack; do check "connectors: $c requires claude.ai $s" row "mcp:$c:claude.ai $s" ok; done
+done
+check "connectors: Microsoft 365 is exxo-only" bash -c '! grep -qE "^  mcp:(personal|reserve|exxo-personal):claude.ai Microsoft 365" <<<"$1"' _ "$summary"
+check "connectors: no Notion/Slack rows for exxo-personal" bash -c '! grep -qE "^  mcp:exxo-personal:claude.ai" <<<"$1"' _ "$summary"
+check "connectors: Figma/Datadog/Linear never rows" bash -c '! grep -qE "claude\.ai (Figma|Datadog|Linear)" <<<"$1"' _ "$out"
+check "vercel: hint says connected does not prove team access" \
+    grep -qF 'connected does not prove team access: in a session run the vercel list_teams tool and expect Exxo Labs' <<<"$summary"
 check "all ok: unlisted failing server is ignored" bash -c '! grep -q broken <<<"$1"' _ "$out"
 check "all ok: user email shown" grep -q 't@example.com' <<<"$summary"
 check "all ok: TTL hint carries 12h in seconds" grep -q 'EXXO_SECRET_CACHE_TTL_SECONDS=43200' <<<"$out"
@@ -221,12 +244,36 @@ stub az "$AZ_STUB"
 # --- MCP ---------------------------------------------------------------------
 reset; STUBENV=(STUB_mcp_exxo=missing); go --check
 check "mcp exxo: datadog needs-auth" row 'mcp:exxo:datadog' needs-auth
-check "mcp exxo: optional absent → skipped" row 'mcp:exxo:claude.ai Datadog' skipped
 check "mcp exxo: personal still ok" row 'mcp:personal:Sanity' ok
 check "mcp exxo: in-session step names the launcher" grep -q 'claude-exxo' <<<"$out"
 check "mcp exxo: in-session step names the server" grep -qF '/mcp → select "datadog"' <<<"$out"
 check "mcp exxo: exit 1" test "$rc" -eq 1
 check "mcp exxo: no secret-like output" noleak
+
+reset; STUBENV=(STUB_mcp_personal=missing); go --check --context personal
+check "mcp personal: optional absent → skipped" row 'mcp:personal:claude.ai Gmail' skipped
+
+# A server disabled for the project is its own state, fixed by claude-sync.
+reset; STUBENV=(STUB_mcp_reserve=disabled); go --check
+check "disabled: own state" row 'mcp:reserve:mantine' disabled
+check "disabled: hint names claude-sync" grep -qF 'disabled for this project — re-enable with claude-sync' <<<"$summary"
+check "disabled: not reported as not connecting" bash -c '! grep -q "mcp:reserve:mantine .*not connecting" <<<"$1"' _ "$summary"
+check "disabled: exit 1" test "$rc" -eq 1
+check "disabled: no in-session /mcp step for it" bash -c '! grep -qF "select \"mantine\"" <<<"$1"' _ "$out"
+check "disabled: no secret-like output" noleak
+reset; STUBENV=(STUB_mcp_reserve=disabled); go --context reserve
+check "disabled, run mode: no login attempted for it" bash -c '! grep -q "mcp login mantine" "$1"' _ "$STATE/calls.log"
+
+# A required connector that is absent: needs-auth, attached at claude.ai.
+reset; STUBENV=(STUB_conn_reserve=missing); go --check
+check "connector absent: needs-auth" row 'mcp:reserve:claude.ai Notion' needs-auth
+check "connector absent: hint says attach at claude.ai for the account" \
+    grep -qF 'attach Notion at claude.ai for the reserve account' <<<"$summary"
+check "connector absent: not 'optional, not present'" bash -c '! grep -q "mcp:reserve:claude.ai Notion .*optional, not present" <<<"$1"' _ "$summary"
+check "connector absent: no /mcp step for it" bash -c '! grep -qF "select \"claude.ai Notion\"" <<<"$1"' _ "$out"
+check "connector absent: exit 1" test "$rc" -eq 1
+reset; STUBENV=(STUB_conn_reserve=missing); go --context reserve
+check "connector absent, run mode: no login attempted" bash -c '! grep -q "mcp login" "$1"' _ "$STATE/calls.log"
 
 reset; go --check --context personal
 check "--context personal: no exxo rows" bash -c '! grep -qE "^  (gcloud|pulumi|az|exxo-secret-cache|mcp:exxo)" <<<"$1"' _ "$summary"
@@ -299,6 +346,13 @@ check "gaia no expiry: ok" row gaia-members-packages-token ok
 reset; STUBENV=(STUB_ttl=short); go --check --ttl-hours 72
 check "gaia short TTL: still ok" row gaia-members-packages-token ok
 check "gaia short TTL: hint says shorter than the run" grep -q 'shorter than the 72h unattended run' <<<"$summary"
+# Just warmed for the run's TTL: 2 minutes under 12h is within the 90% tolerance.
+reset; STUBENV=(STUB_ttl=justwarm); go --check --ttl-hours 12
+check "gaia just warmed: ok" row gaia-members-packages-token ok
+check "gaia just warmed: no 'shorter than' note" bash -c '! grep -q "shorter than" <<<"$1"' _ "$summary"
+# Genuinely short: 10h left of a 12h run is under 90%.
+reset; STUBENV=(STUB_ttl=tenh); go --check --ttl-hours 12
+check "gaia 10h of 12h: note shown" grep -q 'shorter than the 12h unattended run' <<<"$summary"
 
 reset; STUBENV=(STUB_ttl=absent); go --check
 for r in $GROWS; do check "gaia absent: $r needs-auth" row "$r" needs-auth; done

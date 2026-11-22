@@ -9,7 +9,8 @@
 # --check reports only and changes nothing. The default reports, then runs each
 # missing login in turn (browser / Touch ID — the operator answers them), starts
 # OrbStack and the secret caches if they are down, re-checks, and prints the
-# summary. Exit 0 when nothing needs auth, 1 when something still does, 2 on a
+# summary. Exit 0 when nothing needs auth, 1 when something still does (or a
+# required MCP server is disabled for the project: run claude-sync), 2 on a
 # usage error.
 #
 # Hygiene: no tool's raw output is ever printed. Each check captures it, keeps
@@ -53,13 +54,19 @@
 #   claude mcp list  "Checking MCP server health…", a blank line, then one
 #                    "<name>: <url-or-command> - <status>" per server. Status is
 #                    "✔ Connected", "! Needs authentication", "✘ Failed to
-#                    connect — <reason>", "Not configured" or "⏸ Pending
-#                    approval". The middle field can carry URLs and commands, so
+#                    connect — <reason>", "Not configured", "⏸ Pending
+#                    approval" or "⊘ Disabled for this project (re-enable via
+#                    /mcp)" (seen 2026-11-22: a per-project /mcp toggle, which
+#                    claude-sync resets for the managed servers; reported as
+#                    its own state, `disabled`). The middle field can carry URLs and commands, so
 #                    only <name> and <status> are kept. `claude mcp get <name>`
 #                    prints "  Status: <status>".
 #   claude mcp login <name>  exists (HTTP, SSE, or claude.ai connector): it
 #                    opens the browser OAuth flow from the CLI, so MCP auth does
 #                    not need the TUI; `/mcp` in a session is the fallback.
+#                    `claude mcp` has no subcommand that calls a tool, so a
+#                    scope check such as Vercel team access cannot be made from
+#                    here: the vercel row says how to check it in a session.
 #
 # The secret caches have no warm command (agent-tooling's surface is `cache
 # status|purge`, `auth`): a value's TTL is set when `agent-run` / the homelab op
@@ -182,7 +189,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 # --- rows ----------------------------------------------------------------------
 # Parallel arrays (bash 3.2: no associative arrays). A check sets S (ok |
-# needs-auth | failed | skipped), N (one-line hint), FIX (the command shown to
+# needs-auth | disabled | failed | skipped), N (one-line hint), FIX (the command shown to
 # the operator, empty when there is no CLI fix), TTY (1 = the fix needs a
 # terminal) and REFRESH (1 = ok, but run mode should still run the fix).
 R_ITEM=(); R_CHECK=(); R_CTX=(); R_SRV=(); R_S=(); R_N=(); R_FIX=(); R_TTY=(); R_REF=()
@@ -292,7 +299,10 @@ check_gaia_ref() {  # ctx(unused) ref
         -1) S=ok; N="$ref cached, no expiry"; return ;;
     esac
     S=ok; N="$ref cached, expires in $(human_secs "$ttl")"
-    if [ "$ttl" -lt "$TTL_SECONDS" ]; then
+    # Tolerance: an entry warmed moments ago is a few seconds or minutes under the
+    # effective TTL (seen live 2026-11-22: "71h58m" against 72h). Flag it only
+    # when meaningfully short: under 90% of the effective TTL.
+    if [ $((ttl * 10)) -lt $((TTL_SECONDS * 9)) ]; then
         N="$N (shorter than the ${TTL_HOURS}h unattended run; a cache hit keeps its TTL: to renew, DEL it from the cache, then re-run)"
     fi
 }
@@ -440,7 +450,17 @@ classify_mcp() {
         *Connected*) S=ok; N="connected" ;;
         *"Needs authentication"*) S=needs-auth; N="needs authentication" ;;
         *"Pending approval"*) S=needs-auth; N="pending approval (project .mcp.json) — approve in-session" ;;
+        *"Disabled for this project"*) S=disabled; N="disabled for this project — re-enable with claude-sync" ;;
         *) S=failed; N="not connecting (not an auth problem) — check: claude mcp get '$2'" ;;
+    esac
+}
+# Which claude.ai account a context's connectors follow, for the attach hint.
+connector_account() {
+    case "$1" in
+        personal|exxo-personal) echo "the personal account (claude-personal's login)" ;;
+        reserve) echo "the reserve account (claude-reserve's login)" ;;
+        exxo) echo "the Exxo account (claude-exxo's login)" ;;
+        *) echo "the $1 account" ;;
     esac
 }
 check_mcp_ctx() {  # a context whose directory is missing
@@ -457,12 +477,22 @@ check_mcp() {
     fi
     if [ -z "$st" ]; then
         if [ "$optional" = 1 ]; then S=skipped; N="optional, not present in this context"
+        elif case "$srv" in "claude.ai "*) true ;; *) false ;; esac; then
+            # A required connector that is absent is attached at claude.ai, not
+            # in Claude Code: no CLI fix, so run mode leaves it to the operator.
+            S=needs-auth; N="attach ${srv#claude.ai } at claude.ai for $(connector_account "$ctx") — claude.ai/customize/connectors"
         else S=failed; N="not configured in this context — run claude-sync, or add it"; fi
         return
     fi
     classify_mcp "$st" "$srv"
     if [ "$S" = needs-auth ] && case "$st" in *"Needs authentication"*) true ;; *) false ;; esac; then
         FIX="env CLAUDE_CONFIG_DIR=~/.claude-$ctx claude mcp login '$srv'"
+    fi
+    # Seen 2026-11-22: a vercel login can grant identity only, with an empty team
+    # list, so every project call 403s until the team is authorised. claude mcp
+    # cannot call a tool, so the check is left to a session.
+    if [ "$S" = ok ] && [ "$srv" = vercel ]; then
+        N="connected; connected does not prove team access: in a session run the vercel list_teams tool and expect Exxo Labs"
     fi
 }
 fix_mcp() { (cd "$MCP_CWD" && env CLAUDE_CONFIG_DIR="$(ctx_dir "$1")" claude mcp login "$2"); }
@@ -516,6 +546,8 @@ print_mcp_steps() {
         printed_ctx=0
         for i in "${!R_ITEM[@]}"; do
             [ "${R_CHECK[$i]}" = mcp ] && [ "${R_CTX[$i]}" = "$ctx" ] && [ "${R_S[$i]}" = needs-auth ] || continue
+            # An absent connector is attached at claude.ai, not from /mcp.
+            case "${R_N[$i]}" in "attach "*) continue ;; esac
             if [ "$printed_head" = 0 ]; then
                 echo
                 echo "== In-session MCP steps (one pass per context; or let claude-reauth run \`claude mcp login\`)"
@@ -569,6 +601,6 @@ print_ttl
 
 rc=0
 for i in "${!R_ITEM[@]}"; do
-    case "${R_S[$i]}" in needs-auth|failed) rc=1 ;; esac
+    case "${R_S[$i]}" in needs-auth|disabled|failed) rc=1 ;; esac
 done
 exit "$rc"

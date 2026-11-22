@@ -29,9 +29,17 @@
 # Needs that only a login with that connector satisfies; a member needing one
 # launches only in a context that `provides` it (exit 9 otherwise). A need not
 # listed here is ignored with a warning.
-#   m365 figma notion  claude.ai connectors, which follow the logged-in account
+#   m365 notion        claude.ai connectors, which follow the logged-in account:
+#                      m365 is tied to the Exxo tenant (exxo only); notion is
+#                      required in personal, reserve and exxo (reauth-needed.toml)
+#   figma              the repo-managed `figma` server (mcp.shared.json, Figma's
+#                      own endpoint), in every attended context since MCP parity
+#                      (22 Nov 2026); exxo-openrouter does not provide it
 #   agent-run          agent/run; exxo-openrouter's deny rules block it
 #   datadog boards     shared MCP servers; exxo-openrouter denies them
+# Parity: exxo, personal and reserve provide the same set apart from m365;
+# exxo-personal (personal login, no connector required) also lacks notion.
+# tests/claude-kickoff.sh holds that shape.
 account_bound = ["m365", "figma", "notion", "agent-run", "datadog", "boards"]
 
 [[context]]
@@ -49,7 +57,7 @@ name = "exxo-personal"
 harness = "claude-code"
 config_dir = "~/.claude-exxo-personal"
 account = "personal"
-provides = ["agent-run", "datadog", "boards"]
+provides = ["figma", "agent-run", "datadog", "boards"]
 env = { EXXO_SECRET_CACHE_TTL_SECONDS = "43200" }
 preconditions = []
 resume_group = "exxo"
@@ -59,7 +67,7 @@ name = "personal"
 harness = "claude-code"
 config_dir = "~/.claude-personal"
 account = "personal"
-provides = ["agent-run", "datadog", "boards"]
+provides = ["figma", "notion", "agent-run", "datadog", "boards"]
 env = { EXXO_SECRET_CACHE_TTL_SECONDS = "43200" }
 preconditions = []
 resume_group = "personal"
@@ -69,7 +77,7 @@ name = "reserve"
 harness = "claude-code"
 config_dir = "~/.claude-reserve"
 account = "reserve"
-provides = ["agent-run", "datadog", "boards"]
+provides = ["figma", "notion", "agent-run", "datadog", "boards"]
 env = { EXXO_SECRET_CACHE_TTL_SECONDS = "43200" }
 preconditions = []
 resume_group = "reserve"
