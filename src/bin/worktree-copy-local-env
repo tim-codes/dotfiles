@@ -14,14 +14,20 @@
 # hand for a worktree made without wt (`git worktree add`, EnterWorktree, an
 # isolation: "worktree" agent) - safe to repeat.
 #
-# Looks at the repo root and one level into apps/* and packages/*. A file is
-# copied only when ALL hold:
+# Looks at the whole tree, at any depth (deploy/.env, gui/.env.local, ...). The
+# candidates come from git itself - the source checkout's ignored, untracked
+# files - so nothing is guessed from the filesystem. Only these names qualify:
+# .env, .env.*, agent.env, .envrc, *.local.* (so .env.example is only copied
+# where the repo gitignores it). A file is copied only when ALL hold:
 #   - it is gitignored in the source checkout and not tracked (tracked files
-#     arrive with the branch anyway);
-#   - it is a regular file, not a symlink (symlinks are typically recreated by
-#     the repo's own install step, and would dangle or alias the source);
-#   - the destination does not already exist (never overwrites) and the
-#     destination directory does (a branch without apps/foo gets no apps/foo).
+#     arrive with the branch anyway); git does not descend into nested git
+#     checkouts, and paths under node_modules, .git, target, dist, build,
+#     .next, vendor and .venv are skipped;
+#   - it is a regular file, not a symlink, and no directory above it is a
+#     symlink (symlinks are typically recreated by the repo's own install step,
+#     and would dangle or alias the source);
+#   - the destination does not already exist (never overwrites). Missing parent
+#     directories are created, so an untracked deploy/ still gets deploy/.env.
 # Names are printed, contents never are. Mode is preserved (.env is often 0600).
 #
 # FAIL-OPEN on purpose: a pre-start hook that exits non-zero aborts worktree
@@ -48,25 +54,33 @@ fi
 [ -d "$src" ] || { warn "source checkout not found: ${src:-<empty>}"; exit 0; }
 [ "$src" = "$dest" ] && exit 0
 
-# Globs anchored on $src, not the cwd: run by hand from elsewhere, a bare
-# apps/* would match nothing and silently skip every subdirectory.
-for dir in "$src" "$src"/apps/* "$src"/packages/*; do
-    [ -d "$dir" ] || continue
-    sub="${dir#"$src"}"; sub="${sub#/}"; sub="${sub:-.}"
-    [ -d "$dest/$sub" ] || continue
-    while IFS= read -r f; do
-        rel="${f#"$src"/}"; rel="${rel#./}"
-        [ -f "$f" ] && [ ! -L "$f" ] || continue
-        [ -e "$dest/$rel" ] || [ -L "$dest/$rel" ] && continue
-        git -C "$src" check-ignore -q -- "$rel" || continue
-        git -C "$src" ls-files --error-unmatch -- "$rel" >/dev/null 2>&1 && continue
-        if [ "$dry" -eq 0 ]; then
-            cp -p "$f" "$dest/$rel" || { warn "could not copy $rel"; continue; }
-        fi
-        if [ "$dry" -eq 1 ]; then echo "worktree-copy-local-env: would copy $rel"; else echo "worktree-copy-local-env: copied $rel"; fi
-    done < <(find "$src/$sub" -maxdepth 1 -type f \
-        \( -name .env -o -name .env.local -o -name '.env.*.local' \
-           -o -name agent.env -o -name .envrc -o -name '*.local.*' \) | sort)
-done
+# The source's ignored, untracked files, NUL-separated so odd names survive.
+# -z also stops git quoting paths. Filtering by name happens below.
+while IFS= read -r -d '' rel; do
+    case "$rel" in
+        node_modules/*|*/node_modules/*|.git/*|*/.git/*|target/*|*/target/*|dist/*|*/dist/*|build/*|*/build/*|.next/*|*/.next/*|vendor/*|*/vendor/*|.venv/*|*/.venv/*) continue ;;
+    esac
+    base="${rel##*/}"
+    case "$base" in
+        .env|.env.*|agent.env|.envrc|*.local.*) ;;
+        *) continue ;;
+    esac
+    f="$src/$rel"
+    [ -f "$f" ] && [ ! -L "$f" ] || continue
+    [ -e "$dest/$rel" ] || [ -L "$dest/$rel" ] && continue
+    # No symlinked directory on either side: it could lead out of the checkout.
+    d="$(dirname "$rel")"
+    if [ "$d" != . ]; then
+        [ "$(cd "$src/$d" 2>/dev/null && pwd -P)" = "$(cd "$src" && pwd -P)/$d" ] || continue
+        [ "$(cd "$dest/$d" 2>/dev/null && pwd -P)" = "$(cd "$dest" && pwd -P)/$d" ] || [ ! -e "$dest/$d" ] || continue
+    fi
+    git -C "$src" ls-files --error-unmatch -- "$rel" >/dev/null 2>&1 && continue
+    if [ "$dry" -eq 0 ]; then
+        mkdir -p "$dest/$d" && cp -p "$f" "$dest/$rel" || { warn "could not copy $rel"; continue; }
+        echo "worktree-copy-local-env: copied $rel"
+    else
+        echo "worktree-copy-local-env: would copy $rel"
+    fi
+done < <(git -C "$src" ls-files -z --others --ignored --exclude-standard 2>/dev/null | sort -z)
 
 exit 0

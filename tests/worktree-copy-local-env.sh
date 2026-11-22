@@ -66,7 +66,7 @@ check "node_modules/pkg/.env not copied" test ! -e "$W/node_modules/pkg/.env"
 check "nested git repo .env not copied" test ! -e "$W/nested-repo/.env"
 check "symlink not copied" test ! -e "$W/link.local.env" -a ! -L "$W/link.local.env"
 check "unrelated file not copied" test ! -e "$W/unrelated.txt"
-mode() { stat -f %Lp "$1" 2>/dev/null || stat -c %a "$1"; }
+mode() { stat -f %Lp "$1" 2>/dev/null || stat -c %a "$1" 2>/dev/null; }
 check "root .env mode 600 preserved" test "$(mode "$W/.env")" = 600
 check "deploy/.env mode 600 preserved" test "$(mode "$W/deploy/.env")" = 600
 check "output names deploy/.env" grep -q 'copied deploy/.env' "$OUT"
