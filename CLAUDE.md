@@ -37,7 +37,7 @@ This is a personal dotfiles repository for macOS and Linux development environme
 
 ### Development
 - No build/compile step required - this is a configuration repository
-- No tests - configuration files are validated by their respective applications
+- Tests live in `tests/` (bash and python); run them all with `bash tests/run.sh`, which CI runs too. Configuration files themselves are validated by their respective applications
 
 ## Architecture
 

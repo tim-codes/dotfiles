@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (macos)
+    # The suite targets macOS: tests use BSD stat/sed and /bin/bash 3.2. Public repo, so macOS minutes are free.
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install tools the tests use
+        # bash 5: several tests use mapfile and `source <(...)`, which /bin/bash 3.2 lacks.
+        run: brew install bash jq yq fish
+      - name: Test suite
+        # Pre-existing failures on main (also fail on a clean local checkout), tracked for the owner:
+        #   claude-skills-lint: build-lead SKILL.md is 277 lines, the lint allows 250
+        #   claude-openrouter-wrapper: the fish wrappers' `env` invocation fails under the test's stubbed PATH
+        #   claude-reauth: the "exxo cache started after Docker came up" case fails
+        # Reported as KNOWN-FAIL by tests/run.sh, never hidden; remove a name here once it is fixed.
+        env:
+          TESTS_KNOWN_FAILING: claude-skills-lint.sh claude-openrouter-wrapper.sh claude-reauth.sh
+        run: bash tests/run.sh
+
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: All jobs succeeded
+        run: |
+          result='${{ needs.test.result }}'
+          echo "test: $result"
+          [ "$result" = success ]

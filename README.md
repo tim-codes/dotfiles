@@ -29,6 +29,7 @@ user should modify:
 ## contributing
 
 * if new files are added to dotfiles/src, then run `restow` to update symlinks
+* run the tests with `bash tests/run.sh [-v] [name-filter ...]` (every `tests/*.sh` and `tests/test_*.py`; needs `jq`, and `fish`/`zsh` for the wrapper test); CI (`.github/workflows/ci.yml`) runs the same command on pull requests and pushes to main
 
 ## macbook setup
 
