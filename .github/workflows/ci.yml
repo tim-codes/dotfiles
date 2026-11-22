@@ -14,15 +14,16 @@ concurrency:
 
 jobs:
   test:
-    name: test (ubuntu)
-    runs-on: ubuntu-latest
+    name: test (macos)
+    # The suite targets macOS: tests use BSD stat/sed and /bin/bash 3.2. Public repo, so macOS minutes are free.
+    runs-on: macos-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install tools the tests use
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends jq fish zsh tmux
+        run: brew install jq yq fish
       - name: Test suite
         run: bash tests/run.sh
 
