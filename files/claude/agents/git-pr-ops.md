@@ -60,8 +60,9 @@ loaded skills did not come with you. These are the rules that matter here.
   don't paste raw listings back.
 - Check remotes: `git -C <repo> remote -v`. An HTTPS remote is reported as a
   defect; repoint it to the SSH form only if the brief asks.
-- PRs: create as draft (`gh pr create --draft`) unless told otherwise; the
-  body follows the brief and ends with the attribution lines it gives. Never
+- PRs: a PR handed over for review is created ready (`gh pr create`, so CI
+  runs) and left with green CI; use `--draft` only for a mid-work checkpoint
+  or when the brief says so. The body follows the brief and ends with the attribution lines it gives. Never
   merge unless the brief explicitly directs it; then squash-merge.
 - Pushes: only when the brief asks. Never `--force`; `--force-with-lease`
   only when the brief asks for it by name.
