@@ -65,7 +65,36 @@
 # status|purge`, `auth`): a value's TTL is set when `agent-run` / the homelab op
 # shim writes it, from EXXO_SECRET_CACHE_TTL_SECONDS / HOMELAB_1P_CACHE_TTL_SECONDS
 # in that invocation's env. So this script makes sure the containers are up and
-# prints the env to start the unattended run with (--ttl-hours, default 12).
+# prints the env to start the unattended run with (--ttl-hours, else the machine's
+# local override, else 12). The one thing it does warm is Gaia's ESC references
+# (below), by resolving them through agent-run, which is what writes a cache entry.
+#
+# TTL ceiling: none anywhere. agent-tooling (secret-cache.ts secretCacheTtlSeconds)
+# takes any positive number (an unparseable or non-positive value silently becomes
+# the 1 h default, which is why this script validates first), the homelab op shim
+# is the same, and Gaia only warns when an ESC key is near expiry. The cache is
+# redis with --save '' though, so a container restart drops every entry whatever
+# its TTL. A cache hit does NOT extend a TTL: a value already cached keeps the TTL
+# of the invocation that wrote it, so a longer TTL only applies to the next write.
+#
+# Gaia cache items: `squad doctor` checks only two of Gaia's ESC-backed secrets (the
+# packages token and the datadog keys), and the orchestrator reads others (Linear
+# filing token, Notion docs token) cache-only too. Gaia's config holds one
+# `<key>_ref = "esc:<env>:<path>"` per such secret; every such line in
+# ~/.config/squad/config.toml gets a row (gaia-<section>-<key>), so a new ref in the
+# config is covered with no change here. The cache key is esc:v1:<env>:<path> (as
+# orchestrator/src/secrets/cache.ts escCacheKey); presence and remaining TTL come
+# from `redis-cli TTL` inside exxo-1p-cache, never GET, so no value is read. Repair
+# writes a refs-only manifest (ESC_REF_n=<ref>, the shape Gaia's own re-warm hint
+# uses) into the script's private temp dir and runs
+#   AGENT_ENV_FILE=<manifest> EXXO_SECRET_CACHE_TTL_SECONDS=<ttl> agent-run -- true
+# ESC refs ask for no 1Password approval. 1Password-backed (1p:) refs are not
+# matched: Gaia refuses them for these keys, and they have no cache-only reader.
+#
+# Local TTL override: CLAUDE_REAUTH_TTL_HOURS, exported from ~/.config/local.sh
+# (the repo's machine-local, un-vendored env file, shared by bash, zsh and fish);
+# read from the environment, else straight from that file so it also works where
+# local.sh was not sourced. Precedence: --ttl-hours > local > built-in 12.
 set -uo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -75,28 +104,36 @@ HOMELAB_JUSTFILE="$HOME/dev/homelab/justfile"
 # wrappers start sessions, and falls back to $HOME.
 MCP_CWD="$HOME/claude"; [ -d "$MCP_CWD" ] || MCP_CWD="$HOME"
 
+LOCAL_SH="$HOME/.config/local.sh"
+GAIA_CONFIG="$HOME/.config/squad/config.toml"
+EXXO_CACHE_CONTAINER=exxo-1p-cache
+
 usage() {
     cat <<'EOF'
 Usage: claude-reauth [--check] [--context personal|reserve|exxo|exxo-personal|all] [--ttl-hours N]
 
   --check        report only; run no login and start nothing
   --context C    limit context-specific checks (default: all)
-  --ttl-hours N  secret-cache TTL to start the unattended run with (default: 12)
+  --ttl-hours N  secret-cache TTL to start the unattended run with. Precedence:
+                 --ttl-hours, then CLAUDE_REAUTH_TTL_HOURS (machine-local: export
+                 it from ~/.config/local.sh, not a vendored file), then 12. The
+                 summary says which one applied.
 
 Without --check: report, then run each missing interactive login one at a
-time, start OrbStack / the secret caches if down, re-check, summarise.
+time, start OrbStack / the secret caches if down, warm any Gaia ESC reference
+(from ~/.config/squad/config.toml) that is not in the cache, re-check, summarise.
 Exit 0 all ok, 1 something still needs auth, 2 usage error.
 EOF
 }
 
-MODE=run; CTX_ARG=all; TTL_HOURS=12
+MODE=run; CTX_ARG=all; TTL_HOURS=""; TTL_SOURCE=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --check) MODE=check ;;
         --context) [ $# -ge 2 ] || { usage >&2; exit 2; }; CTX_ARG="$2"; shift ;;
         --context=*) CTX_ARG="${1#--context=}" ;;
-        --ttl-hours) [ $# -ge 2 ] || { usage >&2; exit 2; }; TTL_HOURS="$2"; shift ;;
-        --ttl-hours=*) TTL_HOURS="${1#--ttl-hours=}" ;;
+        --ttl-hours) [ $# -ge 2 ] || { usage >&2; exit 2; }; TTL_HOURS="$2"; TTL_SOURCE=flag; shift ;;
+        --ttl-hours=*) TTL_HOURS="${1#--ttl-hours=}"; TTL_SOURCE=flag ;;
         -h|--help) usage; exit 0 ;;
         *) usage >&2; exit 2 ;;
     esac
@@ -107,8 +144,29 @@ case "$CTX_ARG" in
     personal|reserve|exxo|exxo-personal) CONTEXTS="$CTX_ARG" ;;
     *) usage >&2; exit 2 ;;
 esac
+# Effective TTL: flag > machine-local CLAUDE_REAUTH_TTL_HOURS > built-in 12.
+if [ -z "$TTL_SOURCE" ]; then
+    local_ttl="${CLAUDE_REAUTH_TTL_HOURS:-}"; local_from="CLAUDE_REAUTH_TTL_HOURS in the environment"
+    if [ -z "$local_ttl" ] && [ -f "$LOCAL_SH" ]; then
+        local_ttl="$(sed -n 's/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}CLAUDE_REAUTH_TTL_HOURS=//p' "$LOCAL_SH" | tail -n 1 | sed 's/[[:space:]]*#.*//' | tr -d "\"' ")"
+        local_from="CLAUDE_REAUTH_TTL_HOURS in ~/.config/local.sh"
+    fi
+    if [ -n "$local_ttl" ]; then
+        case "$local_ttl" in
+            *[!0-9]*|0) echo "claude-reauth: $local_from is '$local_ttl': it must be a whole number of hours above 0" >&2; exit 2 ;;
+        esac
+        TTL_HOURS="$local_ttl"; TTL_SOURCE=local
+    else
+        TTL_HOURS=12; TTL_SOURCE=default
+    fi
+fi
 case "$TTL_HOURS" in ''|*[!0-9]*|0) usage >&2; exit 2 ;; esac
 TTL_SECONDS=$((TTL_HOURS * 3600))
+case "$TTL_SOURCE" in
+    flag) TTL_DESC="${TTL_HOURS}h, from --ttl-hours" ;;
+    local) TTL_DESC="${TTL_HOURS}h, from local config CLAUDE_REAUTH_TTL_HOURS" ;;
+    *) TTL_DESC="${TTL_HOURS}h, built-in default" ;;
+esac
 
 want_personal=0; want_exxo=0
 for c in $CONTEXTS; do
@@ -171,7 +229,7 @@ check_exxo_cache() {
             *) S=failed; N="container up but agent-tooling reports it unreachable"; return ;;
         esac
     fi
-    S=ok; N="up on 127.0.0.1:6380; TTL is per run: EXXO_SECRET_CACHE_TTL_SECONDS=$TTL_SECONDS"
+    S=ok; N="up on 127.0.0.1:6380; TTL is per run: EXXO_SECRET_CACHE_TTL_SECONDS=$TTL_SECONDS ($TTL_DESC)"
 }
 fix_exxo_cache() {
     # The reference invocation from the exxo-common cache contract (idempotent).
@@ -182,12 +240,70 @@ check_homelab_cache() {
     if [ ! -f "$HOMELAB_JUSTFILE" ]; then S=skipped; N="no ~/dev/homelab checkout"; return; fi
     if ! docker_up; then S=skipped; N="Docker down — fix docker first"; return; fi
     if container_running homelab-1p-cache; then
-        S=ok; N="up on 127.0.0.1:6381; TTL is per run: HOMELAB_1P_CACHE_TTL_SECONDS=$TTL_SECONDS"; return
+        S=ok; N="up on 127.0.0.1:6381; TTL is per run: HOMELAB_1P_CACHE_TTL_SECONDS=$TTL_SECONDS ($TTL_DESC)"; return
     fi
     if ! have just; then S=failed; N="homelab-1p-cache down and just not installed"; return; fi
     S=needs-auth; N="homelab-1p-cache not running"; FIX="just --justfile ~/dev/homelab/justfile secret-cache-up"
 }
 fix_homelab_cache() { just --justfile "$HOMELAB_JUSTFILE" secret-cache-up >/dev/null 2>&1; }
+
+# --- Gaia cache items (see the header: one row per esc: ref in the squad config) -----
+# "<row name>\t<ref>" per `<key>_ref = "esc:..."` line, name gaia-<section>-<key>.
+gaia_refs() {
+    [ -f "$GAIA_CONFIG" ] || return 0
+    awk '
+        /^[[:space:]]*#/ { next }
+        /^[[:space:]]*\[[^]]+\][[:space:]]*(#.*)?$/ {
+            sec = $0; sub(/^[[:space:]]*\[/, "", sec); sub(/\].*$/, "", sec)
+            n = split(sec, p, "."); last = p[n]; gsub(/_/, "-", last); next
+        }
+        match($0, /^[[:space:]]*[a-z0-9_]+_ref[[:space:]]*=[[:space:]]*"esc:[^"]+"/) {
+            line = substr($0, RSTART, RLENGTH)
+            key = line; sub(/^[[:space:]]*/, "", key); sub(/[[:space:]]*=.*/, "", key); sub(/_ref$/, "", key); gsub(/_/, "-", key)
+            ref = line; sub(/^[^"]*"/, "", ref); sub(/"$/, "", ref)
+            print "gaia-" last "-" key "\t" ref
+        }' "$GAIA_CONFIG"
+}
+gaia_key() {  # esc:<env>:<path> → the cache key, esc:v1:<env>:<path>
+    printf 'esc:v1:%s' "${1#esc:}"
+}
+gaia_ttl() {  # ref → remaining seconds (-1 no expiry, -2 absent); TTL only, never GET
+    docker exec "$EXXO_CACHE_CONTAINER" redis-cli TTL "$(gaia_key "$1")" 2>/dev/null | tr -d '[:space:]'
+}
+human_secs() {
+    local s="$1"; [ "$s" -ge 3600 ] && printf '%dh%02dm' $((s / 3600)) $(((s % 3600) / 60)) || printf '%dm' $((s / 60))
+}
+gaia_manifest() {  # refs-only manifest of the given refs → path
+    local f="$TMP/gaia-refs.env" n=0 r; : >"$f"; chmod 600 "$f"
+    for r in "$@"; do n=$((n + 1)); printf 'ESC_REF_%d=%s\n' "$n" "$r" >>"$f"; done
+    printf '%s' "$f"
+}
+GAIA_WARM_CMD="env AGENT_ENV_FILE=<refs-only manifest> EXXO_SECRET_CACHE_TTL_SECONDS=$TTL_SECONDS agent-run -- true"
+check_gaia_none() { S=skipped; N="$2"; }
+check_gaia_ref() {  # ctx(unused) ref
+    local ref="$2" ttl
+    if ! docker_up; then S=skipped; N="Docker down — fix docker first"; return; fi
+    if ! container_running "$EXXO_CACHE_CONTAINER"; then S=skipped; N="$EXXO_CACHE_CONTAINER not running — fix that first"; return; fi
+    ttl="$(gaia_ttl "$ref")"
+    case "$ttl" in
+        ''|*[!0-9-]*) S=failed; N="could not read the cache TTL for $ref"; return ;;
+        -2) S=needs-auth; N="$ref not in the secret cache (Gaia gets 503 secret_not_cached); ESC asks for no approval"
+            FIX="$GAIA_WARM_CMD"; return ;;
+        -1) S=ok; N="$ref cached, no expiry"; return ;;
+    esac
+    S=ok; N="$ref cached, expires in $(human_secs "$ttl")"
+    if [ "$ttl" -lt "$TTL_SECONDS" ]; then
+        N="$N (shorter than the ${TTL_HOURS}h unattended run; a cache hit keeps its TTL: to renew, DEL it from the cache, then re-run)"
+    fi
+}
+fix_gaia_ref() {  # warm every Gaia ref that is absent, in one agent-run, refs-only manifest
+    local name ref refs=()
+    while IFS=$'\t' read -r name ref; do
+        [ -n "$ref" ] && [ "$(gaia_ttl "$ref")" = -2 ] && refs+=("$ref")
+    done < <(gaia_refs)
+    [ ${#refs[@]} -gt 0 ] || return 0
+    env AGENT_ENV_FILE="$(gaia_manifest "${refs[@]}")" EXXO_SECRET_CACHE_TTL_SECONDS="$TTL_SECONDS" agent-run -- true >/dev/null 2>&1
+}
 
 # --- 1Password CLI ---------------------------------------------------------------
 check_op() {
@@ -355,6 +471,17 @@ fix_mcp() { (cd "$MCP_CWD" && env CLAUDE_CONFIG_DIR="$(ctx_dir "$1")" claude mcp
 add_row docker docker
 [ "$want_exxo" = 1 ] && add_row exxo-secret-cache exxo_cache
 [ "$want_personal" = 1 ] && add_row homelab-secret-cache homelab_cache
+# Gaia's cache-only secrets: one row per esc: ref in its config; skipped when squad
+# or its config is absent (a machine without Gaia is not blocked).
+if ! have squad; then add_row gaia-cache gaia_none "" "squad not installed"
+elif [ ! -f "$GAIA_CONFIG" ]; then add_row gaia-cache gaia_none "" "no ~/.config/squad/config.toml"
+else
+    gaia_refs >"$TMP/gaia-rows"
+    if [ -s "$TMP/gaia-rows" ]; then
+        while IFS=$'\t' read -r name ref; do add_row "$name" gaia_ref "" "$ref"; done <"$TMP/gaia-rows"
+    else add_row gaia-cache gaia_none "" "no esc: references in the squad config"
+    fi
+fi
 add_row 1password op
 add_row gh gh
 add_row glab glab
@@ -404,7 +531,7 @@ print_mcp_steps() {
 }
 print_ttl() {
     echo
-    echo "== Unattended run: start it with the cache TTL set (${TTL_HOURS}h)"
+    echo "== Unattended run: start it with the cache TTL set ($TTL_DESC)"
     [ "$want_exxo" = 1 ] && echo "  EXXO_SECRET_CACHE_TTL_SECONDS=$TTL_SECONDS     (read by agent-run per invocation)"
     [ "$want_personal" = 1 ] && echo "  HOMELAB_1P_CACHE_TTL_SECONDS=$TTL_SECONDS      (read by homelab's op shim per invocation)"
     return 0

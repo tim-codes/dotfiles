@@ -1,6 +1,6 @@
 ---
 name: reauth
-description: Re-authenticate Tim's workstation in one pass — OrbStack/Docker, the exxo and homelab secret caches, 1Password CLI, gcloud (+ADC), gh, glab, pulumi (+ESC), az, and the MCP servers each Claude context needs — by running `scripts/claude-reauth` and relaying its table. Use before an unattended or overnight run, after a laptop reboot, when a squad `preflight blocked` comes back, when a session hits an expired login, or when Tim says "/reauth".
+description: Re-authenticate Tim's workstation in one pass — OrbStack/Docker, the exxo and homelab secret caches, the Gaia cache items (packages token, Linear, Notion docs and Datadog keys), 1Password CLI, gcloud (+ADC), gh, glab, pulumi (+ESC), az, and the MCP servers each Claude context needs — by running `scripts/claude-reauth` and relaying its table. Use before an unattended or overnight run, after a laptop reboot, when a squad `preflight blocked` comes back, when a session hits an expired login, or when Tim says "/reauth".
 ---
 
 # Re-auth the workstation
@@ -14,8 +14,13 @@ $HOME/dev/dotfiles/scripts/claude-reauth --context exxo --ttl-hours 16
 ```
 
 `--context personal|reserve|exxo|exxo-personal|all` (default `all`) limits the
-context-specific checks; `--ttl-hours N` (default 12) sets the cache TTL the
-unattended run should start with. Exit 0 all ok, 1 something still needs
+context-specific checks; `--ttl-hours N` sets the cache TTL the unattended run
+should start with. The TTL is, in order: `--ttl-hours`, then
+`CLAUDE_REAUTH_TTL_HOURS` (machine-local: exported from `~/.config/local.sh`,
+never a vendored file; on Tim's MacBook it is 72), then the built-in 12. The
+Summary and the "Unattended run" lines say which one applied. No ceiling exists
+in agent-tooling, the homelab op shim or Gaia, but the cache container holds
+entries in memory only, so restarting it drops them whatever the TTL. Exit 0 all ok, 1 something still needs
 auth, 2 usage error. The script never prints a token, secret or id — only the
 email / account name the tools themselves show on status. Don't run the
 underlying status commands by hand to "double-check"; several print tokens or
@@ -49,6 +54,18 @@ ids (`gh auth status`, `glab auth status`, `az account show`, `op whoami`).
    command, so the run itself must carry `EXXO_SECRET_CACHE_TTL_SECONDS` (and
    `HOMELAB_1P_CACHE_TTL_SECONDS` for homelab work) or cached items expire
    after the default hour and the run hangs on an unapprovable Touch ID.
+6. **Gaia cache items are warmed by the script.** Every
+   `<key>_ref = "esc:<env>:<path>"` in `~/.config/squad/config.toml` (today the
+   packages token, the Linear filing token, the Notion docs token and the two
+   Datadog keys) gets a `gaia-<section>-<key>` row: `ok` with the remaining TTL
+   read from the cache (never a value), `needs-auth` when the key is absent
+   (Gaia would answer 503 `secret_not_cached`), `skipped` when `squad` or its
+   config is missing. The non-check run resolves the absent ones in one
+   `agent-run -- true` with a refs-only manifest and the effective TTL; ESC refs
+   ask for no Touch ID. A new ref in the config is covered with no script change.
+   A value already cached keeps its old TTL (a cache hit does not extend it), so
+   a row that says "shorter than the run" needs its key `DEL`eted from the cache
+   before the next run re-warms it.
 
 ## Facts the table depends on
 
