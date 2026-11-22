@@ -122,7 +122,8 @@ hook relocates the Claude transcripts of sessions that ran there first
 
 New worktrees also get the primary checkout's gitignored local config (`.env`,
 `.env.local`, `agent.env`, `.envrc`, `*.local.*`, at any depth, e.g.
-`deploy/.env`) copied in automatically: worktrunk's `pre-start` hook
+`deploy/.env`; never anything under `.claude/`, nor backup variants such as
+`*.local.json.bak`) copied in automatically: worktrunk's `pre-start` hook
 runs `src/bin/worktree-copy-local-env` (no overwrite, names printed, never
 contents, fail-open). For a worktree made without `wt`, run
 `worktree-copy-local-env <worktree>` yourself - don't ask the operator to.

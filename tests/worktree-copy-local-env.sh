@@ -45,6 +45,12 @@ echo placeholder >"$P/apps/web/app.local.json"
 echo placeholder >"$P/secretsdir/.env"
 echo placeholder >"$P/node_modules/pkg/.env"
 echo placeholder >"$P/nested-repo/.env"
+mkdir -p "$P/.claude" "$P/gui"
+printf '.claude/\n' >>"$P/.gitignore"
+echo placeholder >"$P/.claude/settings.local.json"
+echo placeholder >"$P/gui/config.local.json"
+echo placeholder >"$P/gui/config.local.json.bak"
+echo placeholder >"$P/gui/.env.local.pre-leader"
 echo placeholder >"$P/unrelated.txt"
 ln -s "$P/.env" "$P/link.local.env"
 
@@ -72,6 +78,11 @@ check "deploy/.env mode 600 preserved" test "$(mode "$W/deploy/.env")" = 600
 check "output names deploy/.env" grep -q 'copied deploy/.env' "$OUT"
 check "output keeps format for root file" grep -q '^worktree-copy-local-env: copied \.env$' "$OUT"
 check "sentinel never printed" bash -c "! grep -rq '$SENTINEL' '$OUT' '$ERR'"
+
+check ".claude/settings.local.json not copied" test ! -e "$W/.claude/settings.local.json"
+check "gui/config.local.json copied" test -f "$W/gui/config.local.json"
+check "config.local.json.bak not copied" test ! -e "$W/gui/config.local.json.bak"
+check ".env.local.pre-leader not copied" test ! -e "$W/gui/.env.local.pre-leader"
 
 # Fully ignored directory (not a prune-listed name) still yields its env file.
 check "ignored non-build dir .env copied" test -f "$W/secretsdir/.env"

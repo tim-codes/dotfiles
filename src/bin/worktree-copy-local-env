@@ -17,8 +17,11 @@
 # Looks at the whole tree, at any depth (deploy/.env, gui/.env.local, ...). The
 # candidates come from git itself - the source checkout's ignored, untracked
 # files - so nothing is guessed from the filesystem. Only these names qualify:
-# .env, .env.*, agent.env, .envrc, *.local.* (so .env.example is only copied
-# where the repo gitignores it). A file is copied only when ALL hold:
+# .env, .env.<word>, .env.<word>.local, agent.env, .envrc and <name>.local.<ext>
+# (<word> and <ext> contain no dot, so backups such as config.local.json.bak or
+# .env.local.pre-leader are not copied; .env.example only where the repo
+# gitignores it). Anything under a .claude/ directory, at any depth, is never
+# copied: it holds Claude permission state (settings.local.json). A file is copied only when ALL hold:
 #   - it is gitignored in the source checkout and not tracked (tracked files
 #     arrive with the branch anyway); git does not descend into nested git
 #     checkouts, and paths under node_modules, .git, target, dist, build,
@@ -58,11 +61,13 @@ fi
 # -z also stops git quoting paths. Filtering by name happens below.
 while IFS= read -r -d '' rel; do
     case "$rel" in
-        node_modules/*|*/node_modules/*|.git/*|*/.git/*|target/*|*/target/*|dist/*|*/dist/*|build/*|*/build/*|.next/*|*/.next/*|vendor/*|*/vendor/*|.venv/*|*/.venv/*) continue ;;
+        .claude/*|*/.claude/*|node_modules/*|*/node_modules/*|.git/*|*/.git/*|target/*|*/target/*|dist/*|*/dist/*|build/*|*/build/*|.next/*|*/.next/*|vendor/*|*/vendor/*|.venv/*|*/.venv/*) continue ;;
     esac
     base="${rel##*/}"
     case "$base" in
-        .env|.env.*|agent.env|.envrc|*.local.*) ;;
+        .env|.env.*.local|agent.env|.envrc) ;;
+        .env.*.*|*.local.*.*) continue ;;
+        .env.*|*.local.*) ;;
         *) continue ;;
     esac
     f="$src/$rel"
