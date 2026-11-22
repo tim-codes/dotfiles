@@ -30,8 +30,14 @@ ids (`gh auth status`, `glab auth status`, `az account show`, `op whoami`).
 
 1. Run `--check` and relay the **Summary** table to Tim as-is (item, status,
    hint). Statuses: `ok`, `needs-auth` (a login or start is due — the hint
-   names the command), `failed` (broken, not an auth problem — say so),
-   `skipped` (not installed / not applicable).
+   names the command), `disabled` (a required MCP server is switched off for
+   this project with the `/mcp` toggle: run `~/dev/dotfiles/scripts/claude-sync`,
+   which resets those flags for the managed servers), `failed` (broken, not an
+   auth problem — say so), `skipped` (not installed / not applicable).
+   A required claude.ai connector (Notion, Slack; Microsoft 365 in exxo) that is
+   absent shows `needs-auth` with "attach <Name> at claude.ai for <account>":
+   there is no CLI fix, Tim attaches it at claude.ai/customize/connectors while
+   signed in to that account.
 2. All ok → say so and stop. Otherwise, before running anything interactive,
    tell Tim what will appear: browser OAuth windows (gcloud, ADC, az, MCP
    `claude mcp login`) and possibly a Touch ID prompt (1Password). Then run
@@ -65,7 +71,13 @@ ids (`gh auth status`, `glab auth status`, `az account show`, `op whoami`).
    ask for no Touch ID. A new ref in the config is covered with no script change.
    A value already cached keeps its old TTL (a cache hit does not extend it), so
    a row that says "shorter than the run" needs its key `DEL`eted from the cache
-   before the next run re-warms it.
+   before the next run re-warms it. That note appears only when the remaining
+   TTL is under 90% of the effective one, so a just-warmed entry is not flagged.
+7. **Vercel team access.** A `vercel` row that is `ok` proves the login, not the
+   scope: a login can grant identity only, with an empty team list, so every
+   project call 403s (seen 22 Nov 2026). `claude mcp` cannot call a tool, so in a
+   session of each context run the vercel `list_teams` tool and expect Exxo Labs;
+   if it is missing, re-authorise the Vercel MCP and select the Exxo Labs team.
 
 ## Facts the table depends on
 
@@ -82,4 +94,11 @@ ids (`gh auth status`, `glab auth status`, `az account show`, `op whoami`).
   script only starts them.
 - Which MCP servers count is `files/claude/reauth-needed.toml` in the dotfiles
   repo (names exactly as `claude mcp list` prints them). Change it there, via
-  a dotfiles worktree, not here.
+  a dotfiles worktree, not here. MCP parity (22 Nov 2026): all nine servers in
+  `mcp.shared.json` are required in every attended context; the claude.ai
+  Notion and Slack connectors in personal, reserve and exxo, Microsoft 365 in
+  exxo only. The claude.ai Figma, Datadog and Linear connectors are never
+  required: the repo-managed `figma` and `datadog` servers and the `linear`
+  plugin replace them (after `claude mcp login figma`, the `claude.ai Figma`
+  connector drops out of `claude mcp list`, because a configured server on the
+  same URL takes precedence).
