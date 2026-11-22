@@ -164,8 +164,10 @@ Most blocked Bash calls are blocked for their shape, not their intent:
   `gh api graphql -f` or a pipe into an interpreter.
 - Edit files with the edit tools and commit with `git commit -F <file>`; no
   heredoc or `python -` writes.
-- Never `--no-verify` or `--force`; use the sanctioned recipe. Waits follow
-  the section above; credentials follow "Blanket-trusted files" (a
+- Never `--no-verify`, a plain `--force` push or a forced restart; use the
+  sanctioned recipe. After a rebase, rewrite your own branch with
+  `git push --force-with-lease` (never main or a shared branch).
+- Waits follow the section above; credentials follow "Blanket-trusted files" (a
   fixed-consumer recipe, never `K=$(…)`).
 - On a classifier "no verdict" error, retry once, then raise it.
 - No broad process listings (`ps aux`, a loose `pgrep -fl`): they print other
