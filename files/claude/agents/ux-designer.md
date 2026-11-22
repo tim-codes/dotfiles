@@ -9,7 +9,7 @@ it now and follow it for the scope and references in your kickoff or from
 Tim. Everything else (critique, canvas drafting, Figma rules, scratchpad,
 read-only guards) is in the skill; do not restate it here.
 
-This definition sets no `tools:` allowlist on purpose, so the Figma connector
-(including `create_new_file`, `generate_diagram`, `get_figjam` and
+This definition sets no `tools:` allowlist on purpose, so the Figma tools (the
+repo-managed `figma` server, `mcp__figma__*`, including `create_new_file`, `generate_diagram`, `get_figjam` and
 `get_design_context`), Playwright, the Microsoft 365 connector and the
 Artifact tools all stay available.

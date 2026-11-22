@@ -94,7 +94,8 @@ every context has them (Tim's decision, 2026-11-03, superseding ENG-20).
 The one carve-out is OAuth-only MCP servers (`datadog`, `boards`, `workos`, `vercel`):
 they hold no credential and access is gated by the provider's own login, so
 they live in `mcp.shared.json` and reach every context, as does the stdio
-`playwright`. `exxo-openrouter` denies all five via `deniedMcpServers` in its
+`playwright` (MCP parity, including the per-project disabled-flag reset: see
+"MCP parity across the attended contexts" below). `exxo-openrouter` denies all five via `deniedMcpServers` in its
 overlay: workers cannot authenticate, and get no browser automation. The same
 overlay sets `superpowers@claude-plugins-official` to `false`, because its
 process skills stop and ask the user questions, which an unattended overlay worker
@@ -315,6 +316,49 @@ The gap this closed (added 2026-08-23): every context had been populated by
 hand, three times over, and `~/.claude-exxo-personal` was missed entirely — it
 carried no MCP servers at all while `~/.claude-exxo` had four.
 
+### MCP parity across the attended contexts
+
+The rule (Tim, 2026-11-22: "config parity between personal/exxo/reserve
+contexts ... so that we can use them fully interchangeably to balance quota
+availability"): personal, reserve, exxo and exxo-personal expose the same
+repo-managed servers, and any of them can take any work. `exxo-openrouter` is
+outside it and keeps its own denies.
+
+- **Disabled-flag reset.** The `/mcp` toggle records a per-project switch-off in
+  that context's `.claude.json` (`projects.<path>.disabledMcpServers`), which
+  breaks parity for one project in one context without any other sign (seen
+  2026-11-22: six managed servers "Disabled for this project" in reserve for
+  `~/claude`). A plain `claude-sync` removes the MANAGED names (the keys of the
+  merged MCP fragment) from every such list in the four parity contexts and
+  prints one line per context with the project count and the names. Connector
+  entries (`claude.ai Slack`), plugin and hand-added names, and every other key
+  are left alone; same checksum, no-op skip and atomic swap as the merge, plus a
+  mode-preserving `.claude.json.bak-<ts>` before the write. Consequence: a
+  deliberate per-project switch-off of a managed server is undone by the next
+  sync. To keep one off, deny it in a settings fragment (`deniedMcpServers`,
+  as the exxo-openrouter overlay does) rather than with the toggle.
+- **`claude-sync --check`** is the read-only parity probe: per parity context it
+  lists managed servers missing or differing from the fragment and managed
+  names in any per-project disabled list (names and counts only, never a path
+  or value), and exits 1 on drift. `workstation-setup` runs it next to `--diff`.
+- **Managed server over connector.** In the CLI, prefer the repo-managed server
+  or plugin wherever one exists: `figma` (Figma's own endpoint,
+  `mcp.figma.com/mcp`) over the claude.ai Figma connector, `datadog` (EU site)
+  over claude.ai Datadog, the `linear` plugin over claude.ai Linear. A
+  configured server on the same URL takes precedence, so once `figma` is
+  signed in the `claude.ai Figma` connector drops out of `claude mcp list`
+  (confirmed 2026-11-22 in personal and exxo). Connectors remain only where no
+  managed server exists (Notion, Slack) and for web and mobile use. Notion and
+  Slack are deliberately not added to `mcp.shared.json`: Gaia builders must not
+  carry them (Notion is heavy; builders do not use Slack).
+- **Exxo-only carve-out.** `claude.ai Microsoft 365` is tied to the Exxo tenant
+  and required in exxo only; m365 stays exxo-only in the kickoff contexts file.
+  Notion and Slack connectors are required in personal, reserve and exxo
+  (`reauth-needed.toml`); exxo-personal requires none.
+- **Cost.** More servers per context costs little up front: tool search defers
+  MCP tool definitions until a tool is searched for. Measure, don't assume: run
+  `/context` in a session before and after a change and compare the MCP line.
+
 ## Skills reach a context by exactly two paths
 
 1. **Dotfiles skills** (`files/claude/skills/`, this skill included):
@@ -400,8 +444,8 @@ that Claude Code follows both a symlinked `agents/` dir and symlinked agent
 files. `claude-sync --diff` reports each agent's link state. The experimental
 `ux-designer` (promoted to exxo on 2026-11-05 at Tim's request, so it is in
 `shared_agents()` and `shared_skills()`) agent is a thin
-definition pinned to opus with no `tools:` allowlist (so the Figma connector
-is unrestricted) that loads the `ux-designer` skill; the skill itself runs in
+definition pinned to opus with no `tools:` allowlist (so the Figma tools,
+`mcp__figma__*` from the managed server, are unrestricted) that loads the `ux-designer` skill; the skill itself runs in
 whichever session invokes it and launches nothing (revised 2026-11-06).
 
 The delegation policy in `CLAUDE.md.shared` routes to these first, with
@@ -427,8 +471,10 @@ installed marketplace plugin on. Notion in exxo goes through the
 hand-added `notion` server is retired with `claude mcp remove -s user notion`
 under each CLAUDE_CONFIG_DIR. `linear@claude-plugins-official` stays on because
 parentedit's `linear-tpe` skill names `mcp__plugin_linear_linear__*` tools.
-Figma reaches a context only inside the claude.ai account-synced `design`
-plugin (`<context>/plugins/synced/`), which the fragments don't manage.
+Figma reaches every context as the repo-managed `figma` server in
+`mcp.shared.json` (tools `mcp__figma__*`); the claude.ai Figma connector and the
+account-synced `design` plugin (`<context>/plugins/synced/`, not managed by the
+fragments) are no longer relied on.
 
 ## Managed preferences: top-level `.claude.json` keys
 
@@ -507,6 +553,9 @@ Tests: `tests/claude-sync-prefs.sh`.
   `claude mcp add -s user` under that CLAUDE_CONFIG_DIR. `claude-sync --diff`
   lists the managed names per context, and the unmanaged ones it is leaving
   alone, without printing any values.
+- A managed server shows "Disabled for this project" in one context →
+  `claude-sync --check` names it; a plain `claude-sync` resets it (see "MCP
+  parity across the attended contexts").
 - `sanity mcp configure` (Sanity CLI v8.x) hard-codes `~/.claude.json` and
   ignores `CLAUDE_CONFIG_DIR`, so it only ever reaches the legacy default
   context, never a real one — don't use it; add/change the server via the

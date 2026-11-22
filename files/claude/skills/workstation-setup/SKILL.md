@@ -28,6 +28,9 @@ Use `git -C <dir>` and absolute paths.
   do not fix it here.
 - `~/dev/dotfiles/scripts/claude-sync --diff` run from the dotfiles primary checkout: clean?
   Drift means recommend `workstation-sync` (or `claude-workstation-setup` to understand it).
+- `~/dev/dotfiles/scripts/claude-sync --check`: MCP parity across personal, reserve, exxo and
+  exxo-personal (read-only; names and counts only). Exit 1 means a managed server differs or
+  is switched off for a project somewhere: recommend running `claude-sync`.
 - OrbStack/Docker up: `claude-reauth` in step b starts it; don't start it separately.
 
 ## b. Auth

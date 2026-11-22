@@ -215,9 +215,10 @@ back off. That is the lazy-load pattern. Notion work in exxo goes through the
 hand-added `notion` server is retired per context with `claude mcp remove -s
 user notion`. `linear@claude-plugins-official` stays on: the parentedit
 repo's `linear-tpe` skill calls the plugin's `mcp__plugin_linear_linear__*`
-tools by name. Figma is not a Claude Code plugin here — it arrives inside the
-claude.ai account-synced `design` plugin (`plugins/synced/`), which these
-fragments do not manage.
+tools by name. Figma is not a Claude Code plugin here — it is the repo-managed
+`figma` server in `mcp.shared.json` (Figma's own endpoint, tools
+`mcp__figma__*`), present in every attended context; once it is signed in the
+claude.ai Figma connector on the same URL drops out of the session.
 
 Contexts are created by `scripts/claude-contexts`; the `claude`,
 `claude-personal`, `claude-reserve`, `claude-exxo` and `claude-exxo-personal` shell wrappers
