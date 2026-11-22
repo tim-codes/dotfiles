@@ -316,3 +316,9 @@ notion_docs = true                         # Plan C (C3, v0.7.11): Tim, 21 Nov 2
 [policy.docs]                              # Plan C (C3, v0.7.11): the Notion docs kit behind docs_update
 token_ref = "esc:exxo/gaia/tfo:notion.docsToken"  # internal integration gaia-tfo-docs (Tim, 21 Nov 2026); warm cache only
 allowed_roots = ["2df68f9d46d8807db9d3cda6e64cf14d"]  # Exxo Engineering page (Infrastructure, Onboarding, Incidents, Admin Journal under it)
+
+[policy.datadog]                           # Plan C (C6, v0.7.11): the read-only validate probe and doctor rows (Tim, 22 Nov 2026)
+enabled = true
+site = "datadoghq.eu"
+api_key_ref = "esc:exxo/datadog/main:datadog.apiKeys.admin"   # ESC reference only
+app_key_ref = "esc:exxo/datadog/minted:datadog.appKeys.gaia"   # svc-gaia app key (exxo-infra #338), ESC reference only
