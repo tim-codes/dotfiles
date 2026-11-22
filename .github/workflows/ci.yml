@@ -1,9 +1,11 @@
 name: ci
 
+# Pull requests only: there is no automated deployment from main, so checks are
+# needed before merge, and a commit that passed on its PR is not re-run after the
+# squash merge. workflow_dispatch lets a run on main be started by hand.
 on:
   pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
