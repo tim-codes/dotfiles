@@ -39,8 +39,11 @@ than one commit for everything, and push the branch with a draft PR at
 sensible checkpoints as work progresses, rather than waiting until
 everything is finished to make it visible.
 
-When explicitly directed to complete or ship the work, squash-merge the PR
-into main.
+Drafts are for checkpoints only. To hand a PR to the operator for review,
+bring the branch up to date with its base, mark it ready (`gh pr ready`), wait
+for CI in the background until it is green, then hand over with the check
+result. When explicitly directed to complete or ship the work, squash-merge
+the PR into main.
 
 An explicit direction to skip part of this flow — commit straight to main,
 merge without waiting, skip the draft stage — is scoped to the specific
@@ -54,7 +57,9 @@ work without forcing a decision on it, and merging only on explicit
 direction keeps "merge" a deliberate act rather than a default outcome of
 finishing a task. Treating a one-off approval as standing permission is exactly the
 inference that erodes the "explicit" part — each skip has to be re-earned,
-not generalized from the last one.
+not generalized from the last one. Tim, 22 Nov 2026: sessions pushed draft PRs
+and stopped, and in Exxo repos a draft skips or fails `ci-ok` by design, so he
+arrived at PRs with no CI verdict.
 
 ## Commit often, push in batches
 
@@ -145,6 +150,33 @@ for nearly nine minutes while his queued question sat unanswered. A CI wait is
 pure latency with nothing to judge until it ends; running it in the background
 keeps the session responsive to the operator, to other agents' messages and
 to independent work, at no cost.
+
+## Shape shell commands to pass the permission rules first time
+
+Most blocked Bash calls are blocked for their shape, not their intent:
+
+- Anything that pushes, merges, re-runs or dispatches is one literal command
+  per call: no variable prefix, function, loop or trailing pipe.
+- No `cd … &&`: use `git -C`, `-R owner/repo` and absolute paths. Never mix
+  reads and writes in one compound.
+- Read GitHub with `agent-tooling gh pr-status|run-jobs|file|compare`
+  (agent-tooling ≥ 0.9.0) or `gh … --json … --jq`, never a hand-written
+  `gh api graphql -f` or a pipe into an interpreter.
+- Edit files with the edit tools and commit with `git commit -F <file>`; no
+  heredoc or `python -` writes.
+- Never `--no-verify`, a plain `--force` push or a forced restart; use the
+  sanctioned recipe. After a rebase, rewrite your own branch with
+  `git push --force-with-lease` (never main or a shared branch).
+- Waits follow the section above; credentials follow "Blanket-trusted files" (a
+  fixed-consumer recipe, never `K=$(…)`).
+- On a classifier "no verdict" error, retry once, then raise it.
+- No broad process listings (`ps aux`, a loose `pgrep -fl`): they print other
+  sessions' command lines, which can include tokens.
+
+**Why:** Tim, 22 Nov 2026 — a scan of 548 blocked Bash calls (11–22 Nov) found
+most were blocked for command shape; this guidance lived only in a Gaia member
+skill and was lost in the 21 Nov trim. The same day a process listing exposed
+another session's command line (logged in `~/claude/fs-breach-log.md`).
 
 ## Tim's shells: fish in his terminal, zsh at the Claude prompt
 
@@ -295,11 +327,16 @@ manifests (`tldr` in `brew-update`, `bropages` in `cargo-update`).
 ## New worktrees: local config is copied in, never asked for
 
 A new worktree gets the primary checkout's gitignored local config (`.env`,
-`.env.local`, `agent.env`, `.envrc`, `*.local.*`) copied in as standard
+`.env.local`, `agent.env`, `.envrc`, `*.local.*`, nested ones such as
+`deploy/.env` included) copied in as standard
 procedure — worktrunk's `pre-start` hook does it on `wt switch --create`. For a
 worktree made any other way (`git worktree add`, EnterWorktree, a subagent's
 `isolation: "worktree"`), run `worktree-copy-local-env <worktree>` yourself;
-don't ask the operator to copy them. Names are printed, never contents.
+don't ask the operator to copy them. Names are printed, never contents. The
+copy is routine: don't stop, warn or decline because a file holds secrets (they
+still never go into committed files, chat or logs). Machine-operated worktrees
+are to move to Pulumi ESC, with env files populated by procedure at creation
+(ENG-776); 1Password stays acceptable for local Gaia.
 
 Create worktrees with worktrunk. When the session itself must stay put (an
 orchestrator preparing worktrees for subagents, say), use `wt -C <repo> switch
@@ -310,7 +347,9 @@ config is copied in. When the session should move in, use `wt switch --create`
 
 **Why:** a worktree without its `.env` fails in confusing ways, and asking the
 operator each time is a round-trip for something fully mechanical and safe
-(no overwrite, ignored files only).
+(no overwrite, ignored files only). On 22 Nov 2026 a builder could not start
+a preview because `deploy/.env` existed only in the primary checkout and it
+declined to copy "a secrets file".
 
 ## No `git stash` in shared repos
 
@@ -426,7 +465,12 @@ caches, SSH multiplexing/config, command runners, PATH shims — the brief
 must restate those mechanics explicitly (e.g. the delegation clause in the
 `run-with-secrets` skill). A subagent left to improvise here doesn't just
 work worse, it leaks side effects onto the operator (auth prompt storms,
-uncached secret reads, unmultiplexed connections).
+uncached secret reads, unmultiplexed connections). Conversely, a brief never
+passes on this session's own facts as the delegate's: not its `Co-Authored-By`
+model line (tell the delegate to use the attribution lines its own session's
+guidance gives), and not ports or targets from memory (point at the repo's own
+source for them). On 22 Nov 2026 briefs quoted a stale Postgres port that the
+repo marks as the live database.
 
 Self-audit: on noticing more than ~5 tool calls have just run inline on
 work a subagent could have done, say so in the next message and delegate
@@ -455,6 +499,22 @@ so `general-purpose` launches carry an explicit `model` instead, enforced by
 exception: in the `exxo-openrouter` context only, `CLAUDE_CODE_SUBAGENT_MODEL`
 and every tier variable point at `deepseek/deepseek-v4.1-flash-1017@preset/tim-ds`, because one session has
 one backend; the overlay settings fragment sets them, never a session.
+
+## Talking to other Claude sessions in tmux
+
+Prefer SendMessage. When typing into a pane is the only route, send the text
+literally (`tmux send-keys -t <pane> -l "<text>"`), send Enter as a separate
+call, then `tmux capture-pane` to confirm the prompt is empty and the message
+is in the transcript; until that check passes, the message is not sent.
+
+A session spawned into a tmux window (`claude-kickoff`) reports its results to
+the session that spawned it unless Tim says he will work with it directly. The
+launch brief names the spawner; where the two run in different account
+contexts (they cannot see each other), it gives a report file path and the
+spawner sets a background watch on it at launch.
+
+**Why:** Tim, 22 Nov 2026 — a correction typed with one send-keys call sat
+unsent for 50 minutes, and a builder's final report stayed in its own pane.
 
 ## Always set up the task tracker
 
