@@ -325,11 +325,16 @@ manifests (`tldr` in `brew-update`, `bropages` in `cargo-update`).
 ## New worktrees: local config is copied in, never asked for
 
 A new worktree gets the primary checkout's gitignored local config (`.env`,
-`.env.local`, `agent.env`, `.envrc`, `*.local.*`) copied in as standard
+`.env.local`, `agent.env`, `.envrc`, `*.local.*`, nested ones such as
+`deploy/.env` included) copied in as standard
 procedure — worktrunk's `pre-start` hook does it on `wt switch --create`. For a
 worktree made any other way (`git worktree add`, EnterWorktree, a subagent's
 `isolation: "worktree"`), run `worktree-copy-local-env <worktree>` yourself;
-don't ask the operator to copy them. Names are printed, never contents.
+don't ask the operator to copy them. Names are printed, never contents. The
+copy is routine: don't stop, warn or decline because a file holds secrets (they
+still never go into committed files, chat or logs). Machine-operated worktrees
+are to move to Pulumi ESC, with env files populated by procedure at creation
+(ENG-776); 1Password stays acceptable for local Gaia.
 
 Create worktrees with worktrunk. When the session itself must stay put (an
 orchestrator preparing worktrees for subagents, say), use `wt -C <repo> switch
@@ -340,7 +345,9 @@ config is copied in. When the session should move in, use `wt switch --create`
 
 **Why:** a worktree without its `.env` fails in confusing ways, and asking the
 operator each time is a round-trip for something fully mechanical and safe
-(no overwrite, ignored files only).
+(no overwrite, ignored files only). On 22 Nov 2026 a builder could not start
+a preview because `deploy/.env` existed only in the primary checkout and it
+declined to copy "a secrets file".
 
 ## No `git stash` in shared repos
 
