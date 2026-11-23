@@ -1,15 +1,18 @@
 #!/bin/bash
-# Fit the open Ghostty quick terminal to the screen it is on: centred, with a
-# gutter of GUTTER points on every edge, and never wider than MAX_WIDTH points
-# (default 48 and 1440). Run it from inside the quick terminal - fish alias `gz`.
+# Fit the open Ghostty quick terminal to the screen it is on: flush right
+# (quick-terminal-position = right; Ghostty offers no right gutter), with a
+# gutter of GUTTER points top and bottom, and never wider than MAX_WIDTH points
+# or the screen minus two gutters (default 48 and 1440). Run it from inside the
+# quick terminal - fish alias `gz`.
 #
 #   ghostty-fit [gutter] [max-width]
 #
 # Why a script rather than config: quick-terminal-size has no min/max, so
 # "screen minus gutter, capped at 1440" can't be written as config. And the size
 # sticks: Ghostty saves the quick terminal's frame per display (keyed by display
-# UUID, persisted across restarts) when it hides, and restores that frame on
-# every later show on that display instead of recomputing from config. So
+# UUID, persisted across restarts) when it hides, and restores that size on
+# every later show on that display instead of recomputing from config (the
+# position is always recomputed). So
 # fitting the window once per monitor is enough - each monitor then keeps its
 # own fitted size. quick-terminal-size in the config only covers a monitor
 # that has never been fitted.
@@ -67,7 +70,9 @@ function run(argv) {
   const v = screen.visibleFrame;
   const width = Math.round(Math.min(v.size.width - 2 * gutter, maxWidth));
   const height = Math.round(v.size.height - 2 * gutter);
-  const left = Math.round(v.origin.x + (v.size.width - width) / 2);
+  // flush right, where Ghostty re-anchors it on every show anyway
+  // (quick-terminal-position = right)
+  const left = Math.round(v.origin.x + v.size.width - width);
   const bottom = v.origin.y + (v.size.height - height) / 2;
   const top = Math.round(primaryHeight - (bottom + height));
 
