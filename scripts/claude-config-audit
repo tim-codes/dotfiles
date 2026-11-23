@@ -27,8 +27,11 @@ containing "picnic", and skips repos with no commit in the last 30 days unless
 
 Checks (level, id):
   error committed-dangerous   committed settings grant just:*/git:*/interpreters/
-                              mutating pulumi/secret-revealing commands
+                              mutating pulumi/secret-revealing commands, or a recipe file,
+                              recipe or agent/run by pattern (any `*`; `just --list:*` exempt)
   error local-dangerous       settings.local.json holds a grant from the dangerous list
+  error global-recipe-file-grant  a global fragment reaching this context allows a recipe
+                              file, recipe or agent/run by pattern
   warn  local-oversize        settings.local.json has more than 25 allow entries
   warn  local-strippable      local entries already covered globally / junk / dead
                               (info when fewer than 5)
@@ -37,9 +40,12 @@ Checks (level, id):
   warn  claude-md-restated    CLAUDE.md restates a global instruction block
   warn  claude-md-contradiction  CLAUDE.md contradicts a global rule
   warn  skill-links           duplicate / aliased / broken / doubly-delivered skill links
-  error justfile-blanket      agent/Justfile is blanket-trusted but has mutating-looking recipes
-  error justfile-param-splice agent/Justfile is blanket-trusted and a recipe splices a parameter
-                              ({{ param }}) into its shell body (reports file:recipe)
+  error justfile-blanket      agent/Justfile has mutating-looking recipes (the permission hook
+                              trusts the file whole, so these run whenever the file exists)
+  error justfile-param-splice an agent/Justfile recipe splices a parameter ({{ param }}) into its
+                              shell body (reports file:recipe)
+  error justfile-var-splice   an agent/Justfile recipe splices a top-level variable, which the
+                              caller can override (`name=…`, `--set`)
   warn  skills-submodule      shared-skills submodule pin >3 commits behind origin/main
                               (info when 1-3; local ref only, never fetched)
   error role-floor            (--roles) a kind fragment (member, operator, planner, reviewer,
@@ -107,7 +113,11 @@ SHELL_KEYWORDS = {"for", "do", "done", "then", "fi", "if", "else", "elif", "whil
                   "until", "case", "esac", "{", "}", "(", ")", "&&", "||", ";"}
 DEAD_PREFIXES = ("mcp__plugin_Notion_notion__", "mcp__plugin_vercel_")
 FLOOR_LIKE_RE = re.compile(r"op read|--reveal|--show-secrets|env open|secrets versions access|\.claude\.json|\.credentials\.json")
-BLANKET_RE = re.compile(r"^Bash\(\s*just\s+(--justfile[= ]|-f\s*)\S*agent/Justfile\b.*\*\)$")
+# Recipe files and agent/run are trusted per exact file by the permission hook, never by a
+# static rule: a `*` lets a novel file, an option (`--command`, `--set`) or a chained recipe ride.
+RECIPE_FILE_RE = re.compile(r"justfile|agent[/-]run", re.I)
+JUST_WORD_RE = re.compile(r"(^|[\s/*])just($|[\s:*])")
+JUST_LISTING = {"--list", "-l", "--summary"}  # list recipes, run none (`--list --command` is rejected)
 
 
 def parse_rule(rule):
@@ -148,9 +158,37 @@ def dangerous_reason(rule):
         return "unrestricted Bash" if wild else None
     if wild and len(toks) == 1 and toks[0] in BARE_DANGEROUS:
         return f"grants {BARE_DANGEROUS[toks[0]]}"
+    why = recipe_file_reason(rule)
+    if why:
+        return why
     for head, why in HEAD_DANGEROUS:
         if tok_prefix(head, toks) or (wild and tok_prefix(toks, head)):
             return why
+    return None
+
+
+def recipe_file_reason(rule):
+    """A Bash rule that grants a recipe file, a recipe or agent/run by pattern.
+
+    Any `*` in a rule naming a justfile or agent/run, or in a `just` rule, lets
+    something other than the reviewed command ride on it: a novel file matching
+    the name, an option before the recipe (`--command`, `--shell`, `--set`,
+    `NAME=value`), or a further recipe chained after one whose parameters are
+    filled (`just lab-status zima '<cmd>'`). Only the exact command, with no
+    wildcard, is a static grant; whole-file trust is the permission hook's job.
+    Listing recipes (`just --list:*`) runs none, so it is exempt.
+    """
+    tool, arg = parse_rule(rule)
+    if tool != "Bash" or arg is None or "*" not in arg:
+        return None
+    toks, wild = canon(arg)
+    if toks and toks[0] == "just" and len(toks) == 2 and toks[1] in JUST_LISTING and wild \
+            and "*" not in " ".join(toks):
+        return None
+    if RECIPE_FILE_RE.search(arg):
+        return "grants a recipe file or agent/run by pattern (exact command only; the hook trusts the reviewed file)"
+    if JUST_WORD_RE.search(arg):
+        return "grants just recipes by pattern (extra words chain recipes or add options; exact command only)"
     return None
 
 
@@ -341,6 +379,7 @@ class Audit:
         self.check_skills()
         self.check_justfile()
         self.check_justfile_splice()
+        self.check_global_fragments()
         self.check_legacy_ops_name()
         self.check_submodule()
         return self.findings
@@ -501,19 +540,21 @@ class Audit:
                 ep.update((load_json(os.path.join(FRAGMENTS, name)) or {}).get("enabledPlugins") or {})
         return any(k.startswith(prefix) and v for k, v in ep.items())
 
-    def blanket_trusted(self):
-        docs = [self.committed] + [load_json(f) for f in self.local_files]
-        return any(BLANKET_RE.match(r.strip()) for doc in docs for r in perms(doc, "allow"))
-
+    # agent/Justfile is trusted as a whole file by the permission hook in every owned repo,
+    # with no settings rule involved, so its content checks run whenever the file exists.
     def check_justfile(self):
         path = os.path.join(self.repo, "agent", "Justfile")
-        if not os.path.isfile(path) or not self.blanket_trusted():
+        if not os.path.isfile(path):
             return
         bad = [f"{n} ({why})" for n, why in mutating_recipes(path)]
         if bad:
             self.add("error", "justfile-blanket", path,
-                     "blanket-trusted but recipe(s) look mutating: " + ", ".join(bad[:6])
+                     "hook-trusted but recipe(s) look mutating: " + ", ".join(bad[:6])
                      + (" …" if len(bad) > 6 else "") + " — move them to a non-trusted ops.Justfile")
+
+    def check_global_fragments(self):
+        for path, rule, why in fragment_recipe_grants(FRAGMENTS, self.ctx):
+            self.add("error", "global-recipe-file-grant", tilde(path), f"{redact(rule, 80)} ({why})")
 
     def check_legacy_ops_name(self):
         path = os.path.join(self.repo, "agent", "Justfile.ops")
@@ -523,14 +564,20 @@ class Audit:
 
     def check_justfile_splice(self):
         path = os.path.join(self.repo, "agent", "Justfile")
-        if not os.path.isfile(path) or not self.blanket_trusted():
+        if not os.path.isfile(path):
             return
         bad = splicing_recipes(path)
         if bad:
             shown = ", ".join(f"agent/Justfile:{n}" for n in bad[:6]) + (" …" if len(bad) > 6 else "")
             self.add("error", "justfile-param-splice", path,
-                     "blanket-trusted but recipe(s) splice parameters into shell: " + shown
+                     "hook-trusted but recipe(s) splice parameters into shell: " + shown
                      + " — use `set positional-arguments` and \"$1\", never {{ param }} in a shell line")
+        bad = var_splicing_recipes(path)
+        if bad:
+            shown = ", ".join(f"agent/Justfile:{n} ({v})" for n, v in bad[:6]) + (" …" if len(bad) > 6 else "")
+            self.add("error", "justfile-var-splice", path,
+                     "hook-trusted but recipe(s) splice a variable the caller can override (`name=…`, `--set`): "
+                     + shown + " — compute the value in the recipe's shell instead")
 
     def check_submodule(self):
         try:
@@ -637,6 +684,54 @@ def splicing_recipes(path):
                    for expr in PARAM_EXPR_RE.findall(line) for p in params):
                 out.append(name)
                 break
+    return out
+
+
+VAR_DECL_RE = re.compile(r"^(?:export\s+)?([A-Za-z_][\w-]*)\s*:=")
+
+
+def var_splicing_recipes(path):
+    """[(recipe, variable)] where a body line splices a top-level `name := …` via {{ name }}.
+
+    A caller can override any variable before the recipe (`just -f F 'name=x"; cmd; "' r`,
+    `--set name …`), so a spliced variable is shell code exactly as a parameter is.
+    """
+    try:
+        with open(path, errors="replace") as f:
+            variables = [m.group(1) for m in map(VAR_DECL_RE.match, f.read().splitlines()) if m]
+    except OSError:
+        return []
+    if not variables:
+        return []
+    out = []
+    for name, head, body in parse_recipes(path):
+        params = set(recipe_params(head))
+        for line in body:
+            if line.lstrip().startswith("#"):
+                continue
+            hit = next((v for expr in PARAM_EXPR_RE.findall(line) for v in variables
+                        if v not in params and re.search(r"(?<![\w-])%s(?![\w(-])" % re.escape(v), expr)), None)
+            if hit:
+                out.append((name, hit))
+                break
+    return out
+
+
+def fragment_recipe_grants(fragments, ctx):
+    """[(path, rule, why)] for allow rules of the recipe-file class in the global fragments
+    that reach this context (shared, attended, the account fragment, any overlay)."""
+    out = []
+    names = ["settings.shared.json", "settings.attended.json", f"settings.{ctx}.json"]
+    try:
+        names += sorted(n for n in os.listdir(fragments) if n.startswith("settings.overlay.") and n.endswith(".json"))
+    except OSError:
+        pass
+    for name in names:
+        path = os.path.join(fragments, name)
+        for rule in perms(load_json(path), "allow"):
+            why = recipe_file_reason(rule)
+            if why:
+                out.append((path, rule, why))
     return out
 
 
