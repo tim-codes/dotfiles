@@ -64,7 +64,10 @@ for ctx in personal reserve exxo exxo-personal; do
     check "$ctx: wrapped agent-tooling mail send asks" has "$ctx" ask 'Bash(agent/run -- agent-tooling mail send*)'
     check "$ctx: ./-wrapped agent-tooling mail send asks" has "$ctx" ask 'Bash(./agent/run -- agent-tooling mail send*)'
     check "$ctx: gcloud compute ssh is denied" has "$ctx" deny 'Bash(gcloud compute ssh*)'
-    check "$ctx: nested gcloud compute ssh is denied" has "$ctx" deny 'Bash(* gcloud compute ssh*)'
+    # A leading-star twin matched the text anywhere, a quoted grep argument included (false
+    # denials); the anchored rule still matches each sub-command after && ; | and env prefixes.
+    check "$ctx: no leading-star gcloud compute ssh twin" lacks "$ctx" deny 'Bash(* gcloud compute ssh*)'
+    check "$ctx: no leading-star gcloud secrets twin" lacks "$ctx" deny 'Bash(* gcloud secrets versions access*)'
 done
 # deniedMcpServers lives only in the shared fragment, so the plain deep-merge
 # must carry the whole array into every context (it silences the unauthenticated
@@ -112,21 +115,37 @@ ATT_GRANTS=(
     'Read(//private/tmp/claude-501/**)'
     'Read(//Users/tim/claude/artefacts/**)' 'Edit(//Users/tim/claude/artefacts/**)'
     'Bash(wc:*)' 'Bash(grep:*)' 'Bash(ls:*)' 'Bash(cat:*)' 'Bash(tree:*)' 'Bash(find:*)'
-    'Bash(git ls-tree:*)' 'Bash(npm view:*)'
+    'Bash(git ls-tree:*)' 'Bash(npm view:*)' 'Bash(ps:*)' 'Bash(pgrep:*)'
     'mcp__Sanity__query_documents' 'mcp__plugin_linear_linear__list_issues'
 )
+# Example commands for the gh api and git push asks: tests/test_attended_ask_rules.py.
 ATT_ASKS=(
     'mcp__claude_ai_Notion__notion-delete-databases'
-    'Bash(git push*main*)' 'Bash(git push*master*)'
+    'Bash(git push * main)' 'Bash(git push * main *)' 'Bash(git push * +main)' 'Bash(git push * +main *)'
+    'Bash(git push *:main)' 'Bash(git push *:main *)'
+    'Bash(git push *refs/heads/main)' 'Bash(git push *refs/heads/main *)'
+    'Bash(git push * master)' 'Bash(git push *:master)' 'Bash(git push *refs/heads/master)'
     'Bash(find *-delete*)' 'Bash(find *-exec*)' 'Bash(find *-execdir*)' 'Bash(find *-ok*)' 'Bash(find *-fprint*)'
     'Bash(pulumi up*)' 'Bash(* pulumi up*)'
     'Bash(gh secret set*)' 'Bash(gh variable set*)'
-    'Bash(gh api *-X*)' 'Bash(gh api *--method*)' 'Bash(gh api *-f*)' 'Bash(gh api *-F*)'
+    'Bash(gh api *-X*)' 'Bash(gh api *--method*)'
+    'Bash(gh api -f*)' 'Bash(gh api * -f*)' 'Bash(gh api -F*)' 'Bash(gh api * -F*)'
     'Bash(gh api *--field*)' 'Bash(gh api *--raw-field*)' 'Bash(gh api *--input*)'
     'mcp__claude_ai_Slack__slack_send_message' 'mcp__claude_ai_Microsoft_365__outlook_send_mail'
     'mcp__claude_ai_Microsoft_365__teams_send_chat_message'
-    'Bash(ps:*)' 'Bash(pgrep:*)' 'Bash(gcloud config set*)' 'Bash(kubectl config use-context*)' 'Bash(aws-use*)'
+    'Bash(gcloud config set*)' 'Bash(kubectl config use-context*)' 'Bash(aws-use*)'
 )
+# Retired asks: substring forms that asked on any path or branch name containing the text, and
+# the process-listing asks (the session token left command lines with Gaia ENG-785).
+for r in 'Bash(git push*main*)' 'Bash(git push*master*)' 'Bash(gh api *-f*)' 'Bash(gh api *-F*)' \
+         'Bash(ps:*)' 'Bash(pgrep:*)'; do
+    check "attended fragment no longer asks $r" \
+        jq -e --arg r "$r" '(.permissions.ask // []) | index($r) == null' "$ATT"
+done
+for f in "$C"/settings.*.json; do
+    check "$(basename "$f"): no deny catches ps or pgrep" \
+        jq -e '[(.permissions.deny // [])[] | select(test("^Bash\\((\\* )?(ps|pgrep)[ :*]"))] | length == 0' "$f"
+done
 ctxs="personal exxo exxo-personal exxo-openrouter"
 for r in "${ATT_GRANTS[@]}"; do
     check "attended fragment allows $r" jq -e --arg r "$r" '.permissions.allow | index($r) != null' "$ATT"
