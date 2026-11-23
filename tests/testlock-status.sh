@@ -5,8 +5,8 @@
 # into the owner file must never appear in any output. Live pids come from background sleeps;
 # no process listing is used.
 # Usage: bash tests/testlock-status.sh
-set -uo pipefail
 # shellcheck disable=SC2015,SC2329  # `check && ok || bad` is the house idiom; cleanup runs via trap
+set -uo pipefail
 
 SRC_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TL="$SRC_REPO/src/bin/testlock"
