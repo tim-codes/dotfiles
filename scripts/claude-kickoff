@@ -94,6 +94,8 @@ effort is used):
   name     the whole value passed as --name (display name); new launches only
   harness  must equal the context's harness (default claude-code; else exit 5)
   role     client (default) | orchestrator | infra
+           Setting `role` makes the session Gaia's (builder tier: Gaia's guidance and
+           permissions); standalone kickoffs leave `role` out.
   tier     builder | attended. Default builder when `role` is set or the body starts
            with /gaia:planner (or the legacy /squad-planner), else attended (anything else: exit 5). A builder
            lane renders its settings with `squad roles render --kind K

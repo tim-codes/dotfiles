@@ -156,6 +156,8 @@ check "  and role_fragment: none" hasx "role_fragment: none"
 kick "$T/client.md" --no-member-deny
 check "--no-member-deny is gone" [ "$rc" -eq 2 ]
 check "--help no longer documents it" bash -c '! "$1" --help | grep -q -- "--no-member-deny"' _ "$KICK"
+check "--help says role makes a session Gaia's and standalone kickoffs leave it out" \
+    bash -c '"$1" --help | grep -q "Setting \`role\` makes the session Gaia'"'"'s" && "$1" --help | grep -q "standalone kickoffs leave \`role\` out"' _ "$KICK"
 
 # --- nothing is written ---
 snap() { { find "$FAKE" -exec stat -f '%N %m %z' {} + 2>/dev/null | sort; git -C "$SRC_REPO" status --porcelain; } | shasum; }
