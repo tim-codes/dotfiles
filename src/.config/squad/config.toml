@@ -247,23 +247,21 @@ ca_file = "~/.local/state/squad/keys/buildlab-ca.pem"
 credentials_file = "~/.local/state/squad/keys/gaia-broker.json"
 # The Homebrew cask keeps the plugin in the SDK's bin dir, which is not on [broker] launch_path.
 auth_plugin = "/opt/homebrew/share/google-cloud-sdk/bin/gke-gcloud-auth-plugin"
-image = "europe-west2-docker.pkg.dev/exxo-internal/gaia/gaia-verify@sha256:77dc784e7fa1af85c48c26244cc9f85809ca2bc2317ab32a07864532335e5a3c"  # tag mise-2026.11.1-3712bba; pinned by digest
-machine_cpu = 16
-machine_mem_gi = 64
-max_nodes = 3                      # 23 Nov 2026: exxo/gaia/main output gaiaBrokerConfig (Gaia's share of the shared `spot` pool, max 6, under its 34 CPU quota). Was 2 (gaia pool, exxo-infra#295)
-max_cpu_m = 34000  # 23 Nov 2026: gaiaBrokerConfig, = the namespace quota (34 CPU / 136Gi) after the 19 Nov pool consolidation. Was 29000
-fallback_pools = []                # gaiaBrokerConfig: no shared fallback pools beyond `spot` itself
-min_nodes = 0
-warm_idle_s = 1200
-scale_ahead = true
-# 23 Nov 2026: exxo-infra's 19 Nov pool consolidation folded the `gaia` pool into the shared,
-# autoscaled Spot pool `spot` (projects/fleet/index.ts), so the broker no longer resizes anything:
-# external scaling (gaia#401) admits against max_nodes virtual nodes and the cluster autoscaler adds
-# nodes for its pending pods. The Jobs tolerate ci.exxo.one/pool=spot and select the pool by the
-# default pool_label (cloud.google.com/gke-nodepool). min_nodes, warm_idle_s and scale_ahead are
-# unused under external scaling.
-scaling = "external"
-node_pool = "spot"
+image = "europe-west2-docker.pkg.dev/exxo-internal/gaia/gaia-verify@sha256:73f3bd254c61dcdf73bfeb76e7b75c2282ecea88381194e67be11652ad05d449"  # v0.7.16 kueue-mode image (checkout decrypts GAIA_TOKEN_CT); pinned by digest
+# 23 Nov 2026 (v0.7.16, ENG-799/ENG-764): verify Jobs go to the fleet hub's Kueue, which places them in
+# the one shared pool with CI (cohort `pool`: home magni → home odin → buildlab spot, with borrowing).
+# No broker-side capacity arithmetic: the partition keys (max_cpu_m, max_nodes, min_nodes, machine_*,
+# node_pool, fallback_pools) are refused in this mode. Values below are exxo/gaia/main output
+# gaiaBrokerConfigKueue; hub_ca_file is written by exxo-infra `gaia-hub-ca` (agent/ops.Justfile).
+scaling = "kueue"
+hub_server = "https://34.39.102.86"
+hub_ca_file = "~/.local/state/squad/keys/fleet-hub-ca.pem"
+hub_namespace = "gaia"
+queue_name = "gaia-verify"
+priority_class = "gaia-verify"
+results_bucket = "exxo-ci-results"
+token_kms_key = "projects/exxo-internal/locations/europe-west2/keyRings/gaia-checkout/cryptoKeys/gaia-checkout"
+member_token_audience = "https://iam.googleapis.com/projects/695509523857/locations/global/workloadIdentityPools/fleet-members/providers/home-k3s"
 
 # The read-only monitor feeds (v0.7.9 Phase 2), needing the `monitor` watcher above. Enabled 23 Nov 2026 (Tim).
 # Clusters, identity (gaia-monitor@exxo-internal), project and region keep their defaults; the GKE kubeconfigs
