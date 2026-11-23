@@ -1,9 +1,9 @@
 #!/bin/bash
 # Fit the open Ghostty quick terminal to the screen it is on: flush right
-# (quick-terminal-position = right; Ghostty offers no right gutter), with a
-# gutter of GUTTER points top and bottom, and never wider than MAX_WIDTH points
-# or the screen minus two gutters (default 48 and 1440). Run it from inside the
-# quick terminal - fish alias `gz`.
+# (quick-terminal-position = right; Ghostty offers no right gutter), full
+# height (vertical resizing fights Ghostty's re-centring), and never wider than
+# MAX_WIDTH points or the screen minus two GUTTERs (default 48 and 1440). Run
+# it from inside the quick terminal - fish alias `gz`.
 #
 #   ghostty-fit [gutter] [max-width]
 #
@@ -69,11 +69,11 @@ function run(argv) {
   // visibleFrame excludes the menu bar and Dock
   const v = screen.visibleFrame;
   const width = Math.round(Math.min(v.size.width - 2 * gutter, maxWidth));
-  const height = Math.round(v.size.height - 2 * gutter);
-  // flush right, where Ghostty re-anchors it on every show anyway
-  // (quick-terminal-position = right)
+  // full height and flush right, where Ghostty re-anchors it on every show
+  // anyway (quick-terminal-position = right)
+  const height = Math.round(v.size.height);
   const left = Math.round(v.origin.x + v.size.width - width);
-  const bottom = v.origin.y + (v.size.height - height) / 2;
+  const bottom = v.origin.y;
   const top = Math.round(primaryHeight - (bottom + height));
 
   // size, then position, then size again: macOS may clamp a resize that
