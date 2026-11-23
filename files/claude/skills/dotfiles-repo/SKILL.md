@@ -98,5 +98,6 @@ procedure is the same in every repo.
 ## Shipping the change
 
 Standard shared git-workflow instruction applies as-is: branch (in a
-worktree, per above), logical commits, push with a draft PR at a sensible
-checkpoint, squash-merge only when explicitly directed.
+worktree, per above), logical commits, related work combined locally before
+it is submitted, push with a draft PR at a sensible checkpoint, ready with
+green CI at hand-over, squash-merge only when explicitly directed.

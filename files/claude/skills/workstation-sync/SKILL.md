@@ -51,7 +51,8 @@ where a decision is needed.
 - Dotfiles: use a worktree (`wt switch --create <branch>`), never switch branches in
   `~/dev/dotfiles` (live-symlinked config; see the `dotfiles-repo` skill). Remove finished
   worktrees only via `worktree-closedown`.
-- Unpushed commits on a branch: push, and open a draft PR if none exists.
+- Unpushed commits on a branch: push. Open a draft PR only if none exists and the work
+  is not better combined into another branch first (ask Tim when unsure).
 - Production-stage Exxo repos need human review before merge; Exxo-Labs repos are org
   repos, so their merges are Tim's call.
 
