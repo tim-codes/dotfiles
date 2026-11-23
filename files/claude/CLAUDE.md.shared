@@ -171,13 +171,13 @@ Most blocked Bash calls are blocked for their shape, not their intent:
 - Waits follow the section above; credentials follow "Blanket-trusted files" (a
   fixed-consumer recipe, never `K=$(…)`).
 - On a classifier "no verdict" error, retry once, then raise it.
-- No broad process listings (`ps aux`, a loose `pgrep -fl`): they print other
-  sessions' command lines, which can include tokens.
+- Process listings (`ps`, `pgrep`) are allowed: the session token no longer
+  travels on command lines (Gaia, ENG-785). For the test queue, `testlock --status`.
 
 **Why:** Tim, 22 Nov 2026 — a scan of 548 blocked Bash calls (11–22 Nov) found
 most were blocked for command shape; this guidance lived only in a Gaia member
-skill and was lost in the 21 Nov trim. The same day a process listing exposed
-another session's command line (logged in `~/claude/fs-breach-log.md`).
+skill and was lost in the 21 Nov trim. A 22 Nov listing that showed another
+session's token (`~/claude/fs-breach-log.md`) led to ENG-785's fix.
 
 ## Tim's shells: fish in his terminal, zsh at the Claude prompt
 
