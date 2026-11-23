@@ -49,6 +49,9 @@ font-size = 15
 # monitor.
 quick-terminal-position = right
 quick-terminal-size = 1440px
+# Always on the primary display (the one holding the menu bar in System
+# Settings > Displays), not whichever screen has keyboard focus (`main`).
+quick-terminal-screen = macos-menu-bar
 # No slide: it should just appear, like an iTerm2 hotkey window.
 quick-terminal-animation-duration = 0
 # Only the hotkey hides it. The default (true) also hides it whenever it loses
