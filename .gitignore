@@ -44,3 +44,7 @@ src/.config/squad/agent.env
 src/.config/squad/*.bak*
 # Gaia install-roles writes role fragments, builder-instructions.md and plugin/ here (via the stow symlink).
 src/.config/squad/roles/
+# Generated kubeconfigs for Gaia's monitor feeds: the GKE ones by `gcloud container clusters
+# get-credentials` (exxo-infra docs/gaia-monitor-access.md), home.yaml by Gaia's `monitor-home-kubeconfig`
+# from the CA in ESC. No secrets, but machine-specific output, so never committed.
+src/.config/squad/kube/
