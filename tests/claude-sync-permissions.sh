@@ -182,7 +182,7 @@ for m in 'tmux-home' 'notchbar-agents-claude-hook' 'tmux-claude-hatch' 'claude-c
             test "$(hooks_with "$FAKE/.claude-$ctx/settings.json" "$m")" -eq "$(hooks_with "$ATT" "$m")"
     done
 done
-for m in 'squad hook' 'claude-scratch-persist' 'guard-dotfiles-checkout' 'preserve-worktree-transcripts' 'claude-agent-model-guard'; do
+for m in 'squad hook' 'claude-scratch-persist' 'guard-dotfiles-checkout' 'preserve-worktree-transcripts' 'claude-agent-model-guard' 'claude-pr-create-guard'; do
     check "shared base keeps the $m hook" test "$(hooks_with "$SHARED" "$m")" -gt 0
     check "attended fragment does not carry the $m hook" test "$(hooks_with "$ATT" "$m")" -eq 0
 done

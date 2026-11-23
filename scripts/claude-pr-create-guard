@@ -1,0 +1,315 @@
+#!/usr/bin/env -S python3 -I
+"""PreToolUse hook (Bash): keep standalone sessions off Gaia's refs and make a
+second PR to the same base a deliberate choice.
+
+Wired in files/claude/settings.shared.json, so it runs only in standalone
+sessions: builder-tier kickoffs and broker-launched Gaia sessions start with
+--setting-sources project and never load the user settings. It therefore needs
+no Gaia exemption. The convention it backs is
+~/dev/exxo/skills/agent-conventions/branches-and-prs.md.
+
+Per simple command in the Bash string (split on ; && || | and newlines, quotes
+respected, so `echo "gh pr create"` is not a command):
+
+  gh pr create with a gaia/* base or head (--head, else the current branch)
+      -> deny
+  git push whose destination is a gaia/* ref (a refspec, or the current
+  branch when no refspec is given)
+      -> deny
+  gh pr create when the session's GitHub user already has open PRs with
+  claude/* heads against the same base in the same repo
+      -> ask, listing them
+  anything else
+      -> no output (no decision; the normal permission flow continues)
+
+The repo comes from -R/--repo or the cwd's origin remote, the base from
+-B/--base or origin/HEAD. One `gh pr list` call per gh pr create (a second,
+`gh repo view`, only when -R names another repo and no --base is given); no gh
+call at all for any other command. Fails open: any parse error, missing gh,
+network failure or timeout gives no output and exit 0.
+
+Optional tuning: CLAUDE_PR_GUARD_TIMEOUT_S, the timeout for each gh call
+(default 5 seconds).
+"""
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+
+CONVENTION = "agent-conventions/branches-and-prs.md"
+DENY_REASON = ("gaia/* belongs to Gaia. Standalone work goes on claude/<topic>. "
+               "A Gaia leader fix must be launched with `role: orchestrator`. "
+               "See " + CONVENTION + ".")
+OPERATORS = {";", "&&", "||", "|", "&", "|&", "\n", "(", ")"}
+LIST_LIMIT = 5
+
+# gh pr create options that take a value (from `gh pr create --help`, gh 2.102).
+GH_CREATE_VALUE_OPTS = {
+    "-a", "--assignee", "--attach", "-B", "--base", "-b", "--body",
+    "-F", "--body-file", "-H", "--head", "-l", "--label", "-m", "--milestone",
+    "-p", "--project", "--recover", "-r", "--reviewer", "-T", "--template",
+    "-t", "--title", "-R", "--repo",
+}
+GIT_GLOBAL_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
+                         "--exec-path", "--config-env"}
+GIT_PUSH_VALUE_OPTS = {"-o", "--push-option", "--repo", "--receive-pack", "--exec"}
+
+
+def timeout_s():
+    try:
+        return float(os.environ.get("CLAUDE_PR_GUARD_TIMEOUT_S", "5"))
+    except ValueError:
+        return 5.0
+
+
+def run(argv, cwd, timeout):
+    """stdout of argv, or None on any failure."""
+    try:
+        p = subprocess.run(argv, cwd=cwd or None, capture_output=True, text=True,
+                           timeout=timeout, stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    return p.stdout if p.returncode == 0 else None
+
+
+def git(cwd, *args):
+    out = run(["git", "-C", cwd or ".", *args], None, 2)
+    return out.strip() if out else None
+
+
+def simple_commands(text):
+    """Split a Bash string into simple commands (lists of words)."""
+    # An unquoted newline separates commands like `;`; a quoted one stays in its word.
+    lex = shlex.shlex(text, posix=True, punctuation_chars=";&|()\n")
+    lex.whitespace = " \t\r"
+    lex.whitespace_split = True
+    cmds, cur = [], []
+    for tok in lex:
+        if tok in OPERATORS or (tok and set(tok) <= set(";&|()\n")):
+            if cur:
+                cmds.append(cur)
+            cur = []
+            continue
+        cur.append(tok)
+    if cur:
+        cmds.append(cur)
+    return cmds
+
+
+def strip_prefix(words):
+    """Drop env assignments and transparent wrappers in front of the command."""
+    i = 0
+    while i < len(words):
+        w = words[i]
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w):
+            i += 1
+        elif w in ("env", "command", "exec", "time", "nohup"):
+            i += 1
+        elif w.endswith("agent/run") and i + 1 < len(words) and words[i + 1] == "--":
+            i += 2
+        else:
+            break
+    return words[i:]
+
+
+def tool_is(word, name):
+    return word == name or word.endswith("/" + name)
+
+
+def option_value(args, i, opts):
+    """(name, value, next index) for args[i] if it is one of opts, else None."""
+    a = args[i]
+    for o in opts:
+        if a == o:
+            return o, (args[i + 1] if i + 1 < len(args) else ""), i + 2
+        if o.startswith("--") and a.startswith(o + "="):
+            return o, a[len(o) + 1:], i + 1
+        if len(o) == 2 and not o.startswith("--") and a.startswith(o) and len(a) > 2:
+            return o, a[2:], i + 1
+    return None
+
+
+def is_gaia(ref):
+    if not ref:
+        return False
+    ref = ref.lstrip("+")
+    for prefix in ("refs/heads/", "refs/remotes/origin/", "origin/"):
+        if ref.startswith(prefix):
+            ref = ref[len(prefix):]
+    return ref.startswith("gaia/")
+
+
+def repo_from_url(url):
+    m = re.search(r"github\.com[:/]+([^/]+/[^/]+?)(?:\.git)?/?$", url or "")
+    return m.group(1) if m else None
+
+
+def normalise_repo(r):
+    if not r:
+        return None
+    if "github.com" in r:
+        return repo_from_url(r)
+    parts = r.strip("/").split("/")
+    return "/".join(parts[-2:]) if len(parts) >= 2 else None
+
+
+def parse_pr_create(args):
+    opts = {}
+    i = 0
+    while i < len(args):
+        hit = option_value(args, i, GH_CREATE_VALUE_OPTS)
+        if hit:
+            name, value, i = hit
+            key = {"-B": "base", "--base": "base", "-H": "head", "--head": "head",
+                   "-R": "repo", "--repo": "repo"}.get(name)
+            if key:
+                opts[key] = value
+            continue
+        i += 1
+    return opts
+
+
+def check_pr_create(args, cwd):
+    """('deny', reason) | ('ask', reason) | None."""
+    opts = parse_pr_create(args)
+    head = opts.get("head")
+    if head and ":" in head:
+        head = head.split(":", 1)[1]
+    if not head:
+        head = git(cwd, "rev-parse", "--abbrev-ref", "HEAD")
+    if is_gaia(opts.get("base")) or is_gaia(head):
+        return ("deny", DENY_REASON)
+
+    local_repo = repo_from_url(git(cwd, "remote", "get-url", "origin"))
+    repo = normalise_repo(opts.get("repo")) or local_repo
+    if not repo:
+        return None
+    base = opts.get("base")
+    t = timeout_s()
+    if not base:
+        if repo == local_repo:
+            ref = git(cwd, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+            base = ref.split("/", 1)[1] if ref and "/" in ref else None
+        if not base:
+            out = run(["gh", "repo", "view", repo, "--json", "defaultBranchRef",
+                       "--jq", ".defaultBranchRef.name"], cwd, t)
+            base = out.strip() if out else None
+    if not base:
+        return None
+
+    out = run(["gh", "pr", "list", "-R", repo, "--author", "@me", "--state", "open",
+               "--base", base, "--limit", "50", "--json", "number,title,headRefName"], cwd, t)
+    if out is None:
+        return None
+    prs = [p for p in json.loads(out)
+           if isinstance(p, dict)
+           and str(p.get("headRefName", "")).startswith("claude/")
+           and p.get("headRefName") != head]
+    if not prs:
+        return None
+    shown = []
+    for p in prs[:LIST_LIMIT]:
+        title = str(p.get("title", ""))
+        title = title if len(title) <= 60 else title[:57] + "..."
+        shown.append(f"#{p.get('number')} \"{title}\" ({p.get('headRefName')})")
+    more = f", and {len(prs) - LIST_LIMIT} more" if len(prs) > LIST_LIMIT else ""
+    n = len(prs)
+    noun = "PR" if n == 1 else "PRs"
+    reason = (f"You already have {n} open {noun} against `{base}` in {repo}: "
+              f"{'; '.join(shown)}{more}. Each PR to `{base}` runs the repo's PR checks "
+              f"on every push. Combine this into one of them, or continue with a "
+              f"separate PR? ({CONVENTION})")
+    return ("ask", reason)
+
+
+def check_push(args, cwd):
+    """args follow `push`."""
+    positional = []
+    i = 0
+    while i < len(args):
+        a = args[i]
+        hit = option_value(args, i, GIT_PUSH_VALUE_OPTS)
+        if hit:
+            i = hit[2]
+            continue
+        if a == "--":
+            positional.extend(args[i + 1:])
+            break
+        if not a.startswith("-"):
+            positional.append(a)
+        i += 1
+    refspecs = positional[1:]
+    if not refspecs:
+        branch = git(cwd, "rev-parse", "--abbrev-ref", "HEAD")
+        return ("deny", DENY_REASON) if is_gaia(branch) else None
+    for spec in refspecs:
+        dst = spec.split(":", 1)[1] if ":" in spec else spec
+        if is_gaia(dst) or (":" not in spec and dst == "HEAD"
+                            and is_gaia(git(cwd, "rev-parse", "--abbrev-ref", "HEAD"))):
+            return ("deny", DENY_REASON)
+    return None
+
+
+def check_git(args, cwd):
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a in GIT_GLOBAL_VALUE_OPTS:
+            if a == "-C" and i + 1 < len(args):
+                cwd = os.path.join(cwd or ".", os.path.expanduser(args[i + 1]))
+            i += 2
+            continue
+        if a.startswith("-"):
+            i += 1
+            continue
+        break
+    if i < len(args) and args[i] == "push":
+        return check_push(args[i + 1:], cwd)
+    return None
+
+
+def decide(command, cwd):
+    decisions = []
+    for words in simple_commands(command):
+        words = strip_prefix(words)
+        if not words:
+            continue
+        if words[0] == "cd" and len(words) > 1:
+            cwd = os.path.join(cwd or ".", os.path.expanduser(words[1]))
+            continue
+        if tool_is(words[0], "gh") and words[1:3] == ["pr", "create"]:
+            d = check_pr_create(words[3:], cwd)
+        elif tool_is(words[0], "git"):
+            d = check_git(words[1:], cwd)
+        else:
+            d = None
+        if d and d[0] == "deny":
+            return d
+        if d:
+            decisions.append(d)
+    return decisions[0] if decisions else None
+
+
+def main():
+    try:
+        payload = json.loads(sys.stdin.read())
+        if payload.get("tool_name") not in (None, "Bash"):
+            return
+        command = (payload.get("tool_input") or {}).get("command")
+        if not isinstance(command, str) or not re.search(r"\b(gh|git)\b", command):
+            return
+        d = decide(command, payload.get("cwd") or os.getcwd())
+        if d:
+            sys.stdout.write(json.dumps({"hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": d[0],
+                "permissionDecisionReason": d[1],
+            }}) + "\n")
+    except Exception:  # fail open: a nudge, not a security boundary
+        pass
+
+
+if __name__ == "__main__":
+    main()

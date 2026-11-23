@@ -205,6 +205,17 @@ session means Fable. It is exempt when `CLAUDE_CODE_SUBAGENT_MODEL` is set (the
 exxo-openrouter overlay pins every subagent that way) and fails open on any
 error. Tests: `python3 -I tests/test_claude_agent_model_guard.py`.
 
+A second shared PreToolUse hook (matcher `Bash`, `# claude-pr-create-guard`)
+runs `scripts/claude-pr-create-guard`, backing
+`agent-conventions/branches-and-prs.md`: it denies `gh pr create` with a
+`gaia/*` base or head and `git push` to a `gaia/*` ref, and asks (never denies)
+before a `gh pr create` when the session's GitHub user already has open
+`claude/*` PRs against the same base, listing them. Otherwise it is silent, and
+it fails open on any error, missing `gh` or timeout. It lives in the user
+settings, so only standalone sessions run it: builder-tier and broker-launched
+Gaia sessions start with `--setting-sources project`. Tests:
+`bash tests/claude-pr-create-guard.sh`.
+
 Plugins that are off by default: `notion@claude-plugins-official` and
 `vercel@claude-plugins-official` are set to `false` in `settings.shared.json`
 (not deleted — the merged settings file is copied over the live one, and an
