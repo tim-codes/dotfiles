@@ -1,6 +1,6 @@
 ---
 name: build-lead
-description: Use when a session is briefed as the build lead for a multi-lane build from reviewed plans (several plans, lanes in their own worktrees, one integration branch), when a plan says 'subagent-driven-development' but the work spans more than one lane or repo, or when merging lane branches back into a build branch.
+description: Use when a session is briefed as the build lead for a multi-lane build from reviewed plans (several plans, lanes in their own worktrees, one integration branch), when a plan says 'subagent-driven-development' but the work spans more than one lane or repo, or when merging lane branches back into a build branch, or when an orchestrating session delegates more than one lane in one repo.
 ---
 
 # Build lead
@@ -176,7 +176,7 @@ merge themselves.
    operator asks; open the draft PR at the first push. The full rule,
    the Tim quote and the pause-push variants are in
    [references/push-policy.md](references/push-policy.md).
-8. Keep `main` untouched. Only the operator merges the build branch.
+8. Keep `main` untouched; only the operator merges. What to submit: [references/push-policy.md](references/push-policy.md).
 
 ## 5. Cross-plan seams
 

@@ -33,11 +33,10 @@ the wrong stack, host or directory.
 
 ## Git workflow: branch, checkpoint as you go, merge only when directed
 
-Never commit directly to `main`/`master` unless explicitly directed to — do
-the work on a branch. Group commits into logical, reviewable chunks rather
-than one commit for everything, and push the branch with a draft PR at
-sensible checkpoints as work progresses, rather than waiting until
-everything is finished to make it visible.
+Never commit directly to `main`/`master` unless explicitly directed to: work on
+branches, combined locally before submission (see "Branches and pull
+requests"). Group commits into logical, reviewable chunks, and push at
+checkpoints with the PR opened as a draft at the first push.
 
 Drafts are for checkpoints only. To hand a PR to the operator for review,
 bring the branch up to date with its base, mark it ready (`gh pr ready`), wait
@@ -49,7 +48,7 @@ An explicit direction to skip part of this flow — commit straight to main,
 merge without waiting, skip the draft stage — is scoped to the specific
 change it was given for, one-off. It does not carry forward to later
 changes in the same session or the same repo, even ones that look similar;
-default back to branch + draft PR + merge-on-direction for the next change
+default back to branch + PR + merge-on-direction for the next change
 and wait for a fresh direction if this one is meant to skip it too.
 
 **Why:** a draft PR at each checkpoint gives visibility into in-progress
@@ -458,6 +457,10 @@ On every launch, announce a numbered roster — **task** (agent type) —
 **model**, with a one-line brief per agent — so delegation and model
 choices stay visible and reviewable.
 
+Delegating several pieces in one repo: lanes commit to local branches and a
+brief says "commit to `<branch>`; do not push or open a PR". You combine them
+and decide what to submit ("Branches and pull requests").
+
 Environment rules don't travel: skills and CLAUDE.md discipline loaded in
 the orchestrator do NOT reach a subagent's fresh context. If a delegated
 task touches an environment with prescribed invocation mechanics — secret
@@ -514,6 +517,10 @@ The task tools are enabled by `CLAUDE_CODE_ENABLE_TODO_TOOLS` in
 ## Review threads get an outcome before merge
 
 @~/dev/exxo/skills/agent-conventions/review-threads.md
+
+## Branches and pull requests
+
+@~/dev/exxo/skills/agent-conventions/branches-and-prs.md
 
 ## Specs and plans are OpenSpec changes
 
@@ -630,8 +637,8 @@ or calling a change complete, run the repo's comprehensive gate (`just ci`
 SSR/prerender failures and build-time-only import errors surface; a green
 `just check` has missed them by definition.
 
-In a multi-lane build (the `build-lead` skill), "before pushing" means the one
-push at the end: lanes gate locally with the fast check plus their own tests,
+Whenever lanes are combined locally before submission (a `build-lead` build
+included), "before pushing" means the one push at the end: lanes gate locally with the fast check plus their own tests,
 the build branch stays local between checkpoints, and CI runs the
 comprehensive gate once on the final push (local `just ci` only where CI
 doesn't run it).

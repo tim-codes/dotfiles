@@ -63,7 +63,10 @@ loaded skills did not come with you. These are the rules that matter here.
 - PRs: a PR handed over for review is created ready (`gh pr create`, so CI
   runs) and left with green CI; use `--draft` only for a mid-work checkpoint
   or when the brief says so. The body follows the brief and ends with the attribution lines it gives. Never
-  merge unless the brief explicitly directs it; then squash-merge.
+  merge unless the brief explicitly directs it; then squash-merge. If a PR
+  of yours is already open against the same base (`gh pr list -R <repo>
+  --base <base> --state open --author @me`), report it and let the caller
+  decide. Never create, push to or target a `gaia/*` ref: it is Gaia's.
 - Pushes: only when the brief asks. Never `--force`; `--force-with-lease`
   only when the brief asks for it by name.
 - Worktree closedown: `worktree-closedown <repo> <branch>` (pre-approved,

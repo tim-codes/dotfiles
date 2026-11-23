@@ -108,9 +108,9 @@ ATT_GRANTS=(
     'Bash(gh project view:*)' 'Bash(gh project item-list:*)'
     'mcp__playwright__browser_snapshot' 'mcp__playwright__browser_navigate'
     'mcp__playwright__browser_console_messages' 'mcp__playwright__browser_network_requests'
-    'Read(//Users/tim/scratch/claude/**)' 'Edit(//Users/tim/scratch/claude/**)' 'Write(//Users/tim/scratch/claude/**)'
+    'Read(//Users/tim/scratch/claude/**)' 'Edit(//Users/tim/scratch/claude/**)'
     'Read(//private/tmp/claude-501/**)'
-    'Read(//Users/tim/claude/artefacts/**)' 'Edit(//Users/tim/claude/artefacts/**)' 'Write(//Users/tim/claude/artefacts/**)'
+    'Read(//Users/tim/claude/artefacts/**)' 'Edit(//Users/tim/claude/artefacts/**)'
     'Bash(wc:*)' 'Bash(grep:*)' 'Bash(ls:*)' 'Bash(cat:*)' 'Bash(tree:*)' 'Bash(find:*)'
     'Bash(git ls-tree:*)' 'Bash(npm view:*)'
     'mcp__Sanity__query_documents' 'mcp__plugin_linear_linear__list_issues'
@@ -162,6 +162,13 @@ for f in "$SHARED" "$ATT" "$C/settings.exxo.json" "$C/settings.personal.json"; d
     check "$(basename "$f"): no never-grant wildcard" \
         jq -e '[(.permissions.allow // [])[] | select(test("^Bash\\((\\*|just:\\*|git:\\*|node:\\*|python3?:\\*|npx:\\*|pnpm:\\*|bash:\\*|curl:\\*)\\)$"))] | length == 0' "$f"
 done
+# File path rules only match as Edit(path) or Read(path): Claude Code accepts
+# Write/NotebookEdit/MultiEdit/Glob/Grep with a path but never matches it, so
+# such an allow is dead and such a deny or ask is a silent gap.
+for f in "$C"/settings.*.json; do
+    check "$(basename "$f"): no path rule on Write/NotebookEdit/MultiEdit/Glob/Grep (use Edit or Read)" \
+        jq -e '[(.permissions // {}) | (.allow, .ask, .deny) // [] | .[] | select(test("^(Write|NotebookEdit|MultiEdit|Glob|Grep)\\((?!\\*\\))"))] | length == 0' "$f"
+done
 check "attended gh api read form: no write flags in allows" \
     jq -e '[.permissions.allow[] | select(startswith("Bash(gh api") and test("-X|--method|-f |-F |--input|--field"))] | length == 0' "$ATT"
 # deny floor verbatim in every context, from shared
@@ -182,7 +189,7 @@ for m in 'tmux-home' 'notchbar-agents-claude-hook' 'tmux-claude-hatch' 'claude-c
             test "$(hooks_with "$FAKE/.claude-$ctx/settings.json" "$m")" -eq "$(hooks_with "$ATT" "$m")"
     done
 done
-for m in 'squad hook' 'claude-scratch-persist' 'guard-dotfiles-checkout' 'preserve-worktree-transcripts' 'claude-agent-model-guard'; do
+for m in 'squad hook' 'claude-scratch-persist' 'guard-dotfiles-checkout' 'preserve-worktree-transcripts' 'claude-agent-model-guard' 'claude-pr-create-guard'; do
     check "shared base keeps the $m hook" test "$(hooks_with "$SHARED" "$m")" -gt 0
     check "attended fragment does not carry the $m hook" test "$(hooks_with "$ATT" "$m")" -eq 0
 done
