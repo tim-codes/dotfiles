@@ -141,8 +141,10 @@ Bash with `run_in_background` and a command that exits when the state is
 terminal (emitting the verdict, failures included), or `Monitor` when each
 check's result is wanted as it lands. Then carry on with other work, or end
 the turn, and act on the completion notice. Never hold the session's loop on
-a foreground `--watch` or `sleep`, and never poll it by hand. Subagents follow
-the same rule within their own loop.
+a foreground `--watch` or `sleep`, and never poll it by hand: a background
+task re-invokes you when it exits, so never read its output file in a loop. To
+see each event as it lands, load Monitor first (`ToolSearch` with
+`select:Monitor`) and use it with an until-loop. Subagents follow the same rule.
 
 **Why:** Tim, 11 Nov 2026 — a foreground `gh pr checks --watch` held a session
 for nearly nine minutes while his queued question sat unanswered. A CI wait is
