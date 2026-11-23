@@ -10,6 +10,26 @@
 # patch upgrades.
 launch_path = ["~/.cargo/bin", "~/.local/bin", "~/Library/pnpm/bin", "~/.local/share/mise/installs/node/24/bin", "~/.orbstack/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
 
+# The repos whose agent/Justfile `squad hook permission` may allow without a prompt, and only
+# when the file is the unmodified version on the repo's default branch (ENG-788, Gaia #426).
+# Format: "owner/name", the owner literal, the name may be a * glob. A repo not covered gets no
+# automatic allow: its `just -f agent/Justfile …` goes to the normal permission flow. These are
+# the estate repos whose default branch tracks agent/Justfile (checked 23 Nov 2026); five more
+# wait on ENG-791 and are deliberately absent.
+# Note: Gaia #426's hook matches on the owner part of each entry only, so today every repo of a
+# listed owner is covered; the exact names keep this list right when the hook narrows to the
+# full owner/name.
+agent_justfile_repos = [
+  "Exxo-Labs/exxo-infra",
+  "Exxo-Labs/exxo-platform-agent",
+  "Exxo-Labs/exxo-tools",
+  "Exxo-Labs/h2gc-legacy",
+  "Exxo-Labs/h2gc-portal",
+  "Exxo-Labs/mailkit",
+  "Exxo-Labs/theparentedit",
+  "Exxo-Labs/therenaway",
+]
+
 # Personal and exxo-personal are the same account; listing both dirs lets the
 # watcher dedupe their caches. The first dir is the one whose keychain token
 # the API tier reads.

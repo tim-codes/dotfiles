@@ -8,8 +8,16 @@
 #
 #   testlock pnpm vitest run src/foo.test.ts
 #   TESTLOCK_MAX_LOAD=12 testlock just ci
+#   testlock --status [--json]    counts only: lock held?, holder label and age, waiters, load
+#   testlock --help | -h          usage
+#
+# --status never takes the lock, waits or runs anything, and never prints a command line
+# or environment (the owner file's command field is deliberately not shown): use it, not
+# `ps` or `pgrep`, to look at the queue.
 #
 # The lock is a mkdir'd directory holding an `owner` file (pid, label, time, command).
+# Each waiting testlock touches <TESTLOCK_DIR>.waiters/<pid> and removes it on exit; --status
+# counts those entries, pruning dead pids with kill -0.
 # A lock whose owner pid is dead is reclaimed. While waiting, testlock says what it is
 # waiting on. The command runs under timeout(1) (or gtimeout) and its exit code is passed
 # through (124 when timeout killed it).
@@ -22,16 +30,38 @@
 #   TESTLOCK_POLL_S / TESTLOCK_LOAD_POLL_S   seconds between lock / load checks (5 / 20)
 # Works under macOS /bin/bash 3.2.
 set -u
-if [ $# -eq 0 ]; then
+usage() {
   echo "usage: testlock <command...>" >&2
+  echo "       testlock --status [--json]   counts only: lock, holder label and age, waiters, load" >&2
+  echo "       testlock --help | -h" >&2
+}
+case "${1:-}" in
+  -h|--help) usage; exit 0 ;;
+esac
+if [ $# -eq 0 ]; then
+  usage
   exit 64
 fi
+want_status=0; json=0
+case "$1" in
+  --status|status)
+    want_status=1
+    case "${2:-}" in
+      "") ;;
+      --json) json=1 ;;
+      *) usage; exit 64 ;;
+    esac
+    [ $# -le 2 ] || { usage; exit 64; }
+    ;;
+esac
 LOCKDIR="${TESTLOCK_DIR:-${XDG_RUNTIME_DIR:-/tmp}/testlock-${USER:-$(id -un)}.d}"
+WAITDIR="$LOCKDIR.waiters"
 MAX_LOAD="${TESTLOCK_MAX_LOAD:-20}"
 TIMEOUT_S="${TESTLOCK_TIMEOUT_S:-2400}"
 POLL_S="${TESTLOCK_POLL_S:-5}"
 LOAD_POLL_S="${TESTLOCK_LOAD_POLL_S:-20}"
-label="${TESTLOCK_LABEL:-$(basename "$PWD")}"
+# No whitespace in the label, so the owner file's fields split cleanly.
+label="$(printf '%s' "${TESTLOCK_LABEL:-$(basename "$PWD")}" | tr -s '[:space:]' '_')"
 
 tmo=$(command -v timeout || command -v gtimeout || true)
 
@@ -42,10 +72,83 @@ load1() {
   echo "${v:-0}"
 }
 
+# iso_epoch <ISO-8601 UTC>: epoch seconds (BSD date, then GNU date), empty if unparsable.
+iso_epoch() {
+  date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null || date -u -d "$1" +%s 2>/dev/null
+}
+
+# json_str <s>: s as a JSON string.
+json_str() {
+  local v=${1//\\/\\\\}
+  v=${v//\"/\\\"}
+  printf '"%s"' "$v"
+}
+
+# status: counts only. Never prints the owner file's command field or any process data.
+status() {
+  local held=no pid="" olabel="" ots="" age="" n=0 f p holder_pid="" load
+  if [ -d "$LOCKDIR" ]; then
+    read -r pid olabel ots _ < "$LOCKDIR/owner" 2>/dev/null || true
+    holder_pid=$pid
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      held=yes
+      local e now
+      e=$(iso_epoch "$ots"); now=$(date -u +%s)
+      if [ -n "$e" ]; then age=$((now - e)); [ "$age" -ge 0 ] || age=0; fi
+    fi
+  fi
+  if [ -d "$WAITDIR" ]; then
+    for f in "$WAITDIR"/*; do
+      [ -e "$f" ] || continue
+      p=${f##*/}
+      case "$p" in *[!0-9]*|"") continue ;; esac
+      if kill -0 "$p" 2>/dev/null; then
+        [ "$p" = "$holder_pid" ] || n=$((n + 1))
+      else
+        rm -f "$f"
+      fi
+    done
+  fi
+  load=$(load1)
+  if [ "$json" -eq 1 ]; then
+    printf '{"held":%s' "$([ "$held" = yes ] && echo true || echo false)"
+    if [ "$held" = yes ]; then
+      printf ',"holder_label":%s,"held_seconds":%s' "$(json_str "$olabel")" "${age:-null}"
+    fi
+    printf ',"waiters":%s,"load":%s,"max_load":%s}\n' "$n" "$load" "$MAX_LOAD"
+  else
+    echo "lock held: $held"
+    if [ "$held" = yes ]; then
+      echo "holder: $olabel${age:+ (held ${age}s)}"
+    fi
+    echo "waiters: $n"
+    echo "load: $load (ceiling $MAX_LOAD)"
+  fi
+}
+
+if [ "$want_status" -eq 1 ]; then
+  status
+  exit 0
+fi
+
+held_lock=0
+# shellcheck disable=SC2329  # invoked via the EXIT trap
+cleanup() {
+  rm -f "$WAITDIR/$$"
+  [ "$held_lock" -eq 1 ] && rm -rf "$LOCKDIR"
+  return 0
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+mkdir -p "$WAITDIR" 2>/dev/null && : > "$WAITDIR/$$"
+
 waited=0
 while :; do
   if mkdir "$LOCKDIR" 2>/dev/null; then
     echo "$$ $label $(date -u +%FT%TZ) $*" > "$LOCKDIR/owner"
+    held_lock=1
+    rm -f "$WAITDIR/$$"
     break
   fi
   owner_pid=$(cut -d' ' -f1 "$LOCKDIR/owner" 2>/dev/null)
@@ -58,9 +161,6 @@ while :; do
   fi
   sleep "$POLL_S"; waited=$((waited + POLL_S))
 done
-trap 'rm -rf "$LOCKDIR"' EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM HUP
 
 while :; do
   load=$(load1)
