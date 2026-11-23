@@ -250,11 +250,20 @@ auth_plugin = "/opt/homebrew/share/google-cloud-sdk/bin/gke-gcloud-auth-plugin"
 image = "europe-west2-docker.pkg.dev/exxo-internal/gaia/gaia-verify@sha256:77dc784e7fa1af85c48c26244cc9f85809ca2bc2317ab32a07864532335e5a3c"  # tag mise-2026.11.1-3712bba; pinned by digest
 machine_cpu = 16
 machine_mem_gi = 64
-max_nodes = 2                      # 19 Nov 2026: matches exxo-infra#295 (gaia pool max 2, namespace quota 29 CPU / 112Gi). Was 3 (Tim 16 Nov; 15 Nov within the 200 vCPU quota after exxo-infra#286)
-max_cpu_m = 29000  # 19 Nov 2026: 2 nodes x ~14.5 cores allocatable = the exxo-infra#295 namespace quota (29 CPU). Was 43500 (3 nodes; 145000 at the 16-17 Nov peak). An h2gc-portal verify needing 33000 is now refused too_large
+max_nodes = 3                      # 23 Nov 2026: exxo/gaia/main output gaiaBrokerConfig (Gaia's share of the shared `spot` pool, max 6, under its 34 CPU quota). Was 2 (gaia pool, exxo-infra#295)
+max_cpu_m = 34000  # 23 Nov 2026: gaiaBrokerConfig, = the namespace quota (34 CPU / 136Gi) after the 19 Nov pool consolidation. Was 29000
+fallback_pools = []                # gaiaBrokerConfig: no shared fallback pools beyond `spot` itself
 min_nodes = 0
 warm_idle_s = 1200
 scale_ahead = true
+# 23 Nov 2026: exxo-infra's 19 Nov pool consolidation folded the `gaia` pool into the shared,
+# autoscaled Spot pool `spot` (projects/fleet/index.ts), so the broker no longer resizes anything:
+# external scaling (gaia#401) admits against max_nodes virtual nodes and the cluster autoscaler adds
+# nodes for its pending pods. The Jobs tolerate ci.exxo.one/pool=spot and select the pool by the
+# default pool_label (cloud.google.com/gke-nodepool). min_nodes, warm_idle_s and scale_ahead are
+# unused under external scaling.
+scaling = "external"
+node_pool = "spot"
 
 # The read-only monitor feeds (v0.7.9 Phase 2), needing the `monitor` watcher above. Enabled 23 Nov 2026 (Tim).
 # Clusters, identity (gaia-monitor@exxo-internal), project and region keep their defaults; the GKE kubeconfigs
