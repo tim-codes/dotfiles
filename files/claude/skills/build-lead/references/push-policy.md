@@ -1,4 +1,4 @@
-# Push policy for the build branch (section 4, step 7)
+# Push policy for the build branch (section 4, steps 7 and 8)
 
 The build branch is a local trunk. Moved verbatim from SKILL.md section 4.
 
@@ -23,3 +23,10 @@ PR, is the progress record between pushes. Push only:
 Lane branches are not pushed either: lanes commit locally and the lead
 merges locally. Open the draft PR at the first push (the end or a
 pause), not at setup.
+
+Lane branches are combined locally into the build branch before anything is
+submitted. What goes as a separate submission (an unblocking fix that must
+merge first, a piece needing independent revert or review) follows the factors
+in `agent-conventions/branches-and-prs.md`; a fix submitted separately is
+merged into the build branch locally once it is on `main`. Lanes work on
+`claude/*` branches; `gaia/*` is Gaia's.
