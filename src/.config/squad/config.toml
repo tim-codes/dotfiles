@@ -138,6 +138,9 @@ name = "host"
 # The buildlab gauge, which also drives every run and the gaia pool scaler (R20).
 [[watchers]]
 name = "buildlab"
+# The monitor feeds (v0.7.9 Phase 2), configured by [broker.monitor]. Enabled 23 Nov 2026 (Tim).
+[[watchers]]
+name = "monitor"
 
 [policy.heavy]
 # Slots derive from live host headroom; low per-slot CPU so measured CPU, not load, decides (Tim, 2026-10-30).
@@ -252,6 +255,42 @@ max_cpu_m = 29000  # 19 Nov 2026: 2 nodes x ~14.5 cores allocatable = the exxo-i
 min_nodes = 0
 warm_idle_s = 1200
 scale_ahead = true
+
+# The read-only monitor feeds (v0.7.9 Phase 2), needing the `monitor` watcher above. Enabled 23 Nov 2026 (Tim).
+# Clusters, identity (gaia-monitor@exxo-internal), project and region keep their defaults; the GKE kubeconfigs
+# are ~/.config/squad/kube/{ci-runners,fleet-hub}.yaml (exxo-infra docs/gaia-monitor-access.md). The home
+# cluster stays "not connected" until its token_ref is set (ESC kubernetes.home.monitorToken, Tim's step).
+[broker.monitor]
+enabled = true
+# Same reason as [broker.buildlab]: the plugin is not on [broker] launch_path.
+auth_plugin = "/opt/homebrew/share/google-cloud-sdk/bin/gke-gcloud-auth-plugin"
+
+# The clusters read. A configured list replaces the default whole, so the two GKE entries repeat the
+# defaults (src/contracts/config.rs default_monitor_clusters); home adds its token_ref (23 Nov 2026, Tim:
+# the ci-jobs/gaia-monitor-token Secret exists and its token is in ESC). home.yaml is written by
+# `just -f ~/dev/squad/deploy/ops.Justfile monitor-home-kubeconfig` from the cached CA.
+[[broker.monitor.clusters]]
+name = "ci-runners"
+kubeconfig = "~/.config/squad/kube/ci-runners.yaml"
+source = "login:gcloud"
+identity = "gaia-monitor@exxo-internal.iam.gserviceaccount.com"
+gke_location = "europe-west2-a"
+feeds = ["ci-runners-arc", "flux"]
+
+[[broker.monitor.clusters]]
+name = "fleet-hub"
+kubeconfig = "~/.config/squad/kube/fleet-hub.yaml"
+source = "login:gcloud"
+identity = "gaia-monitor@exxo-internal.iam.gserviceaccount.com"
+feeds = ["fleet-hub", "flux"]
+
+[[broker.monitor.clusters]]
+name = "home"
+kubeconfig = "~/.config/squad/kube/home.yaml"
+source = "cred:home"
+identity = "system:serviceaccount:ci-jobs:gaia-monitor"
+token_ref = "esc:exxo/gaia/tfo:kubernetes.home.monitorToken"
+feeds = ["home-k3s", "flux"]
 
 # On with [broker.buildlab] (Gaia v0.6.1 rollout C5); needs [policy.trunk.github_app].
 [policy.verification]
