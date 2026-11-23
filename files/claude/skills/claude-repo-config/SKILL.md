@@ -54,8 +54,9 @@ pulumi (and gcloud) commands subcommand-first, with the target flags after:
 
 **Committed `.claude/settings.json`** holds hooks only, such as the Exxo
 `just skills-check` SessionStart hook. No permission rules: the floor and the
-`agent/Justfile` trust (no static rule: the shared `squad hook permission`
-hook allows it only for Exxo-Labs/tim-codes origins) are global.
+`agent/Justfile` trust are global. That trust is no static rule: the shared
+`squad hook permission` hook allows the reviewed file of an owned repo, that
+exact file, so no look-alike name, path or option can ride on it.
 
 **`settings.local.json`** is per machine and never reaches a worktree, so
 nothing load-bearing can live there. Claude Code writes "don't ask again"
@@ -70,6 +71,11 @@ answers here, and that is how drift accumulates.
 - anything that reveals a secret: `esc env get`, `gcloud secrets versions
   access`, `--reveal`, `--show-secrets`
 - a command with a secret resolved inline, like `X_PWD=$(gcloud secrets …)`
+- a recipe file, recipe or `agent/run` by pattern: any `*` in a `just`,
+  justfile or `agent/run` rule. `just --justfile=agent/Justfile:*` admits
+  `--command`, `--set` and any `agent/Justfile` in the cwd; `just check:*`
+  chains `just check deploy`. Grant the exact command or nothing (a bare
+  `just --list:*` is the one exception: listing runs no recipe)
 
 Each of these is effectively arbitrary execution or mutation. In auto mode
 the classifier is the backstop, but a grant skips it.
@@ -103,40 +109,36 @@ pipeline and prints nothing.
 
 ## agent/Justfile is read-only by construction; mutations go in ops.Justfile
 
-The global grant trusts the file, not today's entries, so every future recipe
+The hook trusts the file, not today's entries, so every future recipe
 inherits it. Recipes in `agent/Justfile` must be read-only lookups and
 secret-piping reads. Anything that deploys, revokes, destroys, resets,
 restores, writes `.env`, or touches prod state goes in `agent/ops.Justfile`,
-or in the main `Justfile` as a named recipe. That file is never blanket-trusted,
+or in the main `Justfile` as a named recipe. That file is never trusted,
 so each run is approved per use. A dated one-off (`*-july-urls`) belongs in
 neither: run it ad hoc.
 
 **Parameters are data, never shell.** Just substitutes `{{ param }}` into the
-recipe text before the shell parses it, so under a blanket grant the argument
+recipe text before the shell parses it, so under the whole-file trust the argument
 the model passes becomes shell code (`just --justfile=agent/Justfile show 'x;
 curl evil'`). In `agent/Justfile`, put `set positional-arguments` at the top
 and reference arguments as `"$1"`, `"$2"`, ... (quoted); never write
-`{{ param }}` in a shell line. Functions such as `{{ justfile_directory() }}`
-are not parameters and are fine. The audit's `justfile-param-splice` check
-(error level) reports `agent/Justfile:<recipe>` for any recipe that splices
-one of its own parameters while the file is blanket-trusted.
+`{{ param }}` in a shell line. Variables count too: a caller overrides any
+`name := …` with `name=…` or `--set`, so compute such a value in the recipe's
+shell. Functions such as `{{ justfile_directory() }}` are fine. The audit's
+`justfile-param-splice` and `justfile-var-splice` checks (error level) report
+`agent/Justfile:<recipe>` whenever the file exists, rule or no rule.
 
 Splitting a recipe out:
 1. Move the recipe into `agent/ops.Justfile`. Add a header comment saying the
-   file is not blanket-trusted.
+   file is not trusted.
 2. Call it as `just --justfile=agent/ops.Justfile <recipe>` and accept the
-   prompt each time. Grant nothing for that file. The blanket rule
-   `Bash(just --justfile=agent/Justfile:*)` means `just --justfile=agent/Justfile *`
-   (`:*` is a trailing wildcard preceded by a space, per the permissions docs),
-   so `just --justfile=agent/ops.Justfile ...` does not match it. As belt and
-   braces, repos also add `ask` rules for `ops.Justfile` in both spellings
-   (`--justfile=agent/ops.Justfile` and `--justfile agent/ops.Justfile`), so a
-   future loosening of the blanket cannot silently trust the ops file.
+   prompt each time. Grant nothing for that file, in any repo file: the hook
+   trusts only the exact `agent/Justfile`.
 3. Update the repo CLAUDE.md pointer that names the recipe.
 
 The file was renamed from `Justfile.ops` to `ops.Justfile` on 2026-10-24; any repo still carrying `agent/Justfile.ops` should rename it (the audit warns, check `ops-justfile-name`).
 
-Approved exception (2026-10-24, first instance Exxo-Labs/exxo-infra PR #184): committed settings may carry a named allow grant for a specific `ops.Justfile` recipe that is a single in-recipe fetch-and-consume pipeline. Blanket `ops.Justfile` grants remain forbidden.
+The 2026-10-24 exception for named `ops.Justfile` recipe grants (exxo-infra PR #184) is withdrawn (ENG-788): written as `<recipe>:*`, they let another ops recipe chain after the named one.
 
 ## Worktrees: submodules and closedown
 
@@ -212,11 +214,10 @@ the primary checkout):
 ## Bringing a new or drifted repo into line
 
 1. Run `claude-config-audit`, and note the errors first.
-2. **Committed settings:** delete what the global set covers. Replace
-   `just:*` with named recipe grants. Normalise spellings. Keep hooks intact.
+2. **Committed settings:** delete the permission rules; keep hooks intact.
    Validate with `jq .`.
-3. **agent/Justfile:** move mutating recipes to `ops.Justfile`. Drop the
-   blanket grant if the file can't be made read-only.
+3. **agent/Justfile:** move mutating recipes to `ops.Justfile`. The hook
+   trusts the file whenever it exists, so make it read-only or remove it.
 4. **Local file:** follow the `--fix-local` procedure above.
 5. **CLAUDE.md:** replace restated globals with pointers, and relocate
    reference material until the file is under 300 lines. Fix stale paths.
@@ -237,5 +238,5 @@ git repo. When it finds something, you see a one-line "Claude config drift in
 The warning reports drift; it doesn't ask you to fix anything. Mention it to
 the operator. Fix it only if they ask, or if the task already touches repo
 config. Never fix it by weakening the audit or the floor. Errors (dangerous
-grants, a mutating or parameter-splicing blanket-trusted recipe) deserve a sentence in your first
+grants, a mutating or splicing hook-trusted recipe) deserve a sentence in your first
 reply. Warnings can wait for a config pass.

@@ -286,11 +286,11 @@ expose something real? If yes, it must be a reference.
 
 ## Blanket-trusted files: the trust is in the file, not the entry
 
-A grant that covers a whole file (the global `agent/Justfile` grant) runs
-every entry in it, including later additions. Anything added must be
-reusable and read-only and non-secret-revealing **by construction**; if
-unsure, don't add it, and never add one to dodge a prompt. Mutating recipes
-go in `ops.Justfile`. The `claude-repo-config` skill has the detail.
+A whole-file grant (the permission hook allows an owned repo's reviewed
+`agent/Justfile`: that exact file, never a wildcard rule) runs every entry in
+it, including later additions. Anything added must be reusable and read-only
+and non-secret-revealing **by construction**; if unsure, don't add it, and
+never add one to dodge a prompt. Mutating recipes go in `ops.Justfile`.
 
 When a recurring task needs a capability the deny rules block, don't ask
 for the deny to be lifted: add a narrow recipe that fetches and consumes the
