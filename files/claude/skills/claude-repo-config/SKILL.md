@@ -83,10 +83,12 @@ the classifier is the backstop, but a grant skips it.
 ## The deny floor, and why it is global
 
 `settings.shared.json` denies `op read`, `--reveal`, `--show-secrets`, `pulumi
-env open`, `esc env open` and `gcloud secrets versions access`. Each comes in
-two forms, plain and `* <cmd>`, so the deny also matches when the command is a
-later segment. The floor also denies `Read` on `.claude.json` and
-`.credentials.json`.
+env open`, `esc env open` and `gcloud secrets versions access`. The `op`,
+`pulumi` and `esc` rules come in two forms, plain and `* <cmd>`, so they hold
+even without the hook; the gcloud rules (and `gcloud compute ssh`) are anchored
+only, because a leading `*` also matched a quoted `grep` argument. An anchored
+rule still matches each sub-command after `&&`, `;` or `|`. The floor also
+denies `Read` on `.claude.json` and `.credentials.json`.
 
 Claude Code evaluates deny rules before allow rules, across every scope. A
 deny matches any subcommand, including `$(…)` and loop bodies, and skips

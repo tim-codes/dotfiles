@@ -64,7 +64,10 @@ for ctx in personal reserve exxo exxo-personal; do
     check "$ctx: wrapped agent-tooling mail send asks" has "$ctx" ask 'Bash(agent/run -- agent-tooling mail send*)'
     check "$ctx: ./-wrapped agent-tooling mail send asks" has "$ctx" ask 'Bash(./agent/run -- agent-tooling mail send*)'
     check "$ctx: gcloud compute ssh is denied" has "$ctx" deny 'Bash(gcloud compute ssh*)'
-    check "$ctx: nested gcloud compute ssh is denied" has "$ctx" deny 'Bash(* gcloud compute ssh*)'
+    # A leading-star twin matched the text anywhere, a quoted grep argument included (false
+    # denials); the anchored rule still matches each sub-command after && ; | and env prefixes.
+    check "$ctx: no leading-star gcloud compute ssh twin" lacks "$ctx" deny 'Bash(* gcloud compute ssh*)'
+    check "$ctx: no leading-star gcloud secrets twin" lacks "$ctx" deny 'Bash(* gcloud secrets versions access*)'
 done
 # deniedMcpServers lives only in the shared fragment, so the plain deep-merge
 # must carry the whole array into every context (it silences the unauthenticated
