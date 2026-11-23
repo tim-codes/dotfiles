@@ -247,7 +247,7 @@ ca_file = "~/.local/state/squad/keys/buildlab-ca.pem"
 credentials_file = "~/.local/state/squad/keys/gaia-broker.json"
 # The Homebrew cask keeps the plugin in the SDK's bin dir, which is not on [broker] launch_path.
 auth_plugin = "/opt/homebrew/share/google-cloud-sdk/bin/gke-gcloud-auth-plugin"
-image = "europe-west2-docker.pkg.dev/exxo-internal/gaia/gaia-verify@sha256:73f3bd254c61dcdf73bfeb76e7b75c2282ecea88381194e67be11652ad05d449"  # v0.7.16 kueue-mode image (checkout decrypts GAIA_TOKEN_CT); pinned by digest
+image = "europe-west2-docker.pkg.dev/exxo-internal/gaia/gaia-verify@sha256:b9949416ad97b5f89445a530701207d24326e73786e1646a8a1ed903ac7a2b3c"  # tag mise-2026.11.1-78d4970 (exxo-infra#355): kueue-mode checkout keeps the decrypted token until checkout exits (partial-clone lazy fetches); pinned by digest
 # 23 Nov 2026 (v0.7.16, ENG-799/ENG-764): verify Jobs go to the fleet hub's Kueue, which places them in
 # the one shared pool with CI (cohort `pool`: home magni → home odin → buildlab spot, with borrowing).
 # No broker-side capacity arithmetic: the partition keys (max_cpu_m, max_nodes, min_nodes, machine_*,
